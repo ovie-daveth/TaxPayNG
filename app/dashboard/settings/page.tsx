@@ -1,6 +1,8 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { DashboardNav } from "@/components/dashboard/dashboard-nav"
+import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { Card } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -8,21 +10,25 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
+import { SettingsSkeleton } from "@/components/ui/skeletons"
 
 export default function SettingsPage() {
-  return (
-    <div className="min-h-screen bg-background">
-      <DashboardNav />
-      <div className="flex-1 md:ml-64">
-        <div className="border-b border-border bg-card">
-          <div className="container mx-auto px-4 py-4 max-w-7xl">
-            <div>
-              <h1 className="text-2xl font-bold">Settings</h1>
-              <p className="text-sm text-muted-foreground mt-1">Manage your account and preferences</p>
-            </div>
-          </div>
-        </div>
+  const [isLoading, setIsLoading] = useState(true)
 
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 500)
+    return () => clearTimeout(timer)
+  }, [])
+  if (isLoading) {
+    return (
+          <main className="container mx-auto px-4 py-6 max-w-4xl">
+            <SettingsSkeleton />
+          </main>
+    )
+  }
+
+  return (
+    <div className="">
         <main className="container mx-auto px-4 py-6 max-w-4xl">
           <div className="space-y-6">
             {/* Profile Settings */}
@@ -142,6 +148,5 @@ export default function SettingsPage() {
           </div>
         </main>
       </div>
-    </div>
   )
 }

@@ -1,43 +1,34 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { DashboardNav } from "@/components/dashboard/dashboard-nav"
+import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Search, Filter, Download } from "lucide-react"
 import { TransactionList } from "@/components/transactions/transaction-list"
 import { TransactionFilters } from "@/components/transactions/transaction-filters"
-import { AddTransactionDialog } from "@/components/transactions/add-transaction-dialog"
+import { TransactionsSkeleton } from "@/components/ui/skeletons"
 
 export default function TransactionsPage() {
-  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setIsLoading(false), 800)
+    return () => clearTimeout(timer)
+  }, [])
+
+  if (isLoading) {
+    return (
+          <main className="container mx-auto px-4 py-6 max-w-7xl">
+            <TransactionsSkeleton />
+          </main>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
-      <DashboardNav />
-      <div className="flex-1 md:ml-64">
-        <div className="border-b border-border bg-card">
-          <div className="container mx-auto px-4 py-4 max-w-7xl">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <h1 className="text-2xl font-bold">Transactions</h1>
-                <p className="text-sm text-muted-foreground mt-1">Track and manage your income and expenses</p>
-              </div>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-                <Button variant="outline" size="sm">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
-                <Button size="sm" onClick={() => setIsAddDialogOpen(true)}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Transaction
-                </Button>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <main className="container mx-auto px-4 py-6 max-w-7xl">
           <div className="space-y-6">
             {/* Search and Filter Bar */}
@@ -59,9 +50,6 @@ export default function TransactionsPage() {
             <TransactionList />
           </div>
         </main>
-      </div>
-
-      <AddTransactionDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} />
     </div>
   )
 }

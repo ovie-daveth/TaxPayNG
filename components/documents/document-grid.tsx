@@ -5,63 +5,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { FileText, ImageIcon, File, Download, Eye, Trash2, MoreVertical } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-
-const documents = [
-  {
-    id: 1,
-    name: "Office Rent Receipt - January 2025.pdf",
-    type: "receipt",
-    fileType: "pdf",
-    size: "245 KB",
-    uploadedAt: "2025-01-15",
-    linkedTransaction: "Office Rent",
-  },
-  {
-    id: 2,
-    name: "Client Invoice - Website Design.pdf",
-    type: "invoice",
-    fileType: "pdf",
-    size: "189 KB",
-    uploadedAt: "2025-01-14",
-    linkedTransaction: "Client Payment - Website Design",
-  },
-  {
-    id: 3,
-    name: "Software Subscription Receipt.png",
-    type: "receipt",
-    fileType: "image",
-    size: "512 KB",
-    uploadedAt: "2025-01-10",
-    linkedTransaction: "Software Subscription",
-  },
-  {
-    id: 4,
-    name: "Tax Clearance Certificate 2024.pdf",
-    type: "proof",
-    fileType: "pdf",
-    size: "1.2 MB",
-    uploadedAt: "2025-01-08",
-    linkedTransaction: null,
-  },
-  {
-    id: 5,
-    name: "Bank Statement - December 2024.pdf",
-    type: "proof",
-    fileType: "pdf",
-    size: "890 KB",
-    uploadedAt: "2025-01-05",
-    linkedTransaction: null,
-  },
-  {
-    id: 6,
-    name: "Marketing Invoice.pdf",
-    type: "invoice",
-    fileType: "pdf",
-    size: "156 KB",
-    uploadedAt: "2025-01-02",
-    linkedTransaction: "Marketing & Advertising",
-  },
-]
+import { useDocuments } from "@/lib/hooks/use-documents"
+import { Document } from "@/lib/types/document"
 
 function getFileIcon(fileType: string) {
   switch (fileType) {
@@ -77,17 +22,67 @@ function getFileIcon(fileType: string) {
 function getTypeColor(type: string) {
   switch (type) {
     case "receipt":
-      return "bg-blue-100 text-blue-700"
+      return "bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300"
     case "invoice":
-      return "bg-green-100 text-green-700"
+      return "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-300"
     case "proof":
-      return "bg-purple-100 text-purple-700"
+      return "bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300"
     default:
-      return "bg-gray-100 text-gray-700"
+      return "bg-gray-100 text-gray-700 dark:bg-gray-900/20 dark:text-gray-300"
   }
 }
 
-export function DocumentGrid() {
+function formatFileSize(bytes: number): string {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+function formatDate(dateString: string): string {
+  return new Date(dateString).toLocaleDateString()
+}
+
+interface DocumentGridProps {
+  documents?: Document[]
+}
+
+export function DocumentGrid({ documents: propDocuments }: DocumentGridProps = {}) {
+  const { downloadDocument, deleteDocument } = useDocuments()
+  
+  // Use passed documents prop if available, otherwise use hook
+  const { documents: hookDocuments } = useDocuments()
+  const documents = propDocuments || hookDocuments
+
+  const handleView = (document: Document) => {
+    window.open(document.url, '_blank')
+  }
+
+  const handleDownload = (document: Document) => {
+    downloadDocument(document)
+  }
+
+  const handleDelete = async (document: Document) => {
+    if (confirm(`Are you sure you want to delete "${document.name}"?`)) {
+      try {
+        await deleteDocument(document.id)
+      } catch (error) {
+        console.error('Failed to delete document:', error)
+      }
+    }
+  }
+
+  if (documents.length === 0) {
+    return (
+      <div className="text-center py-12">
+        <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
+        <h3 className="text-lg font-medium mb-2">No documents yet</h3>
+        <p className="text-muted-foreground">Upload your first document to get started.</p>
+      </div>
+    )
+  }
+
   return (
     <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
       {documents.map((doc) => (
@@ -103,15 +98,18 @@ export function DocumentGrid() {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleView(doc)}>
                   <Eye className="w-4 h-4 mr-2" />
                   View
                 </DropdownMenuItem>
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleDownload(doc)}>
                   <Download className="w-4 h-4 mr-2" />
                   Download
                 </DropdownMenuItem>
-                <DropdownMenuItem className="text-destructive">
+                <DropdownMenuItem 
+                  className="text-destructive"
+                  onClick={() => handleDelete(doc)}
+                >
                   <Trash2 className="w-4 h-4 mr-2" />
                   Delete
                 </DropdownMenuItem>
@@ -125,7 +123,7 @@ export function DocumentGrid() {
             <Badge variant="secondary" className="text-xs capitalize">
               {doc.type}
             </Badge>
-            <span className="text-xs text-muted-foreground">{doc.size}</span>
+            <span className="text-xs text-muted-foreground">{formatFileSize(doc.size)}</span>
           </div>
 
           {doc.linkedTransaction && (
@@ -135,7 +133,13 @@ export function DocumentGrid() {
             </div>
           )}
 
-          <p className="text-xs text-muted-foreground">Uploaded {doc.uploadedAt}</p>
+          {doc.notes && (
+            <div className="bg-muted/30 rounded p-2 mb-3">
+              <p className="text-xs text-muted-foreground">{doc.notes}</p>
+            </div>
+          )}
+
+          <p className="text-xs text-muted-foreground">Uploaded {formatDate(doc.uploadedAt)}</p>
         </Card>
       ))}
     </div>

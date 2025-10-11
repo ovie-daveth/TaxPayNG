@@ -9,7 +9,9 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Upload, X, FileText } from "lucide-react"
+import { Upload, X, FileText, Loader2 } from "lucide-react"
+import { useDocuments } from "@/lib/hooks/use-documents"
+import { UploadDocumentData } from "@/lib/types/document"
 
 interface UploadDocumentDialogProps {
   open: boolean
@@ -18,11 +20,81 @@ interface UploadDocumentDialogProps {
 
 export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialogProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [formData, setFormData] = useState({
+    name: '',
+    type: '' as 'receipt' | 'invoice' | 'proof' | 'other' | '',
+    date: '',
+    linkedTransaction: 'none',
+    notes: ''
+  })
+  const [isUploading, setIsUploading] = useState(false)
+
+  const { uploadDocument } = useDocuments()
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0])
+      const file = e.target.files[0]
+      setSelectedFile(file)
+      
+      // Auto-fill name if empty
+      if (!formData.name) {
+        const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '')
+        setFormData(prev => ({ ...prev, name: nameWithoutExt }))
+      }
     }
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    if (!selectedFile || !formData.name || !formData.type) {
+      return
+    }
+
+    setIsUploading(true)
+
+    try {
+      const uploadData: UploadDocumentData = {
+        file: selectedFile,
+        name: formData.name,
+        type: formData.type as 'receipt' | 'invoice' | 'proof' | 'other',
+        date: formData.date || new Date().toISOString(),
+        linkedTransaction: formData.linkedTransaction === 'none' ? undefined : formData.linkedTransaction || undefined,
+        notes: formData.notes || undefined
+      }
+
+      await uploadDocument(uploadData)
+      
+      // Reset form
+      setSelectedFile(null)
+      setFormData({
+        name: '',
+        type: '',
+        date: '',
+        linkedTransaction: 'none',
+        notes: ''
+      })
+      
+      onOpenChange(false)
+      
+      // Refresh the page to show the new document
+      window.location.reload()
+    } catch (error) {
+      console.error('Upload failed:', error)
+    } finally {
+      setIsUploading(false)
+    }
+  }
+
+  const resetForm = () => {
+    setSelectedFile(null)
+    setFormData({
+      name: '',
+      type: '',
+      date: '',
+      linkedTransaction: 'none',
+      notes: ''
+    })
   }
 
   return (
@@ -31,15 +103,20 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
         <DialogHeader>
           <DialogTitle>Upload Document</DialogTitle>
         </DialogHeader>
-        <form className="space-y-4 mt-4">
+        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           <div className="space-y-2">
             <Label>Select File</Label>
             {!selectedFile ? (
               <label className="border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer block">
-                <input type="file" className="hidden" onChange={handleFileSelect} accept=".pdf,.png,.jpg,.jpeg" />
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  onChange={handleFileSelect} 
+                  accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" 
+                />
                 <Upload className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground mb-1">Click to upload or drag and drop</p>
-                <p className="text-xs text-muted-foreground">PDF, PNG, JPG up to 10MB</p>
+                <p className="text-xs text-muted-foreground">PDF, PNG, JPG, DOC up to 10MB</p>
               </label>
             ) : (
               <div className="border border-border rounded-lg p-4 flex items-center justify-between">
@@ -60,14 +137,23 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="doc-name">Document Name</Label>
-            <Input id="doc-name" placeholder="e.g., Office Rent Receipt - January 2025" />
+            <Label htmlFor="doc-name">Document Name *</Label>
+            <Input 
+              id="doc-name" 
+              placeholder="e.g., Office Rent Receipt - January 2025"
+              value={formData.name}
+              onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+              required
+            />
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="doc-type">Document Type</Label>
-              <Select>
+              <Label htmlFor="doc-type">Document Type *</Label>
+              <Select 
+                value={formData.type} 
+                onValueChange={(value) => setFormData(prev => ({ ...prev, type: value as any }))}
+              >
                 <SelectTrigger id="doc-type">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
@@ -81,29 +167,43 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
             </div>
             <div className="space-y-2">
               <Label htmlFor="upload-date">Date</Label>
-              <Input id="upload-date" type="date" />
+              <Input 
+                id="upload-date" 
+                type="date" 
+                value={formData.date}
+                onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+              />
             </div>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="link-transaction">Link to Transaction (Optional)</Label>
-            <Select>
+            <Select 
+              value={formData.linkedTransaction} 
+              onValueChange={(value) => setFormData(prev => ({ ...prev, linkedTransaction: value }))}
+            >
               <SelectTrigger id="link-transaction">
                 <SelectValue placeholder="Select transaction" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">None</SelectItem>
-                <SelectItem value="1">Office Rent - ₦120,000</SelectItem>
-                <SelectItem value="2">Client Payment - ₦450,000</SelectItem>
-                <SelectItem value="3">Software Subscription - ₦25,000</SelectItem>
-                <SelectItem value="4">Marketing & Advertising - ₦75,000</SelectItem>
+                <SelectItem value="Office Rent - ₦120,000">Office Rent - ₦120,000</SelectItem>
+                <SelectItem value="Client Payment - ₦450,000">Client Payment - ₦450,000</SelectItem>
+                <SelectItem value="Software Subscription - ₦25,000">Software Subscription - ₦25,000</SelectItem>
+                <SelectItem value="Marketing & Advertising - ₦75,000">Marketing & Advertising - ₦75,000</SelectItem>
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-2">
             <Label htmlFor="notes">Notes (Optional)</Label>
-            <Textarea id="notes" placeholder="Add any additional notes about this document..." rows={3} />
+            <Textarea 
+              id="notes" 
+              placeholder="Add any additional notes about this document..." 
+              rows={3}
+              value={formData.notes}
+              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+            />
           </div>
 
           <div className="flex gap-3 pt-4">
@@ -111,12 +211,27 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
               type="button"
               variant="outline"
               className="flex-1 bg-transparent"
-              onClick={() => onOpenChange(false)}
+              onClick={() => {
+                resetForm()
+                onOpenChange(false)
+              }}
+              disabled={isUploading}
             >
               Cancel
             </Button>
-            <Button type="submit" className="flex-1" disabled={!selectedFile}>
-              Upload Document
+            <Button 
+              type="submit" 
+              className="flex-1" 
+              disabled={!selectedFile || !formData.name || !formData.type || isUploading}
+            >
+              {isUploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                'Upload Document'
+              )}
             </Button>
           </div>
         </form>

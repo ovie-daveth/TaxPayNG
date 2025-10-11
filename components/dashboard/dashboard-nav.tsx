@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Calculator, LayoutDashboard, Receipt, FileText, Bell, Settings, LogOut, Menu, X } from "lucide-react"
+import { Calculator, LayoutDashboard, Receipt, FileText, Bell, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight } from "lucide-react"
 import { useState } from "react"
 
 const navItems = [
@@ -19,21 +19,42 @@ const navItems = [
 export function DashboardNav() {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
 
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex fixed left-0 top-0 h-screen w-64 flex-col border-r border-border bg-card">
-        <div className="p-6 border-b border-border">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+      <aside className={cn(
+        "hidden md:flex fixed left-0 top-0 h-screen flex-col border-r border-border bg-card transition-all duration-300 ease-in-out",
+        sidebarCollapsed ? "w-16" : "w-64"
+      )}>
+        <div className="p-6 border-b border-border flex items-center justify-between">
+          <Link href="/dashboard" className={cn(
+            "flex items-center gap-2 transition-all duration-300",
+            sidebarCollapsed && "justify-center"
+          )}>
+            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
               <Calculator className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="font-semibold text-lg">TaxPal NG</span>
+            {!sidebarCollapsed && (
+              <span className="font-semibold text-lg whitespace-nowrap">TaxPal NG</span>
+            )}
           </Link>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="w-8 h-8 hover:bg-muted"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          >
+            {sidebarCollapsed ? (
+              <ChevronRight className="w-4 h-4" />
+            ) : (
+              <ChevronLeft className="w-4 h-4" />
+            )}
+          </Button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-8">
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href
@@ -41,14 +62,20 @@ export function DashboardNav() {
               <Link key={item.href} href={item.href}>
                 <div
                   className={cn(
-                    "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                    "flex items-center gap-3 px-3 my-5 py-2 rounded-lg text-sm font-medium transition-all duration-200",
                     isActive
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                    sidebarCollapsed && "justify-center px-2"
                   )}
+                  title={sidebarCollapsed ? item.label : undefined}
                 >
-                  <Icon className="w-5 h-5" />
-                  {item.label}
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  {!sidebarCollapsed && (
+                    <span className="whitespace-nowrap transition-opacity duration-300">
+                      {item.label}
+                    </span>
+                  )}
                 </div>
               </Link>
             )
@@ -56,9 +83,21 @@ export function DashboardNav() {
         </nav>
 
         <div className="p-4 border-t border-border">
-          <Button variant="ghost" className="w-full justify-start text-muted-foreground" size="sm">
-            <LogOut className="w-4 h-4 mr-2" />
-            Log out
+          <Button 
+            variant="ghost" 
+            className={cn(
+              "w-full text-muted-foreground transition-all duration-200",
+              sidebarCollapsed ? "justify-center px-2" : "justify-start"
+            )} 
+            size="sm"
+            title={sidebarCollapsed ? "Log out" : undefined}
+          >
+            <LogOut className="w-4 h-4 flex-shrink-0" />
+            {!sidebarCollapsed && (
+              <span className="ml-2 whitespace-nowrap transition-opacity duration-300">
+                Log out
+              </span>
+            )}
           </Button>
         </div>
       </aside>
@@ -108,7 +147,10 @@ export function DashboardNav() {
       </header>
 
       {/* Spacer for desktop sidebar */}
-      <div className="hidden md:block w-64" />
+      <div className={cn(
+        "hidden md:block transition-all duration-300 ease-in-out",
+        sidebarCollapsed ? "w-16" : "w-64"
+      )} />
     </>
   )
 }
