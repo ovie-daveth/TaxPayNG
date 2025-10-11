@@ -103,7 +103,10 @@ export default function PricingPage() {
             </Card>
 
             {/* Big Business Plan */}
-            <Card className="relative flex flex-col">
+            <Card className="relative flex flex-col opacity-75">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-muted text-muted-foreground px-4 py-1 rounded-full text-sm font-medium">
+                Coming Soon
+              </div>
               <CardHeader>
                 <CardTitle className="text-2xl">Big Business</CardTitle>
                 <CardDescription>For established businesses and enterprises</CardDescription>
@@ -125,11 +128,9 @@ export default function PricingPage() {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Link href="/signup" className="w-full">
-                  <Button className="w-full bg-transparent" variant="outline">
-                    Start Free Trial
-                  </Button>
-                </Link>
+                <Button className="w-full bg-transparent" variant="outline" disabled>
+                  Coming Soon
+                </Button>
               </CardFooter>
             </Card>
           </div>
