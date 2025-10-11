@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Calculator, LayoutDashboard, Receipt, FileText, Bell, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight } from "lucide-react"
 import { useState } from "react"
+import { useSidebar } from "@/lib/contexts/sidebar-context"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -19,7 +20,7 @@ const navItems = [
 export function DashboardNav() {
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const { sidebarCollapsed, toggleSidebar } = useSidebar()
 
   return (
     <>
@@ -44,7 +45,7 @@ export function DashboardNav() {
             variant="ghost"
             size="icon"
             className="w-8 h-8 hover:bg-muted"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            onClick={toggleSidebar}
           >
             {sidebarCollapsed ? (
               <ChevronRight className="w-4 h-4" />
@@ -146,11 +147,6 @@ export function DashboardNav() {
         )}
       </header>
 
-      {/* Spacer for desktop sidebar */}
-      <div className={cn(
-        "hidden md:block transition-all duration-300 ease-in-out",
-        sidebarCollapsed ? "w-16" : "w-64"
-      )} />
     </>
   )
 }
