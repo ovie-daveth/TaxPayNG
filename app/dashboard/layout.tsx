@@ -1,8 +1,11 @@
 "use client"
 
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { DashboardNav } from "@/components/dashboard/dashboard-nav"
 import { SidebarProvider, useSidebar } from "@/lib/contexts/sidebar-context"
+import { useAuth } from "@/lib/hooks/useAuth"
 import { cn } from "@/lib/utils"
 
 function LayoutContent({
@@ -11,6 +14,26 @@ function LayoutContent({
   children: React.ReactNode
 }>) {
   const { sidebarCollapsed } = useSidebar()
+  const { user, loading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login")
+    }
+  }, [user, loading, router])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return null
+  }
 
   return (
     <div className="min-h-screen bg-background">

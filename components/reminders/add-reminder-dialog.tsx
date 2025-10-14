@@ -10,9 +10,10 @@ import { Textarea } from "@/components/ui/textarea"
 interface AddReminderDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  onSubmit: (data: any) => Promise<any>
 }
 
-export function AddReminderDialog({ open, onOpenChange }: AddReminderDialogProps) {
+export function AddReminderDialog({ open, onOpenChange, onSubmit }: AddReminderDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl">

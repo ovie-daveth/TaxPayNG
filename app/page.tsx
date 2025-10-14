@@ -2,6 +2,7 @@ import type React from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, BarChart3, Calculator, FileText, Bell } from "lucide-react"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function HomePage() {
   return (
@@ -27,6 +28,7 @@ export default function HomePage() {
             </Link>
           </nav>
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             <Link href="/login">
               <Button variant="ghost" size="sm">
                 Log in

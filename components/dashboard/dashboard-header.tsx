@@ -7,12 +7,22 @@ import { UploadDocumentDialog } from "../documents/upload-document-dialog"
 import { useState } from "react"
 import { AddTransactionDialog } from "../transactions/add-transaction-dialog"
 import { AddReminderDialog } from "../reminders/add-reminder-dialog"
+import { ThemeToggle } from "../theme-toggle"
+import { useDocumentsFirebase } from "@/lib/hooks/use-documents-firebase"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { useTransactions } from "@/lib/hooks/useTransactions"
+import { useReminders } from "@/lib/hooks/useReminders"
 
 export function DashboardHeader() {
   const pathname = usePathname()
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isAddReminderDialogOpen, setIsAddReminderDialogOpen] = useState(false)
+  
+  const { user } = useAuth()
+  const { uploadDocument } = useDocumentsFirebase()
+  const { createTransaction } = useTransactions(user?.uid || null)
+  const { createReminder } = useReminders(user?.uid || null)
 
   const getPageInfo = (path: string) => {
     switch (path) {
@@ -88,6 +98,7 @@ export function DashboardHeader() {
             <p className="text-sm text-muted-foreground mt-1">{pageInfo.subtitle}</p>
           </div>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             {pageInfo.showExportButton && (
               <Button 
                 variant="outline" 
@@ -104,9 +115,22 @@ export function DashboardHeader() {
           </div>
         </div>
       </div>
-      <UploadDocumentDialog open={isUploadDialogOpen} onOpenChange={setIsUploadDialogOpen} />
-      <AddTransactionDialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen} />
-      <AddReminderDialog open={isAddReminderDialogOpen} onOpenChange={setIsAddReminderDialogOpen} />
+      <UploadDocumentDialog 
+        open={isUploadDialogOpen} 
+        onOpenChange={setIsUploadDialogOpen} 
+        onUpload={uploadDocument}
+      />
+      <AddTransactionDialog 
+        open={isAddDialogOpen} 
+        onOpenChange={setIsAddDialogOpen}
+        onSubmit={createTransaction}
+        transaction={null}
+      />
+      <AddReminderDialog 
+        open={isAddReminderDialogOpen} 
+        onOpenChange={setIsAddReminderDialogOpen}
+        onSubmit={createReminder}
+      />
     </div>
   )
 }

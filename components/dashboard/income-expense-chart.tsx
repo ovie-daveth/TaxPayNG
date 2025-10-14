@@ -4,43 +4,107 @@ import { Card } from "@/components/ui/card"
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ResponsiveContainer } from "recharts"
 
 const data = [
-  { month: "Jan", income: 70000, expenses: 170000 },
-  { month: "Feb", income: 80000, expenses: 220000 },
-  { month: "Mar", income: 80000, expenses: 190000 },
+  { month: "Jan", income: 75000, expenses: 165000 },
+  { month: "Feb", income: 80000, expenses: 225000 },
+  { month: "Mar", income: 80000, expenses: 180000 },
   { month: "Apr", income: 70000, expenses: 240000 },
-  { month: "May", income: 90000, expenses: 280000 },
-  { month: "Jun", income: 80000, expenses: 310000 },
+  { month: "May", income: 85000, expenses: 280000 },
+  { month: "Jun", income: 80000, expenses: 300000 },
 ]
+
+// Custom tooltip component for better visibility
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-slate-900/95 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4 shadow-2xl z-50">
+        <div className="text-slate-100 font-medium mb-2">{`${label} 2025`}</div>
+        {payload.map((entry: any, index: number) => (
+          <div key={index} className="flex items-center gap-2 mb-1">
+            <div 
+              className="w-3 h-3 rounded-full" 
+              style={{ backgroundColor: entry.color }}
+            />
+            <span className="text-slate-200 text-sm">
+              {entry.name}: <span className="font-semibold text-slate-50">
+                ₦{entry.value.toLocaleString()}
+              </span>
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return null;
+};
 
 export function IncomeExpenseChart() {
   return (
-    <Card className="p-6">
+    <Card className="p-6 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-slate-200 dark:border-slate-700">
       <div className="mb-6">
-        <h3 className="text-lg font-semibold">Income vs Expenses</h3>
-        <p className="text-sm text-muted-foreground">Monthly comparison for 2025</p>
+        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Income vs Expenses</h3>
+        <p className="text-sm text-slate-600 dark:text-slate-400">Monthly comparison for 2025</p>
       </div>
       <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={data}>
-          <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-          <XAxis dataKey="month" className="text-xs" />
-          <YAxis className="text-xs" />
-          <Tooltip
-            contentStyle={{
-              backgroundColor: "hsl(var(--card))",
-              border: "1px solid hsl(var(--border))",
-              borderRadius: "8px",
-              zIndex: 1000,
-              boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
-            }}
-            formatter={(value, name) => [
-              `₦${value.toLocaleString()}`,
-              name
-            ]}
-            labelFormatter={(label) => `${label} 2025`}
+        <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+          <defs>
+            <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#10b981" stopOpacity={0.8} />
+              <stop offset="100%" stopColor="#059669" stopOpacity={0.9} />
+            </linearGradient>
+            <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="#dc2626" stopOpacity={0.8} />
+              <stop offset="100%" stopColor="#b91c1c" stopOpacity={0.9} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid 
+            strokeDasharray="3 3" 
+            stroke="#64748b" 
+            strokeOpacity={0.3}
+            vertical={false}
           />
-          <Legend />
-          <Bar dataKey="income" fill="#10b981" name="Income" radius={[4, 4, 0, 0]} />
-          <Bar dataKey="expenses" fill="#ef4444" name="Expenses" radius={[4, 4, 0, 0]} />
+          <XAxis 
+            dataKey="month" 
+            axisLine={false}
+            tickLine={false}
+            tick={{ 
+              fill: '#64748b', 
+              fontSize: 12, 
+              fontWeight: 500 
+            }}
+          />
+          <YAxis 
+            axisLine={false}
+            tickLine={false}
+            tick={{ 
+              fill: '#64748b', 
+              fontSize: 12, 
+              fontWeight: 500 
+            }}
+            tickFormatter={(value) => `₦${(value / 1000)}k`}
+          />
+          <Tooltip content={<CustomTooltip />} />
+          <Legend 
+            wrapperStyle={{
+              paddingTop: '20px',
+              fontSize: '14px',
+              fontWeight: '500'
+            }}
+            iconType="circle"
+          />
+          <Bar 
+            dataKey="income" 
+            fill="url(#incomeGradient)" 
+            name="Income" 
+            radius={[6, 6, 0, 0]}
+            maxBarSize={40}
+          />
+          <Bar 
+            dataKey="expenses" 
+            fill="url(#expenseGradient)" 
+            name="Expenses" 
+            radius={[6, 6, 0, 0]}
+            maxBarSize={40}
+          />
         </BarChart>
       </ResponsiveContainer>
     </Card>

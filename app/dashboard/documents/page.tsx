@@ -11,7 +11,7 @@ import { DocumentList } from "@/components/documents/document-list"
 import { DocumentFilters } from "@/components/documents/document-filters"
 import { UploadDocumentDialog } from "@/components/documents/upload-document-dialog"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useDocuments } from "@/lib/hooks/use-documents"
+import { useDocumentsFirebase } from "@/lib/hooks/use-documents-firebase"
 import { DocumentFilters as FilterType } from "@/lib/types/document"
 import { DocumentsSkeleton } from "@/components/ui/skeletons"
 
@@ -21,7 +21,7 @@ export default function DocumentsPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [filters, setFilters] = useState<FilterType>({})
   
-  const { documents, filterDocuments, loading } = useDocuments()
+  const { documents, filterDocuments, loading, error, uploadDocument, deleteDocument, downloadDocument } = useDocumentsFirebase()
 
   // Filter documents based on search and filters
   const filteredDocuments = useMemo(() => {
@@ -78,6 +78,13 @@ export default function DocumentsPage() {
               </div>
             </div>
 
+            {/* Error Message */}
+            {error && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+                <p className="text-destructive text-sm">{error}</p>
+              </div>
+            )}
+
             {/* Filters Panel */}
             {isFilterOpen && (
               <DocumentFilters 
@@ -94,9 +101,17 @@ export default function DocumentsPage() {
                 </p>
               )}
               {viewMode === "grid" ? (
-                <DocumentGrid documents={filteredDocuments} />
+                <DocumentGrid 
+                  documents={filteredDocuments} 
+                  onDelete={deleteDocument}
+                  onDownload={downloadDocument}
+                />
               ) : (
-                <DocumentList documents={filteredDocuments} />
+                <DocumentList 
+                  documents={filteredDocuments}
+                  onDelete={deleteDocument}
+                  onDownload={downloadDocument}
+                />
               )}
             </div>
           </div>

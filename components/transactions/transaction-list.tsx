@@ -1,103 +1,200 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { ArrowUpRight, ArrowDownRight, MoreVertical, Pencil, Trash2, Paperclip } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DeleteConfirmationModal } from "@/components/ui/delete-confirmation-modal"
+import { Transaction } from "@/lib/types"
+import { AddTransactionDialog } from "./add-transaction-dialog"
+import { ImageViewerModal } from "@/components/ui/image-viewer-modal"
+import { formatDate } from "@/lib/utils/date"
+import { useTransactions } from "@/lib/hooks/useTransactions"
+import { useAuth } from "@/lib/hooks/useAuth"
 
-const transactions = [
-  {
-    id: 1,
-    type: "income",
-    description: "Client Payment - Website Design",
-    amount: 450000,
-    date: "2025-01-15",
-    category: "Services",
-    paymentMethod: "Bank Transfer",
-    hasAttachment: true,
-    taxDeductible: false,
-  },
-  {
-    id: 2,
-    type: "expense",
-    description: "Office Rent",
-    amount: 120000,
-    date: "2025-01-14",
-    category: "Rent",
-    paymentMethod: "Bank Transfer",
-    hasAttachment: true,
-    taxDeductible: true,
-  },
-  {
-    id: 3,
-    type: "income",
-    description: "Consulting Fee - Tech Startup",
-    amount: 280000,
-    date: "2025-01-12",
-    category: "Consulting",
-    paymentMethod: "Cash",
-    hasAttachment: false,
-    taxDeductible: false,
-  },
-  {
-    id: 4,
-    type: "expense",
-    description: "Software Subscription - Adobe Creative Cloud",
-    amount: 25000,
-    date: "2025-01-10",
-    category: "Software",
-    paymentMethod: "Card",
-    hasAttachment: true,
-    taxDeductible: true,
-  },
-  {
-    id: 5,
-    type: "income",
-    description: "Project Milestone Payment",
-    amount: 350000,
-    date: "2025-01-08",
-    category: "Projects",
-    paymentMethod: "Bank Transfer",
-    hasAttachment: true,
-    taxDeductible: false,
-  },
-  {
-    id: 6,
-    type: "expense",
-    description: "Internet & Utilities",
-    amount: 35000,
-    date: "2025-01-05",
-    category: "Utilities",
-    paymentMethod: "Bank Transfer",
-    hasAttachment: false,
-    taxDeductible: true,
-  },
-  {
-    id: 7,
-    type: "income",
-    description: "Freelance Writing - Blog Posts",
-    amount: 180000,
-    date: "2025-01-03",
-    category: "Services",
-    paymentMethod: "Bank Transfer",
-    hasAttachment: false,
-    taxDeductible: false,
-  },
-  {
-    id: 8,
-    type: "expense",
-    description: "Marketing & Advertising",
-    amount: 75000,
-    date: "2025-01-02",
-    category: "Marketing",
-    paymentMethod: "Card",
-    hasAttachment: true,
-    taxDeductible: true,
-  },
-]
 
-export function TransactionList() {
+interface TransactionListProps {
+  transactions: Transaction[]
+  loading: boolean
+  onUpdateTransaction: (id: string, data: Partial<Transaction>) => Promise<any>
+  onDeleteTransaction: (id: string) => Promise<any>
+  onRefresh?: () => void
+}
+
+export function TransactionList({ 
+  transactions, 
+  loading, 
+  onUpdateTransaction, 
+  onDeleteTransaction,
+  onRefresh
+}: TransactionListProps) {
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
+  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false)
+  const [selectedImages, setSelectedImages] = useState<string[]>([])
+  const [selectedTransactionTitle, setSelectedTransactionTitle] = useState('')
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
+
+  const { user } = useAuth()
+  const { createTransaction } = useTransactions(user?.uid || null)
+
+  console.log("Transactions:", transactions)
+  
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
+      minimumFractionDigits: 0,
+    }).format(amount)
+  }
+
+  const handleEdit = (transaction: Transaction) => {
+    setEditingTransaction(transaction)
+    setIsAddDialogOpen(true)
+  }
+
+  const handleDeleteClick = (id: string) => {
+    setTransactionToDelete(id)
+    setIsDeleteDialogOpen(true)
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!transactionToDelete || isDeleting) return
+    
+    const deletedTransactionId = transactionToDelete
+    console.log('Starting delete operation for:', deletedTransactionId)
+    setIsDeleting(true)
+    
+    try {
+      const result = await onDeleteTransaction(deletedTransactionId)
+      console.log('Delete result:', result)
+      
+      if (result && result.success) {
+        console.log('Delete successful')
+        
+        // Close dialog immediately
+        setIsDeleteDialogOpen(false)
+        
+        // Clean up state and refresh
+        setTimeout(() => {
+          setTransactionToDelete(null)
+          setIsDeleting(false)
+          
+          if (onRefresh) {
+            onRefresh()
+          }
+          
+          window.dispatchEvent(new CustomEvent('transactionChanged', { 
+            detail: { 
+              action: 'deleted',
+              transactionId: deletedTransactionId 
+            } 
+          }))
+        }, 100)
+      } else {
+        console.error('Delete operation failed:', result)
+        setIsDeleting(false)
+      }
+    } catch (error) {
+      console.error('Error deleting transaction:', error)
+      setIsDeleting(false)
+    }
+  }
+
+  const closeDeleteDialog = () => {
+    setIsDeleteDialogOpen(false)
+    // Delay cleanup to allow dialog to close smoothly
+    setTimeout(() => {
+      setTransactionToDelete(null)
+      setIsDeleting(false)
+    }, 200)
+  }
+
+  const handleViewImages = (transaction: Transaction) => {
+    if (transaction.attachments && transaction.attachments.length > 0) {
+      setSelectedImages(transaction.attachments)
+      setSelectedTransactionTitle(`${transaction.description} - Receipts`)
+      setIsImageViewerOpen(true)
+    }
+  }
+
+  const handleSubmit = async (data: Omit<Transaction, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      let result
+      if (editingTransaction) {
+        result = await onUpdateTransaction(editingTransaction.id, data)
+        setEditingTransaction(null)
+      } else {
+        result = await createTransaction(data)
+        console.log("Result from handleSubmit:", result)
+      }
+      
+      if (result && result.success) {
+        setIsAddDialogOpen(false)
+        if (onRefresh) {
+          onRefresh()
+        }
+        
+        window.dispatchEvent(new CustomEvent('transactionChanged', { 
+          detail: { 
+            action: editingTransaction ? 'updated' : 'created',
+            transactionId: result.data?.id 
+          } 
+        }))
+      }
+      
+      return result // Return the result so add-transaction-dialog can read it
+    } catch (error) {
+      console.error('Error in handleSubmit:', error)
+      return { success: false, error: 'Failed to save transaction' }
+    }
+  }
+
+  if (loading && transactions.length === 0) {
+    return (
+      <Card className="p-8 text-center">
+        <div className="animate-pulse space-y-4">
+          <div className="h-4 bg-muted rounded w-1/4 mx-auto"></div>
+          <div className="space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-12 bg-muted rounded"></div>
+            ))}
+          </div>
+        </div>
+      </Card>
+    )
+  }
+
+  if (transactions.length === 0) {
+    return (
+      <>
+        <Card className="p-8 text-center">
+          <div className="text-muted-foreground">
+            <p className="text-lg font-medium mb-2">No transactions found</p>
+            <p className="text-sm mb-4">Start by adding your first transaction</p>
+            <Button onClick={() => {
+              setEditingTransaction(null)
+              setIsAddDialogOpen(true)
+            }}>
+              Add Transaction
+            </Button>
+          </div>
+        </Card>
+        
+        <AddTransactionDialog
+          open={isAddDialogOpen}
+          onOpenChange={setIsAddDialogOpen}
+          onSubmit={handleSubmit}
+          transaction={editingTransaction}
+        />
+      </>
+    )
+  }
+  
   return (
     <Card className="overflow-hidden">
       {/* Desktop View */}
@@ -116,8 +213,8 @@ export function TransactionList() {
           </thead>
           <tbody>
             {transactions.map((transaction) => (
-              <tr key={transaction.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                <td className="py-4 px-4 text-sm">{transaction.date}</td>
+              <tr key={`${transaction.id}-${transaction.updatedAt || transaction.createdAt}`} className="border-b border-border last:border-0 hover:bg-muted/30">
+                <td className="py-4 px-4 text-sm">{formatDate(transaction.date)}</td>
                 <td className="py-4 px-4">
                   <div className="flex items-center gap-2">
                     <div
@@ -133,7 +230,15 @@ export function TransactionList() {
                     </div>
                     <div className="flex items-center gap-2">
                       <span className="text-sm font-medium">{transaction.description}</span>
-                      {transaction.hasAttachment && <Paperclip className="w-3 h-3 text-muted-foreground" />}
+                      {transaction.attachments && transaction.attachments.length > 0 && (
+                        <button
+                          onClick={() => handleViewImages(transaction)}
+                          className="hover:bg-muted rounded p-1 transition-colors cursor-pointer"
+                          title={`View ${transaction.attachments.length} receipt(s)`}
+                        >
+                          <Paperclip className="w-3 h-3 text-muted-foreground hover:text-primary" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 </td>
@@ -147,13 +252,17 @@ export function TransactionList() {
                   <span
                     className={`font-semibold ${transaction.type === "income" ? "text-green-600" : "text-red-600"}`}
                   >
-                    {transaction.type === "income" ? "+" : "-"}₦{transaction.amount.toLocaleString()}
+                    {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
                   </span>
                 </td>
                 <td className="py-4 px-4 text-center">
-                  {transaction.taxDeductible && (
+                  {transaction.taxDeductible ? (
                     <Badge variant="outline" className="text-xs">
                       Tax Deductible
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-xs">
+                      Tax Non-deductible
                     </Badge>
                   )}
                 </td>
@@ -165,11 +274,14 @@ export function TransactionList() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleEdit(transaction)}>
                         <Pencil className="w-4 h-4 mr-2" />
                         Edit
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">
+                      <DropdownMenuItem 
+                        className="text-destructive"
+                        onClick={() => handleDeleteClick(transaction.id)}
+                      >
                         <Trash2 className="w-4 h-4 mr-2" />
                         Delete
                       </DropdownMenuItem>
@@ -185,7 +297,7 @@ export function TransactionList() {
       {/* Mobile View */}
       <div className="md:hidden divide-y divide-border">
         {transactions.map((transaction) => (
-          <div key={transaction.id} className="p-4">
+          <div key={`mobile-${transaction.id}-${transaction.updatedAt || transaction.createdAt}`} className="p-4">
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
                 <div
@@ -202,9 +314,17 @@ export function TransactionList() {
                 <div>
                   <div className="flex items-center gap-2">
                     <p className="font-medium text-sm">{transaction.description}</p>
-                    {transaction.hasAttachment && <Paperclip className="w-3 h-3 text-muted-foreground" />}
+                    {transaction.attachments && transaction.attachments.length > 0 && (
+                      <button
+                        onClick={() => handleViewImages(transaction)}
+                        className="hover:bg-muted rounded p-1 transition-colors"
+                        title={`View ${transaction.attachments.length} receipt(s)`}
+                      >
+                        <Paperclip className="w-3 h-3 text-muted-foreground hover:text-primary" />
+                      </button>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">{transaction.date}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{formatDate(transaction.date)}</p>
                 </div>
               </div>
               <DropdownMenu>
@@ -214,11 +334,14 @@ export function TransactionList() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleEdit(transaction)}>
                     <Pencil className="w-4 h-4 mr-2" />
                     Edit
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="text-destructive">
+                  <DropdownMenuItem 
+                    className="text-destructive"
+                    onClick={() => handleDeleteClick(transaction.id)}
+                  >
                     <Trash2 className="w-4 h-4 mr-2" />
                     Delete
                   </DropdownMenuItem>
@@ -237,12 +360,38 @@ export function TransactionList() {
                 )}
               </div>
               <span className={`font-semibold ${transaction.type === "income" ? "text-green-600" : "text-red-600"}`}>
-                {transaction.type === "income" ? "+" : "-"}₦{transaction.amount.toLocaleString()}
+                {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
               </span>
             </div>
           </div>
-        ))}
+        ))} 
       </div>
+
+      {/* Add Transaction Dialog */}
+      <AddTransactionDialog
+        open={isAddDialogOpen}
+        onOpenChange={setIsAddDialogOpen}
+        onSubmit={handleSubmit}
+        transaction={editingTransaction || null}
+      />
+
+      {/* Image Viewer Modal */}
+      <ImageViewerModal
+        open={isImageViewerOpen}
+        onOpenChange={setIsImageViewerOpen}
+        images={selectedImages}
+        title={selectedTransactionTitle}
+      />
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={isDeleteDialogOpen}
+        onClose={closeDeleteDialog}
+        onConfirm={handleDeleteConfirm}
+        isDeleting={isDeleting}
+        title="Delete Transaction"
+        description="Are you sure you want to delete this transaction? This action cannot be undone."
+      />
     </Card>
   )
 }

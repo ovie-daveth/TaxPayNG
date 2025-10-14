@@ -10,15 +10,15 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Upload, X, FileText, Loader2 } from "lucide-react"
-import { useDocuments } from "@/lib/hooks/use-documents"
 import { UploadDocumentData } from "@/lib/types/document"
 
 interface UploadDocumentDialogProps {
   open: boolean
-  onOpenChange: (open: boolean) => void
+  onOpenChange: (open: boolean) => voidk
+  onUpload: (data: UploadDocumentData) => Promise<any>
 }
 
-export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialogProps) {
+export function UploadDocumentDialog({ open, onOpenChange, onUpload }: UploadDocumentDialogProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [formData, setFormData] = useState({
     name: '',
@@ -29,7 +29,6 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
   })
   const [isUploading, setIsUploading] = useState(false)
 
-  const { uploadDocument } = useDocuments()
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -63,7 +62,7 @@ export function UploadDocumentDialog({ open, onOpenChange }: UploadDocumentDialo
         notes: formData.notes || undefined
       }
 
-      await uploadDocument(uploadData)
+      await onUpload(uploadData)
       
       // Reset form
       setSelectedFile(null)

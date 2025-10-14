@@ -54,10 +54,6 @@ export function TaxBreakdown({ result }: TaxBreakdownProps) {
         <div className="bg-muted/50 rounded-lg p-4">
           <h3 className="font-semibold text-sm mb-3">Tax Reliefs & Deductions</h3>
           <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Consolidated Relief Allowance</span>
-              <span className="font-medium text-green-600">-₦{result.reliefs.consolidatedRelief.toLocaleString()}</span>
-            </div>
             {result.reliefs.rentRelief > 0 && (
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Rent Relief (20%)</span>

@@ -119,13 +119,21 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
             <h3 className="font-semibold">Tax-Deductible Expenses</h3>
             <Info className="w-4 h-4 text-muted-foreground" />
           </div>
+          <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
+            <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+              💡 Enter your expenses for the selected period ({getPeriodLabel().toLowerCase()})
+            </p>
+            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+              The calculator will automatically convert them to annual amounts for tax calculation
+            </p>
+          </div>
           <p className="text-sm text-muted-foreground mb-4">
             Only expenses that qualify for tax relief under Nigerian tax law
           </p>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="rentPaid">Rent Paid (₦)</Label>
+              <Label htmlFor="rentPaid">{getPeriodLabel()} Rent Paid (₦)</Label>
               <Input
                 id="rentPaid"
                 type="number"
@@ -138,7 +146,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
 
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="pensionContribution">Pension Contributions (₦)</Label>
+                <Label htmlFor="pensionContribution">{getPeriodLabel()} Pension Contributions (₦)</Label>
                 <Input
                   id="pensionContribution"
                   type="number"
@@ -146,11 +154,11 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                   value={formData.pensionContribution}
                   onChange={(e) => setFormData({ ...formData, pensionContribution: e.target.value })}
                 />
-                <p className="text-xs text-muted-foreground">Up to 8% of income</p>
+                <p className="text-xs text-muted-foreground">Up to 8% of annual income</p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="healthInsurance">Health Insurance (₦)</Label>
+                <Label htmlFor="healthInsurance">{getPeriodLabel()} Health Insurance (₦)</Label>
                 <Input
                   id="healthInsurance"
                   type="number"
@@ -158,13 +166,13 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                   value={formData.healthInsurance}
                   onChange={(e) => setFormData({ ...formData, healthInsurance: e.target.value })}
                 />
-                <p className="text-xs text-muted-foreground">NHIS or private HMO</p>
+                <p className="text-xs text-muted-foreground">NHIS or private HMO premiums</p>
               </div>
             </div>
 
             <div className="grid sm:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="lifeInsurance">Life Insurance (₦)</Label>
+                <Label htmlFor="lifeInsurance">{getPeriodLabel()} Life Insurance (₦)</Label>
                 <Input
                   id="lifeInsurance"
                   type="number"
@@ -172,11 +180,11 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                   value={formData.lifeInsurance}
                   onChange={(e) => setFormData({ ...formData, lifeInsurance: e.target.value })}
                 />
-                <p className="text-xs text-muted-foreground">Premium payments</p>
+                <p className="text-xs text-muted-foreground">Premium payments for life insurance</p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="charitableDonations">Charitable Donations (₦)</Label>
+                <Label htmlFor="charitableDonations">{getPeriodLabel()} Charitable Donations (₦)</Label>
                 <Input
                   id="charitableDonations"
                   type="number"
@@ -184,12 +192,12 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                   value={formData.charitableDonations}
                   onChange={(e) => setFormData({ ...formData, charitableDonations: e.target.value })}
                 />
-                <p className="text-xs text-muted-foreground">To approved NGOs (max 10% of income)</p>
+                <p className="text-xs text-muted-foreground">To approved NGOs (max 10% of annual income)</p>
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="businessExpenses">Business Expenses (₦)</Label>
+              <Label htmlFor="businessExpenses">{getPeriodLabel()} Business Expenses (₦)</Label>
               <Input
                 id="businessExpenses"
                 type="number"

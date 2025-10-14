@@ -8,21 +8,42 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Calculator } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { toast } from "sonner"
 
 export default function LoginPage() {
   const router = useRouter()
+  const { signIn, user, loading } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  })
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.push("/dashboard")
+    }
+  }, [user, loading, router])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
 
-    // Simulate login process
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    const result = await signIn({
+      email: formData.email,
+      password: formData.password
+    })
 
-    // Redirect to dashboard
-    router.push("/dashboard")
+    setIsLoading(false)
+
+    if (result.success) {
+      toast.success('Logged in successfully!')
+      router.push("/dashboard")
+    } else {
+      toast.error(result.error || 'Failed to log in')
+    }
   }
 
   return (
@@ -45,7 +66,14 @@ export default function LoginPage() {
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" placeholder="you@example.com" required />
+              <Input 
+                id="email" 
+                type="email" 
+                placeholder="you@example.com" 
+                value={formData.email}
+                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                required 
+              />
             </div>
 
             <div className="space-y-2">
@@ -55,7 +83,14 @@ export default function LoginPage() {
                   Forgot password?
                 </Link>
               </div>
-              <Input id="password" type="password" placeholder="••••••••" required />
+              <Input 
+                id="password" 
+                type="password" 
+                placeholder="••••••••" 
+                value={formData.password}
+                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                required 
+              />
             </div>
 
             <Button type="submit" className="w-full" size="lg" disabled={isLoading}>

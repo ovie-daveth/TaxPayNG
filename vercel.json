@@ -1,0 +1,8 @@
+{
+    "builds": [
+        {
+            "src": "app/dashboard/layout.tsx",
+            "use": "@vercel/static"
+        }
+    ]
+}

@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { FileText, ImageIcon, File, Download, Eye, Trash2, MoreVertical, LinkIcon } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { useDocuments } from "@/lib/hooks/use-documents"
 import { Document } from "@/lib/types/document"
 
 function getFileIcon(fileType: string) {
@@ -45,28 +44,28 @@ function formatDate(dateString: string): string {
 }
 
 interface DocumentListProps {
-  documents?: Document[]
+  documents: Document[]
+  onDownload: (document: Document) => Promise<void>
+  onDelete: (id: string) => Promise<void>
 }
 
-export function DocumentList({ documents: propDocuments }: DocumentListProps = {}) {
-  const { downloadDocument, deleteDocument } = useDocuments()
-  
-  // Use passed documents prop if available, otherwise use hook
-  const { documents: hookDocuments } = useDocuments()
-  const documents = propDocuments || hookDocuments
-
+export function DocumentList({ documents, onDownload, onDelete }: DocumentListProps) {
   const handleView = (document: Document) => {
     window.open(document.url, '_blank')
   }
 
-  const handleDownload = (document: Document) => {
-    downloadDocument(document)
+  const handleDownload = async (document: Document) => {
+    try {
+      await onDownload(document)
+    } catch (error) {
+      console.error('Failed to download document:', error)
+    }
   }
 
   const handleDelete = async (document: Document) => {
     if (confirm(`Are you sure you want to delete "${document.name}"?`)) {
       try {
-        await deleteDocument(document.id)
+        await onDelete(document.id)
       } catch (error) {
         console.error('Failed to delete document:', error)
       }

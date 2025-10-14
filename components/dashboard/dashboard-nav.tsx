@@ -1,12 +1,14 @@
 "use client"
 
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Calculator, LayoutDashboard, Receipt, FileText, Bell, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight } from "lucide-react"
 import { useState } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { toast } from "sonner"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -19,8 +21,20 @@ const navItems = [
 
 export function DashboardNav() {
   const pathname = usePathname()
+  const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { sidebarCollapsed, toggleSidebar } = useSidebar()
+  const { logout } = useAuth()
+
+  const handleLogout = async () => {
+    const result = await logout()
+    if (result.success) {
+      toast.success('Logged out successfully!')
+      router.push('/login')
+    } else {
+      toast.error(result.error || 'Failed to log out')
+    }
+  }
 
   return (
     <>
@@ -92,6 +106,7 @@ export function DashboardNav() {
             )} 
             size="sm"
             title={sidebarCollapsed ? "Log out" : undefined}
+            onClick={handleLogout}
           >
             <LogOut className="w-4 h-4 flex-shrink-0" />
             {!sidebarCollapsed && (
@@ -139,7 +154,12 @@ export function DashboardNav() {
                 </Link>
               )
             })}
-            <Button variant="ghost" className="w-full justify-start text-muted-foreground mt-4" size="sm">
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-muted-foreground mt-4" 
+              size="sm"
+              onClick={handleLogout}
+            >
               <LogOut className="w-4 h-4 mr-2" />
               Log out
             </Button>

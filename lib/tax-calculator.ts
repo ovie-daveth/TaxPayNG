@@ -28,6 +28,7 @@ const TAX_BRACKETS: TaxBracket[] = [
 ]
 
 export function calculateNigerianTax(input: TaxInput) {
+  // Convert income to annual amount
   let annualIncome = input.income
   if (input.period === "monthly") {
     annualIncome = input.income * 12
@@ -35,32 +36,43 @@ export function calculateNigerianTax(input: TaxInput) {
     annualIncome = input.income * 4
   }
 
+  // Convert all expenses to annual amounts
   let annualRentPaid = input.rentPaid
   let annualBusinessExpenses = input.businessExpenses
+  let annualPensionContribution = input.pensionContribution
+  let annualHealthInsurance = input.healthInsurance
+  let annualLifeInsurance = input.lifeInsurance
+  let annualCharitableDonations = input.charitableDonations
+
   if (input.period === "monthly") {
     annualRentPaid = input.rentPaid * 12
     annualBusinessExpenses = input.businessExpenses * 12
+    annualPensionContribution = input.pensionContribution * 12
+    annualHealthInsurance = input.healthInsurance * 12
+    annualLifeInsurance = input.lifeInsurance * 12
+    annualCharitableDonations = input.charitableDonations * 12
   } else if (input.period === "quarterly") {
     annualRentPaid = input.rentPaid * 4
     annualBusinessExpenses = input.businessExpenses * 4
+    annualPensionContribution = input.pensionContribution * 4
+    annualHealthInsurance = input.healthInsurance * 4
+    annualLifeInsurance = input.lifeInsurance * 4
+    annualCharitableDonations = input.charitableDonations * 4
   }
 
   const grossIncome = annualIncome
 
+  // Current Nigerian tax law reliefs (CRA has been abolished)
   const rentRelief = Math.min(annualRentPaid * 0.2, 500000)
-
-  const craOption1 = Math.max(grossIncome * 0.01, 200000) + grossIncome * 0.2
-  const consolidatedRelief = craOption1
-
-  const pensionRelief = Math.min(input.pensionContribution, grossIncome * 0.08)
-  const healthInsuranceRelief = input.healthInsurance
-  const lifeInsuranceRelief = input.lifeInsurance
-  const charitableRelief = Math.min(input.charitableDonations, grossIncome * 0.1)
+  const pensionRelief = Math.min(annualPensionContribution, grossIncome * 0.08)
+  const healthInsuranceRelief = annualHealthInsurance
+  const lifeInsuranceRelief = annualLifeInsurance
+  const charitableRelief = Math.min(annualCharitableDonations, grossIncome * 0.1)
 
   const adjustedGrossIncome = grossIncome - annualBusinessExpenses
 
   const totalReliefs =
-    consolidatedRelief + rentRelief + pensionRelief + healthInsuranceRelief + lifeInsuranceRelief + charitableRelief
+    rentRelief + pensionRelief + healthInsuranceRelief + lifeInsuranceRelief + charitableRelief
 
   const taxableIncome = Math.max(adjustedGrossIncome - totalReliefs, 0)
 
@@ -101,7 +113,6 @@ export function calculateNigerianTax(input: TaxInput) {
     businessExpenses: annualBusinessExpenses,
     adjustedGrossIncome,
     reliefs: {
-      consolidatedRelief,
       rentRelief,
       pension: pensionRelief,
       healthInsurance: healthInsuranceRelief,
