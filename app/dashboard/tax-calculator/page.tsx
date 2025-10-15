@@ -1,8 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { DashboardNav } from "@/components/dashboard/dashboard-nav"
-import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { TaxCalculatorForm } from "@/components/tax-calculator/tax-calculator-form"
 import { TaxBreakdown } from "@/components/tax-calculator/tax-breakdown"
 import { TaxRatesInfo } from "@/components/tax-calculator/tax-rates-info"

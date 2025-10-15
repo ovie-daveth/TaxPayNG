@@ -7,8 +7,8 @@ export function TaxRatesInfo() {
       <div className="flex items-start gap-2 mb-4">
         <Info className="w-5 h-5 text-primary mt-0.5" />
         <div>
-          <h3 className="font-semibold">Nigerian Tax Rates (2025)</h3>
-          <p className="text-xs text-muted-foreground mt-1">Personal Income Tax (PAYE) - New Law</p>
+          <h3 className="font-semibold">Nigerian Tax Rates (2026)</h3>
+          <p className="text-xs text-muted-foreground mt-1">Nigeria Tax Act (2025) - Effective Jan 1, 2026</p>
         </div>
       </div>
 
@@ -62,29 +62,49 @@ export function TaxRatesInfo() {
       </div>
 
       <div className="mt-6 pt-6 border-t border-border">
-        <h4 className="font-semibold text-sm mb-3">Common Reliefs & Deductions</h4>
+        <h4 className="font-semibold text-sm mb-3">Tax-Free Threshold & Reliefs (2026 Reform)</h4>
+        
+        <div className="bg-amber-50 dark:bg-amber-950/20 rounded-lg p-3 border border-amber-200 dark:border-amber-900 mb-4">
+          <p className="text-xs font-medium text-amber-900 dark:text-amber-100 mb-1">
+            🚨 Major Change: CRA Abolished
+          </p>
+          <p className="text-xs text-amber-800 dark:text-amber-200">
+            The Consolidated Relief Allowance (CRA) has been removed and replaced with specific, capped reliefs.
+          </p>
+        </div>
+
+        <div className="mb-4 bg-green-50 dark:bg-green-950/20 rounded-lg p-3 border border-green-200 dark:border-green-900">
+          <p className="text-xs font-medium text-green-900 dark:text-green-100 mb-1">
+            ✓ Tax-Free Income
+          </p>
+          <p className="text-xs text-green-800 dark:text-green-200">
+            First ₦800,000 of annual income is completely tax-exempt
+          </p>
+        </div>
+
+        <h5 className="font-semibold text-xs mb-2 text-foreground">Allowable Deductions:</h5>
         <ul className="space-y-2 text-xs text-muted-foreground">
           <li className="flex items-start gap-2">
             <span className="text-primary mt-0.5">•</span>
-            <span>Consolidated Relief: Higher of 1% of gross income or ₦200,000 + 20% of gross income</span>
+            <span><strong>Rent Relief:</strong> 20% of rent paid (Max ₦500,000/year) - requires proof</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary mt-0.5">•</span>
-            <span>Rent: Deductible business rent expense</span>
+            <span><strong>Pension Contribution:</strong> Up to 8% of annual income (no fixed cap)</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary mt-0.5">•</span>
-            <span>Pension: Up to 8% of annual income</span>
+            <span><strong>Health Insurance:</strong> Actual premium paid (requires documentation)</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-primary mt-0.5">•</span>
-            <span>NHF: 2.5% of annual income</span>
-          </li>
-          <li className="flex items-start gap-2">
-            <span className="text-primary mt-0.5">•</span>
-            <span>Life Insurance: Actual premium paid</span>
+            <span><strong>Life Insurance:</strong> Actual premium paid (requires documentation)</span>
           </li>
         </ul>
+        
+        <p className="text-xs text-muted-foreground mt-3 italic">
+          Note: All reliefs require proper documentation for claims.
+        </p>
       </div>
     </Card>
   )
