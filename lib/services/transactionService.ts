@@ -1,5 +1,6 @@
 import { BaseService } from './base'
-import { Transaction, TransactionFilters, ApiResponse, PaginatedResponse } from '@/lib/types'
+import { Transaction, TransactionFilters, ApiResponse, PaginatedResponse, Document } from '@/lib/types'
+import { documentService } from './documentService'
 
 export class TransactionService extends BaseService {
   constructor() {
@@ -74,6 +75,18 @@ export class TransactionService extends BaseService {
       const transactionId = await this.create(newTransaction)
       const createdTransaction = await this.getById(transactionId)
 
+      // If transaction has attachments, create corresponding documents
+      if (transactionData.attachments && transactionData.attachments.length > 0) {
+        await this.createDocumentsFromAttachments(
+          userId,
+          transactionId,
+          transactionData.attachments,
+          transactionData.description,
+          transactionData.date,
+          transactionData.type
+        )
+      }
+
       return {
         success: true,
         data: createdTransaction,
@@ -85,6 +98,65 @@ export class TransactionService extends BaseService {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'
       }
+    }
+  }
+
+  // Helper method to create documents from transaction attachments
+  private async createDocumentsFromAttachments(
+    userId: string,
+    transactionId: string,
+    attachmentUrls: string[],
+    transactionDescription: string,
+    transactionDate: string,
+    transactionType: 'income' | 'expense'
+  ): Promise<void> {
+    try {
+      for (let i = 0; i < attachmentUrls.length; i++) {
+        const url = attachmentUrls[i]
+        
+        // Extract filename from URL
+        const urlParts = url.split('/')
+        const filename = urlParts[urlParts.length - 1] || `attachment-${i + 1}`
+        
+        // Determine file type from URL
+        const fileExtension = filename.split('.').pop()?.toLowerCase() || ''
+        let fileType: 'pdf' | 'image' | 'document' = 'document'
+        let mimeType = 'application/octet-stream'
+        
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp'].includes(fileExtension)) {
+          fileType = 'image'
+          mimeType = `image/${fileExtension === 'jpg' ? 'jpeg' : fileExtension}`
+        } else if (fileExtension === 'pdf') {
+          fileType = 'pdf'
+          mimeType = 'application/pdf'
+        }
+        
+        // Determine document type based on transaction type
+        const documentType: Document['type'] = transactionType === 'income' ? 'invoice' : 'receipt'
+        
+        // Create document record
+        const documentData = {
+          userId,
+          name: `${transactionDescription} - Attachment ${i + 1}`,
+          originalName: filename,
+          type: documentType,
+          fileType: fileType,
+          mimeType: mimeType,
+          size: 0, // We don't have size info from ImageKit URL
+          url: url,
+          thumbnailUrl: fileType === 'image' ? url : undefined,
+          uploadedAt: transactionDate,
+          linkedTransaction: transactionId,
+          notes: `Auto-created from transaction: ${transactionDescription}`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        }
+        
+        await documentService.create(documentData)
+      }
+    } catch (error) {
+      console.error('Error creating documents from attachments:', error)
+      // Don't throw error - transaction creation should succeed even if document creation fails
     }
   }
 
@@ -102,6 +174,25 @@ export class TransactionService extends BaseService {
 
       await this.update(transactionId, updateData)
       const updatedTransaction = await this.getById(transactionId)
+
+      // If attachments were updated, create documents for new attachments
+      if (updateData.attachments && updateData.attachments.length > 0) {
+        const existingAttachments = existingTransaction.attachments || []
+        const newAttachments = updateData.attachments.filter(
+          (url: string) => !existingAttachments.includes(url)
+        )
+        
+        if (newAttachments.length > 0) {
+          await this.createDocumentsFromAttachments(
+            userId,
+            transactionId,
+            newAttachments,
+            updateData.description || existingTransaction.description,
+            updateData.date || existingTransaction.date,
+            updateData.type || existingTransaction.type
+          )
+        }
+      }
 
       return {
         success: true,
@@ -128,6 +219,17 @@ export class TransactionService extends BaseService {
           error: 'Unauthorized: You can only delete your own transactions'
         }
       }
+
+      // Delete linked documents (optional - documents remain even if transaction is deleted)
+      // Uncomment the following lines if you want to delete documents when transaction is deleted:
+      // try {
+      //   const linkedDocs = await documentService.getDocumentsByTransaction(userId, transactionId)
+      //   for (const doc of linkedDocs) {
+      //     await documentService.deleteDocument(doc.id, userId)
+      //   }
+      // } catch (docError) {
+      //   console.warn('Error deleting linked documents:', docError)
+      // }
 
       await this.delete(transactionId)
 

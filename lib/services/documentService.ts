@@ -91,24 +91,37 @@ export class DocumentService extends BaseService {
   async uploadDocument(userId: string, uploadData: UploadDocumentData): Promise<ApiResponse<Document>> {
     try {
       const file = uploadData.file
-      const fileExtension = file.name.split('.').pop()
-      const fileName = `${userId}/${Date.now()}-${file.name}`
-      
-      // Create storage reference
-      const storageRef = ref(storage, `documents/${fileName}`)
-      
-      // Upload file to Firebase Storage
-      const uploadResult = await uploadBytes(storageRef, file)
-      const downloadURL = await getDownloadURL(uploadResult.ref)
-      
-      // Create thumbnail URL for images
+      let downloadURL: string
       let thumbnailURL: string | undefined
-      if (file.type.startsWith('image/')) {
-        thumbnailURL = downloadURL
+      
+      // Use ImageKit URL if provided, otherwise upload to Firebase Storage
+      if (uploadData.imageKitUrl) {
+        downloadURL = uploadData.imageKitUrl
+        
+        // For images, use the same URL as thumbnail
+        if (file.type.startsWith('image/') || uploadData.imageKitUrl.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+          thumbnailURL = downloadURL
+        }
+      } else {
+        // Fallback to Firebase Storage upload
+        const fileExtension = file.name.split('.').pop()
+        const fileName = `${userId}/${Date.now()}-${file.name}`
+        
+        // Create storage reference
+        const storageRef = ref(storage, `documents/${fileName}`)
+        
+        // Upload file to Firebase Storage
+        const uploadResult = await uploadBytes(storageRef, file)
+        downloadURL = await getDownloadURL(uploadResult.ref)
+        
+        // Create thumbnail URL for images
+        if (file.type.startsWith('image/')) {
+          thumbnailURL = downloadURL
+        }
       }
 
       // Create document record in Firestore
-      const documentData = {
+      const documentData: any = {
         userId,
         name: uploadData.name,
         originalName: file.name,
@@ -117,12 +130,16 @@ export class DocumentService extends BaseService {
         mimeType: file.type,
         size: file.size,
         url: downloadURL,
-        thumbnailUrl: thumbnailURL,
         uploadedAt: uploadData.date || new Date().toISOString(),
         linkedTransaction: uploadData.linkedTransaction || null,
         notes: uploadData.notes || null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
+      }
+
+      // Only add thumbnailUrl if it exists
+      if (thumbnailURL) {
+        documentData.thumbnailUrl = thumbnailURL
       }
 
       const documentId = await this.create(documentData)

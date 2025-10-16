@@ -1,11 +1,13 @@
 "use client"
 
+import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { FileText, ImageIcon, File, Download, Eye, Trash2, MoreVertical } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { Document } from "@/lib/types/document"
+import { DeleteConfirmationModal } from "@/components/ui/delete-confirmation-modal"
+import type { Document } from "@/lib/types"
 
 function getFileIcon(fileType: string) {
   switch (fileType) {
@@ -45,14 +47,15 @@ function formatDate(dateString: string): string {
 
 interface DocumentGridProps {
   documents: Document[]
+  onView: (document: Document) => void
   onDownload: (document: Document) => Promise<void>
   onDelete: (id: string) => Promise<void>
 }
 
-export function DocumentGrid({ documents, onDownload, onDelete }: DocumentGridProps) {
-  const handleView = (document: Document) => {
-    window.open(document.url, '_blank')
-  }
+export function DocumentGrid({ documents, onView, onDownload, onDelete }: DocumentGridProps) {
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
+  const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const handleDownload = async (document: Document) => {
     try {
@@ -62,13 +65,29 @@ export function DocumentGrid({ documents, onDownload, onDelete }: DocumentGridPr
     }
   }
 
-  const handleDelete = async (document: Document) => {
-    if (confirm(`Are you sure you want to delete "${document.name}"?`)) {
-      try {
-        await onDelete(document.id)
-      } catch (error) {
-        console.error('Failed to delete document:', error)
-      }
+  const openDeleteModal = (document: Document) => {
+    setDocumentToDelete(document)
+    setIsDeleteModalOpen(true)
+  }
+
+  const closeDeleteModal = () => {
+    if (!isDeleting) {
+      setIsDeleteModalOpen(false)
+      setDocumentToDelete(null)
+    }
+  }
+
+  const handleDeleteConfirm = async () => {
+    if (!documentToDelete) return
+    
+    setIsDeleting(true)
+    try {
+      await onDelete(documentToDelete.id)
+      closeDeleteModal()
+    } catch (error) {
+      console.error('Failed to delete document:', error)
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -97,7 +116,7 @@ export function DocumentGrid({ documents, onDownload, onDelete }: DocumentGridPr
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => handleView(doc)}>
+                <DropdownMenuItem onClick={() => onView(doc)}>
                   <Eye className="w-4 h-4 mr-2" />
                   View
                 </DropdownMenuItem>
@@ -107,7 +126,7 @@ export function DocumentGrid({ documents, onDownload, onDelete }: DocumentGridPr
                 </DropdownMenuItem>
                 <DropdownMenuItem 
                   className="text-destructive"
-                  onClick={() => handleDelete(doc)}
+                  onClick={() => openDeleteModal(doc)}
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
                   Delete
@@ -141,6 +160,16 @@ export function DocumentGrid({ documents, onDownload, onDelete }: DocumentGridPr
           <p className="text-xs text-muted-foreground">Uploaded {formatDate(doc.uploadedAt)}</p>
         </Card>
       ))}
+      
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={isDeleteModalOpen}
+        onClose={closeDeleteModal}
+        onConfirm={handleDeleteConfirm}
+        isDeleting={isDeleting}
+        title="Delete Document"
+        description={`Are you sure you want to delete "${documentToDelete?.name}"? This action cannot be undone.`}
+      />
     </div>
   )
 }

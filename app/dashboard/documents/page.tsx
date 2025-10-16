@@ -1,11 +1,9 @@
 "use client"
 
-import { useState, useMemo } from "react"
-import { DashboardNav } from "@/components/dashboard/dashboard-nav"
-import { DashboardHeader } from "@/components/dashboard/dashboard-header"
+import { useState, useMemo, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Search, Filter, Grid, List } from "lucide-react"
+import { Plus, Search, Filter, Grid, List, Loader2 } from "lucide-react"
 import { DocumentGrid } from "@/components/documents/document-grid"
 import { DocumentList } from "@/components/documents/document-list"
 import { DocumentFilters } from "@/components/documents/document-filters"
@@ -13,15 +11,32 @@ import { UploadDocumentDialog } from "@/components/documents/upload-document-dia
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useDocumentsFirebase } from "@/lib/hooks/use-documents-firebase"
 import { DocumentFilters as FilterType } from "@/lib/types/document"
+import { Document } from "@/lib/types"
 import { DocumentsSkeleton } from "@/components/ui/skeletons"
+import { DocumentViewerModal } from "@/components/ui/document-viewer-modal"
 
 export default function DocumentsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [isUploadOpen, setIsUploadOpen] = useState(false)
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
   const [searchQuery, setSearchQuery] = useState("")
   const [filters, setFilters] = useState<FilterType>({})
+  const [viewerOpen, setViewerOpen] = useState(false)
+  const [currentDocument, setCurrentDocument] = useState<Document | null>(null)
+  const loadMoreRef = useRef<HTMLDivElement>(null)
   
-  const { documents, filterDocuments, loading, error, uploadDocument, deleteDocument, downloadDocument } = useDocumentsFirebase()
+  const { 
+    documents, 
+    filterDocuments, 
+    loading, 
+    loadingMore,
+    hasMore,
+    error, 
+    uploadDocument, 
+    deleteDocument, 
+    downloadDocument,
+    loadMore
+  } = useDocumentsFirebase()
 
   // Filter documents based on search and filters
   const filteredDocuments = useMemo(() => {
@@ -31,16 +46,60 @@ export default function DocumentsPage() {
     })
   }, [documents, searchQuery, filters, filterDocuments])
 
+  // Handle view document in modal
+  const handleView = (document: Document) => {
+    setCurrentDocument(document)
+    setViewerOpen(true)
+  }
+
+  // Handle download document
+  const handleDownload = async (doc: Document) => {
+    try {
+      const response = await fetch(doc.url)
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = doc.originalName
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+    } catch (error) {
+      console.error('Failed to download document:', error)
+    }
+  }
+
+  // Infinite scroll: Intersection Observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const target = entries[0]
+        if (target.isIntersecting && hasMore && !loadingMore && !loading) {
+          loadMore()
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    const currentRef = loadMoreRef.current
+    if (currentRef) {
+      observer.observe(currentRef)
+    }
+
+    return () => {
+      if (currentRef) {
+        observer.unobserve(currentRef)
+      }
+    }
+  }, [hasMore, loadingMore, loading, loadMore])
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-        <DashboardNav />
-        <div className="flex-1 md:ml-64">
-          <DashboardHeader />
-          <main className="container mx-auto px-4 py-6 max-w-7xl">
+          <main className="">
             <DocumentsSkeleton />
           </main>
-        </div>
       </div>
     )
   }
@@ -61,6 +120,10 @@ export default function DocumentsPage() {
                 />
               </div>
               <div className="flex gap-2">
+                {/* <Button onClick={() => setIsUploadOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Upload
+                </Button> */}
                 <Button variant="outline" onClick={() => setIsFilterOpen(!isFilterOpen)}>
                   <Filter className="w-4 h-4 mr-2" />
                   Filters
@@ -97,25 +160,54 @@ export default function DocumentsPage() {
             <div>
               {filteredDocuments.length > 0 && (
                 <p className="text-sm text-muted-foreground mb-4">
-                  Showing {filteredDocuments.length} of {documents.length} documents
+                  Showing {filteredDocuments.length} documents
                 </p>
               )}
               {viewMode === "grid" ? (
                 <DocumentGrid 
                   documents={filteredDocuments} 
-                  onDelete={deleteDocument}
-                  onDownload={downloadDocument}
+                  onView={handleView}
+                  onDelete={(id) => deleteDocument(documents.find(d => d.id === id)!)}
+                  onDownload={handleDownload}
                 />
               ) : (
                 <DocumentList 
                   documents={filteredDocuments}
-                  onDelete={deleteDocument}
-                  onDownload={downloadDocument}
+                  onView={handleView}
+                  onDelete={(id) => deleteDocument(documents.find(d => d.id === id)!)}
+                  onDownload={handleDownload}
                 />
               )}
+
+              {/* Infinite Scroll Trigger */}
+              <div ref={loadMoreRef} className="h-20 flex items-center justify-center">
+                {loadingMore && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span className="text-sm">Loading more documents...</span>
+                  </div>
+                )}
+                {!hasMore && documents.length > 0 && (
+                  <p className="text-sm text-muted-foreground">No more documents to load</p>
+                )}
+              </div>
             </div>
           </div>
         </main>
+
+      {/* Upload Document Dialog */}
+      <UploadDocumentDialog
+        open={isUploadOpen}
+        onOpenChange={setIsUploadOpen}
+        onUpload={uploadDocument}
+      />
+
+      {/* Document Viewer Modal */}
+      <DocumentViewerModal
+        open={viewerOpen}
+        onOpenChange={setViewerOpen}
+        document={currentDocument}
+      />
     </div>
   )
 }

@@ -28,7 +28,8 @@ export interface UploadDocumentData {
   file: File
   name: string
   type: Document['type']
-  date: string
+  date?: string
   linkedTransaction?: string
   notes?: string
+  imageKitUrl?: string
 }

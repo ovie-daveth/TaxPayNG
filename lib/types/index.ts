@@ -86,6 +86,7 @@ export interface UploadDocumentData {
   date?: string
   linkedTransaction?: string
   notes?: string
+  imageKitUrl?: string
 }
 
 export interface DocumentFilters {

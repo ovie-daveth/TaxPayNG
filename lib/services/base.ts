@@ -43,12 +43,28 @@ export class BaseService {
     const data = doc.data() as any
     if (!data) throw new Error('Document data not found')
     
-    return {
+    const converted: any = {
       id: doc.id,
       ...data,
       createdAt: this.convertTimestamp(data.createdAt),
       updatedAt: this.convertTimestamp(data.updatedAt),
-    } as T
+    }
+    
+    // Convert other timestamp fields if present
+    if (data.uploadedAt) {
+      converted.uploadedAt = this.convertTimestamp(data.uploadedAt)
+    }
+    if (data.date) {
+      converted.date = this.convertTimestamp(data.date)
+    }
+    if (data.dueDate) {
+      converted.dueDate = this.convertTimestamp(data.dueDate)
+    }
+    if (data.completedAt) {
+      converted.completedAt = this.convertTimestamp(data.completedAt)
+    }
+    
+    return converted as T
   }
 
   // Helper method to prepare data for Firestore
@@ -71,6 +87,9 @@ export class BaseService {
     }
     if (prepared.completedAt) {
       prepared.completedAt = this.convertToTimestamp(prepared.completedAt)
+    }
+    if (prepared.uploadedAt) {
+      prepared.uploadedAt = this.convertToTimestamp(prepared.uploadedAt)
     }
 
     return prepared

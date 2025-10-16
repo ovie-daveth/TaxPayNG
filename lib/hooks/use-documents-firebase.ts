@@ -1,7 +1,8 @@
 "use client"
 
 import { useState, useCallback, useEffect } from 'react'
-import { Document, UploadDocumentData, DocumentFilters } from '@/lib/types/document'
+import type { Document } from '@/lib/types'
+import { UploadDocumentData, DocumentFilters } from '@/lib/types/document'
 import { useAuth } from './useAuth'
 import { documentService } from '@/lib/services'
 
@@ -11,17 +12,33 @@ export function useDocumentsFirebase() {
   const { user } = useAuth()
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hasMore, setHasMore] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const PAGE_SIZE = 20
 
   // Load documents from localStorage (fallback) or Firebase
-  const loadDocuments = useCallback(async () => {
-    setLoading(true)
+  const loadDocuments = useCallback(async (page: number = 1, append: boolean = false) => {
+    if (append) {
+      setLoadingMore(true)
+    } else {
+      setLoading(true)
+    }
     setError(null)
     try {
       if (user) {
         // Use Firebase service when user is authenticated
-        const result = await documentService.getUserDocuments(user.uid)
-        setDocuments(result.data)
+        const result = await documentService.getUserDocuments(user.uid, undefined, page, PAGE_SIZE)
+        
+        if (append) {
+          setDocuments(prev => [...prev, ...result.data])
+        } else {
+          setDocuments(result.data)
+        }
+        
+        setHasMore(result.pagination.hasNext)
+        setCurrentPage(page)
         console.log('Loaded documents from Firebase:', result.data)
       } else {
         // Fallback to localStorage when user is not authenticated
@@ -29,20 +46,31 @@ export function useDocumentsFirebase() {
         if (stored) {
           const parsed = JSON.parse(stored)
           setDocuments(parsed)
+          setHasMore(false)
           console.log('Loaded documents from localStorage:', parsed)
         } else {
           setDocuments([])
+          setHasMore(false)
           console.log('No documents found in localStorage')
         }
       }
     } catch (err) {
       console.error('Error loading documents:', err)
       setError('Failed to load documents')
-      setDocuments([])
+      if (!append) {
+        setDocuments([])
+      }
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
   }, [user])
+
+  // Load more documents for infinite scroll
+  const loadMore = useCallback(async () => {
+    if (!hasMore || loadingMore || loading) return
+    await loadDocuments(currentPage + 1, true)
+  }, [hasMore, loadingMore, loading, currentPage, loadDocuments])
 
   // Save documents to localStorage (fallback)
   const saveDocuments = useCallback((newDocuments: Document[]) => {
@@ -79,8 +107,10 @@ export function useDocumentsFirebase() {
           thumbnailUrl = url
         }
         
+        const now = new Date().toISOString()
         const newDocument: Document = {
           id: crypto.randomUUID(),
+          userId: 'local',
           name: data.name,
           originalName: data.file.name,
           type: data.type,
@@ -88,11 +118,13 @@ export function useDocumentsFirebase() {
                     data.file.type === 'application/pdf' ? 'pdf' : 'document',
           mimeType: data.file.type,
           size: data.file.size,
-          uploadedAt: data.date || new Date().toISOString(),
+          uploadedAt: data.date || now,
           linkedTransaction: data.linkedTransaction,
           notes: data.notes,
           url,
-          thumbnailUrl
+          thumbnailUrl,
+          createdAt: now,
+          updatedAt: now
         }
         
         const updatedDocuments = [...documents, newDocument]
@@ -207,13 +239,32 @@ export function useDocumentsFirebase() {
     loadDocuments()
   }, [loadDocuments])
 
+  // Listen for document changes from other components (e.g., transactions)
+  useEffect(() => {
+    const handleDocumentChanged = () => {
+      if (user) {
+        loadDocuments()
+      }
+    }
+
+    window.addEventListener('documentChanged', handleDocumentChanged)
+    
+    return () => {
+      window.removeEventListener('documentChanged', handleDocumentChanged)
+    }
+  }, [user, loadDocuments])
+
   return {
     documents,
     loading,
+    loadingMore,
     error,
+    hasMore,
     uploadDocument,
     deleteDocument,
     downloadDocument,
-    filterDocuments
+    filterDocuments,
+    loadDocuments,
+    loadMore
   }
 }

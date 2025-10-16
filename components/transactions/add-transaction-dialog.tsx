@@ -137,7 +137,14 @@ export function AddTransactionDialog({
       console.log("Result:", result)
       
       if (result.success) {
-        toast.success(transaction ? 'Transaction updated successfully!' : 'Transaction added successfully!')
+        const hasAttachments = uploadedImages.length > 0
+        const successMessage = transaction 
+          ? 'Transaction updated successfully!' 
+          : hasAttachments 
+            ? `Transaction added successfully! ${uploadedImages.length} document(s) also saved.`
+            : 'Transaction added successfully!'
+        
+        toast.success(successMessage)
         onOpenChange(false)
         
         // Dispatch custom event to notify other components of the change
@@ -148,6 +155,14 @@ export function AddTransactionDialog({
           } 
         })
         window.dispatchEvent(event)
+        
+        // Dispatch document changed event if documents were created
+        if (hasAttachments && !transaction) {
+          const docEvent = new CustomEvent('documentChanged', { 
+            detail: { action: 'created' } 
+          })
+          window.dispatchEvent(docEvent)
+        }
       } else {
         toast.error(result.error || 'Failed to save transaction')
       }
@@ -307,7 +322,7 @@ export function AddTransactionDialog({
               id="file-upload"
               className="hidden"
               multiple
-              accept="image/*,.pdf"
+              accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
               onChange={handleFileSelect}
               disabled={uploadingImages}
             />
@@ -321,21 +336,21 @@ export function AddTransactionDialog({
               <p className="text-sm text-muted-foreground">
                 {uploadingImages ? 'Uploading...' : 'Click to upload or drag and drop'}
               </p>
-              <p className="text-xs text-muted-foreground mt-1">PDF, PNG, JPG up to 10MB</p>
+              <p className="text-xs text-muted-foreground mt-1">Images, PDF, Word, Excel, CSV up to 10MB</p>
             </label>
             
             {uploadedImages.length > 0 && (
               <div className="space-y-2 mt-2">
-                <p className="text-sm font-medium text-green-600">✅ Uploaded Images:</p>
+                <p className="text-sm font-medium text-green-600">✅ Uploaded Files:</p>
                 {uploadedImages.map((image, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 bg-green-50 rounded-lg border border-green-200">
+                  <div key={index} className="flex items-center justify-between p-2 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-green-100 rounded flex items-center justify-center">
-                        <Upload className="w-4 h-4 text-green-600" />
+                      <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded flex items-center justify-center">
+                        <Upload className="w-4 h-4 text-green-600 dark:text-green-400" />
                       </div>
                       <div>
-                        <span className="text-sm font-medium text-green-800">{image.name}</span>
-                        <p className="text-xs text-green-600">Uploaded successfully</p>
+                        <span className="text-sm font-medium text-green-800 dark:text-green-100">{image.name}</span>
+                        <p className="text-xs text-green-600 dark:text-green-400">Uploaded successfully</p>
                       </div>
                     </div>
                     <Button
@@ -343,7 +358,7 @@ export function AddTransactionDialog({
                       variant="ghost"
                       size="sm"
                       onClick={() => handleRemoveFile(index)}
-                      className="text-red-600 hover:text-red-700"
+                      className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
                     >
                       Remove
                     </Button>
