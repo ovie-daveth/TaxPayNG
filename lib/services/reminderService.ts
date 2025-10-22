@@ -14,10 +14,10 @@ export class ReminderService extends BaseService {
     showCompleted: boolean = false
   ): Promise<PaginatedResponse<Reminder>> {
     try {
-      const queryFilters = [{ field: 'userId', operator: '==', value: userId }]
+      const queryFilters: any[] = [{ field: 'userId', operator: '==', value: userId }]
       
       if (!showCompleted) {
-        queryFilters.push({ field: 'isCompleted', operator: '==', value: 'false' })
+        queryFilters.push({ field: 'isCompleted', operator: '==', value: false })
       }
 
       const { data, total } = await this.getPaginated(
@@ -205,7 +205,7 @@ export class ReminderService extends BaseService {
 
       return await this.getAll([
         { field: 'userId', operator: '==', value: userId },
-        { field: 'isCompleted', operator: '==', value: 'false' },
+        { field: 'isCompleted', operator: '==', value: false },
         { field: 'dueDate', operator: '>=', value: now.toISOString() },
         { field: 'dueDate', operator: '<=', value: futureDate.toISOString() }
       ], 'dueDate', 'asc')
@@ -222,7 +222,7 @@ export class ReminderService extends BaseService {
 
       return await this.getAll([
         { field: 'userId', operator: '==', value: userId },
-        { field: 'isCompleted', operator: '==', value: 'false' },
+        { field: 'isCompleted', operator: '==', value: false },
         { field: 'dueDate', operator: '<', value: now.toISOString() }
       ], 'dueDate', 'asc')
     } catch (error) {

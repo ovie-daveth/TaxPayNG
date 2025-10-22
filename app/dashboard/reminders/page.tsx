@@ -11,10 +11,12 @@ import { RemindersList } from "@/components/reminders/reminders-list"
 import { AddReminderDialog } from "@/components/reminders/add-reminder-dialog"
 import { ReminderStats } from "@/components/reminders/reminder-stats"
 import { RemindersSkeleton } from "@/components/ui/skeletons"
+import { Reminder } from "@/lib/types"
 
 export default function RemindersPage() {
   const { user } = useAuth()
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [editingReminder, setEditingReminder] = useState<Reminder | null>(null)
   
   const {
     reminders,
@@ -28,6 +30,18 @@ export default function RemindersPage() {
     getReminderStats
   } = useReminders(user?.uid || null)
 
+  const handleEdit = (reminder: Reminder) => {
+    setEditingReminder(reminder)
+    setIsAddDialogOpen(true)
+  }
+
+  const handleCloseDialog = (open: boolean) => {
+    setIsAddDialogOpen(open)
+    if (!open) {
+      setEditingReminder(null)
+    }
+  }
+
   if (loading && reminders.length === 0) {
     return (
       <main className="container mx-auto px-4 py-6 max-w-7xl">
@@ -36,10 +50,25 @@ export default function RemindersPage() {
     )
   }
 
+
+  console.log('reminders', reminders)
+
   return (
     <div className="">
         <main className="container mx-auto px-4 py-6 max-w-7xl">
           <div className="space-y-6">
+            {/* Header with Add Button */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold">Reminders</h1>
+                <p className="text-sm text-muted-foreground mt-1">Manage your tax deadlines and important dates</p>
+              </div>
+              <Button onClick={() => setIsAddDialogOpen(true)}>
+                <Plus className="w-4 h-4 mr-2" />
+                Add Reminder
+              </Button>
+            </div>
+
             {/* Error Message */}
             {error && (
               <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
@@ -55,14 +84,17 @@ export default function RemindersPage() {
               onDelete={deleteReminder}
               onMarkCompleted={markCompleted}
               onMarkIncomplete={markIncomplete}
+              onEdit={handleEdit}
             />
           </div>
         </main>
         
         <AddReminderDialog
           open={isAddDialogOpen}
-          onOpenChange={setIsAddDialogOpen}
+          onOpenChange={handleCloseDialog}
           onSubmit={createReminder}
+          editingReminder={editingReminder}
+          onUpdate={updateReminder}
         />
     </div>
   )

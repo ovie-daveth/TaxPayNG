@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { reminderService } from '@/lib/services'
-import { Reminder, ReminderFilters, PaginatedResponse } from '@/lib/types'
+import { Reminder, PaginatedResponse } from '@/lib/types'
 
 export function useReminders(userId: string | null) {
   const [reminders, setReminders] = useState<Reminder[]>([])
@@ -12,15 +12,15 @@ export function useReminders(userId: string | null) {
 
   const loadReminders = useCallback(async (
     page: number = 1,
-    pageSize: number = 20,
-    filters?: ReminderFilters
+    pageSize: number = 20
   ) => {
     if (!userId) return
 
     setLoading(true)
     setError(null)
     try {
-      const result = await reminderService.getUserReminders(userId, page, pageSize, filters)
+      const result = await reminderService.getUserReminders(userId, page, pageSize)
+      console.log('result', result)
       setReminders(result.data)
       setPagination(result.pagination)
     } catch (err) {
@@ -31,16 +31,15 @@ export function useReminders(userId: string | null) {
   }, [userId])
 
   const createReminder = useCallback(async (data: Omit<Reminder, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
-    if (!userId) return
+    if (!userId) return { success: false, error: 'User not authenticated' }
 
     setError(null)
     try {
-      const result = await reminderService.createReminder({
-        ...data,
-        userId
-      })
-      setReminders(prev => [result.data, ...prev])
-      return result.data
+      const result = await reminderService.createReminder(userId, data)
+      if (result.success && result.data) {
+        setReminders(prev => [result.data!, ...prev])
+      }
+      return result
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create reminder')
       throw err
@@ -48,57 +47,74 @@ export function useReminders(userId: string | null) {
   }, [userId])
 
   const updateReminder = useCallback(async (id: string, data: Partial<Reminder>) => {
+    if (!userId) return { success: false, error: 'User not authenticated' }
+
     setError(null)
     try {
-      const result = await reminderService.updateReminder(id, data)
-      setReminders(prev => prev.map(reminder => 
-        reminder.id === id ? { ...reminder, ...result.data } : reminder
-      ))
-      return result.data
+      const result = await reminderService.updateReminder(id, userId, data)
+      if (result.success && result.data) {
+        setReminders(prev => prev.map(reminder => 
+          reminder.id === id ? result.data! : reminder
+        ))
+      }
+      return result
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to update reminder')
       throw err
     }
-  }, [])
+  }, [userId])
 
   const deleteReminder = useCallback(async (id: string) => {
+    if (!userId) return { success: false, error: 'User not authenticated' }
+
     setError(null)
     try {
-      await reminderService.deleteReminder(id)
-      setReminders(prev => prev.filter(reminder => reminder.id !== id))
+      const result = await reminderService.deleteReminder(id, userId)
+      if (result.success) {
+        setReminders(prev => prev.filter(reminder => reminder.id !== id))
+      }
+      return result
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to delete reminder')
       throw err
     }
-  }, [])
+  }, [userId])
 
   const markCompleted = useCallback(async (id: string) => {
+    if (!userId) return { success: false, error: 'User not authenticated' }
+
     setError(null)
     try {
-      const result = await reminderService.markCompleted(id)
-      setReminders(prev => prev.map(reminder => 
-        reminder.id === id ? { ...reminder, ...result.data } : reminder
-      ))
-      return result.data
+      const result = await reminderService.markCompleted(id, userId)
+      if (result.success && result.data) {
+        setReminders(prev => prev.map(reminder => 
+          reminder.id === id ? result.data! : reminder
+        ))
+      }
+      return result
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to mark reminder as completed')
       throw err
     }
-  }, [])
+  }, [userId])
 
   const markIncomplete = useCallback(async (id: string) => {
+    if (!userId) return { success: false, error: 'User not authenticated' }
+
     setError(null)
     try {
-      const result = await reminderService.markIncomplete(id)
-      setReminders(prev => prev.map(reminder => 
-        reminder.id === id ? { ...reminder, ...result.data } : reminder
-      ))
-      return result.data
+      const result = await reminderService.markIncomplete(id, userId)
+      if (result.success && result.data) {
+        setReminders(prev => prev.map(reminder => 
+          reminder.id === id ? result.data! : reminder
+        ))
+      }
+      return result
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to mark reminder as incomplete')
       throw err
     }
-  }, [])
+  }, [userId])
 
   const getUpcomingReminders = useCallback(async (days: number = 7) => {
     if (!userId) return []
@@ -106,7 +122,7 @@ export function useReminders(userId: string | null) {
     setError(null)
     try {
       const result = await reminderService.getUpcomingReminders(userId, days)
-      return result.data
+      return result
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get upcoming reminders')
       return []
@@ -119,7 +135,7 @@ export function useReminders(userId: string | null) {
     setError(null)
     try {
       const result = await reminderService.getOverdueReminders(userId)
-      return result.data
+      return result
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get overdue reminders')
       return []
@@ -132,7 +148,7 @@ export function useReminders(userId: string | null) {
     setError(null)
     try {
       const result = await reminderService.getReminderStats(userId)
-      return result.data
+      return result
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get reminder stats')
       return null

@@ -22,7 +22,8 @@ export function DashboardHeader() {
   const { user } = useAuth()
   const { uploadDocument } = useDocumentsFirebase()
   const { createTransaction } = useTransactions(user?.uid || null)
-  const { createReminder } = useReminders(user?.uid || null)
+  // Only load reminders hook when not on reminders page to avoid duplicate state
+  const { createReminder } = useReminders(pathname !== "/dashboard/reminders" ? (user?.uid || null) : null)
 
   const getPageInfo = (path: string) => {
     switch (path) {
@@ -108,10 +109,24 @@ export function DashboardHeader() {
                 Export
               </Button>
             )}
-            <Button onClick={pageInfo.buttonAction}>
-              <ButtonIcon className="w-4 h-4 mr-2" />
-              {pageInfo.buttonText}
-            </Button>
+            {/* Show Add Reminder button on non-reminder pages */}
+            {pathname !== "/dashboard/reminders" && pathname !== "/dashboard/settings" && (
+              <Button 
+                variant="outline" 
+                size="icon"
+                onClick={() => setIsAddReminderDialogOpen(true)}
+                title="Add Reminder"
+              >
+                <Bell className="w-4 h-4" />
+              </Button>
+            )}
+            {/* Show main action button except on reminders page */}
+            {pathname !== "/dashboard/reminders" && (
+              <Button onClick={pageInfo.buttonAction}>
+                <ButtonIcon className="w-4 h-4 mr-2" />
+                {pageInfo.buttonText}
+              </Button>
+            )}
           </div>
         </div>
       </div>
@@ -126,11 +141,14 @@ export function DashboardHeader() {
         onSubmit={createTransaction}
         transaction={null}
       />
-      <AddReminderDialog 
-        open={isAddReminderDialogOpen} 
-        onOpenChange={setIsAddReminderDialogOpen}
-        onSubmit={createReminder}
-      />
+      {/* Always render AddReminderDialog except on reminders page to avoid duplicate state */}
+      {pathname !== "/dashboard/reminders" && (
+        <AddReminderDialog 
+          open={isAddReminderDialogOpen} 
+          onOpenChange={setIsAddReminderDialogOpen}
+          onSubmit={createReminder}
+        />
+      )}
     </div>
   )
 }
