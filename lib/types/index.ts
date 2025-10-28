@@ -164,6 +164,34 @@ export interface TaxCalculation {
   updatedAt: string
 }
 
+// Tax Payment Types
+export interface TaxPayment {
+  id: string
+  userId: string
+  transactionId: string
+  amount: number
+  period: 'monthly' | 'quarterly' | 'yearly'
+  taxDuration: string // e.g., "October 2024", "Jan-Mar 2024", "2024"
+  paymentMethod: 'remitta' | 'interswitch' | 'paystack' | 'firs'
+  status: 'pending' | 'completed' | 'failed'
+  taxCalculation?: {
+    businessType: string
+    income: number
+    rentPaid: number
+    pensionContribution: number
+    healthInsurance: number
+    lifeInsurance: number
+    charitableDonations: number
+    businessExpenses: number
+    dependents: number
+    result: TaxCalculation['result']
+  }
+  receiptUrl?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
+
 // API Response Types
 export interface ApiResponse<T> {
   success: boolean

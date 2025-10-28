@@ -63,11 +63,11 @@ export default function SignupPage() {
 
     setIsLoading(false)
 
-    if (result.success) {
+    if (result?.success) {
       toast.success('Account created successfully!')
       router.push("/dashboard")
     } else {
-      toast.error(result.error || 'Failed to create account')
+      toast.error(result?.error || 'Failed to create account')
     }
   }
 

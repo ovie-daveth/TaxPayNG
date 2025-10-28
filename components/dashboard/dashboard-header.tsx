@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Plus, FileText, Calculator, Bell, Settings, Receipt, Download } from "lucide-react"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { UploadDocumentDialog } from "../documents/upload-document-dialog"
 import { useState } from "react"
 import { AddTransactionDialog } from "../transactions/add-transaction-dialog"
@@ -15,6 +15,7 @@ import { useReminders } from "@/lib/hooks/useReminders"
 
 export function DashboardHeader() {
   const pathname = usePathname()
+  const router = useRouter()
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isAddReminderDialogOpen, setIsAddReminderDialogOpen] = useState(false)
@@ -31,9 +32,9 @@ export function DashboardHeader() {
         return {
           title: "Dashboard",
           subtitle: "Welcome back! Here's your financial overview.",
-          buttonText: "Add Transaction",
+          buttonText: "Pay Tax",
           buttonIcon: Plus,
-          buttonAction: () => console.log("Add transaction")
+          buttonAction: () => router.push("/dashboard/payment")
         }
       case "/dashboard/transactions":
         return {
