@@ -27,7 +27,7 @@ const TAX_BRACKETS: TaxBracket[] = [
   { min: 50000000, max: null, rate: 25 },
 ]
 
-export function calculateNigerianTax(input: TaxInput) {
+export function calculateNigerianTax(input: TaxInput, includeInputs: boolean = false) {
   // Convert income to annual amount
   let annualIncome = input.income
   if (input.period === "monthly") {
@@ -108,7 +108,7 @@ export function calculateNigerianTax(input: TaxInput) {
     { quarter: "Q4 (Oct-Dec)", amount: quarterlyAmount },
   ]
 
-  return {
+  const result: any = {
     grossIncome,
     businessExpenses: annualBusinessExpenses,
     adjustedGrossIncome,
@@ -130,4 +130,20 @@ export function calculateNigerianTax(input: TaxInput) {
     })),
     effectiveRate: taxableIncome > 0 ? ((totalTax / taxableIncome) * 100).toFixed(2) : 0,
   }
+
+  // Include original inputs if requested
+  if (includeInputs) {
+    result.businessType = input.businessType
+    result.income = input.income
+    result.rentPaid = input.rentPaid
+    result.pensionContribution = input.pensionContribution
+    result.healthInsurance = input.healthInsurance
+    result.lifeInsurance = input.lifeInsurance
+    result.charitableDonations = input.charitableDonations
+    result.businessExpenses = input.businessExpenses
+    result.dependents = input.dependents
+    result.period = input.period
+  }
+
+  return result
 }

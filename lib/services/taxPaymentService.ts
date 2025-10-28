@@ -60,6 +60,19 @@ export class TaxPaymentService extends BaseService {
     }
   }
 
+  // Get all payments for a user (simple query without ordering to avoid index requirement)
+  async getUserPaymentsSimple(userId: string): Promise<TaxPayment[]> {
+    try {
+      const payments = await this.getAll([
+        { field: 'userId', operator: '==', value: userId }
+      ])
+      return payments || []
+    } catch (error) {
+      console.error('Error getting user tax payments (simple):', error)
+      return []
+    }
+  }
+
   // Get all payments for a user
   async getUserPayments(
     userId: string,

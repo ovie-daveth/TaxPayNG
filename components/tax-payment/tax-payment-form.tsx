@@ -77,6 +77,14 @@ export function TaxPaymentForm({ onPay, processing, onCheckDuplicate }: TaxPayme
     return null
   })
   
+  const [originalTaxInputs, setOriginalTaxInputs] = useState<any>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('tax_payment_original_inputs')
+      return saved ? JSON.parse(saved) : null
+    }
+    return null
+  })
+  
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('tax_payment_tab') || "direct"

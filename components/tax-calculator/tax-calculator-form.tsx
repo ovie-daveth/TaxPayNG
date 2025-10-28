@@ -13,6 +13,7 @@ import { calculateNigerianTax } from "@/lib/tax-calculator"
 
 interface TaxCalculatorFormProps {
   onCalculate: (result: any) => void
+  onInputsSaved?: (inputs: any) => void
 }
 
 export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {

@@ -96,18 +96,7 @@ export default function PaymentPage() {
             taxDuration: taxDuration,
             paymentMethod: method as 'remitta' | 'interswitch' | 'paystack' | 'firs',
             status: 'completed',
-            taxCalculation: taxCalculation ? {
-              businessType: taxCalculation.businessType || '',
-              income: taxCalculation.income || 0,
-              rentPaid: taxCalculation.rentPaid || 0,
-              pensionContribution: taxCalculation.pensionContribution || 0,
-              healthInsurance: taxCalculation.healthInsurance || 0,
-              lifeInsurance: taxCalculation.lifeInsurance || 0,
-              charitableDonations: taxCalculation.charitableDonations || 0,
-              businessExpenses: taxCalculation.businessExpenses || 0,
-              dependents: taxCalculation.dependents || 0,
-              result: taxCalculation.result || taxCalculation
-            } : undefined,
+            taxCalculation: taxCalculation,
             notes: 'Payment completed successfully'
           })
           
@@ -165,12 +154,12 @@ export default function PaymentPage() {
     }
 
     try {
-      // Get all payments for this user
-      const result = await taxPaymentService.getUserPayments(user.uid)
+      // Get all payments for this user using simple query (no index required)
+      const payments = await taxPaymentService.getUserPaymentsSimple(user.uid)
       
-      if (result.data && result.data.length > 0) {
+      if (payments && payments.length > 0) {
         // Check if any payment exists with the same period and taxDuration
-        const duplicate = result.data.find(payment => 
+        const duplicate = payments.find(payment => 
           payment.period === period && 
           payment.taxDuration === taxDuration &&
           payment.status === 'completed'
