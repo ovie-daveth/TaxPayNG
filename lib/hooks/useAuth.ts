@@ -14,7 +14,7 @@ import { auth } from '@/firebase/firebase'
 import { userService } from '@/lib/services'
 
 interface AuthState {
-  user: User | null
+  user: User | null 
   loading: boolean
   error: string | null
 }
