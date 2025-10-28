@@ -15,9 +15,10 @@ import { PERIODS, PaymentPeriodCard } from "./payment-period-card"
 import { PaymentStepsIndicator } from "./payment-steps-indicator"
 import { TaxCalculatorForm } from "@/components/tax-calculator/tax-calculator-form"
 import { TaxDurationSelector } from "./tax-duration-selector"
+import { RRRPaymentForm } from "./rrr-payment-form"
 
 interface TaxPaymentFormProps {
-  onPay: (amount: number, method: string, period: string, taxDuration: string, taxCalculation?: any) => void
+  onPay: (amount: number, method: string, period: string, taxDuration: string, taxCalculation?: any, rrr?: string, tin?: string, state?: string) => void
   processing: boolean
   onCheckDuplicate?: (period: string, taxDuration: string) => Promise<{ isDuplicate: boolean; payment?: any }>
 }
@@ -26,7 +27,8 @@ const STEPS = [
   { id: 1, title: "Period", description: "Select tax period" },
   { id: 2, title: "Amount", description: "Enter tax amount" },
   { id: 3, title: "Payment", description: "Choose gateway" },
-  { id: 4, title: "Review", description: "Confirm payment" },
+  { id: 4, title: "Generate RRR", description: "Create reference" },
+  { id: 5, title: "Review", description: "Confirm payment" },
 ]
 
 export function TaxPaymentForm({ onPay, processing, onCheckDuplicate }: TaxPaymentFormProps) {
@@ -147,6 +149,9 @@ export function TaxPaymentForm({ onPay, processing, onCheckDuplicate }: TaxPayme
 
   const [showDuplicateModal, setShowDuplicateModal] = useState(false)
   const [duplicatePaymentInfo, setDuplicatePaymentInfo] = useState<any>(null)
+  const [generatedRRR, setGeneratedRRR] = useState<string>("")
+  const [tinNumber, setTinNumber] = useState<string>("")
+  const [stateOfWork, setStateOfWork] = useState<string>("")
 
   const handleCalculate = (result: any) => {
     // Validate that expenses don't exceed income
@@ -198,6 +203,14 @@ export function TaxPaymentForm({ onPay, processing, onCheckDuplicate }: TaxPayme
     }
   }
 
+  const handleGenerateRRR = (rrr: string, tin: string, state: string) => {
+    setGeneratedRRR(rrr)
+    setTinNumber(tin)
+    setStateOfWork(state)
+    // Go to next step (review)
+    setCurrentStep(5)
+  }
+
   const handlePay = async () => {
     const paymentAmount = parseFloat(amount) || 0
     if (paymentAmount > 0 && selectedMethod && period && taxDuration) {
@@ -213,8 +226,8 @@ export function TaxPaymentForm({ onPay, processing, onCheckDuplicate }: TaxPayme
       
       // Clear localStorage when payment is initiated
       clearPaymentData()
-      // Pass the full tax calculation if it exists
-      onPay(paymentAmount, selectedMethod, period, taxDuration, calculatedTaxFull)
+      // Pass the full tax calculation and RRR details if they exist
+      onPay(paymentAmount, selectedMethod, period, taxDuration, calculatedTaxFull, generatedRRR, tinNumber, stateOfWork)
     }
   }
 
@@ -227,16 +240,25 @@ export function TaxPaymentForm({ onPay, processing, onCheckDuplicate }: TaxPayme
       case 3:
         return selectedMethod !== ""
       case 4:
-        return amount !== "" && parseFloat(amount) > 0 && selectedMethod !== "" && period !== "" && taxDuration !== ""
+        // Only require RRR for certain payment methods
+        const requiresRRR = selectedMethod && ['remitta', 'interswitch', 'paystack'].includes(selectedMethod)
+        return requiresRRR ? generatedRRR !== "" : true
+      case 5:
+        return true
       default:
         return false
     }
   }
 
   const nextStep = () => {
-    if (canProceed() && currentStep < 4) {
+    if (canProceed() && currentStep < 5) {
       setCurrentStep(currentStep + 1)
     }
+  }
+  
+  // Check if current payment method requires RRR
+  const requiresRRR = () => {
+    return selectedMethod && ['remitta', 'interswitch', 'paystack'].includes(selectedMethod)
   }
 
   const prevStep = () => {
@@ -414,6 +436,99 @@ export function TaxPaymentForm({ onPay, processing, onCheckDuplicate }: TaxPayme
                   <span className="text-muted-foreground">Payment Method:</span>
                   <span className="font-semibold">{getMethodDisplay()}</span>
                 </div>
+                <div className="flex items-center justify-between pt-2">
+                  <span className="text-lg font-semibold">Total Amount:</span>
+                  <span className="text-3xl font-bold text-primary">
+                    ₦{amount ? parseFloat(amount).toLocaleString() : "0.00"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <p className="font-semibold text-blue-900 dark:text-blue-100">Secure Payment</p>
+                    <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">
+                      Your payment will be processed securely through our payment gateway. 
+                      You'll receive a receipt upon successful payment.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+            <CardFooter className="flex justify-between gap-3">
+              <Button variant="outline" onClick={prevStep} size="lg">
+                <ArrowLeft className="w-4 h-4 mr-2" /> Back
+              </Button>
+              <Button 
+                onClick={handlePay} 
+                disabled={!canProceed() || processing} 
+                size="lg"
+                className="flex-1"
+              >
+                {processing ? "Processing Payment..." : "Confirm Payment"}
+              </Button>
+            </CardFooter>
+          </Card>
+        )}
+
+        {currentStep === 4 && requiresRRR() && (
+          <RRRPaymentForm 
+            onGenerateRRR={handleGenerateRRR}
+            processing={processing}
+          />
+        )}
+
+        {currentStep === 4 && !requiresRRR() && (
+          <Card>
+            <CardContent className="pt-6">
+              <p className="text-center text-muted-foreground mb-4">
+                Click continue to proceed to review...
+              </p>
+              <Button onClick={nextStep} className="w-full">Continue</Button>
+            </CardContent>
+          </Card>
+        )}
+
+        {currentStep === 5 && (
+          <Card className="animate-in fade-in slide-in-from-right duration-300">
+            <CardHeader>
+              <CardTitle>Review Payment</CardTitle>
+              <CardDescription>Please review your payment details before proceeding</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-4 p-6 bg-muted/50 rounded-lg">
+                <div className="flex items-center justify-between pb-3 border-b">
+                  <span className="text-muted-foreground">Tax Period:</span>
+                  <span className="font-semibold">{getPeriodDisplay()}</span>
+                </div>
+                <div className="flex items-center justify-between pb-3 border-b">
+                  <span className="text-muted-foreground">Tax Duration:</span>
+                  <span className="font-semibold text-primary">{taxDuration || "Not specified"}</span>
+                </div>
+                <div className="flex items-center justify-between pb-3 border-b">
+                  <span className="text-muted-foreground">Payment Method:</span>
+                  <span className="font-semibold">{getMethodDisplay()}</span>
+                </div>
+                {generatedRRR && (
+                  <div className="flex items-center justify-between pb-3 border-b">
+                    <span className="text-muted-foreground">RRR:</span>
+                    <span className="font-mono font-semibold text-primary">{generatedRRR}</span>
+                  </div>
+                )}
+                {tinNumber && (
+                  <div className="flex items-center justify-between pb-3 border-b">
+                    <span className="text-muted-foreground">TIN:</span>
+                    <span className="font-semibold">{tinNumber}</span>
+                  </div>
+                )}
+                {stateOfWork && (
+                  <div className="flex items-center justify-between pb-3 border-b">
+                    <span className="text-muted-foreground">State of Work:</span>
+                    <span className="font-semibold">{stateOfWork}</span>
+                  </div>
+                )}
                 <div className="flex items-center justify-between pt-2">
                   <span className="text-lg font-semibold">Total Amount:</span>
                   <span className="text-3xl font-bold text-primary">

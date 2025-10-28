@@ -19,6 +19,9 @@ interface PaymentData {
   method: string
   taxDuration: string
   timestamp: string
+  rrr?: string
+  tin?: string
+  state?: string
 }
 
 export default function PaymentPage() {
@@ -54,7 +57,7 @@ export default function PaymentPage() {
     }
   }
 
-  const handlePay = async (amount: number, method: string, period: string, taxDuration: string, taxCalculation?: any) => {
+  const handlePay = async (amount: number, method: string, period: string, taxDuration: string, taxCalculation?: any, rrr?: string, tin?: string, state?: string) => {
     setProcessing(true)
     
     try {
@@ -117,8 +120,11 @@ export default function PaymentPage() {
         toast.error('Payment completed but user not authenticated')
       }
       
-      // Add taxDuration to paymentResult
+      // Add taxDuration and RRR details to paymentResult
       paymentResult.taxDuration = taxDuration
+      if (rrr) paymentResult.rrr = rrr
+      if (tin) paymentResult.tin = tin
+      if (state) paymentResult.state = state
       
       setPaymentData(paymentResult)
       setShowReceipt(true)
