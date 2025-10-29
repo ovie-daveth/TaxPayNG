@@ -10,7 +10,7 @@ const reminders = [
     date: "2025-01-31",
     type: "tax_deadline",
     icon: DollarSign,
-    color: "text-red-600 bg-red-100",
+    color: "text-destructive bg-destructive/10",
   },
   {
     id: 2,
@@ -18,7 +18,7 @@ const reminders = [
     date: "2025-02-05",
     type: "document_submission",
     icon: FileText,
-    color: "text-blue-600 bg-blue-100",
+    color: "text-chart-3 bg-chart-3/10",
   },
   {
     id: 3,
@@ -26,7 +26,7 @@ const reminders = [
     date: "2025-02-15",
     type: "quarterly_payment",
     icon: Calendar,
-    color: "text-orange-600 bg-orange-100",
+    color: "text-accent bg-accent/10",
   },
 ]
 

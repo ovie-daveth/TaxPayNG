@@ -11,10 +11,10 @@ export default function HomePage() {
       <header className="border-b border-border">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Calculator className="w-5 h-5 text-primary-foreground" />
+            <div className="w-8 h-8 bg-primary text-primary-foreground font-bold rounded-lg flex items-center justify-center">
+              O
             </div>
-            <span className="font-semibold text-xl">TaxPal NG</span>
+            <span className="font-semibold text-xl">OTax</span>
           </div>
           <nav className="hidden md:flex items-center gap-6">
             <Link href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -118,9 +118,9 @@ export default function HomePage() {
               <div className="w-6 h-6 bg-primary rounded flex items-center justify-center">
                 <Calculator className="w-4 h-4 text-primary-foreground" />
               </div>
-              <span className="font-semibold">TaxPal NG</span>
+              <span className="font-semibold">OTax</span>
             </div>
-            <p className="text-sm text-muted-foreground">© 2025 TaxPal NG. All rights reserved.</p>
+            <p className="text-sm text-muted-foreground">© 2025 OTax. All rights reserved.</p>
           </div>
         </div>
       </footer>

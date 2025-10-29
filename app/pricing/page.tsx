@@ -14,7 +14,7 @@ export default function PricingPage() {
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <Calculator className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="font-semibold text-xl">TaxPal NG</span>
+            <span className="font-semibold text-xl">OTax</span>
           </Link>
           <div className="flex items-center gap-3">
             <Link href="/login">
@@ -168,9 +168,9 @@ export default function PricingPage() {
               <div className="w-6 h-6 bg-primary rounded flex items-center justify-center">
                 <Calculator className="w-4 h-4 text-primary-foreground" />
               </div>
-              <span className="font-semibold">TaxPal NG</span>
+              <span className="font-semibold">OTax</span>
             </div>
-            <p className="text-sm text-muted-foreground">© 2025 TaxPal NG. All rights reserved.</p>
+            <p className="text-sm text-muted-foreground">© 2025 OTax. All rights reserved.</p>
           </div>
         </div>
       </footer>

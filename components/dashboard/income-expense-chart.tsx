@@ -16,16 +16,16 @@ const data = [
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (active && payload && payload.length) {
     return (
-      <div className="bg-slate-900/95 backdrop-blur-sm border border-slate-700/50 rounded-xl p-4 shadow-2xl z-50">
-        <div className="text-slate-100 font-medium mb-2">{`${label} 2025`}</div>
+      <div className="bg-card border border-border rounded-xl p-4 shadow-2xl z-50">
+        <div className="font-medium mb-2">{`${label} 2025`}</div>
         {payload.map((entry: any, index: number) => (
           <div key={index} className="flex items-center gap-2 mb-1">
             <div 
               className="w-3 h-3 rounded-full" 
               style={{ backgroundColor: entry.color }}
             />
-            <span className="text-slate-200 text-sm">
-              {entry.name}: <span className="font-semibold text-slate-50">
+            <span className="text-sm text-muted-foreground">
+              {entry.name}: <span className="font-semibold text-foreground">
                 ₦{entry.value.toLocaleString()}
               </span>
             </span>
@@ -39,26 +39,26 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export function IncomeExpenseChart() {
   return (
-    <Card className="p-6 bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 border-slate-200 dark:border-slate-700">
+    <Card className="p-6">
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Income vs Expenses</h3>
-        <p className="text-sm text-slate-600 dark:text-slate-400">Monthly comparison for 2025</p>
+        <h3 className="text-lg font-semibold">Income vs Expenses</h3>
+        <p className="text-sm text-muted-foreground">Monthly comparison for 2025</p>
       </div>
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={data} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
           <defs>
             <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#10b981" stopOpacity={0.8} />
-              <stop offset="100%" stopColor="#059669" stopOpacity={0.9} />
+              <stop offset="0%" stopColor="#007F5F" stopOpacity={0.8} />
+              <stop offset="100%" stopColor="#004D40" stopOpacity={0.9} />
             </linearGradient>
             <linearGradient id="expenseGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#dc2626" stopOpacity={0.8} />
-              <stop offset="100%" stopColor="#b91c1c" stopOpacity={0.9} />
+              <stop offset="0%" stopColor="#FFC107" stopOpacity={0.8} />
+              <stop offset="100%" stopColor="#FF9800" stopOpacity={0.9} />
             </linearGradient>
           </defs>
           <CartesianGrid 
             strokeDasharray="3 3" 
-            stroke="#64748b" 
+            className="stroke-border"
             strokeOpacity={0.3}
             vertical={false}
           />
@@ -67,7 +67,7 @@ export function IncomeExpenseChart() {
             axisLine={false}
             tickLine={false}
             tick={{ 
-              fill: '#64748b', 
+              className: 'fill-muted-foreground',
               fontSize: 12, 
               fontWeight: 500 
             }}
@@ -76,7 +76,7 @@ export function IncomeExpenseChart() {
             axisLine={false}
             tickLine={false}
             tick={{ 
-              fill: '#64748b', 
+              className: 'fill-muted-foreground',
               fontSize: 12, 
               fontWeight: 500 
             }}
