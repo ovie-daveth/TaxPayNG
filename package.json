@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "next dev",
+    "dev": "concurrently \"afrihub start --port 3001\" \"next dev\"",
     "backend": "afrihub start --port 3001",
     "frontend": "next dev",
     "lint": "next lint",
