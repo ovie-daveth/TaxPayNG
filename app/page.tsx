@@ -1,10 +1,28 @@
+"use client"
+
 import type React from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, BarChart3, Calculator, FileText, Bell } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { toast } from "sonner"
 
 export default function HomePage() {
+  const { user, logout, loading } = useAuth()
+  const router = useRouter()
+
+  const handleLogout = async () => {
+    const result = await logout()
+    if (result.success) {
+      toast.success('Logged out successfully!')
+      router.push('/')
+    } else {
+      toast.error(result.error || 'Failed to log out')
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -29,14 +47,29 @@ export default function HomePage() {
           </nav>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <Link href="/login">
-              <Button variant="ghost" size="sm">
-                Log in
-              </Button>
-            </Link>
-            <Link href="/signup">
-              <Button size="sm">Get Started</Button>
-            </Link>
+            {user ? (
+              <>
+                <Link href="/dashboard">
+                  <Button variant="ghost" size="sm">
+                    Dashboard
+                  </Button>
+                </Link>
+                <Button variant="ghost" size="sm" onClick={handleLogout} disabled={loading}>
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link href="/login">
+                  <Button variant="ghost" size="sm">
+                    Log in
+                  </Button>
+                </Link>
+                <Link href="/signup">
+                  <Button size="sm">Get Started</Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>

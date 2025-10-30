@@ -52,8 +52,11 @@ export default function LoginPage() {
         <div className="bg-card border border-border rounded-xl p-8 shadow-lg">
           {/* Logo */}
           <div className="flex items-center justify-center gap-2 mb-8">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+            {/* <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
               <Calculator className="w-6 h-6 text-primary-foreground" />
+            </div> */}
+             <div className="w-8 h-8 bg-primary text-primary-foreground font-bold rounded-lg flex items-center justify-center">
+              O
             </div>
             <span className="font-semibold text-2xl">OTax</span>
           </div>
