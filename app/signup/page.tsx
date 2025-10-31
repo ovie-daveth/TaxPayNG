@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Calculator } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/hooks/useAuth"
@@ -17,6 +18,7 @@ export default function SignupPage() {
   const router = useRouter()
   const { signUp, user, loading } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
+  const [showComingSoonModal, setShowComingSoonModal] = useState(false)
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -25,11 +27,7 @@ export default function SignupPage() {
     confirmPassword: ''
   })
 
-  useEffect(() => {
-    if (!loading && user) {
-      router.push("/dashboard")
-    }
-  }, [user, loading, router])
+  // Remove auto-redirect - let the form submission handle it
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -58,14 +56,20 @@ export default function SignupPage() {
       password: formData.password,
       firstName,
       lastName,
-      businessType: formData.businessType as 'freelancer' | 'sme' | 'individual'
+      businessType: formData.businessType as 'freelancer' | 'sme'
     })
 
     setIsLoading(false)
-
+    console.log("result", result)
     if (result?.success) {
       toast.success('Account created successfully!')
-      router.push("/dashboard")
+      // Redirect based on business type
+      console.log("business type", formData.businessType)
+      if (formData.businessType === 'freelancer') {
+        router.push("/verify-tin")
+      } else {
+        router.push("/dashboard")
+      }
     } else {
       toast.error(result?.error || 'Failed to create account')
     }
@@ -92,12 +96,40 @@ export default function SignupPage() {
           </div>
 
           <form className="space-y-4" onSubmit={handleSubmit}>
+            {/* Business Type - First Field */}
             <div className="space-y-2">
-              <Label htmlFor="fullName">Full Name</Label>
+              <Label htmlFor="businessType">Business Type</Label>
+              <Select 
+                value={formData.businessType}
+                onValueChange={(value) => {
+                  if (value === 'large_corporation') {
+                    setShowComingSoonModal(true)
+                    // Revert to small business
+                    setFormData(prev => ({ ...prev, businessType: 'sme' }))
+                  } else {
+                    setFormData(prev => ({ ...prev, businessType: value }))
+                  }
+                }}
+              >
+                <SelectTrigger id="businessType">
+                  <SelectValue placeholder="Select business type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="freelancer">Freelancer</SelectItem>
+                  <SelectItem value="sme">Small Business</SelectItem>
+                  <SelectItem value="large_corporation">Large Corporation</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fullName">
+                {formData.businessType === 'sme' ? 'Company Name' : 'Full Name'}
+              </Label>
               <Input 
                 id="fullName" 
                 type="text" 
-                placeholder="John Doe" 
+                placeholder={formData.businessType === 'sme' ? 'Acme Corporation Ltd' : 'John Doe'} 
                 value={formData.fullName}
                 onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
                 required 
@@ -114,23 +146,6 @@ export default function SignupPage() {
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                 required 
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="businessType">Business Type</Label>
-              <Select 
-                value={formData.businessType}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, businessType: value }))}
-              >
-                <SelectTrigger id="businessType">
-                  <SelectValue placeholder="Select business type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="freelancer">Freelancer</SelectItem>
-                  <SelectItem value="sme">Small & Medium Enterprise</SelectItem>
-                  <SelectItem value="individual">Individual</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="space-y-2">
@@ -174,6 +189,23 @@ export default function SignupPage() {
           By continuing, you agree to our Terms of Service and Privacy Policy
         </p>
       </div>
+
+      {/* Coming Soon Modal */}
+      <Dialog open={showComingSoonModal} onOpenChange={setShowComingSoonModal}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Coming Soon</DialogTitle>
+            <DialogDescription>
+              Large corporation features are currently under development. For now, we've set your account as a Small Business. You can manage your employees, payroll, and PAYE tax with our Small Business plan.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end mt-4">
+            <Button onClick={() => setShowComingSoonModal(false)}>
+              Got it
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

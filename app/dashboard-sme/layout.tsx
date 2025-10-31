@@ -3,7 +3,7 @@
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
-import { DashboardNav } from "@/components/dashboard/dashboard-nav"
+import { DashboardNavSME } from "@/components/dashboard/dashboard-nav-sme"
 import { SidebarProvider, useSidebar } from "@/lib/contexts/sidebar-context"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
@@ -26,23 +26,13 @@ function LayoutContent({
   }, [user, loading, router])
 
   useEffect(() => {
-    if (!profile) return
-    
-    console.log("Dashboard layout - businessType:", profile.businessType, "current path:", window.location.pathname)
-    
-    // Redirect SMEs to their dashboard
-    if (profile.businessType === 'sme' && !window.location.pathname.startsWith('/dashboard-sme')) {
-      console.log("Redirecting SME to /dashboard-sme")
-      router.push('/dashboard-sme')
-    }
-    // Redirect freelancers away from SME dashboard
-    if (profile.businessType === 'freelancer' && window.location.pathname.startsWith('/dashboard-sme')) {
-      console.log("Redirecting freelancer from /dashboard-sme to /dashboard")
+    // Redirect freelancers to their dashboard if they somehow access SME dashboard
+    if (profile && profile.businessType === 'freelancer' && window.location.pathname.startsWith('/dashboard-sme')) {
       router.push('/dashboard')
     }
   }, [profile, router])
 
-  if (loading) {
+  if (loading || profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-pulse text-muted-foreground">Loading...</div>
@@ -50,13 +40,13 @@ function LayoutContent({
     )
   }
 
-  if (!user) {
+  if (!user || (profile && profile.businessType !== 'sme')) {
     return null
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <DashboardNav />
+      <DashboardNavSME />
       <div className={cn(
         "flex-1 transition-all duration-300 ease-in-out",
         sidebarCollapsed ? "md:ml-16" : "md:ml-64"
@@ -79,3 +69,4 @@ export default function RootLayout({
     </SidebarProvider>
   )
 }
+
