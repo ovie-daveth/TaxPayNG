@@ -10,11 +10,13 @@ import { Label } from "@/components/ui/label"
 import { Calculator } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/hooks/useAuth"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { toast } from "sonner"
 
 export default function LoginPage() {
   const router = useRouter()
   const { signIn, user, loading } = useAuth()
+  const { profile, loading: profileLoading } = useUserProfile()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
@@ -22,10 +24,17 @@ export default function LoginPage() {
   })
 
   useEffect(() => {
-    if (!loading && user) {
-      router.push("/dashboard")
+    if (!loading && !profileLoading && user && profile) {
+      // Check if user needs to verify TIN or upload documents
+      if (!profile.taxId) {
+        router.push("/verify-tin")
+      } else if (profile.businessType === 'sme' && !profile.businessDocuments) {
+        router.push("/verify-tin")
+      } else {
+        router.push("/dashboard")
+      }
     }
-  }, [user, loading, router])
+  }, [user, loading, profile, profileLoading, router])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -40,7 +49,7 @@ export default function LoginPage() {
 
     if (result.success) {
       toast.success('Logged in successfully!')
-      router.push("/dashboard")
+      // Don't redirect here - useEffect will handle it based on TIN verification status
     } else {
       toast.error(result.error || 'Failed to log in')
     }

@@ -26,11 +26,27 @@ function LayoutContent({
   }, [user, loading, router])
 
   useEffect(() => {
+    if (!profile || profileLoading) return
+    
     // Redirect freelancers to their dashboard if they somehow access SME dashboard
-    if (profile && profile.businessType === 'freelancer' && window.location.pathname.startsWith('/dashboard-sme')) {
+    if (profile.businessType === 'freelancer' && window.location.pathname.startsWith('/dashboard-sme')) {
       router.push('/dashboard')
+      return
     }
-  }, [profile, router])
+    
+    // Check if user has verified TIN - if not, redirect to verify-tin
+    if (!profile.taxId) {
+      console.log("No TIN found for SME, redirecting to /verify-tin")
+      router.push('/verify-tin')
+      return
+    }
+    
+    // For SMEs, also check if they have uploaded business documents
+    if (!profile.businessDocuments) {
+      console.log("No business documents found for SME, redirecting to /verify-tin")
+      router.push('/verify-tin')
+    }
+  }, [profile, profileLoading, router])
 
   if (loading || profileLoading) {
     return (

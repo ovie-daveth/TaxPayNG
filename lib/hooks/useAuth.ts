@@ -81,8 +81,11 @@ export function useAuth() {
 
       if (profileResult && profileResult.success) {
         console.log("Profile updated successfully")
+        
+        // Sign out the user immediately after signup (no auto-login)
+        await signOut(auth)
         setAuthState({
-          user,
+          user: null,
           loading: false,
           error: null
         })
@@ -90,7 +93,9 @@ export function useAuth() {
       } else {
         const errorMessage = profileResult?.error || 'An error occurred during sign up'
         console.log("Profile update failed:", errorMessage)
-        setAuthState(prev => ({ ...prev, loading: false, error: errorMessage }))
+        // Sign out on failure as well
+        await signOut(auth)
+        setAuthState({ user: null, loading: false, error: errorMessage })
         return { success: false, error: errorMessage }
       }
       

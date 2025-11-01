@@ -19,6 +19,7 @@ export default function SignupPage() {
   const { signUp, user, loading } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [showComingSoonModal, setShowComingSoonModal] = useState(false)
+  const [signupSuccess, setSignupSuccess] = useState(false)
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -27,7 +28,13 @@ export default function SignupPage() {
     confirmPassword: ''
   })
 
-  // Remove auto-redirect - let the form submission handle it
+  // Redirect to login after successful signup (no auto-login)
+  useEffect(() => {
+    if (signupSuccess && !loading && !user) {
+      console.log("Signup successful, redirecting to /login")
+      router.push("/login")
+    }
+  }, [signupSuccess, loading, user, router])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -60,16 +67,10 @@ export default function SignupPage() {
     })
 
     setIsLoading(false)
-    console.log("result", result)
+    console.log("result now", result)
     if (result?.success) {
-      toast.success('Account created successfully!')
-      // Redirect based on business type
-      console.log("business type", formData.businessType)
-      if (formData.businessType === 'freelancer') {
-        router.push("/verify-tin")
-      } else {
-        router.push("/dashboard")
-      }
+      toast.success('Account created successfully! Please log in to continue.')
+      setSignupSuccess(true)
     } else {
       toast.error(result?.error || 'Failed to create account')
     }

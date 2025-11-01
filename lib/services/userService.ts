@@ -21,6 +21,21 @@ export class UserService extends BaseService {
     }
   }
 
+  // Check if a TIN is already registered to another user
+  async isTinTaken(taxId: string, currentUserId: string): Promise<boolean> {
+    try {
+      const profiles = await this.getAll([
+        { field: 'taxId', operator: '==', value: taxId }
+      ])
+      
+      // Return true if TIN is found and belongs to a different user
+      return profiles.some(profile => profile.userId !== currentUserId)
+    } catch (error) {
+      console.error('Error checking if TIN is taken:', error)
+      return false
+    }
+  }
+
   // Create or update user profile
   async upsertProfile(userId: string, profileData: Partial<UserProfile>): Promise<ApiResponse<UserProfile>> {
     try {

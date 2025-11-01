@@ -14,6 +14,11 @@ export interface UserProfile {
   }
   businessType: 'freelancer' | 'sme' | 'individual'
   taxId?: string
+  businessDocuments?: {
+    cac?: string
+    taxCertificate?: string
+    businessLicense?: string
+  }
   createdAt: string
   updatedAt: string
   preferences?: {
