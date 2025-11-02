@@ -60,5 +60,70 @@ service cloud.firestore {
       allow update: if isAuthenticated() && resource.data.userId == request.auth.uid;
       allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
     }
+    
+    // Waitlist Collection (public signup, admin management)
+    match /waitlist/{waitlistId} {
+      // Helper function to validate waitlist entry structure
+      function isValidWaitlistEntry() {
+        return request.resource.data.keys().hasAll(['name', 'email', 'createdAt', 'status', 'notified']) &&
+               request.resource.data.name is string &&
+               request.resource.data.name.size() > 0 &&
+               request.resource.data.email is string &&
+               request.resource.data.email.size() > 0 &&
+               request.resource.data.createdAt is string &&
+               request.resource.data.status is string &&
+               request.resource.data.notified is bool &&
+               (request.resource.data.phone == null || request.resource.data.phone is string);
+      }
+      
+      // Anyone can create a waitlist entry (public signup)
+      allow create: if isValidWaitlistEntry();
+      
+      // Allow reads for checking duplicate emails (needed for public form)
+      // In production, consider using a Cloud Function for better security
+      allow read: if true;
+      
+      // Only authenticated users can update (for status/notified updates)
+      allow update: if isAuthenticated() &&
+                    // Prevent modifying immutable fields (name, email, createdAt must remain unchanged)
+                    request.resource.data.createdAt == resource.data.createdAt &&
+                    request.resource.data.name == resource.data.name &&
+                    request.resource.data.email == resource.data.email;
+      
+      // Only authenticated users can delete
+      allow delete: if isAuthenticated();
+    }
+    
+    // Blog Comments Collection
+    match /blogComments/{commentId} {
+      // Helper function to validate comment structure
+      function isValidComment() {
+        return request.resource.data.keys().hasAll(['blogId', 'name', 'email', 'comment', 'createdAt']) &&
+               request.resource.data.blogId is string &&
+               request.resource.data.name is string &&
+               request.resource.data.name.size() > 0 &&
+               request.resource.data.email is string &&
+               request.resource.data.email.size() > 0 &&
+               request.resource.data.comment is string &&
+               request.resource.data.comment.size() > 0 &&
+               request.resource.data.createdAt is string;
+      }
+      
+      // Anyone can read comments (public)
+      allow read: if true;
+      
+      // Anyone can create comments (waitlist check is done in app logic)
+      allow create: if isValidComment();
+      
+      // Users can update their own comments (by email match)
+      allow update: if isValidComment() &&
+                    request.resource.data.email == resource.data.email &&
+                    request.resource.data.createdAt == resource.data.createdAt &&
+                    request.resource.data.blogId == resource.data.blogId;
+      
+      // Only authenticated users (admins) can delete comments
+      // Note: User deletion by email would require a custom security rule or Cloud Function
+      allow delete: if isAuthenticated();
+    }
   }
 }
