@@ -28,6 +28,11 @@ export default function SignupPage() {
     confirmPassword: ''
   })
 
+  // Redirect to waitlist during pre-launch
+  useEffect(() => {
+    router.push('/#waitlist')
+  }, [router])
+
   // Redirect to login after successful signup (no auto-login)
   useEffect(() => {
     if (signupSuccess && !loading && !user) {

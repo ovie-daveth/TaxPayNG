@@ -23,6 +23,11 @@ export default function LoginPage() {
     password: ''
   })
 
+  // Redirect to waitlist during pre-launch
+  useEffect(() => {
+    router.push('/#waitlist')
+  }, [router])
+
   useEffect(() => {
     if (!loading && !profileLoading && user && profile) {
       // Check if user needs to verify TIN or upload documents

@@ -1,10 +1,87 @@
+"use client"
+
 import Link from "next/link"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Calculator, TrendingUp, TrendingDown, DollarSign, Receipt, FileText, Bell, ArrowRight } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Calculator, TrendingUp, TrendingDown, DollarSign, Receipt, FileText, Bell, ArrowRight, CheckCircle2, Loader2, Sparkles } from "lucide-react"
+import { toast } from "sonner"
+import { db } from "@/firebase/firebase"
+import { collection, addDoc } from "firebase/firestore"
 
 export default function DemoPage() {
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false)
+  const [waitlistData, setWaitlistData] = useState({
+    name: "",
+    email: "",
+    phone: ""
+  })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSubmitted, setIsSubmitted] = useState(false)
+
+  const handleWaitlistSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+
+    try {
+      // Validate inputs
+      if (!waitlistData.name || !waitlistData.email || !waitlistData.phone) {
+        toast.error("Please fill in all fields")
+        setIsSubmitting(false)
+        return
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(waitlistData.email)) {
+        toast.error("Please enter a valid email address")
+        setIsSubmitting(false)
+        return
+      }
+
+      // Validate phone format (Nigerian phone numbers)
+      const phoneRegex = /^(\+234|0)?[789][01]\d{8}$/
+      if (!phoneRegex.test(waitlistData.phone.replace(/\s/g, ""))) {
+        toast.error("Please enter a valid Nigerian phone number")
+        setIsSubmitting(false)
+        return
+      }
+
+      // Save to Firestore
+      const data = {
+        name: waitlistData.name.trim(),
+        email: waitlistData.email.trim().toLowerCase(),
+        phone: waitlistData.phone.replace(/\s/g, ""),
+        createdAt: new Date().toISOString(),
+        status: "pending",
+        notified: false,
+        source: "demo_page"
+      }
+
+      await addDoc(collection(db, "waitlist"), data)
+      
+      setIsSubmitted(true)
+      toast.success("🎉 You're on the waitlist! We'll notify you when we launch.")
+      
+      // Reset form
+      setWaitlistData({ name: "", email: "", phone: "" })
+      
+      // Close modal after 2 seconds
+      setTimeout(() => {
+        setShowWaitlistModal(false)
+        setIsSubmitted(false)
+      }, 2000)
+    } catch (error) {
+      console.error("Error submitting waitlist:", error)
+      toast.error("Oops! Something went wrong. Please try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -12,7 +89,7 @@ export default function DemoPage() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Calculator className="w-5 h-5 text-primary-foreground" />
+              
             </div>
             <span className="font-semibold text-xl">OTax</span>
           </Link>
@@ -20,11 +97,9 @@ export default function DemoPage() {
             <Badge variant="secondary" className="hidden sm:flex">
               Demo Mode
             </Badge>
-            <Link href="/signup">
-              <Button size="sm">
-                Get Started <ArrowRight className="ml-2 w-4 h-4" />
-              </Button>
-            </Link>
+            <Button size="lg" onClick={() => setShowWaitlistModal(true)}>
+              Join the Waitlist <ArrowRight className="ml-2 w-4 h-4" />
+            </Button>
           </div>
         </div>
       </header>
@@ -34,10 +109,10 @@ export default function DemoPage() {
         <div className="container mx-auto px-4 py-4 text-center">
           <p className="text-sm font-medium">
             You're viewing a demo of OTax.{" "}
-            <Link href="/signup" className="underline font-semibold">
-              Sign up free
-            </Link>{" "}
-            to start managing your taxes.
+            <button onClick={() => setShowWaitlistModal(true)} className="underline font-semibold hover:text-primary transition-colors">
+              Join the waitlist
+            </button>{" "}
+            to be notified when we launch.
           </p>
         </div>
       </div>
@@ -189,14 +264,12 @@ export default function DemoPage() {
         <div className="mt-12 bg-primary text-primary-foreground rounded-2xl p-8 md:p-12 text-center">
           <h2 className="text-2xl md:text-3xl font-bold mb-4">Ready to Take Control of Your Taxes?</h2>
           <p className="text-lg mb-6 opacity-90 max-w-2xl mx-auto">
-            Start your 14-day free trial today. No credit card required.
+            Join our waitlist to be among the first to experience OTax when we launch.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/signup">
-              <Button size="lg" variant="secondary">
-                Get Started Free <ArrowRight className="ml-2 w-4 h-4" />
-              </Button>
-            </Link>
+            <Button size="lg" variant="secondary" onClick={() => setShowWaitlistModal(true)}>
+              Join the Waitlist <ArrowRight className="ml-2 w-4 h-4" />
+            </Button>
             <Link href="/pricing">
               <Button
                 size="lg"
@@ -224,6 +297,80 @@ export default function DemoPage() {
           </div>
         </div>
       </footer>
+
+      {/* Waitlist Modal */}
+      <Dialog open={showWaitlistModal} onOpenChange={setShowWaitlistModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-center">Join the Waitlist</DialogTitle>
+            <DialogDescription className="text-center">
+              Be among the first to experience OTax
+            </DialogDescription>
+          </DialogHeader>
+
+          {isSubmitted ? (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="w-8 h-8 text-green-600" />
+              </div>
+              <h3 className="text-xl font-bold mb-2">You're in!</h3>
+              <p className="text-muted-foreground">
+                Thank you for joining our waitlist. We'll notify you as soon as we launch!
+              </p>
+            </div>
+          ) : (
+            <form onSubmit={handleWaitlistSubmit} className="space-y-4">
+              <div>
+                <Input
+                  type="text"
+                  placeholder="Full Name"
+                  value={waitlistData.name}
+                  onChange={(e) => setWaitlistData(prev => ({ ...prev, name: e.target.value }))}
+                  required
+                  className="h-12"
+                />
+              </div>
+              <div>
+                <Input
+                  type="email"
+                  placeholder="Email Address"
+                  value={waitlistData.email}
+                  onChange={(e) => setWaitlistData(prev => ({ ...prev, email: e.target.value }))}
+                  required
+                  className="h-12"
+                />
+              </div>
+              <div>
+                <Input
+                  type="tel"
+                  placeholder="Phone Number (e.g., 08012345678)"
+                  value={waitlistData.phone}
+                  onChange={(e) => setWaitlistData(prev => ({ ...prev, phone: e.target.value }))}
+                  required
+                  className="h-12"
+                />
+              </div>
+              <Button 
+                type="submit" 
+                className="w-full h-12" 
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Joining...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Join the Waitlist
+                  </>
+                )}
+              </Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
