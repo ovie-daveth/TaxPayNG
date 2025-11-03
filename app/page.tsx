@@ -149,12 +149,12 @@ export default function HomePage() {
           </div>
           
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-balance mb-6 animate-in fade-in slide-in-from-bottom duration-1000">
-            Stop Losing Sleep Over
+            Don't Lose Sleep Over
             <span className="bg-gradient-to-r from-green-600 via-green-700 to-green-600 bg-clip-text text-transparent animate-gradient"> Tax Compliance</span>
           </h1>
           <p className="text-xl md:text-2xl text-muted-foreground text-balance mb-6 max-w-3xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom duration-1200">
             OTax helps Nigerian freelancers and small businesses effortlessly manage their taxes, 
-            track expenses, and stay compliant with LIRS & NRS regulations—all in one intelligent platform.
+            track expenses, and stay compliant with IRS & NRS regulations—all in one intelligent platform.
           </p>
           <p className="text-base text-muted-foreground mb-10 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom duration-1400">
             Join other professionals who've simplified their tax journey and saved hundreds of hours each year
@@ -186,7 +186,7 @@ export default function HomePage() {
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-green-600" />
-              <span>LIRS & NRS Compliant</span>
+              <span>IRS & NRS Compliant</span>
             </div>
             <div className="flex items-center gap-2">
               <CheckCircle2 className="w-5 h-5 text-green-600" />
