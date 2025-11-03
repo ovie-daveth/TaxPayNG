@@ -9,7 +9,7 @@ import OtaxLogo from "@/components/OtaxLogo"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { db } from "@/firebase/firebase"
-import { collection, query, where, getDocs, orderBy, onSnapshot } from "firebase/firestore"
+import { collection, query, where, getDocs, orderBy, onSnapshot, DocumentSnapshot } from "firebase/firestore"
 import { Loader2 } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { format } from "date-fns"
@@ -37,25 +37,61 @@ export default function BlogPage() {
   // Fetch blog posts from Firestore
   useEffect(() => {
     const postsRef = collection(db, "blogPosts")
-    const q = query(
+    let unsubscribe: (() => void) | null = null
+    
+    // Use fallback query without orderBy to avoid index requirement
+    const fallbackQuery = query(
       postsRef,
-      where("status", "==", "published"),
-      orderBy("publishedAt", "desc")
+      where("status", "==", "published")
     )
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    
+    // First, try to get initial data
+    getDocs(fallbackQuery).then((snapshot) => {
       const posts = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data()
       })) as BlogPost[]
+      
+      // Sort by publishedAt on client side
+      posts.sort((a, b) => {
+        const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0
+        const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0
+        return dateB - dateA
+      })
+      
       setBlogPosts(posts)
       setLoading(false)
-    }, (error) => {
+    }).catch((error) => {
       console.error("Error loading blog posts:", error)
       setLoading(false)
     })
 
-    return () => unsubscribe()
+    // Set up real-time listener without orderBy (no index required)
+    unsubscribe = onSnapshot(fallbackQuery, (snapshot) => {
+      const posts = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data()
+      })) as BlogPost[]
+      
+      // Sort by publishedAt on client side
+      posts.sort((a, b) => {
+        const dateA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0
+        const dateB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0
+        return dateB - dateA
+      })
+      
+      setBlogPosts(posts)
+      setLoading(false)
+    }, (error) => {
+      console.error("Error in real-time listener:", error)
+      setLoading(false)
+    })
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe()
+      }
+    }
   }, [])
 
   // Filter posts
@@ -87,14 +123,6 @@ export default function BlogPage() {
           </nav>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            {user && (
-              <Link href="/blog/create">
-                <Button variant="outline" size="lg">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Create Post
-                </Button>
-              </Link>
-            )}
             <Link href="/#waitlist">
               <Button size="lg" className="">
                 <span className="relative z-10">Join the Waitlist</span>
@@ -152,14 +180,6 @@ export default function BlogPage() {
           ) : filteredPosts.length === 0 ? (
             <div className="text-center py-20">
               <p className="text-muted-foreground text-lg">No blog posts found.</p>
-              {user && (
-                <Link href="/blog/create" className="mt-4 inline-block">
-                  <Button>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create First Post
-                  </Button>
-                </Link>
-              )}
             </div>
           ) : (
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">

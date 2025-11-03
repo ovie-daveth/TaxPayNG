@@ -1,6 +1,7 @@
 // User Profile Types
 export interface UserProfile {
   id: string
+  userId: string
   email: string
   firstName: string
   lastName: string
@@ -19,6 +20,8 @@ export interface UserProfile {
     taxCertificate?: string
     businessLicense?: string
   }
+  role?: 'user' | 'admin' // User role - defaults to 'user'
+  lastLogin?: string // Last login timestamp
   createdAt: string
   updatedAt: string
   preferences?: {

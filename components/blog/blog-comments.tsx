@@ -54,8 +54,28 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
     setCheckingWaitlist(true)
     try {
       const emailLower = email.toLowerCase().trim()
-      const waitlistDoc = await getDoc(doc(db, "waitlist", emailLower))
-      return waitlistDoc.exists()
+      
+      // Try checking by document ID first (if waitlist uses email as document ID)
+      const waitlistDocById = await getDoc(doc(db, "waitlist", emailLower))
+      if (waitlistDocById.exists()) {
+        console.log("Email found in waitlist by document ID")
+        return true
+      }
+      
+      // Also check by querying email field (in case waitlist uses auto-generated IDs)
+      const waitlistQuery = query(
+        collection(db, "waitlist"),
+        where("email", "==", emailLower)
+      )
+      const waitlistSnapshot = await getDocs(waitlistQuery)
+      
+      if (!waitlistSnapshot.empty) {
+        console.log("Email found in waitlist by query")
+        return true
+      }
+      
+      console.log("Email NOT found in waitlist")
+      return false
     } catch (error) {
       console.error("Error checking waitlist:", error)
       return false
@@ -144,8 +164,12 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
     // Check if user is on waitlist
     const emailLower = commentForm.email.toLowerCase().trim()
     const onWaitlist = await checkWaitlistStatus(emailLower)
+    
+    console.log("Waitlist check result for", emailLower, ":", onWaitlist)
 
+    // Only show modal if NOT on waitlist
     if (!onWaitlist) {
+      console.log("User not on waitlist, showing modal")
       setUserEmail(emailLower)
       setWaitlistForm({
         name: commentForm.name,
@@ -155,6 +179,9 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
       setShowWaitlistModal(true)
       return
     }
+    
+    // If on waitlist, proceed directly to comment submission
+    console.log("User is on waitlist, proceeding with comment submission")
 
     // Submit comment
     setSubmitting(true)

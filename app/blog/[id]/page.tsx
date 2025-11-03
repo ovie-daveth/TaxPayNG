@@ -774,6 +774,8 @@ export default function BlogDetailPage() {
           <div 
             className="article-content mb-16"
             dangerouslySetInnerHTML={{ __html: post.content }}
+            dir="ltr"
+            style={{ direction: 'ltr', textAlign: 'left' }}
           />
 
           {/* Tags/Categories */}
@@ -852,7 +854,7 @@ export default function BlogDetailPage() {
           <BlogComments blogId={post.id} />
 
           {/* Back to Blog CTA */}
-          <div className="text-center">
+          <div className="text-center mt-10">
             <Link href="/blog">
               <Button size="lg" variant="outline" className="w-full sm:w-auto">
                 <ArrowLeft className="w-4 h-4 mr-2" />

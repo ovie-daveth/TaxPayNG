@@ -464,15 +464,27 @@
     }
   }
 
+  
   /* Article Content Styling */
   .article-content {
     @apply text-foreground leading-relaxed;
     font-size: 1.125rem;
     line-height: 1.8;
+    direction: ltr !important;
+    text-align: left !important;
+    unicode-bidi: bidi-override !important;
+  }
+
+  .article-content * {
+    direction: ltr !important;
+    text-align: left !important;
+    unicode-bidi: bidi-override !important;
   }
 
   .article-content p {
     @apply mb-6 text-muted-foreground;
+    direction: ltr !important;
+    text-align: left !important;
   }
 
   .article-content h2 {

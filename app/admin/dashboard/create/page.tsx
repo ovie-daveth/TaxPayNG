@@ -19,7 +19,7 @@ import { useAdmin } from "@/lib/hooks/useAdmin"
 
 const categories = ["Tax Guide", "For Freelancers", "For SMEs", "Tax Tips", "Technology"]
 
-export default function CreateBlogPage() {
+export default function AdminCreateBlogPage() {
   const router = useRouter()
   const { user, loading } = useAuth()
   const { isAdmin, loading: adminLoading } = useAdmin()
@@ -34,15 +34,12 @@ export default function CreateBlogPage() {
     featuredImage: "",
   })
 
-  // Redirect to admin dashboard create page
+  // Redirect if not admin
   useEffect(() => {
     if (!loading && !adminLoading) {
       if (!user || !isAdmin) {
         toast.error("Admin access required to create blog posts")
-        router.push("/blog")
-      } else {
-        // Redirect to admin dashboard create page
-        router.push("/admin/dashboard/create")
+        router.push("/admin/login")
       }
     }
   }, [user, isAdmin, loading, adminLoading, router])
@@ -50,14 +47,11 @@ export default function CreateBlogPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Check admin access
     if (!user || !isAdmin) {
-      toast.error("Admin access required to create blog posts")
-      router.push("/blog")
+      toast.error("Admin access required")
       return
     }
 
-    // Validation
     if (!formData.title.trim()) {
       toast.error("Please enter a title")
       return
@@ -81,8 +75,6 @@ export default function CreateBlogPage() {
     setIsSubmitting(true)
 
     try {
-      // Get the next blog post ID (we'll need to query existing posts)
-      // For now, we'll use timestamp-based ID
       const blogData = {
         title: formData.title.trim(),
         excerpt: formData.excerpt.trim(),
@@ -100,7 +92,7 @@ export default function CreateBlogPage() {
       await addDoc(collection(db, "blogPosts"), blogData)
 
       toast.success("Blog post created successfully!")
-      router.push("/blog")
+      router.push("/admin/dashboard/blog")
     } catch (error) {
       console.error("Error creating blog post:", error)
       toast.error("Failed to create blog post. Please try again.")
@@ -110,10 +102,9 @@ export default function CreateBlogPage() {
   }
 
   const calculateReadTime = (content: string): string => {
-    // Remove HTML tags and calculate word count
     const text = content.replace(/<[^>]*>/g, "").trim()
     const words = text.split(/\s+/).length
-    const minutes = Math.ceil(words / 200) // Average reading speed: 200 words per minute
+    const minutes = Math.ceil(words / 200)
     return `${minutes} min read`
   }
 
@@ -147,57 +138,45 @@ export default function CreateBlogPage() {
     input.click()
   }
 
+  if (loading || adminLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (!user || !isAdmin) {
+    return null
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
       <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
-        <div className="px-[150px] mx-auto py-5 flex items-center justify-between">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/">
             <OtaxLogo />
           </Link>
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Features
-            </Link>
-            <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Pricing
-            </Link>
-            <Link href="/blog" className="text-sm font-medium text-foreground">
-              Blog
-            </Link>
-          </nav>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <ThemeToggle />
+            <Link href="/admin/dashboard">
+              <Button variant="ghost">Dashboard</Button>
+            </Link>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
       <div className="container mx-auto px-4 py-8 max-w-5xl">
-        <Link href="/blog">
+        <Link href="/admin/dashboard">
           <Button variant="ghost" className="mb-6">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Blog
+            Back to Dashboard
           </Button>
         </Link>
 
-        {loading || adminLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : !user || !isAdmin ? (
-          <div className="flex flex-col items-center justify-center h-64 space-y-4">
-            <p className="text-muted-foreground">Admin access required to create blog posts.</p>
-            <Link href="/admin/login">
-              <Button>Go to Admin Login</Button>
-            </Link>
-          </div>
-        ) : (
-          <>
-            <h1 className="text-4xl font-bold mb-8">Create New Blog Post</h1>
+        <h1 className="text-4xl font-bold mb-8">Create New Blog Post</h1>
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Title */}
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <Label htmlFor="title" className="text-base font-semibold mb-2">
               Title *
@@ -212,7 +191,6 @@ export default function CreateBlogPage() {
             />
           </div>
 
-          {/* Excerpt */}
           <div>
             <Label htmlFor="excerpt" className="text-base font-semibold mb-2">
               Excerpt *
@@ -227,7 +205,6 @@ export default function CreateBlogPage() {
             />
           </div>
 
-          {/* Category */}
           <div>
             <Label htmlFor="category" className="text-base font-semibold mb-2">
               Category *
@@ -250,7 +227,6 @@ export default function CreateBlogPage() {
             </Select>
           </div>
 
-          {/* Featured Image */}
           <div>
             <Label className="text-base font-semibold mb-2 block">
               Featured Image
@@ -284,7 +260,6 @@ export default function CreateBlogPage() {
             )}
           </div>
 
-          {/* Content Editor */}
           <div>
             <Label className="text-base font-semibold mb-2 block">
               Content *
@@ -296,9 +271,8 @@ export default function CreateBlogPage() {
             />
           </div>
 
-          {/* Submit Button */}
           <div className="flex justify-end gap-4 pt-6 border-t border-border">
-            <Link href="/blog">
+            <Link href="/admin/dashboard">
               <Button type="button" variant="outline">
                 Cancel
               </Button>
@@ -318,8 +292,6 @@ export default function CreateBlogPage() {
             </Button>
           </div>
         </form>
-          </>
-        )}
       </div>
     </div>
   )
