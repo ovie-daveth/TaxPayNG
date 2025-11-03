@@ -125,5 +125,39 @@ service cloud.firestore {
       // Note: User deletion by email would require a custom security rule or Cloud Function
       allow delete: if isAuthenticated();
     }
+    
+    // Blog Posts Collection
+    match /blogPosts/{postId} {
+      // Helper function to validate blog post structure
+      function isValidBlogPost() {
+        return request.resource.data.keys().hasAll(['title', 'excerpt', 'category', 'author', 'content', 'createdAt', 'publishedAt', 'readTime', 'status']) &&
+               request.resource.data.title is string &&
+               request.resource.data.title.size() > 0 &&
+               request.resource.data.excerpt is string &&
+               request.resource.data.excerpt.size() > 0 &&
+               request.resource.data.category is string &&
+               request.resource.data.author is string &&
+               request.resource.data.content is string &&
+               request.resource.data.content.size() > 0 &&
+               request.resource.data.createdAt is string &&
+               request.resource.data.publishedAt is string &&
+               request.resource.data.readTime is string &&
+               request.resource.data.status is string &&
+               (request.resource.data.featuredImage == null || request.resource.data.featuredImage is string) &&
+               (request.resource.data.views == null || request.resource.data.views is int);
+      }
+      
+      // Anyone can read published posts
+      allow read: if resource.data.status == 'published';
+      
+      // Only authenticated users can create posts
+      allow create: if isAuthenticated() && isValidBlogPost();
+      
+      // Only authenticated users can update posts
+      allow update: if isAuthenticated() && isValidBlogPost();
+      
+      // Only authenticated users can delete posts
+      allow delete: if isAuthenticated();
+    }
   }
 }

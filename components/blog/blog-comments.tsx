@@ -21,7 +21,7 @@ interface Comment {
 }
 
 interface BlogCommentsProps {
-  blogId: number
+  blogId: string | number
 }
 
 export function BlogComments({ blogId }: BlogCommentsProps) {
@@ -67,9 +67,12 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
   // Load comments
   useEffect(() => {
     const commentsRef = collection(db, "blogComments")
-    const q = query(
+    const blogIdStr = blogId.toString()
+    
+    // Try with orderBy first, fallback without if index is missing
+    let q = query(
       commentsRef,
-      where("blogId", "==", blogId.toString()),
+      where("blogId", "==", blogIdStr),
       orderBy("createdAt", "desc")
     )
 
@@ -78,11 +81,45 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
         id: doc.id,
         ...doc.data()
       })) as Comment[]
+      
+      // Sort by date in case orderBy didn't work
+      commentsData.sort((a, b) => {
+        const dateA = new Date(a.createdAt).getTime()
+        const dateB = new Date(b.createdAt).getTime()
+        return dateB - dateA // Descending order
+      })
+      
       setComments(commentsData)
       setLoading(false)
     }, (error) => {
       console.error("Error loading comments:", error)
-      setLoading(false)
+      // Fallback: try without orderBy if index is missing
+      const fallbackQuery = query(
+        commentsRef,
+        where("blogId", "==", blogIdStr)
+      )
+      
+      const fallbackUnsubscribe = onSnapshot(fallbackQuery, (snapshot) => {
+        const commentsData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data()
+        })) as Comment[]
+        
+        // Sort by date manually
+        commentsData.sort((a, b) => {
+          const dateA = new Date(a.createdAt).getTime()
+          const dateB = new Date(b.createdAt).getTime()
+          return dateB - dateA // Descending order
+        })
+        
+        setComments(commentsData)
+        setLoading(false)
+      }, (fallbackError) => {
+        console.error("Error loading comments (fallback):", fallbackError)
+        setLoading(false)
+      })
+      
+      return () => fallbackUnsubscribe()
     })
 
     return () => unsubscribe()
@@ -122,13 +159,17 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
     // Submit comment
     setSubmitting(true)
     try {
-      await addDoc(collection(db, "blogComments"), {
+      const commentData = {
         blogId: blogId.toString(),
         name: commentForm.name.trim(),
         email: emailLower,
         comment: commentForm.comment.trim(),
         createdAt: new Date().toISOString()
-      })
+      }
+      
+      console.log("Submitting comment:", commentData)
+      const docRef = await addDoc(collection(db, "blogComments"), commentData)
+      console.log("Comment submitted with ID:", docRef.id)
 
       toast.success("Comment posted successfully!")
       setCommentForm({ name: "", email: "", comment: "" })
@@ -193,13 +234,18 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
       // Auto-submit comment after joining waitlist
       setTimeout(async () => {
         try {
-          await addDoc(collection(db, "blogComments"), {
+          const commentData = {
             blogId: blogId.toString(),
             name: waitlistForm.name.trim(),
             email: emailLower,
             comment: commentForm.comment.trim(),
             createdAt: new Date().toISOString()
-          })
+          }
+          
+          console.log("Auto-submitting comment after waitlist:", commentData)
+          const docRef = await addDoc(collection(db, "blogComments"), commentData)
+          console.log("Comment submitted with ID:", docRef.id)
+          
           toast.success("Comment posted successfully!")
           setCommentForm({ name: "", email: "", comment: "" })
           setShowWaitlistModal(false)
@@ -208,7 +254,7 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
           console.error("Error submitting comment:", error)
           toast.error("Failed to post comment. Please try again.")
         }
-      }, 1000)
+      }, 1500)
     } catch (error) {
       console.error("Error submitting waitlist:", error)
       toast.error("Oops! Something went wrong. Please try again.")
@@ -302,26 +348,32 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
         </div>
       ) : (
         <div className="space-y-6">
-          {comments.map((comment) => (
-            <div key={comment.id} className="bg-card border border-border rounded-2xl p-6">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                  <UserIcon className="w-6 h-6 text-primary" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h4 className="font-semibold text-lg">{comment.name}</h4>
-                    <span className="text-sm text-muted-foreground">
-                      {format(new Date(comment.createdAt), "MMM d, yyyy 'at' h:mm a")}
-                    </span>
+          {comments.map((comment) => {
+            // Debug logging
+            if (process.env.NODE_ENV === 'development') {
+              console.log("Rendering comment:", comment)
+            }
+            return (
+              <div key={comment.id} className="bg-card border border-border rounded-2xl p-6">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
+                    <UserIcon className="w-6 h-6 text-primary" />
                   </div>
-                  <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                    {comment.comment}
-                  </p>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h4 className="font-semibold text-lg">{comment.name}</h4>
+                      <span className="text-sm text-muted-foreground">
+                        {comment.createdAt ? format(new Date(comment.createdAt), "MMM d, yyyy 'at' h:mm a") : 'Recently'}
+                      </span>
+                    </div>
+                    <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
+                      {comment.comment}
+                    </p>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 

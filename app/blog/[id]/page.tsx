@@ -2,14 +2,30 @@
 
 import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Calendar, Clock, User, Share2, BookOpen, Tag } from "lucide-react"
+import { ArrowLeft, Calendar, Clock, User, Share2, BookOpen, Tag, Loader2 } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import OtaxLogo from "@/components/OtaxLogo"
 import { Badge } from "@/components/ui/badge"
 import { BlogComments } from "@/components/blog/blog-comments"
+import { db } from "@/firebase/firebase"
+import { doc, getDoc, collection, query, where, getDocs, orderBy, limit } from "firebase/firestore"
+import { format } from "date-fns"
 
-// Blog posts data with full content
+interface BlogPost {
+  id: string
+  title: string
+  excerpt: string
+  author: string
+  publishedAt: string
+  readTime: string
+  category: string
+  content: string
+  featuredImage?: string
+}
+
+// Blog posts data with full content (fallback)
 const blogPosts = [
   {
     id: 1,
@@ -527,10 +543,108 @@ const blogPosts = [
 export default function BlogDetailPage() {
   const params = useParams()
   const router = useRouter()
-  const postId = Number(params.id)
-  
-  const post = blogPosts.find(p => p.id === postId)
-  
+  const postId = params.id as string
+  const [post, setPost] = useState<BlogPost | null>(null)
+  const [relatedPosts, setRelatedPosts] = useState<BlogPost[]>([])
+  const [loading, setLoading] = useState(true)
+
+  // Fetch blog post from Firestore
+  useEffect(() => {
+    const fetchPost = async () => {
+      try {
+        const postRef = doc(db, "blogPosts", postId)
+        const postSnap = await getDoc(postRef)
+
+        if (postSnap.exists() && postSnap.data().status === "published") {
+          const postData = {
+            id: postSnap.id,
+            ...postSnap.data()
+          } as BlogPost
+          setPost(postData)
+
+          // Fetch related posts
+          if (postData.category) {
+            const relatedQuery = query(
+              collection(db, "blogPosts"),
+              where("category", "==", postData.category),
+              where("status", "==", "published"),
+              orderBy("publishedAt", "desc"),
+              limit(4)
+            )
+            const relatedSnapshot = await getDocs(relatedQuery)
+            const related = relatedSnapshot.docs
+              .map((doc) => ({
+                id: doc.id,
+                ...doc.data()
+              })) as BlogPost[]
+            // Filter out current post and limit to 3
+            setRelatedPosts(related.filter(p => p.id !== postId).slice(0, 3))
+          }
+        } else {
+          // Fallback to static data if not found in Firestore (for backward compatibility)
+          const staticPost = blogPosts.find(p => p.id === Number(postId))
+          if (staticPost) {
+            setPost({
+              id: postId,
+              title: staticPost.title,
+              excerpt: staticPost.excerpt,
+              author: staticPost.author,
+              publishedAt: staticPost.date,
+              readTime: staticPost.readTime,
+              category: staticPost.category,
+              content: staticPost.content,
+              featuredImage: staticPost.image
+            })
+            const related = blogPosts
+              .filter(p => p.category === staticPost.category && p.id !== staticPost.id)
+              .slice(0, 3)
+              .map(p => ({
+                id: p.id.toString(),
+                title: p.title,
+                excerpt: p.excerpt,
+                author: p.author,
+                publishedAt: p.date,
+                readTime: p.readTime,
+                category: p.category,
+                content: p.content || "",
+                featuredImage: p.image
+              }))
+            setRelatedPosts(related)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching blog post:", error)
+        // Fallback to static data
+        const staticPost = blogPosts.find(p => p.id === Number(postId))
+        if (staticPost) {
+          setPost({
+            id: postId,
+            title: staticPost.title,
+            excerpt: staticPost.excerpt,
+            author: staticPost.author,
+            publishedAt: staticPost.date,
+            readTime: staticPost.readTime,
+            category: staticPost.category,
+            content: staticPost.content,
+            featuredImage: staticPost.image
+          })
+        }
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPost()
+  }, [postId])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
   if (!post) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -543,11 +657,6 @@ export default function BlogDetailPage() {
       </div>
     )
   }
-
-  // Get related posts (same category, excluding current post)
-  const relatedPosts = blogPosts
-    .filter(p => p.category === post.category && p.id !== post.id)
-    .slice(0, 3)
 
   const handleShare = async () => {
     if (navigator.share) {
@@ -625,7 +734,7 @@ export default function BlogDetailPage() {
               </div>
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
-                <span>{post.date}</span>
+                <span>{format(new Date(post.publishedAt), "MMM d, yyyy")}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4" />
@@ -645,10 +754,20 @@ export default function BlogDetailPage() {
 
           {/* Featured Image */}
           <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/10 rounded-2xl mb-12 overflow-hidden relative">
-            <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-blue-600/20" />
-            <div className="absolute inset-0 flex items-center justify-center">
-              <BookOpen className="w-16 h-16 text-muted-foreground/30" />
-            </div>
+            {post.featuredImage ? (
+              <img
+                src={post.featuredImage}
+                alt={post.title}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <>
+                <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-blue-600/20" />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <BookOpen className="w-16 h-16 text-muted-foreground/30" />
+                </div>
+              </>
+            )}
           </div>
 
           {/* Article Content */}
@@ -698,8 +817,16 @@ export default function BlogDetailPage() {
                     href={`/blog/${relatedPost.id}`}
                     className="bg-card border border-border rounded-2xl overflow-hidden hover:shadow-xl hover:scale-[1.02] transition-all duration-300 group"
                   >
-                    <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/10 relative">
-                      <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-blue-600/20" />
+                    <div className="aspect-video bg-gradient-to-br from-primary/20 to-primary/10 relative overflow-hidden">
+                      {relatedPost.featuredImage ? (
+                        <img
+                          src={relatedPost.featuredImage}
+                          alt={relatedPost.title}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 bg-gradient-to-br from-green-600/20 to-blue-600/20" />
+                      )}
                       <Badge className="absolute top-4 left-4">{relatedPost.category}</Badge>
                     </div>
                     <div className="p-6">
@@ -710,7 +837,7 @@ export default function BlogDetailPage() {
                         {relatedPost.excerpt}
                       </p>
                       <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                        <span>{relatedPost.date}</span>
+                        <span>{format(new Date(relatedPost.publishedAt), "MMM d, yyyy")}</span>
                         <span>•</span>
                         <span>{relatedPost.readTime}</span>
                       </div>
@@ -722,7 +849,7 @@ export default function BlogDetailPage() {
           )}
 
           {/* Comments Section */}
-          <BlogComments blogId={postId} />
+          <BlogComments blogId={post.id} />
 
           {/* Back to Blog CTA */}
           <div className="text-center">
