@@ -16,7 +16,8 @@ import {
   UserCheck,
   Menu,
   X,
-  LogOut
+  LogOut,
+  DollarSign
 } from "lucide-react"
 import { signOut } from "firebase/auth"
 import { auth } from "@/firebase/firebase"
@@ -33,6 +34,7 @@ const navItems = [
   { href: "/admin/dashboard/documents", label: "Documents", icon: FolderOpen },
   { href: "/admin/dashboard/reminders", label: "Reminders", icon: Bell },
   { href: "/admin/dashboard/tax-calculations", label: "Tax Calculations", icon: Calculator },
+  { href: "/admin/dashboard/exchange-rates", label: "Exchange Rates", icon: DollarSign },
   { href: "/admin/dashboard/waitlist", label: "Waitlist", icon: UserCheck },
 ]
 

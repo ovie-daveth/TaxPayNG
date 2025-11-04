@@ -194,5 +194,31 @@ service cloud.firestore {
       // Authenticated users can delete posts (admin check done at app level)
       allow delete: if isAuthenticated();
     }
+    
+    // Exchange Rates Collection (public read for tax calculator, authenticated write for admin)
+    match /exchangeRates/{rateId} {
+      // Helper function to validate exchange rate structure
+      function isValidExchangeRate() {
+        return request.resource.data.keys().hasAll(['currency', 'rate', 'lastUpdated', 'updatedBy']) &&
+               request.resource.data.currency is string &&
+               request.resource.data.currency.size() > 0 &&
+               request.resource.data.rate is number &&
+               request.resource.data.rate > 0 &&
+               request.resource.data.lastUpdated is string &&
+               request.resource.data.updatedBy is string;
+      }
+      
+      // Anyone can read exchange rates (needed for tax calculator to work)
+      allow read: if true;
+      
+      // Authenticated users can create rates (admin check done at app level)
+      allow create: if isAuthenticated() && isValidExchangeRate();
+      
+      // Authenticated users can update rates (admin check done at app level)
+      allow update: if isAuthenticated() && isValidExchangeRate();
+      
+      // Authenticated users can delete rates (admin check done at app level)
+      allow delete: if isAuthenticated();
+    }
   }
 }

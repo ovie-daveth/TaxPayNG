@@ -455,7 +455,7 @@ export default function DemoPage() {
         </main>
 
         {/* Demo Banner */}
-        <div className="fixed bottom-0 left-0 right-0 md:left-16 border-t border-border bg-primary text-primary-foreground p-4">
+        <div className={`fixed bottom-0 left-0 right-0 border-t border-border bg-primary text-primary-foreground p-4 transition-all duration-300 ${sidebarCollapsed ? "md:left-16" : "md:left-64"}`}>
           <div className="container mx-auto px-4 max-w-7xl">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
               <div className="flex items-center gap-2">
@@ -859,7 +859,17 @@ function RemindersView({ onAddReminder }: RemindersViewProps) {
     }
   ]
 
-  const completedReminders: typeof upcomingReminders = []
+  const completedReminders: typeof upcomingReminders = [
+    {
+      id: "3",
+      title: "Annual Tax Filing",
+      description: "Submit annual tax return for 2024",
+      date: "01/15/2025",
+      priority: "high",
+      status: "completed",
+      isCompleted: true
+    }
+  ]
 
   const stats = {
     total: 3,
@@ -1166,6 +1176,48 @@ function TaxBreakdownModalContent({ result }: { result: any }) {
       <div className="bg-muted/50 rounded-lg p-4 mb-4">
         <h3 className="font-semibold text-sm mb-3">Income</h3>
         <div className="space-y-2">
+          {/* Income Breakdown by Source */}
+          {result.incomeBreakdown && result.incomeBreakdown.length > 0 && (
+            <div className="mb-3 pb-3 border-b border-border">
+              <p className="text-xs text-muted-foreground mb-2">Income Sources:</p>
+              <div className="space-y-1.5">
+                {result.incomeBreakdown.map((source: any, index: number) => {
+                  const allTypes = [
+                    { value: "salary", label: "Salary (PAYE)" },
+                    { value: "bonus", label: "Bonus" },
+                    { value: "allowance", label: "Allowances" },
+                    { value: "freelance", label: "Freelance Work" },
+                    { value: "consulting", label: "Consulting" },
+                    { value: "contract", label: "Contract Work" },
+                    { value: "sponsorship", label: "Brand Sponsorships" },
+                    { value: "ad_revenue", label: "Ad Revenue" },
+                    { value: "affiliate", label: "Affiliate Income" },
+                    { value: "brand_deal", label: "Brand Deals" },
+                    { value: "content_licensing", label: "Content Licensing" },
+                    { value: "merchandise", label: "Merchandise Sales" },
+                    { value: "subscription", label: "Subscription Revenue" },
+                    { value: "courses", label: "Online Courses/Coaching" },
+                    { value: "events", label: "Events & Speaking" },
+                    { value: "business_income", label: "Business Income" },
+                    { value: "sales", label: "Product/Service Sales" },
+                    { value: "rental", label: "Rental Income" },
+                    { value: "investment", label: "Investment Income" },
+                    { value: "dividends", label: "Dividends" },
+                    { value: "other", label: "Other Income" },
+                  ]
+                  const typeLabel = allTypes.find(t => t.value === source.type)?.label || source.type.replace(/_/g, " ")
+                  return (
+                    <div key={index} className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">
+                        {typeLabel}
+                      </span>
+                      <span className="font-medium">₦{source.amount.toLocaleString()}</span>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
           <div className="flex items-center justify-between text-sm">
             <span className="text-muted-foreground">Gross Income</span>
             <span className="font-medium">₦{result.grossIncome.toLocaleString()}</span>
@@ -1203,6 +1255,12 @@ function TaxBreakdownModalContent({ result }: { result: any }) {
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Health Insurance</span>
               <span className="font-medium text-green-600">-₦{result.reliefs.healthInsurance.toLocaleString()}</span>
+            </div>
+          )}
+          {result.reliefs.housingFund > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">National Housing Fund (NHF)</span>
+              <span className="font-medium text-green-600">-₦{result.reliefs.housingFund.toLocaleString()}</span>
             </div>
           )}
           {result.reliefs.lifeInsurance > 0 && (

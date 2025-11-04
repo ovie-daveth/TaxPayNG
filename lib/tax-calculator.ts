@@ -5,11 +5,17 @@ interface TaxInput {
   rentPaid: number
   pensionContribution: number
   healthInsurance: number
+  housingFund: number
   lifeInsurance: number
   charitableDonations: number
   businessExpenses: number
   dependents: number
+  transportAllowance?: number // Transport allowance for exemption calculation
 }
+
+// Transport allowance exemption: Up to ₦30,000/month (₦360,000/year) is tax-exempt
+// This is an existing provision under the Personal Income Tax Act (PITA), not part of the 2026 reform
+const TRANSPORT_ALLOWANCE_EXEMPTION_LIMIT = 360000 // Annual limit
 
 interface TaxBracket {
   min: number
@@ -36,11 +42,24 @@ export function calculateNigerianTax(input: TaxInput, includeInputs: boolean = f
     annualIncome = input.income * 4
   }
 
+  // Convert transport allowance to annual amount if provided
+  let annualTransportAllowance = input.transportAllowance || 0
+  if (input.period === "monthly" && input.transportAllowance) {
+    annualTransportAllowance = input.transportAllowance * 12
+  } else if (input.period === "quarterly" && input.transportAllowance) {
+    annualTransportAllowance = input.transportAllowance * 4
+  }
+
+  // Calculate transport allowance exemption (up to ₦360,000/year is tax-exempt)
+  const transportAllowanceExempt = Math.min(annualTransportAllowance, TRANSPORT_ALLOWANCE_EXEMPTION_LIMIT)
+  const transportAllowanceTaxable = Math.max(annualTransportAllowance - TRANSPORT_ALLOWANCE_EXEMPTION_LIMIT, 0)
+
   // Convert all expenses to annual amounts
   let annualRentPaid = input.rentPaid
   let annualBusinessExpenses = input.businessExpenses
   let annualPensionContribution = input.pensionContribution
   let annualHealthInsurance = input.healthInsurance
+  let annualHousingFund = input.housingFund
   let annualLifeInsurance = input.lifeInsurance
   let annualCharitableDonations = input.charitableDonations
 
@@ -49,6 +68,7 @@ export function calculateNigerianTax(input: TaxInput, includeInputs: boolean = f
     annualBusinessExpenses = input.businessExpenses * 12
     annualPensionContribution = input.pensionContribution * 12
     annualHealthInsurance = input.healthInsurance * 12
+    annualHousingFund = input.housingFund * 12
     annualLifeInsurance = input.lifeInsurance * 12
     annualCharitableDonations = input.charitableDonations * 12
   } else if (input.period === "quarterly") {
@@ -56,23 +76,35 @@ export function calculateNigerianTax(input: TaxInput, includeInputs: boolean = f
     annualBusinessExpenses = input.businessExpenses * 4
     annualPensionContribution = input.pensionContribution * 4
     annualHealthInsurance = input.healthInsurance * 4
+    annualHousingFund = input.housingFund * 4
     annualLifeInsurance = input.lifeInsurance * 4
     annualCharitableDonations = input.charitableDonations * 4
   }
 
+  // Gross income includes all income, but transport allowance exemption will be applied as a relief
   const grossIncome = annualIncome
 
   // Current Nigerian tax law reliefs (CRA has been abolished)
   const rentRelief = Math.min(annualRentPaid * 0.2, 500000)
   const pensionRelief = Math.min(annualPensionContribution, grossIncome * 0.08)
   const healthInsuranceRelief = annualHealthInsurance
+  const housingFundRelief = annualHousingFund
   const lifeInsuranceRelief = annualLifeInsurance
   const charitableRelief = Math.min(annualCharitableDonations, grossIncome * 0.1)
 
   const adjustedGrossIncome = grossIncome - annualBusinessExpenses
 
+  // Transport allowance exemption is treated as a relief (the exempt portion reduces taxable income)
+  const transportAllowanceRelief = transportAllowanceExempt
+
   const totalReliefs =
-    rentRelief + pensionRelief + healthInsuranceRelief + lifeInsuranceRelief + charitableRelief
+    rentRelief +
+    pensionRelief +
+    healthInsuranceRelief +
+    housingFundRelief +
+    lifeInsuranceRelief +
+    charitableRelief +
+    transportAllowanceRelief
 
   const taxableIncome = Math.max(adjustedGrossIncome - totalReliefs, 0)
 
@@ -116,8 +148,10 @@ export function calculateNigerianTax(input: TaxInput, includeInputs: boolean = f
       rentRelief,
       pension: pensionRelief,
       healthInsurance: healthInsuranceRelief,
+      housingFund: housingFundRelief,
       lifeInsurance: lifeInsuranceRelief,
       charitable: charitableRelief,
+      transportAllowance: transportAllowanceRelief,
     },
     totalReliefs,
     taxableIncome,
@@ -131,6 +165,15 @@ export function calculateNigerianTax(input: TaxInput, includeInputs: boolean = f
     effectiveRate: taxableIncome > 0 ? ((totalTax / taxableIncome) * 100).toFixed(2) : 0,
   }
 
+  // Include transport allowance breakdown if applicable
+  if (annualTransportAllowance > 0) {
+    result.transportAllowance = {
+      total: annualTransportAllowance,
+      exempt: transportAllowanceExempt,
+      taxable: transportAllowanceTaxable,
+    }
+  }
+
   // Include original inputs if requested
   if (includeInputs) {
     result.businessType = input.businessType
@@ -138,6 +181,7 @@ export function calculateNigerianTax(input: TaxInput, includeInputs: boolean = f
     result.rentPaid = input.rentPaid
     result.pensionContribution = input.pensionContribution
     result.healthInsurance = input.healthInsurance
+    result.housingFund = input.housingFund
     result.lifeInsurance = input.lifeInsurance
     result.charitableDonations = input.charitableDonations
     result.businessExpenses = input.businessExpenses
