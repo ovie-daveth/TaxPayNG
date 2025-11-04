@@ -6,7 +6,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ArrowRight, BarChart3, Calculator, FileText, Bell, CheckCircle2, Loader2, Sparkles, Shield, TrendingUp, Clock, Users, Zap, Award, DollarSign } from "lucide-react"
+import { ArrowRight, BarChart3, Calculator, FileText, Bell, CheckCircle2, Loader2, Sparkles, Shield, TrendingUp, Clock, Users, Zap, Award, DollarSign, ScanLine, FolderArchive, CreditCard, Layers, Receipt, FileCheck, Smartphone, Building2 } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { toast } from "sonner"
@@ -212,39 +212,75 @@ export default function HomePage() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
             <FeatureCard
               icon={<BarChart3 className="w-8 h-8" />}
-              title="Smart Expense Tracking"
-              description="Automatically categorize and track all your income and expenses in real-time. Sync transactions, upload receipts, and maintain a complete financial picture without the manual work."
+              title="Income & Expense Tracking"
+              description="Track unlimited transactions with automatic categorization. Monitor income streams, expenses, and maintain a complete financial picture—perfect for freelancers, creators, and businesses."
               delay="0"
             />
             <FeatureCard
               icon={<Calculator className="w-8 h-8" />}
-              title="Intelligent Tax Calculator"
-              description="Calculate your taxes, deductions, allowances, and reliefs based on the latest Nigerian tax laws. Know exactly what you owe before filing season."
+              title="Tax Calculator with Reliefs"
+              description="Calculate taxes, deductions, allowances, and reliefs based on Nigeria Tax Act 2025. Includes Rent Relief Allowance (up to 20% of annual rent, capped at ₦500,000) and automatic exemption for earnings ≤ ₦800,000/year."
               delay="100"
             />
             <FeatureCard
-              icon={<FileText className="w-8 h-8" />}
-              title="Auto-Generated Reports"
-              description="Generate LIRS & NRS-ready self-assessment forms, income statements, and compliance reports in minutes—not hours."
+              icon={<FileCheck className="w-8 h-8" />}
+              title="IRS/NRS Filing Reports"
+              description="Generate filing-ready self-assessment forms, income statements, and compliance reports. Export PDF reports formatted for FIRS/NRS submission requirements."
               delay="200"
             />
             <FeatureCard
-              icon={<Bell className="w-8 h-8" />}
-              title="Smart Deadline Alerts"
-              description="Never miss a filing deadline again. Get personalized reminders for payments, submissions, and renewals based on your business profile."
+              icon={<ScanLine className="w-8 h-8" />}
+              title="Receipt Scanning & OCR"
+              description="Take a photo of receipts and let our OCR technology automatically extract details. Automatically categorizes expenses and updates your tax calculations in real-time."
               delay="300"
             />
             <FeatureCard
-              icon={<Shield className="w-8 h-8" />}
-              title="100% LIRS & NRS Compliant"
-              description="Built to align with all Nigerian tax regulations. Rest assured your filings meet official requirements and standards."
+              icon={<Bell className="w-8 h-8" />}
+              title="SMS & Email Reminders"
+              description="Never miss a filing deadline. Get personalized reminders via SMS and email for payments, submissions, and renewals. Customize reminder frequency to stay ahead."
               delay="400"
             />
             <FeatureCard
-              icon={<Zap className="w-8 h-8" />}
-              title="Lightning-Fast Processing"
-              description="Process thousands of transactions in seconds. Our optimized engine handles complex calculations and report generation in real-time."
+              icon={<FolderArchive className="w-8 h-8" />}
+              title="Secure Document Storage"
+              description="Store receipts, invoices, tax documents, and compliance files securely. Plans include 500MB to 50GB storage with bank-level encryption and easy organization."
               delay="500"
+            />
+            <FeatureCard
+              icon={<Layers className="w-8 h-8" />}
+              title="Multi-Platform Income Tracking"
+              description="Perfect for content creators! Track income from multiple platforms (YouTube, Instagram, TikTok, sponsorships) separately and get consolidated tax reports."
+              delay="600"
+            />
+            <FeatureCard
+              icon={<CreditCard className="w-8 h-8" />}
+              title="Integrated Tax Payments"
+              description="Generate Remita Retrieval Reference (RRR) directly from the platform. Pay taxes seamlessly through integrated payment gateways with instant receipts."
+              delay="700"
+            />
+            <FeatureCard
+              icon={<Receipt className="w-8 h-8" />}
+              title="Invoice Management"
+              description="Create, track, and manage invoices effortlessly. Simple invoice management for freelancers and advanced features for businesses managing multiple clients."
+              delay="800"
+            />
+            <FeatureCard
+              icon={<Users className="w-8 h-8" />}
+              title="Multi-User Collaboration"
+              description="Team up with accountants, partners, or employees. Plans support 3-10 users with role-based access control for secure collaboration."
+              delay="900"
+            />
+            <FeatureCard
+              icon={<TrendingUp className="w-8 h-8" />}
+              title="Advanced Analytics & Insights"
+              description="Get deep insights into your financial health with advanced analytics. Track trends, identify opportunities for tax savings, and make data-driven decisions."
+              delay="1000"
+            />
+            <FeatureCard
+              icon={<Shield className="w-8 h-8" />}
+              title="100% FIRS & NRS Compliant"
+              description="Built to align with all Nigerian tax regulations including NTA 2025. Rest assured your filings meet official requirements and standards—never worry about compliance."
+              delay="1100"
             />
           </div>
 

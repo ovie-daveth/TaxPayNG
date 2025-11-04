@@ -159,15 +159,15 @@ export default function PricingPage() {
                       <ul className="space-y-3">
                         <PricingFeature>Everything in GOLD</PricingFeature>
                         <PricingFeature>Multi-entity business management</PricingFeature>
-                        <PricingFeature>Advanced analytics & insights</PricingFeature>
+                        <PricingFeature comingSoon>Advanced analytics & insights</PricingFeature>
                         <PricingFeature>IRS/NRS filing reports</PricingFeature>
                         <PricingFeature>Document storage (10GB)</PricingFeature>
                         <PricingFeature>Custom report templates</PricingFeature>
-                        <PricingFeature>Team collaboration (up to 3 users)</PricingFeature>
+                        <PricingFeature comingSoon>Team collaboration (up to 3 users)</PricingFeature>
                         <PricingFeature>Dedicated tax advisor consultation</PricingFeature>
                         <PricingFeature>Quarterly tax planning sessions</PricingFeature>
                         <PricingFeature>24/7 priority support</PricingFeature>
-                        <PricingFeature>API access for integrations</PricingFeature>
+                        <PricingFeature comingSoon>API access for integrations</PricingFeature>
                       </ul>
                     </CardContent>
                     <CardFooter>
@@ -238,7 +238,7 @@ export default function PricingPage() {
                   <PricingFeature>Document storage (5GB)</PricingFeature>
                   <PricingFeature>Receipt scanning & OCR</PricingFeature>
                   <PricingFeature>SMS & email reminders</PricingFeature>
-                        <PricingFeature>Multi-user access (up to 3 users)</PricingFeature>
+                        <PricingFeature comingSoon>Multi-user access (up to 3 users)</PricingFeature>
                         <PricingFeature>Basic analytics & insights</PricingFeature>
                   <PricingFeature>Priority support</PricingFeature>
                 </ul>
@@ -251,9 +251,9 @@ export default function PricingPage() {
             </Card>
 
             {/* Big Business Plan */}
-                  <Card className="relative flex flex-col">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-muted text-muted-foreground px-4 py-1 rounded-full text-sm font-medium">
-                      Enterprise
+                  <Card className="relative flex flex-col opacity-60 grayscale">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-orange-500 dark:bg-orange-600 text-white px-4 py-1 rounded-full text-sm font-medium">
+                      Coming Soon
               </div>
               <CardHeader>
                 <CardTitle className="text-2xl">Big Business</CardTitle>
@@ -270,23 +270,21 @@ export default function PricingPage() {
                 <ul className="space-y-3">
                   <PricingFeature>Everything in Small Business</PricingFeature>
                         <PricingFeature>Full corporate tax compliance</PricingFeature>
-                        <PricingFeature>Multi-user access (up to 10 users)</PricingFeature>
-                  <PricingFeature>Advanced analytics & insights</PricingFeature>
+                        <PricingFeature comingSoon>Multi-user access (up to 10 users)</PricingFeature>
+                  <PricingFeature comingSoon>Advanced analytics & insights</PricingFeature>
                   <PricingFeature>Custom report templates</PricingFeature>
                   <PricingFeature>Document storage (50GB)</PricingFeature>
-                  <PricingFeature>API access</PricingFeature>
+                  <PricingFeature comingSoon>API access</PricingFeature>
                   <PricingFeature>Dedicated account manager</PricingFeature>
                   <PricingFeature>24/7 priority support</PricingFeature>
-                        <PricingFeature>White-label options</PricingFeature>
-                        <PricingFeature>Custom integrations</PricingFeature>
+                        <PricingFeature comingSoon>White-label options</PricingFeature>
+                        <PricingFeature comingSoon>Custom integrations</PricingFeature>
                 </ul>
               </CardContent>
               <CardFooter>
-                      <Link href="/signup" className="w-full">
-                        <Button className="w-full bg-transparent" variant="outline">
-                          Start Free Trial
+                      <Button className="w-full bg-transparent" variant="outline" disabled>
+                          Coming Soon
                 </Button>
-                      </Link>
               </CardFooter>
             </Card>
                 </div>
@@ -390,7 +388,10 @@ export default function PricingPage() {
                     How do I pay my taxes through OTax?
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground">
-                    OTax makes tax payments seamless. You can generate your Remita Retrieval Reference (RRR) directly from the platform, pay through integrated payment gateways, or use our automated payment system. We support all major payment methods and provide instant payment receipts.
+                    <p className="mb-3">OTax makes tax payments seamless. You can generate your Remita Retrieval Reference (RRR) directly from the platform, pay through integrated payment gateways, or use our automated payment system. We support all major payment methods and provide instant payment receipts.</p>
+                    <p className="text-red-600 dark:text-red-400 font-medium text-sm mt-3 pt-3 border-t border-border">
+                      <strong>Important:</strong> We do not hold money. We simply intermediate between you and payment platforms like Remita and Paystack. We take no charge for payment processing—all fees are handled directly by the payment providers.
+                    </p>
                   </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="payment-2" className="border border-border rounded-lg px-4 mb-4">
@@ -398,7 +399,10 @@ export default function PricingPage() {
                     Can I automate my tax payments?
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground">
-                    Yes! Our automated payment system allows you to set up recurring tax payments. You can schedule payments for specific dates, set up payment reminders, and even enable auto-pay for your tax obligations. This ensures you never miss a payment deadline and avoid penalties.
+                    <p className="mb-3">Our automated payment system allows you to set up recurring tax payments. You can schedule payments for specific dates, set up payment reminders, and even enable auto-pay for your tax obligations. This ensures you never miss a payment deadline and avoid penalties.</p>
+                    <p className="text-orange-600 dark:text-orange-400 font-medium text-sm mt-3 pt-3 border-t border-border">
+                      <strong>Note:</strong> This feature is coming soon. For now, you can manually process payments through our payment gateway.
+                    </p>
                   </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="payment-3" className="border border-border rounded-lg px-4 mb-4">
@@ -452,15 +456,10 @@ export default function PricingPage() {
                     Can I import transactions automatically?
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground">
-                    Yes! You can connect your bank accounts (where supported), import CSV files from your bank, or use our mobile app to scan receipts. Our OCR technology automatically extracts transaction details, categorizes expenses, and updates your tax calculations in real-time.
-                  </AccordionContent>
-                </AccordionItem>
-                <AccordionItem value="auto-3" className="border border-border rounded-lg px-4 mb-4">
-                  <AccordionTrigger className="text-left font-semibold">
-                    How does receipt scanning work?
-                  </AccordionTrigger>
-                  <AccordionContent className="text-muted-foreground">
-                    Simply take a photo of your receipt using our mobile app or upload it through the web platform. Our OCR technology automatically extracts the merchant name, date, amount, and category. The system then categorizes it as an expense and updates your tax calculations automatically. Available in GOLD, PLATINUM, and SME plans.
+                    <p className="mb-3">Yes! You can connect your bank accounts (where supported), import CSV files from your bank, or use our mobile app to scan receipts. Our OCR technology automatically extracts transaction details, categorizes expenses, and updates your tax calculations in real-time.</p>
+                    <p className="text-orange-600 dark:text-orange-400 font-medium text-sm mt-3 pt-3 border-t border-border">
+                      <strong>Note:</strong> Automatic transaction import is coming soon. For now, you can manually add transactions through the dashboard.
+                    </p>
                   </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="auto-4" className="border border-border rounded-lg px-4 mb-4">
@@ -500,7 +499,10 @@ export default function PricingPage() {
                     Can I integrate with other accounting tools?
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground">
-                    PLATINUM and Big Business plans include API access for integrations. You can connect OTax with popular accounting software, payment processors, and business tools. Our API allows for seamless data synchronization and automated workflows.
+                    <p className="mb-3">PLATINUM and Big Business plans include API access for integrations. You can connect OTax with popular accounting software, payment processors, and business tools. Our API allows for seamless data synchronization and automated workflows.</p>
+                    <p className="text-orange-600 dark:text-orange-400 font-medium text-sm mt-3 pt-3 border-t border-border">
+                      <strong>Note:</strong> API access and integrations are coming soon. We're working on building our API infrastructure to enable seamless integrations with accounting tools.
+                    </p>
                   </AccordionContent>
                 </AccordionItem>
 
@@ -565,11 +567,18 @@ export default function PricingPage() {
   )
 }
 
-function PricingFeature({ children }: { children: React.ReactNode }) {
+function PricingFeature({ children, comingSoon }: { children: React.ReactNode; comingSoon?: boolean }) {
   return (
     <li className="flex items-start gap-2">
       <Check className="w-5 h-5 text-primary shrink-0 mt-0.5" />
-      <span className="text-sm">{children}</span>
+      <span className={`text-sm ${comingSoon ? 'opacity-70' : ''}`}>
+        {children}
+        {comingSoon && (
+          <span className="ml-2 text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-2 py-0.5 rounded-full font-medium">
+            Coming Soon
+          </span>
+        )}
+      </span>
     </li>
   )
 }
