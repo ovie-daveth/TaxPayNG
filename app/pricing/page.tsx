@@ -8,6 +8,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { Check, Calculator } from "lucide-react"
 import OtaxLogo from "@/components/OtaxLogo"
+import Footer from "@/components/footer"
 
 export default function PricingPage() {
   return (
@@ -20,14 +21,19 @@ export default function PricingPage() {
            
           </Link>
           <div className="flex items-center gap-3">
-            <Link href="/login">
+          <a href="/#waitlist">
+                  <Button size="lg" className="">
+                    <span className="relative z-10">Join the Waitlist</span>
+                  </Button>
+                </a>
+            {/* <Link href="/login">
               <Button variant="ghost" size="sm">
                 Log in
               </Button>
             </Link>
             <Link href="/signup">
               <Button size="sm">Get Started</Button>
-            </Link>
+            </Link> */}
           </div>
         </div>
       </header>
@@ -554,14 +560,7 @@ export default function PricingPage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border py-12 mt-20">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <OtaxLogo />
-            <p className="text-sm text-muted-foreground">© 2025 OTax. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   )
 }

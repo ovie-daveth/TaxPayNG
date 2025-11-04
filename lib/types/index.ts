@@ -20,7 +20,7 @@ export interface UserProfile {
     taxCertificate?: string
     businessLicense?: string
   }
-  role?: 'user' | 'admin' // User role - defaults to 'user'
+  role?: 'user' | 'admin' | 'editor' // User role - defaults to 'user'
   lastLogin?: string // Last login timestamp
   createdAt: string
   updatedAt: string

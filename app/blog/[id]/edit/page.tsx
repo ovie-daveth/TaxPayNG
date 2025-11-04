@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -11,48 +11,116 @@ import { ArrowLeft, Save, Loader2, X, FileText } from "lucide-react"
 import { BlogFormSkeleton } from "@/components/ui/skeletons"
 import { RichTextEditor } from "@/components/blog/rich-text-editor"
 import { db } from "@/firebase/firebase"
-import { collection, addDoc } from "firebase/firestore"
+import { doc, getDoc, updateDoc } from "firebase/firestore"
 import { toast } from "sonner"
 import { ThemeToggle } from "@/components/theme-toggle"
 import OtaxLogo from "@/components/OtaxLogo"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useAdmin } from "@/lib/hooks/useAdmin"
+import { useEditor } from "@/lib/hooks/useEditor"
 
 const categories = ["Tax Guide", "For Freelancers", "For SMEs", "Tax Tips", "Technology"]
 
-export default function AdminCreateBlogPage() {
+export default function EditBlogPage() {
   const router = useRouter()
+  const params = useParams()
+  const postId = params.id as string
   const { user, loading } = useAuth()
   const { isAdmin, loading: adminLoading } = useAdmin()
+  const { isEditor, loading: editorLoading } = useEditor()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [loadingPost, setLoadingPost] = useState(true)
+  const [canEdit, setCanEdit] = useState(false)
   
   const [formData, setFormData] = useState({
     title: "",
     excerpt: "",
     category: "",
-    author: "OTax Team",
+    author: "",
     content: "",
     featuredImage: "",
+    authorId: "",
+    isPublished: false,
   })
 
-  // Redirect if not admin
+  // Fetch and check permissions
   useEffect(() => {
-    if (!loading && !adminLoading) {
-      if (!user || !isAdmin) {
-        toast.error("Admin access required to create blog posts")
-        router.push("/admin/login")
+    const fetchPost = async () => {
+      if (!user || (!isAdmin && !isEditor)) {
+        setLoadingPost(false)
+        return
+      }
+
+      try {
+        setLoadingPost(true)
+        const postRef = doc(db, "blogPosts", postId)
+        const postSnap = await getDoc(postRef)
+
+        if (!postSnap.exists()) {
+          toast.error("Blog post not found")
+          router.push("/blog")
+          return
+        }
+
+        const postData = postSnap.data()
+        
+        // Check if editor can edit this post (must be the author)
+        if (isEditor && !isAdmin) {
+          if (postData.authorId !== user.uid) {
+            toast.error("You can only edit your own blog posts")
+            router.push("/editor/dashboard")
+            return
+          }
+        }
+
+        // If we get here, user has permission to edit
+        setCanEdit(true)
+        setFormData({
+          title: postData.title || "",
+          excerpt: postData.excerpt || "",
+          category: postData.category || "",
+          author: postData.author || "",
+          content: postData.content || "",
+          featuredImage: postData.featuredImage || "",
+          authorId: postData.authorId || "",
+          isPublished: postData.isPublished ?? false,
+        })
+      } catch (error) {
+        console.error("Error fetching blog post:", error)
+        toast.error("Failed to load blog post")
+        router.push("/blog")
+      } finally {
+        setLoadingPost(false)
       }
     }
-  }, [user, isAdmin, loading, adminLoading, router])
+
+    if (!loading && !adminLoading && !editorLoading) {
+      fetchPost()
+    }
+  }, [user, isAdmin, isEditor, loading, adminLoading, editorLoading, postId, router])
+
+  // Redirect logic
+  useEffect(() => {
+    if (!loading && !adminLoading && !editorLoading && !loadingPost) {
+      if (!user || (!isAdmin && !isEditor)) {
+        toast.error("Editor or admin access required to edit blog posts")
+        router.push("/blog")
+        return
+      }
+    }
+  }, [user, isAdmin, isEditor, loading, adminLoading, editorLoading, loadingPost, router])
 
   const handleSubmit = async (e: React.FormEvent, isPublished: boolean = true) => {
     e.preventDefault()
 
-    if (!user || !isAdmin) {
-      toast.error("Admin access required")
+    // Check editor or admin access
+    if (!user || (!isEditor && !isAdmin)) {
+      toast.error("Editor or admin access required to edit blog posts")
+      router.push("/blog")
       return
     }
 
+    // Validation
     if (!formData.title.trim()) {
       toast.error("Please enter a title")
       return
@@ -76,29 +144,36 @@ export default function AdminCreateBlogPage() {
     setIsSubmitting(true)
 
     try {
-      const blogData = {
+      const postRef = doc(db, "blogPosts", postId)
+      const updatedData: any = {
         title: formData.title.trim(),
         excerpt: formData.excerpt.trim(),
         category: formData.category,
         author: formData.author,
-        authorId: user.uid, // Store author ID for tracking
         content: formData.content,
         featuredImage: formData.featuredImage || "/placeholder.svg",
-        createdAt: new Date().toISOString(),
-        publishedAt: isPublished ? new Date().toISOString() : null,
         readTime: calculateReadTime(formData.content),
+        updatedAt: new Date().toISOString(),
         status: isPublished ? "published" : "draft",
-        isPublished: isPublished, // Add isPublished flag
-        views: 0,
+        isPublished: isPublished,
       }
 
-      await addDoc(collection(db, "blogPosts"), blogData)
+      // Only update publishedAt if publishing a draft
+      if (isPublished && !formData.isPublished) {
+        updatedData.publishedAt = new Date().toISOString()
+      } else if (!isPublished) {
+        updatedData.publishedAt = null
+      }
 
-      toast.success(isPublished ? "Blog post published successfully!" : "Draft saved successfully!")
-      router.push("/admin/dashboard/blog")
+      await updateDoc(postRef, updatedData)
+
+      toast.success(isPublished ? "Blog post updated successfully!" : "Draft saved successfully!")
+      
+      // Redirect to post detail page
+      router.push(`/blog/${postId}`)
     } catch (error) {
-      console.error("Error creating blog post:", error)
-      toast.error("Failed to save blog post. Please try again.")
+      console.error("Error updating blog post:", error)
+      toast.error("Failed to update blog post. Please try again.")
     } finally {
       setIsSubmitting(false)
     }
@@ -109,9 +184,10 @@ export default function AdminCreateBlogPage() {
   }
 
   const calculateReadTime = (content: string): string => {
+    // Remove HTML tags and calculate word count
     const text = content.replace(/<[^>]*>/g, "").trim()
     const words = text.split(/\s+/).length
-    const minutes = Math.ceil(words / 200)
+    const minutes = Math.ceil(words / 200) // Average reading speed: 200 words per minute
     return `${minutes} min read`
   }
 
@@ -145,41 +221,77 @@ export default function AdminCreateBlogPage() {
     input.click()
   }
 
-  if (loading || adminLoading) {
+  if (loading || adminLoading || editorLoading || loadingPost) {
     return <BlogFormSkeleton />
   }
 
-  if (!user || !isAdmin) {
-    return null
+  if (!canEdit || !user || (!isAdmin && !isEditor)) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Access Denied</h1>
+          <p className="text-muted-foreground mb-4">You don't have permission to edit this post.</p>
+          {isEditor ? (
+            <Link href="/editor/dashboard">
+              <Button>Back to Dashboard</Button>
+            </Link>
+          ) : (
+            <Link href="/blog">
+              <Button>Back to Blog</Button>
+            </Link>
+          )}
+        </div>
+      </div>
+    )
   }
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Header */}
       <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+        <div className="px-[150px] mx-auto py-5 flex items-center justify-between">
           <Link href="/">
             <OtaxLogo />
           </Link>
-          <div className="flex items-center gap-4">
-            <ThemeToggle />
-            <Link href="/admin/dashboard">
-              <Button variant="ghost">Dashboard</Button>
+          <nav className="hidden md:flex items-center gap-6">
+            <Link href="/#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Features
             </Link>
+            <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Pricing
+            </Link>
+            <Link href="/blog" className="text-sm font-medium text-foreground">
+              Blog
+            </Link>
+          </nav>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
           </div>
         </div>
       </header>
 
+      {/* Main Content */}
       <div className="container mx-auto px-4 py-8 max-w-5xl">
-        <Link href="/admin/dashboard">
-          <Button variant="ghost" className="mb-6">
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Dashboard
-          </Button>
-        </Link>
+        {isEditor ? (
+          <Link href="/editor/dashboard">
+            <Button variant="ghost" className="mb-6">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </Link>
+        ) : (
+          <Link href={`/blog/${postId}`}>
+            <Button variant="ghost" className="mb-6">
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Post
+            </Button>
+          </Link>
+        )}
 
-        <h1 className="text-4xl font-bold mb-8">Create New Blog Post</h1>
+        <h1 className="text-4xl font-bold mb-8">Edit Blog Post</h1>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Title */}
           <div>
             <Label htmlFor="title" className="text-base font-semibold mb-2">
               Title *
@@ -194,6 +306,7 @@ export default function AdminCreateBlogPage() {
             />
           </div>
 
+          {/* Excerpt */}
           <div>
             <Label htmlFor="excerpt" className="text-base font-semibold mb-2">
               Excerpt *
@@ -208,6 +321,7 @@ export default function AdminCreateBlogPage() {
             />
           </div>
 
+          {/* Category */}
           <div>
             <Label htmlFor="category" className="text-base font-semibold mb-2">
               Category *
@@ -230,6 +344,7 @@ export default function AdminCreateBlogPage() {
             </Select>
           </div>
 
+          {/* Featured Image */}
           <div>
             <Label className="text-base font-semibold mb-2 block">
               Featured Image
@@ -263,6 +378,7 @@ export default function AdminCreateBlogPage() {
             )}
           </div>
 
+          {/* Content Editor */}
           <div>
             <Label className="text-base font-semibold mb-2 block">
               Content *
@@ -274,12 +390,21 @@ export default function AdminCreateBlogPage() {
             />
           </div>
 
+          {/* Submit Buttons */}
           <div className="flex justify-end gap-4 pt-6 border-t border-border">
-            <Link href="/admin/dashboard">
-              <Button type="button" variant="outline">
-                Cancel
-              </Button>
-            </Link>
+            {isEditor ? (
+              <Link href="/editor/dashboard">
+                <Button type="button" variant="outline">
+                  Cancel
+                </Button>
+              </Link>
+            ) : (
+              <Link href={`/blog/${postId}`}>
+                <Button type="button" variant="outline">
+                  Cancel
+                </Button>
+              </Link>
+            )}
             <Button 
               type="button" 
               onClick={handleSaveDraft} 
@@ -304,12 +429,12 @@ export default function AdminCreateBlogPage() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Publishing...
+                  Updating...
                 </>
               ) : (
                 <>
                   <Save className="w-4 h-4" />
-                  Publish Post
+                  Update Post
                 </>
               )}
             </Button>
@@ -319,3 +444,4 @@ export default function AdminCreateBlogPage() {
     </div>
   )
 }
+

@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Search, Loader2, Bell } from "lucide-react"
+import { ArrowLeft, Search, Bell } from "lucide-react"
+import { AdminTableSkeleton } from "@/components/ui/skeletons"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useAdmin } from "@/lib/hooks/useAdmin"
 import { toast } from "sonner"
@@ -87,11 +88,7 @@ export default function AdminRemindersPage() {
   )
 
   if (authLoading || adminLoading || loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    )
+    return <AdminTableSkeleton />
   }
 
   if (!user || !isAdmin) return null

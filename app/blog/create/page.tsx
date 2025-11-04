@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowLeft, Save, Loader2, X } from "lucide-react"
+import { ArrowLeft, Save, Loader2, X, FileText } from "lucide-react"
+import { BlogFormSkeleton } from "@/components/ui/skeletons"
 import { RichTextEditor } from "@/components/blog/rich-text-editor"
 import { db } from "@/firebase/firebase"
 import { collection, addDoc } from "firebase/firestore"
@@ -16,6 +17,8 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import OtaxLogo from "@/components/OtaxLogo"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useAdmin } from "@/lib/hooks/useAdmin"
+import { useEditor } from "@/lib/hooks/useEditor"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
 
 const categories = ["Tax Guide", "For Freelancers", "For SMEs", "Tax Tips", "Technology"]
 
@@ -23,36 +26,59 @@ export default function CreateBlogPage() {
   const router = useRouter()
   const { user, loading } = useAuth()
   const { isAdmin, loading: adminLoading } = useAdmin()
+  const { isEditor, loading: editorLoading } = useEditor()
+  const { profile, loading: profileLoading } = useUserProfile()
   const [isSubmitting, setIsSubmitting] = useState(false)
   
   const [formData, setFormData] = useState({
     title: "",
     excerpt: "",
     category: "",
-    author: "OTax Team",
+    author: profile?.firstName && profile?.lastName 
+      ? `${profile.firstName} ${profile.lastName}`
+      : user?.email?.split('@')[0] || "OTax Team",
     content: "",
     featuredImage: "",
   })
 
-  // Redirect to admin dashboard create page
+  // Update author when profile loads
   useEffect(() => {
-    if (!loading && !adminLoading) {
-      if (!user || !isAdmin) {
-        toast.error("Admin access required to create blog posts")
+    if (profile && !isAdmin) {
+      const authorName = profile.firstName && profile.lastName
+        ? `${profile.firstName} ${profile.lastName}`
+        : user?.email?.split('@')[0] || "OTax Team"
+      setFormData(prev => ({ ...prev, author: authorName }))
+    }
+  }, [profile, user, isAdmin])
+
+  // Redirect logic: Admins go to admin dashboard, editors stay here, others redirect to blog
+  useEffect(() => {
+    if (!loading && !adminLoading && !editorLoading) {
+      if (!user) {
         router.push("/blog")
-      } else {
-        // Redirect to admin dashboard create page
+        return
+      }
+      
+      // If admin, redirect to admin dashboard create page
+      if (isAdmin) {
         router.push("/admin/dashboard/create")
+        return
+      }
+      
+      // If not editor or admin, redirect to blog
+      if (!isEditor) {
+        toast.error("Editor or admin access required to create blog posts")
+        router.push("/blog")
       }
     }
-  }, [user, isAdmin, loading, adminLoading, router])
+  }, [user, isAdmin, isEditor, loading, adminLoading, editorLoading, router])
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, isPublished: boolean = true) => {
     e.preventDefault()
 
-    // Check admin access
-    if (!user || !isAdmin) {
-      toast.error("Admin access required to create blog posts")
+    // Check editor or admin access
+    if (!user || (!isEditor && !isAdmin)) {
+      toast.error("Editor or admin access required to create blog posts")
       router.push("/blog")
       return
     }
@@ -81,32 +107,44 @@ export default function CreateBlogPage() {
     setIsSubmitting(true)
 
     try {
-      // Get the next blog post ID (we'll need to query existing posts)
-      // For now, we'll use timestamp-based ID
       const blogData = {
         title: formData.title.trim(),
         excerpt: formData.excerpt.trim(),
         category: formData.category,
         author: formData.author,
+        authorId: user.uid, // Store author ID for tracking
         content: formData.content,
         featuredImage: formData.featuredImage || "/placeholder.svg",
         createdAt: new Date().toISOString(),
-        publishedAt: new Date().toISOString(),
+        publishedAt: isPublished ? new Date().toISOString() : null,
         readTime: calculateReadTime(formData.content),
-        status: "published",
+        status: isPublished ? "published" : "draft",
+        isPublished: isPublished, // Add isPublished flag
         views: 0,
       }
 
       await addDoc(collection(db, "blogPosts"), blogData)
 
-      toast.success("Blog post created successfully!")
-      router.push("/blog")
+      toast.success(isPublished ? "Blog post published successfully!" : "Draft saved successfully!")
+      
+      // Redirect based on role
+      if (isAdmin) {
+        router.push("/admin/dashboard/blog")
+      } else if (isEditor) {
+        router.push("/editor/dashboard")
+      } else {
+        router.push("/blog")
+      }
     } catch (error) {
       console.error("Error creating blog post:", error)
-      toast.error("Failed to create blog post. Please try again.")
+      toast.error("Failed to save blog post. Please try again.")
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  const handleSaveDraft = async (e: React.FormEvent) => {
+    await handleSubmit(e, false)
   }
 
   const calculateReadTime = (content: string): string => {
@@ -181,15 +219,13 @@ export default function CreateBlogPage() {
           </Button>
         </Link>
 
-        {loading || adminLoading ? (
-          <div className="flex items-center justify-center h-64">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : !user || !isAdmin ? (
+        {loading || adminLoading || editorLoading ? (
+          <BlogFormSkeleton />
+        ) : !user || (!isAdmin && !isEditor) ? (
           <div className="flex flex-col items-center justify-center h-64 space-y-4">
-            <p className="text-muted-foreground">Admin access required to create blog posts.</p>
+            <p className="text-muted-foreground">Editor or admin access required to create blog posts.</p>
             <Link href="/admin/login">
-              <Button>Go to Admin Login</Button>
+              <Button>Go to Admin/Editor Login</Button>
             </Link>
           </div>
         ) : (
@@ -296,13 +332,33 @@ export default function CreateBlogPage() {
             />
           </div>
 
-          {/* Submit Button */}
+          {/* Submit Buttons */}
           <div className="flex justify-end gap-4 pt-6 border-t border-border">
             <Link href="/blog">
               <Button type="button" variant="outline">
                 Cancel
               </Button>
             </Link>
+            <Button 
+              type="button" 
+              onClick={handleSaveDraft} 
+              disabled={isSubmitting} 
+              variant="outline" 
+              size="lg" 
+              className="gap-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <FileText className="w-4 h-4" />
+                  Save as Draft
+                </>
+              )}
+            </Button>
             <Button type="submit" disabled={isSubmitting} size="lg" className="gap-2">
               {isSubmitting ? (
                 <>

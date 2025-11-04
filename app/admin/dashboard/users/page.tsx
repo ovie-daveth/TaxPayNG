@@ -15,18 +15,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { 
-  ArrowLeft, 
-  Users, 
-  Search, 
-  Loader2, 
-  Trash2, 
-  Ban, 
-  CheckCircle, 
-  AlertTriangle, 
-  Mail,
-  MoreVertical 
-} from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { AdminTableSkeleton } from "@/components/ui/skeletons"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,6 +25,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useAdmin } from "@/lib/hooks/useAdmin"
+import { adminService } from "@/lib/services/adminService"
 import { toast } from "sonner"
 import OtaxLogo from "@/components/OtaxLogo"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -52,13 +43,14 @@ export default function AdminUsersPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [actionDialog, setActionDialog] = useState<{
     open: boolean
-    type: 'delete' | 'disable' | 'enable' | 'warning' | 'mail' | null
+    type: 'delete' | 'disable' | 'enable' | 'warning' | 'mail' | 'assignRole' | null
     user: any | null
   }>({
     open: false,
     type: null,
     user: null
   })
+  const [selectedRole, setSelectedRole] = useState<string>('user')
   const [processing, setProcessing] = useState(false)
 
   useEffect(() => {
@@ -135,12 +127,16 @@ export default function AdminUsersPage() {
     u.lastName?.toLowerCase().includes(searchTerm.toLowerCase())
   )
 
-  const handleOpenDialog = (type: 'delete' | 'disable' | 'enable' | 'warning' | 'mail', user: any) => {
+  const handleOpenDialog = (type: 'delete' | 'disable' | 'enable' | 'warning' | 'mail' | 'assignRole', user: any) => {
     setActionDialog({ open: true, type, user })
+    if (type === 'assignRole') {
+      setSelectedRole(user.role || 'user')
+    }
   }
 
   const handleCloseDialog = () => {
     setActionDialog({ open: false, type: null, user: null })
+    setSelectedRole('user')
   }
 
   const handleDeleteUser = async () => {
@@ -265,6 +261,49 @@ export default function AdminUsersPage() {
     handleCloseDialog()
   }
 
+  const handleAssignRole = async () => {
+    if (!actionDialog.user) return
+    
+    try {
+      setProcessing(true)
+      const userEmail = actionDialog.user.email
+      const userId = actionDialog.user.userId
+
+      if (!userId) {
+        toast.error("User ID not found")
+        return
+      }
+
+      // Update role based on selection
+      if (selectedRole === 'admin') {
+        await adminService.setAdmin(userEmail, userId)
+      } else if (selectedRole === 'editor') {
+        await adminService.setEditor(userEmail, userId)
+      } else {
+        // Set to 'user' role by updating directly
+        await updateDoc(doc(db, "userProfiles", actionDialog.user.id), {
+          role: 'user',
+          updatedAt: new Date().toISOString()
+        })
+      }
+      
+      // Update local state
+      setUsers(users.map((u: any) => 
+        u.id === actionDialog.user.id 
+          ? { ...u, role: selectedRole }
+          : u
+      ))
+      
+      toast.success(`Role updated to ${selectedRole} successfully`)
+      handleCloseDialog()
+    } catch (error: any) {
+      console.error("Error assigning role:", error)
+      toast.error("Failed to assign role: " + (error.message || "Unknown error"))
+    } finally {
+      setProcessing(false)
+    }
+  }
+
   const getDialogContent = () => {
     if (!actionDialog.user || !actionDialog.type) return null
 
@@ -306,6 +345,13 @@ export default function AdminUsersPage() {
           actionText: "Open Email",
           actionButtonVariant: "default" as const
         }
+      case 'assignRole':
+        return {
+          title: "Assign Role",
+          description: `Select a role for ${userName}. Current role: ${actionDialog.user.role || 'user'}`,
+          actionText: "Save Role",
+          actionButtonVariant: "default" as const
+        }
       default:
         return null
     }
@@ -314,11 +360,7 @@ export default function AdminUsersPage() {
   const dialogContent = getDialogContent()
 
   if (authLoading || adminLoading || loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    )
+    return <AdminTableSkeleton />
   }
 
   if (!user || !isAdmin) return null
@@ -393,7 +435,11 @@ export default function AdminUsersPage() {
                         <Badge variant="outline">{u.businessType || 'N/A'}</Badge>
                       </td>
                       <td className="p-4">
-                        <Badge variant={u.role === 'admin' ? 'default' : 'secondary'}>
+                        <Badge variant={
+                          u.role === 'admin' ? 'default' : 
+                          u.role === 'editor' ? 'secondary' : 
+                          'outline'
+                        }>
                           {u.role || 'user'}
                         </Badge>
                       </td>
@@ -434,6 +480,10 @@ export default function AdminUsersPage() {
                               <Mail className="mr-2 h-4 w-4" />
                               Send Email
                             </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleOpenDialog('assignRole', u)}>
+                              <UserCog className="mr-2 h-4 w-4" />
+                              Assign Role
+                            </DropdownMenuItem>
                             <DropdownMenuItem 
                               onClick={() => handleOpenDialog('delete', u)}
                               className="text-destructive focus:text-destructive"
@@ -472,6 +522,25 @@ export default function AdminUsersPage() {
                 {dialogContent.description}
               </DialogDescription>
             </DialogHeader>
+            {actionDialog.type === 'assignRole' && (
+              <div className="py-4">
+                <Select value={selectedRole} onValueChange={setSelectedRole}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="user">User</SelectItem>
+                    <SelectItem value="editor">Editor (Blogger)</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-2">
+                  • <strong>User:</strong> Standard user with no special permissions<br/>
+                  • <strong>Editor:</strong> Can create and edit blog posts, but cannot access admin dashboard<br/>
+                  • <strong>Admin:</strong> Full access to all admin features
+                </p>
+              </div>
+            )}
             <DialogFooter className="flex-row gap-2 justify-end">
               <Button
                 variant="outline"
@@ -497,6 +566,9 @@ export default function AdminUsersPage() {
                       break
                     case 'mail':
                       handleSendMail()
+                      break
+                    case 'assignRole':
+                      handleAssignRole()
                       break
                   }
                 }}

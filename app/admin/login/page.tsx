@@ -6,9 +6,10 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { ArrowLeft, Lock } from "lucide-react"
+import { ArrowLeft, Lock, BookOpen, LayoutDashboard } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useAdmin } from "@/lib/hooks/useAdmin"
+import { useEditor } from "@/lib/hooks/useEditor"
 import { toast } from "sonner"
 import OtaxLogo from "@/components/OtaxLogo"
 import { ThemeToggle } from "@/components/theme-toggle"
@@ -17,18 +18,27 @@ export default function AdminLoginPage() {
   const router = useRouter()
   const { signIn, user, loading: authLoading } = useAuth()
   const { isAdmin, loading: adminLoading } = useAdmin()
+  const { isEditor, loading: editorLoading } = useEditor()
   const [isLoading, setIsLoading] = useState(false)
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [userRole, setUserRole] = useState<'admin' | 'editor' | null>(null)
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   })
 
-  // Redirect if already logged in as admin
+  // Redirect if already logged in
   useEffect(() => {
-    if (!authLoading && !adminLoading && user && isAdmin) {
-      router.push('/admin/dashboard')
+    if (!authLoading && !adminLoading && !editorLoading && user) {
+      if (isAdmin) {
+        setUserRole('admin')
+        setIsLoggedIn(true)
+      } else if (isEditor) {
+        setUserRole('editor')
+        setIsLoggedIn(true)
+      }
     }
-  }, [user, isAdmin, authLoading, adminLoading, router])
+  }, [user, isAdmin, isEditor, authLoading, adminLoading, editorLoading])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,26 +52,32 @@ export default function AdminLoginPage() {
     setIsLoading(false)
 
     if (result.success) {
-      // Wait for auth state to update, then check admin status
+      // Wait for auth state to update, then check admin/editor status
       setTimeout(async () => {
         const { auth } = await import("@/firebase/firebase")
         const { onAuthStateChanged } = await import("firebase/auth")
         
         onAuthStateChanged(auth, async (currentUser) => {
           if (currentUser) {
-            // Check if user is admin
+            // Check if user is admin or editor
             const { adminService } = await import("@/lib/services/adminService")
             const isAdminUser = await adminService.isAdmin(currentUser.email || formData.email, currentUser.uid)
+            const isEditorUser = await adminService.isEditor(currentUser.email || formData.email, currentUser.uid)
             
             if (isAdminUser) {
               // Ensure admin role is set in userProfile
               await adminService.setAdmin(currentUser.email || formData.email, currentUser.uid)
               await adminService.updateLastLogin(currentUser.email || formData.email, currentUser.uid)
               toast.success('Admin login successful!')
-              router.push('/admin/dashboard')
+              setUserRole('admin')
+              setIsLoggedIn(true)
+            } else if (isEditorUser) {
+              toast.success('Editor login successful!')
+              setUserRole('editor')
+              setIsLoggedIn(true)
             } else {
-              toast.error('Access denied. Admin privileges required.')
-              // Sign out the user if they're not admin
+              toast.error('Access denied. Admin or Editor privileges required.')
+              // Sign out the user if they're not admin or editor
               const { signOut } = await import("firebase/auth")
               await signOut(auth)
             }
@@ -99,13 +115,48 @@ export default function AdminLoginPage() {
                 <Lock className="w-8 h-8 text-primary" />
               </div>
             </div>
-            <h1 className="text-3xl font-bold">Admin Login</h1>
+            <h1 className="text-3xl font-bold">Admin/Editor Login</h1>
             <p className="text-muted-foreground">
-              Sign in to access the admin dashboard
+              {isLoggedIn 
+                ? `Welcome back, ${userRole === 'admin' ? 'Admin' : 'Editor'}!`
+                : "Sign in to access the dashboard"
+              }
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          {isLoggedIn ? (
+            <div className="space-y-4">
+              <div className="bg-primary/10 border border-primary/20 rounded-lg p-6 space-y-4">
+                <p className="text-sm text-muted-foreground text-center">
+                  You're logged in as <strong>{userRole === 'admin' ? 'Admin' : 'Editor'}</strong>
+                </p>
+                <div className="flex flex-col gap-3">
+                  <Link href="/blog/create" className="w-full">
+                    <Button className="w-full h-12" size="lg">
+                      <BookOpen className="mr-2 h-4 w-4" />
+                      Create Blog Post
+                    </Button>
+                  </Link>
+                  {userRole === 'admin' ? (
+                    <Link href="/admin/dashboard" className="w-full">
+                      <Button className="w-full h-12" variant="outline" size="lg">
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        Go to Admin Dashboard
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Link href="/editor/dashboard" className="w-full">
+                      <Button className="w-full h-12" variant="outline" size="lg">
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        Go to Editor Dashboard
+                      </Button>
+                    </Link>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -141,10 +192,13 @@ export default function AdminLoginPage() {
               {isLoading ? "Signing in..." : "Sign In"}
             </Button>
           </form>
-
-          <div className="text-center text-sm text-muted-foreground">
-            <p>Admin access only</p>
-          </div>
+          )}
+          
+          {!isLoggedIn && (
+            <div className="text-center text-sm text-muted-foreground">
+              <p>Admin or Editor access only</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

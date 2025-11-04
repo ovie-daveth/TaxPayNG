@@ -13,6 +13,11 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
     
+    // Helper function to get user profile by userId
+    // Note: This requires userProfiles to have userId field and we need to query differently
+    // Since Firestore rules can't query collections, we'll use a different approach
+    // We'll allow authenticated users and check editor role at app level for blog posts
+    
     // Helper function to check if user is admin
     // Since userProfiles use auto-generated IDs (not userId as document ID),
     // we cannot check admin status in Firestore rules via field queries.
@@ -23,6 +28,17 @@ service cloud.firestore {
       // Firestore rules cannot query by field, so we can't verify admin status here
       // Return false - we'll allow authenticated users instead where needed
       // App-level checks (via adminService.isAdmin) ensure only admins access admin dashboard
+      return false;
+    }
+    
+    // Helper function to check if user is editor
+    // Since userProfiles use auto-generated IDs, we cannot directly query by userId
+    // Editor verification will be handled at app level for blog posts
+    // The rules will allow authenticated users, and app-level checks ensure only editors/admins can create/update
+    function isEditor() {
+      // Firestore rules cannot query collections, so we can't verify editor status here
+      // Return false - we'll allow authenticated users instead where needed
+      // App-level checks ensure only editors/admins can create/update blog posts
       return false;
     }
     
@@ -163,8 +179,9 @@ service cloud.firestore {
     // Blog Posts Collection
     match /blogPosts/{postId} {
       // Helper function to validate blog post structure
+      // Updated to accommodate isPublished field and nullable publishedAt for drafts
       function isValidBlogPost() {
-        return request.resource.data.keys().hasAll(['title', 'excerpt', 'category', 'author', 'content', 'createdAt', 'publishedAt', 'readTime', 'status']) &&
+        return request.resource.data.keys().hasAll(['title', 'excerpt', 'category', 'author', 'content', 'createdAt', 'readTime', 'status', 'isPublished']) &&
                request.resource.data.title is string &&
                request.resource.data.title.size() > 0 &&
                request.resource.data.excerpt is string &&
@@ -174,24 +191,36 @@ service cloud.firestore {
                request.resource.data.content is string &&
                request.resource.data.content.size() > 0 &&
                request.resource.data.createdAt is string &&
-               request.resource.data.publishedAt is string &&
                request.resource.data.readTime is string &&
                request.resource.data.status is string &&
-               (request.resource.data.featuredImage == null || request.resource.data.featuredImage is string) &&
-               (request.resource.data.views == null || request.resource.data.views is int);
+               request.resource.data.isPublished is bool &&
+               // publishedAt can be null for drafts, or a string for published posts
+               (!('publishedAt' in request.resource.data) || request.resource.data.publishedAt == null || request.resource.data.publishedAt is string) &&
+               // Optional fields
+               (!('featuredImage' in request.resource.data) || request.resource.data.featuredImage == null || request.resource.data.featuredImage is string) &&
+               (!('views' in request.resource.data) || request.resource.data.views == null || request.resource.data.views is int) &&
+               (!('authorId' in request.resource.data) || request.resource.data.authorId == null || request.resource.data.authorId is string) &&
+               (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt == null || request.resource.data.updatedAt is string);
       }
       
-      // Anyone can read published posts
-      // Authenticated users can read all posts (admin checks done at app level)
-      allow read: if resource.data.status == 'published' || isAuthenticated();
+      // Anyone can read published posts (isPublished == true)
+      // Authenticated users can read all posts (admin/editor checks done at app level)
+      allow read: if (resource.data.isPublished == true && resource.data.status == 'published') || isAuthenticated();
       
-      // Authenticated users can create posts (admin check done at app level)
+      // Authenticated users can create posts
+      // Editor and admin role checks are done at app level (via adminService.isEditor/isAdmin)
+      // Only users with 'editor' or 'admin' role in their userProfile can create posts
       allow create: if isAuthenticated() && isValidBlogPost();
       
-      // Authenticated users can update posts (admin check done at app level)
+      // Authenticated users can update posts
+      // Editors can update their own posts or any post (if they are the author)
+      // Admins can update any post
+      // Role checks are done at app level
       allow update: if isAuthenticated() && isValidBlogPost();
       
-      // Authenticated users can delete posts (admin check done at app level)
+      // Authenticated users can delete posts
+      // Only admins can delete posts (checked at app level)
+      // Editors can only delete their own posts (checked at app level)
       allow delete: if isAuthenticated();
     }
     
@@ -218,6 +247,35 @@ service cloud.firestore {
       allow update: if isAuthenticated() && isValidExchangeRate();
       
       // Authenticated users can delete rates (admin check done at app level)
+      allow delete: if isAuthenticated();
+    }
+    
+    // Newsletter Collection (public signup, admin management)
+    match /newsletter/{emailId} {
+      // Helper function to validate newsletter subscription structure
+      function isValidNewsletterEntry() {
+        return request.resource.data.keys().hasAll(['email', 'subscribedAt', 'status']) &&
+               request.resource.data.email is string &&
+               request.resource.data.email.size() > 0 &&
+               request.resource.data.subscribedAt is string &&
+               request.resource.data.status is string &&
+               (request.resource.data.source == null || request.resource.data.source is string);
+      }
+      
+      // Anyone can create a newsletter subscription (public signup)
+      allow create: if isValidNewsletterEntry();
+      
+      // Allow reads for checking duplicate emails (needed for public form)
+      // In production, consider using a Cloud Function for better security
+      allow read: if true;
+      
+      // Only authenticated users can update (for status updates, unsubscribing)
+      allow update: if isAuthenticated() &&
+                    // Prevent modifying immutable fields (email, subscribedAt must remain unchanged)
+                    request.resource.data.subscribedAt == resource.data.subscribedAt &&
+                    request.resource.data.email == resource.data.email;
+      
+      // Only authenticated users can delete
       allow delete: if isAuthenticated();
     }
   }

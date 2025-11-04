@@ -6,13 +6,16 @@ import { Button } from "@/components/ui/button"
 import { ArrowRight, Calendar, Clock, User, Tag, Search, Plus } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import OtaxLogo from "@/components/OtaxLogo"
+import Footer from "@/components/footer"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { db } from "@/firebase/firebase"
-import { collection, query, where, getDocs, orderBy, onSnapshot, DocumentSnapshot } from "firebase/firestore"
-import { Loader2 } from "lucide-react"
+import { collection, query, where, getDocs, orderBy, onSnapshot, DocumentSnapshot, setDoc, doc } from "firebase/firestore"
+import { CheckCircle2, Loader2 } from "lucide-react"
+import { BlogPageSkeleton } from "@/components/ui/skeletons"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { format } from "date-fns"
+import { toast } from "sonner"
 
 interface BlogPost {
   id: string
@@ -34,15 +37,19 @@ export default function BlogPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("All")
+  const [newsletterEmail, setNewsletterEmail] = useState("")
+  const [isSubscribing, setIsSubscribing] = useState(false)
+  const [isSubscribed, setIsSubscribed] = useState(false)
   // Fetch blog posts from Firestore
   useEffect(() => {
     const postsRef = collection(db, "blogPosts")
     let unsubscribe: (() => void) | null = null
     
     // Use fallback query without orderBy to avoid index requirement
+    // Filter by isPublished flag instead of status
     const fallbackQuery = query(
       postsRef,
-      where("status", "==", "published")
+      where("isPublished", "==", true)
     )
     
     // First, try to get initial data
@@ -101,6 +108,62 @@ export default function BlogPage() {
     const matchesCategory = selectedCategory === "All" || post.category === selectedCategory
     return matchesSearch && matchesCategory
   })
+
+  // Handle newsletter subscription
+  const handleNewsletterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubscribing(true)
+
+    try {
+      // Validate email
+      if (!newsletterEmail.trim()) {
+        toast.error("Please enter your email address")
+        setIsSubscribing(false)
+        return
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(newsletterEmail.trim())) {
+        toast.error("Please enter a valid email address")
+        setIsSubscribing(false)
+        return
+      }
+
+      const normalizedEmail = newsletterEmail.trim().toLowerCase()
+
+      // Check if email is already subscribed
+      const q = query(collection(db, "newsletter"), where("email", "==", normalizedEmail))
+      const existing = await getDocs(q)
+      if (!existing.empty) {
+        toast.error("This email is already subscribed to our newsletter!")
+        setIsSubscribing(false)
+        return
+      }
+
+      // Save to Firestore
+      const data = {
+        email: normalizedEmail,
+        subscribedAt: new Date().toISOString(),
+        status: "active",
+        source: "blog_page"
+      }
+
+      const emailId = normalizedEmail.replace(/[^a-zA-Z0-9]/g, "_") // Use safe ID format
+      await setDoc(doc(db, "newsletter", emailId), data)
+
+      setIsSubscribed(true)
+      toast.success("🎉 Successfully subscribed! You'll receive our latest tax updates.")
+      
+      // Reset form
+      setNewsletterEmail("")
+    } catch (error) {
+      console.error("Error subscribing to newsletter:", error)
+      toast.error("Oops! Something went wrong. Please try again.")
+    } finally {
+      setIsSubscribing(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -174,9 +237,7 @@ export default function BlogPage() {
       <section className="container mx-auto px-4 py-16 md:py-24">
         <div className="max-w-7xl mx-auto">
           {loading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-            </div>
+            <BlogPageSkeleton />
           ) : filteredPosts.length === 0 ? (
             <div className="text-center py-20">
               <p className="text-muted-foreground text-lg">No blog posts found.</p>
@@ -242,37 +303,68 @@ export default function BlogPage() {
       <section className="container mx-auto px-4 py-16 md:py-24">
         <div className="max-w-4xl mx-auto">
           <div className="bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-3xl p-12 md:p-16 text-center shadow-2xl border border-primary/50">
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">
-              Stay Updated with Tax News
-            </h2>
-            <p className="text-xl mb-8 opacity-95">
-              Get the latest tax tips, guides, and Nigerian tax regulation updates delivered to your inbox.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
-              <Input
-                type="email"
-                placeholder="Enter your email"
-                className="h-12 text-base bg-background text-foreground"
-              />
-              <Button size="lg" variant="secondary" className="h-12 text-base">
-                Subscribe
-              </Button>
-            </div>
+            {isSubscribed ? (
+              <div className="space-y-4">
+                <div className="w-16 h-16 bg-primary-foreground/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle2 className="w-8 h-8 text-primary-foreground" />
+                </div>
+                <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                  You're Subscribed!
+                </h2>
+                <p className="text-xl mb-8 opacity-95">
+                  Thank you for subscribing. We'll send you the latest tax tips, guides, and Nigerian tax regulation updates.
+                </p>
+                <Button 
+                  variant="secondary" 
+                  className="h-12 text-base"
+                  onClick={() => setIsSubscribed(false)}
+                >
+                  Subscribe Another Email
+                </Button>
+              </div>
+            ) : (
+              <>
+                <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                  Stay Updated with Tax News
+                </h2>
+                <p className="text-xl mb-8 opacity-95">
+                  Get the latest tax tips, guides, and Nigerian tax regulation updates delivered to your inbox.
+                </p>
+                <form onSubmit={handleNewsletterSubmit} className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
+                  <Input
+                    type="email"
+                    placeholder="Enter your email"
+                    className="h-12 text-base bg-background text-foreground"
+                    value={newsletterEmail}
+                    onChange={(e) => setNewsletterEmail(e.target.value)}
+                    disabled={isSubscribing}
+                    required
+                  />
+                  <Button 
+                    type="submit" 
+                    size="lg" 
+                    variant="secondary" 
+                    className="h-12 text-base"
+                    disabled={isSubscribing}
+                  >
+                    {isSubscribing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Subscribing...
+                      </>
+                    ) : (
+                      "Subscribe"
+                    )}
+                  </Button>
+                </form>
+              </>
+            )}
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border py-12">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <Link href="/">
-              <OtaxLogo />
-            </Link>
-            <p className="text-sm text-muted-foreground">© 2025 OTax. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   )
 }

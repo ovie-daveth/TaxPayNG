@@ -10,7 +10,8 @@ import { useAuth } from "@/lib/hooks/useAuth"
 import { useAdmin } from "@/lib/hooks/useAdmin"
 import { exchangeRateService, type ExchangeRate } from "@/lib/services/exchangeRateService"
 import { toast } from "sonner"
-import { Loader2, Save, RefreshCw, Plus, Trash2, Edit } from "lucide-react"
+import { Save, RefreshCw, Plus, Trash2, Edit } from "lucide-react"
+import { AdminTableSkeleton } from "@/components/ui/skeletons"
 import { SUPPORTED_CURRENCIES } from "@/lib/utils/currency"
 import {
   Dialog,
@@ -184,11 +185,7 @@ export default function AdminExchangeRatesPage() {
   }
 
   if (authLoading || adminLoading || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-      </div>
-    )
+    return <AdminTableSkeleton />
   }
 
   if (!user || !isAdmin) {

@@ -13,6 +13,7 @@ import { toast } from "sonner"
 import { db } from "@/firebase/firebase"
 import { collection, addDoc, query, where, getDocs, setDoc, doc } from "firebase/firestore"
 import OtaxLogo from "@/components/OtaxLogo"
+import Footer from "@/components/footer"
 
 export default function HomePage() {
   const { user, logout, loading } = useAuth()
@@ -481,14 +482,7 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="border-t border-border py-12">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <OtaxLogo />
-            <p className="text-sm text-muted-foreground">© 2025 OTax. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
+      <Footer />
     </div>
   )
 }

@@ -12,7 +12,7 @@ import { toast } from "sonner"
 import { db } from "@/firebase/firebase"
 import { collection, getDocs, query, orderBy, limit, where } from "firebase/firestore"
 import { adminService } from "@/lib/services/adminService"
-import { Loader2 } from "lucide-react"
+import { AdminDashboardSkeleton } from "@/components/ui/skeletons"
 import { StatsOverview } from "@/components/admin/stats-overview"
 import { DashboardCharts } from "@/components/admin/dashboard-charts"
 
@@ -217,11 +217,7 @@ export default function AdminDashboard() {
 
 
   if (authLoading || adminLoading || loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-      </div>
-    )
+    return <AdminDashboardSkeleton />
   }
 
   if (!user || !isAdmin) {
