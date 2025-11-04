@@ -1,142 +1,14 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Card } from "@/components/ui/card"
-import { Send, HelpCircle, Sparkles, MessageSquare, Search, X, BookOpen, Building2, User } from "lucide-react"
+import { Send, HelpCircle, Sparkles, MessageSquare, Search, X, BookOpen, Building2, User, RefreshCw, Menu, X as XIcon } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import OtaxLogo from "@/components/OtaxLogo"
-import Footer from "@/components/footer"
+import { faqData } from "./components/data"
 
-// FAQ Knowledge Base
-const faqData = {
-  individuals: [
-    {
-      question: "What is the new tax reform about?",
-      answer: "The new tax reform introduces fairer, simpler tax rules that ease the burden on low- and middle-income earners while closing loopholes for large corporations. It updates rates, adds new reliefs, and exempts small businesses and low-income individuals from several taxes.",
-      category: "Tax Reform Overview",
-      keywords: ["tax reform", "new tax", "reform", "changes", "updates"]
-    },
-    {
-      question: "Do freelancers and content creators need to pay tax?",
-      answer: "Yes. If you earn income from freelancing, brand deals, digital services, or content creation, it's taxable under the Personal Income Tax Act. The good news is that incomes below ₦1.2 million per year are exempt, and you can claim several deductions and reliefs to lower what you owe.",
-      category: "Freelancers & Creators",
-      keywords: ["freelancer", "creator", "content creator", "tax", "pay tax", "income"]
-    },
-    {
-      question: "What tax reliefs are available for individuals?",
-      answer: "You can claim deductions for pension contributions, National Housing Fund (NHF), National Health Insurance Scheme (NHIS), rent (up to 20% capped at ₦500,000), life insurance premiums, and interest on housing loans. Compensation for job loss up to ₦50 million is also exempt.",
-      category: "Tax Reliefs",
-      keywords: ["relief", "deduction", "pension", "NHF", "NHIS", "rent", "insurance"]
-    },
-    {
-      question: "Who qualifies as a small business under the new law?",
-      answer: "A small company is one with an annual turnover not exceeding ₦100 million and total fixed assets not above ₦250 million. Such businesses are exempt from Company Income Tax (CIT), development levies, and even withholding tax in many cases.",
-      category: "Small Business",
-      keywords: ["small business", "qualify", "turnover", "assets", "exempt"]
-    },
-    {
-      question: "What happens if I earn through platforms like YouTube, Upwork, or TikTok?",
-      answer: "You'll still file your income under personal tax since those platforms don't deduct Nigerian taxes automatically. You can use tools like **OTax** to track your yearly earnings and calculate your taxable income accurately.",
-      category: "Platform Income",
-      keywords: ["platform", "YouTube", "Upwork", "TikTok", "income", "earn", "file"]
-    },
-    {
-      question: "How can I calculate my taxable income?",
-      answer: "Add up all your income for the year, then subtract your allowable deductions — pension, NHF, NHIS, rent relief, and business expenses. The remainder is your taxable income. OTax can handle these calculations automatically for you.",
-      category: "Tax Calculation",
-      keywords: ["calculate", "taxable income", "deduction", "OTax", "calculation"]
-    },
-    {
-      question: "Are transport or fuel allowances still tax-free?",
-      answer: "Under the new reform, transport and fuel allowances are not separate exemptions unless provided as part of employment relief or wage support. However, businesses offering these supports to low-income workers can claim **50% deduction relief.**",
-      category: "Allowances",
-      keywords: ["transport", "fuel", "allowance", "tax-free", "exemption"]
-    },
-    {
-      question: "What taxes do small businesses still pay?",
-      answer: "Depending on your turnover, you may still charge or remit VAT (if over ₦100 million), pay employee PAYE if you have staff, and file annual returns. But several exemptions apply, especially for small companies, agriculture, and startups.",
-      category: "Small Business",
-      keywords: ["small business", "pay", "VAT", "PAYE", "taxes", "exemptions"]
-    },
-    {
-      question: "How does OTax help me stay compliant?",
-      answer: "OTax helps you organize your records, calculate your total income and deductions, and file accurately. It's designed to help freelancers, creators, and small businesses stay compliant without the headache of manual bookkeeping.",
-      category: "OTax Platform",
-      keywords: ["OTax", "compliant", "help", "organize", "calculate", "file"]
-    },
-    {
-      question: "What happens if I don't pay tax?",
-      answer: "Failure to register, file, or pay taxes may attract penalties or interest. However, the government is focusing on voluntary compliance, education, and digital filing tools like OTax to make it easier and fairer for everyone.",
-      category: "Compliance",
-      keywords: ["don't pay", "penalty", "consequences", "failure", "compliance"]
-    }
-  ],
-  businesses: [
-    {
-      question: "What does the new tax reform mean for small businesses?",
-      answer: "The reform simplifies compliance, removes multiple taxes, and grants full exemptions to small companies with turnover under ₦100 million and total assets under ₦250 million. It's designed to help businesses grow without excessive tax pressure.",
-      category: "Tax Reform Overview",
-      keywords: ["tax reform", "small business", "exemption", "compliance", "simplify"]
-    },
-    {
-      question: "Are small businesses still required to pay Company Income Tax (CIT)?",
-      answer: "No. Small companies (turnover ≤ ₦100 million) pay **0% CIT**. Medium-sized businesses (₦100–₦500 million) enjoy reduced rates, while large companies pay the standard rate.",
-      category: "Company Income Tax",
-      keywords: ["CIT", "company income tax", "small business", "pay", "0%", "exempt"]
-    },
-    {
-      question: "Do small businesses have to register for VAT?",
-      answer: "Only if your annual turnover exceeds ₦100 million. Below that threshold, you are **exempt** from charging, collecting, or remitting VAT.",
-      category: "VAT",
-      keywords: ["VAT", "register", "small business", "exempt", "turnover"]
-    },
-    {
-      question: "What is the Development Levy, and do I need to pay it?",
-      answer: "The Development Levy is a 4% charge meant to support national infrastructure. Small companies are **fully exempt** from it under the new law.",
-      category: "Development Levy",
-      keywords: ["development levy", "4%", "pay", "exempt", "infrastructure"]
-    },
-    {
-      question: "What tax reliefs can my business claim?",
-      answer: "Businesses can claim deductions for pension contributions, staff training, and salary increases for low-income employees. There's also a **50% employment relief** for hiring and retaining new workers for at least three years.",
-      category: "Tax Reliefs",
-      keywords: ["relief", "deduction", "pension", "training", "employment relief"]
-    },
-    {
-      question: "What incentives are available for startups and tech businesses?",
-      answer: "Recognized startups get **tax holidays and investor reliefs**, including CIT exemptions and tax-free capital gains on qualified startup investments. Investments by venture capitalists and accelerators are also tax-exempt.",
-      category: "Startups & Tech",
-      keywords: ["startup", "tech", "incentive", "tax holiday", "investor", "capital gains"]
-    },
-    {
-      question: "What about agricultural or manufacturing businesses?",
-      answer: "Agricultural businesses enjoy a **five-year tax holiday**, and both agriculture and manufacturing sectors get VAT exemptions on fertilizers, machinery, diesel, and power equipment.",
-      category: "Agriculture & Manufacturing",
-      keywords: ["agriculture", "manufacturing", "tax holiday", "five-year", "VAT exemption"]
-    },
-    {
-      question: "Do I still need to file PAYE for my employees?",
-      answer: "Yes. Employers must deduct and remit PAYE monthly for staff, but lower-income employees benefit from reduced rates and new personal tax reliefs.",
-      category: "PAYE",
-      keywords: ["PAYE", "employees", "file", "deduct", "remit"]
-    },
-    {
-      question: "Are withholding taxes still deducted from small business payments?",
-      answer: "Small companies are **exempt from withholding tax deductions** — both on their income and on payments they make to suppliers.",
-      category: "Withholding Tax",
-      keywords: ["withholding tax", "small business", "exempt", "deduction", "suppliers"]
-    },
-    {
-      question: "How can OTax help my business stay compliant?",
-      answer: "OTax helps you track income, manage expenses, and calculate VAT, PAYE, and deductions automatically. It keeps your books audit-ready, ensures timely filings, and helps you benefit from every available relief under the new law.",
-      category: "OTax Platform",
-      keywords: ["OTax", "compliant", "track", "calculate", "VAT", "PAYE", "relief"]
-    }
-  ]
-}
 
 // Simple fuzzy search function
 function findBestMatch(query: string, faqs: typeof faqData.individuals) {
@@ -198,16 +70,45 @@ export default function FAQPage() {
   }>>([])
   const [input, setInput] = useState("")
   const [isTyping, setIsTyping] = useState(false)
+  const [quickQuestions, setQuickQuestions] = useState<typeof faqData.individuals[0][]>([])
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Set sidebar state based on screen size
   useEffect(() => {
-    // Welcome message
-    setMessages([{
-      type: "assistant",
-      content: `👋 Hello! I'm your OTax AI assistant. I can help answer questions about Nigeria's new tax reform (effective January 1, 2026), tax reliefs, compliance, and how OTax can help you. What would you like to know?`,
-    }])
+    const handleResize = () => {
+      if (window.innerWidth < 1024) {
+        setSidebarOpen(false)
+      } else {
+        setSidebarOpen(true)
+      }
+    }
+    
+    handleResize() // Set initial state
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
   }, [])
+
+  // Function to generate random quick questions
+  const generateQuickQuestions = useCallback(() => {
+    const currentFaqs = selectedCategory === "individuals" ? faqData.individuals : faqData.businesses
+    // Shuffle array and take 10 random questions
+    const shuffled = [...currentFaqs].sort(() => Math.random() - 0.5)
+    setQuickQuestions(shuffled.slice(0, 10))
+  }, [selectedCategory])
+
+  useEffect(() => {
+    // Welcome message (only on initial mount)
+    if (messages.length === 0) {
+      setMessages([{
+        type: "assistant",
+        content: `👋 Hello! I'm your OTax AI assistant. I can help answer questions about Nigeria's new tax reform (Nigeria Tax Act 2025, effective January 1, 2026), including:\n\n• Tax brackets and rates (0% on first ₦800k, then 15%, 18%, 21%, 23%, 25%)\n• Tax reliefs and deductions (rent relief up to ₦500k, pension up to 8%, etc.)\n• Capital gains tax and exemptions\n• Employment income and benefits-in-kind\n• Small business exemptions (0% CIT for companies ≤ ₦100M turnover)\n• VAT regulations (7.5% rate, ₦100M threshold)\n• Tax registration and TIN requirements\n• Filing deadlines and self-assessment\n• Tax clearance certificates\n• Advance rulings and clarifications\n• Penalties and compliance\n• Tax refunds\n• Objection and appeal processes\n• PAYE obligations\n• Record keeping requirements\n• Nigeria Revenue Service (NRS) and tax administration\n• Tax Appeal Tribunal and dispute resolution\n• Tax Ombud and taxpayer rights\n• Virtual assets and cryptocurrency taxation\n• How OTax can help you\n\nWhat would you like to know?`,
+      }])
+    }
+    // Generate quick questions (when category changes or on mount)
+    generateQuickQuestions()
+  }, [generateQuickQuestions, messages.length])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
@@ -233,7 +134,7 @@ export default function FAQPage() {
         
         setMessages(prev => [...prev, {
           type: "assistant",
-          content: "You're welcome! 😊\n\nIs there anything else you'd like to know? I can help with:\n\n• Tax reform overview\n• Tax reliefs and deductions\n• Freelancer/creator taxation\n• Small business exemptions\n• OTax platform features\n• Compliance requirements\n\nJust ask me anything!"
+          content: "You're welcome! 😊\n\nIs there anything else you'd like to know? I can help with:\n\n• Tax brackets and rates (0% on first ₦800k, then 15%, 18%, 21%, 23%, 25%)\n• Tax reliefs and deductions (rent relief up to ₦500k, pension up to 8%, etc.)\n• Capital gains tax and exemptions\n• Employment income and benefits-in-kind\n• Freelancer/creator taxation\n• Small business exemptions (0% CIT, VAT exemptions)\n• VAT regulations (7.5% rate, ₦100M threshold)\n• Tax registration and TIN requirements\n• Filing deadlines and self-assessment\n• Tax clearance certificates\n• Advance rulings\n• Penalties and compliance\n• Tax refunds\n• Objection and appeal processes\n• PAYE obligations\n• Record keeping requirements\n• Virtual assets and cryptocurrency taxation\n• Nigeria Revenue Service (NRS) and tax administration\n• Tax Appeal Tribunal and dispute resolution\n• Tax Ombud and taxpayer rights\n• OTax platform features\n\nJust ask me anything!"
         }])
         setIsTyping(false)
       }, 800)
@@ -333,7 +234,7 @@ export default function FAQPage() {
       } else {
         setMessages(prev => [...prev, {
           type: "assistant",
-          content: "I'm not sure I understand that question. Could you rephrase it? Here are some topics I can help with:\n\n• Tax reform overview\n• Tax reliefs and deductions\n• Freelancer/creator taxation\n• Small business exemptions\n• OTax platform features\n• Compliance requirements",
+          content: "I'm not sure I understand that question. Could you rephrase it? Here are some topics I can help with:\n\n• Tax brackets and rates (0% on first ₦800k, then 15%, 18%, 21%, 23%, 25%)\n• Tax reliefs and deductions (rent relief up to ₦500k, pension up to 8%, etc.)\n• Capital gains tax and exemptions\n• Employment income and benefits-in-kind\n• Freelancer/creator taxation\n• Small business exemptions (0% CIT, VAT exemptions)\n• VAT regulations (7.5% rate, ₦100M threshold)\n• Tax registration and TIN requirements\n• Filing deadlines and self-assessment\n• Tax clearance certificates\n• Advance rulings\n• Penalties and compliance\n• Tax refunds\n• Objection and appeal processes\n• PAYE obligations\n• Record keeping requirements\n• Virtual assets and cryptocurrency taxation\n• Nigeria Revenue Service (NRS) and tax administration\n• Tax Appeal Tribunal and dispute resolution\n• Tax Ombud and taxpayer rights\n• OTax platform features",
         }])
       }
       
@@ -361,12 +262,18 @@ export default function FAQPage() {
   const categories = [...new Set(currentFaqs.map(f => f.category))]
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="h-screen flex flex-col bg-background overflow-hidden">
       {/* Header */}
-      <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
-        <div className="px-[150px] mx-auto py-5 flex items-center justify-between">
-          <Link href="/">
+      <header className="border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50 flex-shrink-0">
+        <div className="px-4 md:px-8 lg:px-[150px] mx-auto py-3 md:py-4 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2">
             <OtaxLogo />
+            <div className="flex items-center gap-2 ml-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-2 py-1 rounded-full font-medium border border-orange-200 dark:border-orange-800">
+                BETA
+              </span>
+            </div>
           </Link>
           <nav className="hidden md:flex items-center gap-6">
             <Link href="/#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -382,78 +289,159 @@ export default function FAQPage() {
               FAQ
             </Link>
           </nav>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
+            <div className="hidden md:flex gap-2">
+              <Button
+                variant={selectedCategory === "individuals" ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setSelectedCategory("individuals")
+                  setMessages([{
+                    type: "assistant",
+                    content: `👋 Switched to **Individual/Freelancer** mode. I can help with questions about:\n\n• Tax brackets (0% on first ₦800k, then 15%, 18%, 21%, 23%, 25%)\n• Tax reliefs (rent relief up to ₦500k, pension up to 8%, NHF, NHIS, etc.)\n• Capital gains tax and exemptions\n• Employment income and benefits-in-kind\n• Freelancer/content creator taxation\n• Platform income (YouTube, Upwork, TikTok)\n• Tax calculation step-by-step\n• Tax registration and TIN requirements\n• Filing deadlines and self-assessment\n• Tax clearance certificates\n• Objection and appeal processes\n• Record keeping requirements\n• Penalties and compliance\n• Tax refunds\n• Nigeria Revenue Service (NRS) and tax administration\n• Tax Appeal Tribunal and appeals\n• Tax Ombud and your rights\n\nWhat would you like to know?`,
+                  }])
+                }}
+                className="flex items-center gap-1 text-xs"
+              >
+                <User className="w-3 h-3" />
+                Individuals
+              </Button>
+              <Button
+                variant={selectedCategory === "businesses" ? "default" : "outline"}
+                size="sm"
+                onClick={() => {
+                  setSelectedCategory("businesses")
+                  setMessages([{
+                    type: "assistant",
+                    content: `👋 Switched to **Small Business** mode. I can help with questions about:\n\n• Small company definition (turnover ≤ ₦100M, assets ≤ ₦250M)\n• Company Income Tax (0% for small companies, 30% for large)\n• VAT regulations (7.5% rate, ₦100M threshold)\n• Development Levy (4%, exempt for small companies)\n• Withholding tax exemptions\n• Business tax reliefs and deductions\n• Startups and tech business incentives\n• Agriculture and manufacturing exemptions\n• Specialized industries (insurance, mining, free zones)\n• Business registration and TIN requirements\n• Company filing deadlines (6 months for existing, 18 months for new)\n• PAYE obligations and deadlines\n• Tax clearance certificates\n• Advance rulings\n• Record keeping (6 years minimum)\n• Penalties and compliance\n• Tax refunds\n• Settlement of disputes\n• Virtual Assets Service Providers (VASP)\n• Nigeria Revenue Service (NRS) and tax administration\n• Tax Appeal Tribunal and appeals\n• Tax Ombud and your rights\n\nWhat would you like to know?`,
+                  }])
+                }}
+                className="flex items-center gap-1 text-xs"
+              >
+                <Building2 className="w-3 h-3" />
+                Businesses
+              </Button>
+            </div>
             <ThemeToggle />
             <Link href="/#waitlist">
-              <Button size="lg">
-                <span className="relative z-10">Join the Waitlist</span>
+              <Button size="sm" className="hidden md:flex">
+                <span className="relative z-10">Join Waitlist</span>
               </Button>
             </Link>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <section className="container mx-auto px-4 py-12">
-        <div className="max-w-6xl mx-auto">
-          {/* Header Section */}
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center gap-2 mb-4">
-              <Sparkles className="w-8 h-8 text-primary" />
-              <h1 className="text-4xl md:text-5xl font-bold">Ask OTax AI</h1>
-              <span className="text-xs bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-3 py-1 rounded-full font-medium border border-orange-200 dark:border-orange-800">
-                BETA
-              </span>
+      {/* Main Content - Full Screen */}
+      <div className="flex-1 flex gap-0 lg:gap-6 overflow-hidden relative">
+        {/* Mobile Backdrop */}
+        {sidebarOpen && (
+          <div 
+            className="fixed inset-0 bg-black/50 z-20 lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+        {/* Sidebar */}
+        <div className={`${sidebarOpen ? 'w-80 lg:w-80' : 'w-0'} transition-all duration-300 overflow-hidden flex-shrink-0 ${sidebarOpen ? 'block' : 'hidden lg:block'} ${sidebarOpen ? 'fixed lg:relative z-30 h-full left-0 top-0 lg:left-auto lg:top-auto' : ''}`}>
+          {sidebarOpen && (
+            <div className="h-full flex flex-col border-r bg-background shadow-lg lg:shadow-none">
+                  <div className="p-4 pb-3 flex-shrink-0 border-b">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <HelpCircle className="w-5 h-5 text-primary" />
+                        <h3 className="font-semibold">Quick Questions</h3>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={generateQuickQuestions}
+                          className="h-8 w-8 p-0"
+                          title="Generate new questions"
+                        >
+                          <RefreshCw className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setSidebarOpen(false)}
+                          className="h-8 w-8 p-0"
+                          title="Close sidebar"
+                        >
+                          <XIcon className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex-1 overflow-y-auto px-4 py-4 space-y-2 scroll-smooth" style={{ scrollbarWidth: 'thin' }}>
+                    {quickQuestions.map((faq, idx) => (
+                      <button
+                        key={`${faq.question}-${idx}`}
+                        onClick={() => handleQuickQuestion(faq.question)}
+                        className="w-full text-left p-3 rounded-lg border border-border hover:bg-muted hover:border-primary transition-all text-sm"
+                      >
+                        <p className="font-medium line-clamp-2">{faq.question}</p>
+                        <p className="text-xs text-muted-foreground mt-1">{faq.category}</p>
+                      </button>
+                    ))}
+                  </div>
+                  
+                  <div className="p-4 pt-3 border-t flex-shrink-0">
+                    <div className="flex items-center gap-2 mb-3">
+                      <BookOpen className="w-4 h-4 text-muted-foreground" />
+                      <p className="text-sm font-medium">Browse by Category</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {categories.slice(0, 4).map((cat, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => {
+                            const categoryFaqs = currentFaqs.filter(f => f.category === cat)
+                            if (categoryFaqs.length > 0) {
+                              handleQuickQuestion(categoryFaqs[0].question)
+                            }
+                          }}
+                          className="text-xs px-3 py-1 rounded-full bg-muted hover:bg-primary hover:text-primary-foreground transition-colors"
+                        >
+                          {cat}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto mb-2">
-              Get instant answers about Nigeria's new tax reform, tax reliefs, compliance, and how OTax can help you.
-            </p>
-            <p className="text-sm text-muted-foreground max-w-2xl mx-auto">
-              <span className="inline-flex items-center gap-1">
-                <span className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
-                This is a beta version. We're continuously improving and will integrate advanced AI APIs soon.
-              </span>
-            </p>
-          </div>
 
-          {/* Category Toggle */}
-          <div className="flex justify-center gap-4 mb-8">
+        {/* Chat Interface - Full Width */}
+        <div className="flex-1 flex flex-col min-w-0 relative h-full">
+          {!sidebarOpen && (
             <Button
-              variant={selectedCategory === "individuals" ? "default" : "outline"}
-              onClick={() => {
-                setSelectedCategory("individuals")
-                setMessages([{
-                  type: "assistant",
-                  content: `👋 Switched to **Individual/Freelancer** mode. I can help with questions about personal tax, freelancer taxation, content creator income, tax reliefs, and compliance. What would you like to know?`,
-                }])
-              }}
-              className="flex items-center gap-2"
+              variant="ghost"
+              size="sm"
+              onClick={() => setSidebarOpen(true)}
+              className="absolute left-4 top-4 z-20 h-9 w-9 p-0 bg-background border shadow-sm"
+              title="Open sidebar"
             >
-              <User className="w-4 h-4" />
-              Individuals & Creators
+              <Menu className="w-4 h-4" />
             </Button>
-            <Button
-              variant={selectedCategory === "businesses" ? "default" : "outline"}
-              onClick={() => {
-                setSelectedCategory("businesses")
-                setMessages([{
-                  type: "assistant",
-                  content: `👋 Switched to **Small Business** mode. I can help with questions about business tax exemptions, VAT, CIT, PAYE, withholding tax, and business compliance. What would you like to know?`,
-                }])
-              }}
-              className="flex items-center gap-2"
-            >
-              <Building2 className="w-4 h-4" />
-              Small Businesses
-            </Button>
-          </div>
-
-          <div className="grid lg:grid-cols-3 gap-8">
-            {/* Chat Interface */}
-            <div className="lg:col-span-2">
-              <Card className="h-[600px] flex flex-col">
-                {/* Messages */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-4">
+          )}
+          <div className="h-full flex flex-col bg-background">
+            {/* Mobile Sidebar Toggle */}
+            <div className="lg:hidden p-3 border-b flex items-center justify-between flex-shrink-0">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSidebarOpen(true)}
+                className="h-8 px-3"
+              >
+                <Menu className="w-4 h-4 mr-2" />
+                Quick Questions
+              </Button>
+            </div>
+            {/* Messages - Scrollable */}
+            <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6 scroll-smooth">
+              <div className="max-w-4xl mx-auto space-y-6">
                   {messages.map((msg, idx) => (
                     <div
                       key={idx}
@@ -467,7 +455,7 @@ export default function FAQPage() {
                         </div>
                       )}
                       <div
-                        className={`max-w-[80%] rounded-lg p-4 ${
+                        className={`max-w-[85%] md:max-w-[75%] rounded-lg p-4 ${
                           msg.type === "user"
                             ? "bg-primary text-primary-foreground"
                             : "bg-muted"
@@ -523,88 +511,39 @@ export default function FAQPage() {
                     </div>
                   )}
                   <div ref={messagesEndRef} />
+                  </div>
                 </div>
 
-                {/* Input */}
-                <div className="border-t p-4">
-                  <form
-                    onSubmit={(e) => {
+            {/* Input - Fixed at Bottom */}
+            <div className="border-t bg-background flex-shrink-0 p-4">
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  handleSend()
+                }}
+                className="flex gap-2 max-w-4xl mx-auto"
+              >
+                <Input
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Ask a question about taxes..."
+                  className="flex-1"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
                       e.preventDefault()
                       handleSend()
-                    }}
-                    className="flex gap-2"
-                  >
-                    <Input
-                      ref={inputRef}
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      placeholder="Ask a question about taxes..."
-                      className="flex-1"
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" && !e.shiftKey) {
-                          e.preventDefault()
-                          handleSend()
-                        }
-                      }}
-                    />
-                    <Button type="submit" disabled={!input.trim() || isTyping}>
-                      <Send className="w-4 h-4" />
-                    </Button>
-                  </form>
-                </div>
-              </Card>
-            </div>
-
-            {/* Quick Questions Sidebar */}
-            <div className="lg:col-span-1">
-              <Card className="p-6">
-                <div className="flex items-center gap-2 mb-4">
-                  <HelpCircle className="w-5 h-5 text-primary" />
-                  <h3 className="font-semibold">Quick Questions</h3>
-                </div>
-                <div className="space-y-2">
-                  {currentFaqs.slice(0, 6).map((faq, idx) => (
-                    <button
-                      key={idx}
-                      onClick={() => handleQuickQuestion(faq.question)}
-                      className="w-full text-left p-3 rounded-lg border border-border hover:bg-muted hover:border-primary transition-all text-sm"
-                    >
-                      <p className="font-medium line-clamp-2">{faq.question}</p>
-                      <p className="text-xs text-muted-foreground mt-1">{faq.category}</p>
-                    </button>
-                  ))}
-                </div>
-                
-                <div className="mt-6 pt-6 border-t">
-                  <div className="flex items-center gap-2 mb-3">
-                    <BookOpen className="w-4 h-4 text-muted-foreground" />
-                    <p className="text-sm font-medium">Browse by Category</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {categories.slice(0, 4).map((cat, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          const categoryFaqs = currentFaqs.filter(f => f.category === cat)
-                          if (categoryFaqs.length > 0) {
-                            handleQuickQuestion(categoryFaqs[0].question)
-                          }
-                        }}
-                        className="text-xs px-3 py-1 rounded-full bg-muted hover:bg-primary hover:text-primary-foreground transition-colors"
-                      >
-                        {cat}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </Card>
+                    }
+                  }}
+                />
+                <Button type="submit" disabled={!input.trim() || isTyping}>
+                  <Send className="w-4 h-4" />
+                </Button>
+              </form>
             </div>
           </div>
         </div>
-      </section>
-
-      {/* Footer */}
-      <Footer />
+      </div>
     </div>
   )
 }
