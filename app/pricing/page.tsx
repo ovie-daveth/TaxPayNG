@@ -9,6 +9,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { Check, Calculator } from "lucide-react"
 import OtaxLogo from "@/components/OtaxLogo"
 import Footer from "@/components/footer"
+import { ThemeToggle } from "@/components/theme-toggle"
 
 export default function PricingPage() {
   return (
@@ -18,14 +19,28 @@ export default function PricingPage() {
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             <OtaxLogo />
-           
           </Link>
+          <nav className="hidden md:flex items-center gap-6">
+            <Link href="/#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Features
+            </Link>
+            <Link href="/pricing" className="text-sm font-medium text-foreground">
+              Pricing
+            </Link>
+            <Link href="/blog" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Blog
+            </Link>
+            <Link href="/faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              FAQ
+            </Link>
+          </nav>
           <div className="flex items-center gap-3">
-          <a href="/#waitlist">
-                  <Button size="lg" className="">
-                    <span className="relative z-10">Join the Waitlist</span>
-                  </Button>
-                </a>
+            <ThemeToggle />
+            <a href="/#waitlist">
+              <Button size="lg" className="">
+                <span className="relative z-10">Join the Waitlist</span>
+              </Button>
+            </a>
             {/* <Link href="/login">
               <Button variant="ghost" size="sm">
                 Log in
@@ -51,9 +66,9 @@ export default function PricingPage() {
           {/* Toggle between Individuals and SMEs */}
           <div className="flex justify-center mb-12">
             <Tabs defaultValue="individuals" className="w-full">
-              <TabsList className="grid w-full max-w-md mx-auto grid-cols-2">
-                <TabsTrigger value="individuals">Individuals</TabsTrigger>
-                <TabsTrigger value="smes">SMEs</TabsTrigger>
+              <TabsList className="grid w-full max-w-md mx-auto grid-cols-2 mb-20">
+                <TabsTrigger className="cursor-pointer" value="individuals">Individuals</TabsTrigger>
+                <TabsTrigger className="cursor-pointer" value="smes">SMEs</TabsTrigger>
               </TabsList>
 
               {/* Individuals Pricing */}
@@ -90,7 +105,7 @@ export default function PricingPage() {
               </CardContent>
               <CardFooter>
                 <Link href="/signup" className="w-full">
-                  <Button className="w-full bg-transparent" variant="outline">
+                  <Button className="w-full bg-transparent hover:bg-muted hover:text-foreground transition-all duration-200 hover:scale-105 hover:shadow-lg" variant="outline">
                     Start Free Trial
                   </Button>
                 </Link>
@@ -133,7 +148,7 @@ export default function PricingPage() {
                     </CardContent>
                     <CardFooter>
                       <Link href="/signup" className="w-full">
-                        <Button className="w-full">Start Free Trial</Button>
+                        <Button className="w-full hover:bg-primary/90 hover:scale-105 transition-all duration-200 hover:shadow-lg">Start Free Trial</Button>
                       </Link>
                     </CardFooter>
                   </Card>
@@ -172,7 +187,7 @@ export default function PricingPage() {
                     </CardContent>
                     <CardFooter>
                       <Link href="/signup" className="w-full">
-                        <Button className="w-full bg-transparent" variant="outline">
+                        <Button className="w-full bg-transparent hover:bg-muted hover:text-foreground transition-all duration-200 hover:scale-105 hover:shadow-lg" variant="outline">
                           Start Free Trial
                         </Button>
                       </Link>
@@ -245,7 +260,7 @@ export default function PricingPage() {
               </CardContent>
               <CardFooter>
                 <Link href="/signup" className="w-full">
-                  <Button className="w-full">Start Free Trial</Button>
+                  <Button className="w-full hover:bg-primary/90 hover:scale-105 transition-all duration-200 hover:shadow-lg">Start Free Trial</Button>
                 </Link>
               </CardFooter>
             </Card>

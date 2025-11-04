@@ -121,6 +121,9 @@ export default function HomePage() {
             <Link href="/blog" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Blog
             </Link>
+            <Link href="/faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              FAQ
+            </Link>
           </nav>
           <div className="flex items-center gap-3">
         

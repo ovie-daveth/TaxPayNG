@@ -183,6 +183,9 @@ export default function BlogPage() {
             <Link href="/blog" className="text-sm font-medium text-foreground">
               Blog
             </Link>
+            <Link href="/faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              FAQ
+            </Link>
           </nav>
           <div className="flex items-center gap-3">
             <ThemeToggle />

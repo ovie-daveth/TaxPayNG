@@ -204,8 +204,8 @@ service cloud.firestore {
       }
       
       // Anyone can read published posts (isPublished == true)
-      // Authenticated users can read all posts (admin/editor checks done at app level)
-      allow read: if (resource.data.isPublished == true && resource.data.status == 'published') || isAuthenticated();
+      // Authenticated users can read all posts (including drafts) for admin/editor management
+      allow read: if resource.data.isPublished == true || isAuthenticated();
       
       // Authenticated users can create posts
       // Editor and admin role checks are done at app level (via adminService.isEditor/isAdmin)
