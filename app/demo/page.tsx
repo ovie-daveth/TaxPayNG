@@ -1,7 +1,8 @@
 "use client"
 
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
+import { calculateNigerianTax } from "@/lib/tax-calculator"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
@@ -43,7 +44,7 @@ export default function DemoPage() {
   const [activeSection, setActiveSection] = useState("dashboard")
   const [taxResult, setTaxResult] = useState<any>(null)
   const [showTaxResults, setShowTaxResults] = useState(false)
-  const [businessType, setBusinessType] = useState<"freelancer" | "sme">("freelancer")
+  const [businessType, setBusinessType] = useState<"freelancer" | "creator" | "small-business">("freelancer")
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedType, setSelectedType] = useState<string>("all")
@@ -181,10 +182,10 @@ export default function DemoPage() {
       case "dashboard":
         return (
           <div className="space-y-6">
-            <StatsCards />
+            <StatsCards businessType={businessType} />
             <div className="grid lg:grid-cols-3 gap-6">
               <div className="lg:col-span-2">
-                <RecentTransactions />
+                <RecentTransactions businessType={businessType} />
               </div>
               <div>
                 <UpcomingReminders />
@@ -415,8 +416,8 @@ export default function DemoPage() {
                 </p>
               </div>
               <div className="flex items-center gap-2">
-                {/* Business Type Toggle - Only show on transactions page */}
-                {activeSection === "transactions" && (
+                {/* Business Type Toggle - Show on dashboard and transactions pages */}
+                {(activeSection === "dashboard" || activeSection === "transactions") && (
                   <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
                     <Button
                       variant={businessType === "freelancer" ? "default" : "ghost"}
@@ -428,13 +429,22 @@ export default function DemoPage() {
                       <span className="hidden sm:inline">Freelancer</span>
                     </Button>
                     <Button
-                      variant={businessType === "sme" ? "default" : "ghost"}
+                      variant={businessType === "creator" ? "default" : "ghost"}
                       size="sm"
-                      onClick={() => setBusinessType("sme")}
+                      onClick={() => setBusinessType("creator")}
+                      className="flex items-center gap-2"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <span className="hidden sm:inline">Creator</span>
+                    </Button>
+                    <Button
+                      variant={businessType === "small-business" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setBusinessType("small-business")}
                       className="flex items-center gap-2"
                     >
                       <Building2 className="w-4 h-4" />
-                      <span className="hidden sm:inline">SME</span>
+                      <span className="hidden sm:inline">Small Business</span>
                     </Button>
                   </div>
                 )}
@@ -549,20 +559,296 @@ export default function DemoPage() {
   )
 }
 
-function StatsCards() {
-  const stats = [
-    { label: "Total Income", value: "₦2,450,000", change: "+12.5%", trend: "up", icon: ArrowUpRight, color: "text-primary" },
-    { label: "Total Expenses", value: "₦890,000", change: "+8.2%", trend: "up", icon: ArrowDownRight, color: "text-destructive" },
-    { label: "Net Profit", value: "₦1,560,000", change: "+15.3%", trend: "up", icon: TrendingUp, color: "text-chart-3" },
-    { label: "Tax Payable", value: "₦234,000", change: "Q1 2025", trend: "neutral", icon: Calculator, color: "text-accent" },
+function StatsCards({ businessType }: { businessType: "freelancer" | "creator" | "small-business" }) {
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null)
+  const [hoveredCard, setHoveredCard] = useState<string | null>(null)
+  const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      Object.keys(dropdownRefs.current).forEach((key) => {
+        const ref = dropdownRefs.current[key]
+        if (ref && !ref.contains(event.target as Node)) {
+          if (openDropdown === key) {
+            setOpenDropdown(null)
+          }
+        }
+      })
+    }
+
+    if (openDropdown) {
+      document.addEventListener('mousedown', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [openDropdown])
+
+  // Calculate actual tax amounts using the tax calculator
+  const calculateTax = (income: number, expenses: number, rentPaid: number = 0) => {
+    const result = calculateNigerianTax({
+      businessType: businessType === "small-business" ? "sme" : businessType,
+      income: income,
+      period: "yearly",
+      rentPaid: rentPaid,
+      pensionContribution: 0,
+      healthInsurance: 0,
+      housingFund: 0,
+      lifeInsurance: 0,
+      charitableDonations: 0,
+      businessExpenses: expenses,
+      dependents: 0,
+    })
+    return result
+  }
+
+  // Freelancer calculations
+  const freelancerIncome = 2450000
+  const freelancerExpenses = 890000
+  const freelancerRent = 480000 // From breakdown
+  const freelancerTaxResult = calculateTax(freelancerIncome, freelancerExpenses, freelancerRent)
+  const freelancerTax = Math.round(freelancerTaxResult.totalTax)
+
+  // Creator calculations
+  const creatorIncome = 4200000
+  const creatorExpenses = 1350000
+  const creatorRent = 450000 // From breakdown
+  const creatorTaxResult = calculateTax(creatorIncome, creatorExpenses, creatorRent)
+  const creatorTax = Math.round(creatorTaxResult.totalTax)
+
+  // Small Business calculations
+  const smallBusinessIncome = 8500000
+  const smallBusinessExpenses = 5200000
+  const smallBusinessRent = 780000 // From breakdown (Office Rent & Utilities)
+  const smallBusinessTaxResult = calculateTax(smallBusinessIncome, smallBusinessExpenses, smallBusinessRent)
+  const smallBusinessTax = Math.round(smallBusinessTaxResult.totalTax)
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0,
+    }).format(amount).replace('NGN', '₦')
+  }
+
+  const freelancerStats = [
+    { 
+      id: "total-income",
+      label: "Total Income", 
+      value: "₦2,450,000", 
+      change: "+12.5%", 
+      trend: "up", 
+      icon: ArrowUpRight, 
+      color: "text-primary",
+      barColor: "bg-primary",
+      breakdown: [
+        { label: "Client Payments", value: "₦1,200,000", percentage: 49 },
+        { label: "Consulting Services", value: "₦850,000", percentage: 35 },
+        { label: "Freelance Projects", value: "₦400,000", percentage: 16 },
+      ]
+    },
+    { 
+      id: "total-expenses",
+      label: "Total Expenses", 
+      value: "₦890,000", 
+      change: "+8.2%", 
+      trend: "up", 
+      icon: ArrowDownRight, 
+      color: "text-destructive",
+      barColor: "bg-destructive",
+      breakdown: [
+        { label: "Office Rent", value: "₦480,000", percentage: 54 },
+        { label: "Software Subscriptions", value: "₦140,000", percentage: 16 },
+        { label: "Business Expenses", value: "₦270,000", percentage: 30 },
+      ]
+    },
+    { 
+      id: "net-profit",
+      label: "Net Profit", 
+      value: "₦1,560,000", 
+      change: "+15.3%", 
+      trend: "up", 
+      icon: TrendingUp, 
+      color: "text-chart-3",
+      barColor: "bg-green-500",
+      breakdown: [
+        { label: "After Expenses", value: "₦1,560,000", percentage: 100 },
+      ]
+    },
+    { 
+      id: "tax-payable",
+      label: "Tax Payable", 
+      value: formatCurrency(Math.round(freelancerTax / 4)), 
+      change: "Q1 2025", 
+      trend: "neutral", 
+      icon: Calculator, 
+      color: "text-accent",
+      barColor: "bg-accent",
+      breakdown: null, // Will be populated dynamically with tax calculation
+      taxCalculation: freelancerTaxResult,
+    },
   ]
+
+  const creatorStats = [
+    { 
+      id: "total-income",
+      label: "Total Income", 
+      value: "₦4,200,000", 
+      change: "+28.5%", 
+      trend: "up", 
+      icon: ArrowUpRight, 
+      color: "text-primary",
+      barColor: "bg-primary",
+      breakdown: [
+        { label: "Brand Sponsorships", value: "₦1,700,000", percentage: 40 },
+        { label: "YouTube Ad Revenue", value: "₦1,260,000", percentage: 30 },
+        { label: "Instagram Brand Deals", value: "₦840,000", percentage: 20 },
+        { label: "TikTok Creator Fund", value: "₦400,000", percentage: 10 },
+      ]
+    },
+    { 
+      id: "total-expenses",
+      label: "Total Expenses", 
+      value: "₦1,350,000", 
+      change: "+15.2%", 
+      trend: "up", 
+      icon: ArrowDownRight, 
+      color: "text-destructive",
+      barColor: "bg-destructive",
+      breakdown: [
+        { label: "Video Equipment", value: "₦560,000", percentage: 41 },
+        { label: "Studio Rent", value: "₦450,000", percentage: 33 },
+        { label: "Editing Software", value: "₦135,000", percentage: 10 },
+        { label: "Marketing & Promotion", value: "₦205,000", percentage: 16 },
+      ]
+    },
+    { 
+      id: "net-profit",
+      label: "Net Profit", 
+      value: "₦2,850,000", 
+      change: "+35.8%", 
+      trend: "up", 
+      icon: TrendingUp, 
+      color: "text-chart-3",
+      barColor: "bg-green-500",
+      breakdown: [
+        { label: "After Expenses", value: "₦2,850,000", percentage: 100 },
+      ]
+    },
+    { 
+      id: "tax-payable",
+      label: "Tax Payable", 
+      value: formatCurrency(Math.round(creatorTax / 4)), 
+      change: "Q1 2025", 
+      trend: "neutral", 
+      icon: Calculator, 
+      color: "text-accent",
+      barColor: "bg-accent",
+      breakdown: null, // Will be populated dynamically with tax calculation
+      taxCalculation: creatorTaxResult,
+    },
+  ]
+
+  const smallBusinessStats = [
+    { 
+      id: "total-revenue",
+      label: "Total Revenue", 
+      value: "₦8,500,000", 
+      change: "+22.3%", 
+      trend: "up", 
+      icon: ArrowUpRight, 
+      color: "text-primary",
+      barColor: "bg-primary",
+      breakdown: [
+        { label: "Product Sales", value: "₦5,100,000", percentage: 60 },
+        { label: "Service Revenue", value: "₦2,550,000", percentage: 30 },
+        { label: "Consulting Services", value: "₦850,000", percentage: 10 },
+      ]
+    },
+    { 
+      id: "total-expenses",
+      label: "Total Expenses", 
+      value: "₦5,200,000", 
+      change: "+18.5%", 
+      trend: "up", 
+      icon: ArrowDownRight, 
+      color: "text-destructive",
+      barColor: "bg-destructive",
+      breakdown: [
+        { label: "Employee Salaries", value: "₦2,550,000", percentage: 49 },
+        { label: "Inventory Purchase", value: "₦1,560,000", percentage: 30 },
+        { label: "Office Rent & Utilities", value: "₦780,000", percentage: 15 },
+        { label: "Marketing Campaign", value: "₦310,000", percentage: 6 },
+      ]
+    },
+    { 
+      id: "net-profit",
+      label: "Net Profit", 
+      value: "₦3,300,000", 
+      change: "+30.1%", 
+      trend: "up", 
+      icon: TrendingUp, 
+      color: "text-chart-3",
+      barColor: "bg-green-500",
+      breakdown: [
+        { label: "After Expenses", value: "₦3,300,000", percentage: 100 },
+      ]
+    },
+    { 
+      id: "tax-payable",
+      label: "Tax Payable", 
+      value: formatCurrency(Math.round(smallBusinessTax / 4)), 
+      change: "Q1 2025", 
+      trend: "neutral", 
+      icon: Calculator, 
+      color: "text-accent",
+      barColor: "bg-accent",
+      breakdown: null, // Will be populated dynamically with tax calculation
+      taxCalculation: smallBusinessTaxResult,
+    },
+  ]
+
+  const stats = businessType === "freelancer" ? freelancerStats : businessType === "creator" ? creatorStats : smallBusinessStats
+
+  const handleCardClick = (statId: string) => {
+    setOpenDropdown(openDropdown === statId ? null : statId)
+  }
+
+  const handleCardHover = (statId: string | null) => {
+    setHoveredCard(statId)
+  }
 
   return (
     <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-      {stats.map((stat) => {
+      {stats.map((stat, index) => {
         const Icon = stat.icon
+        const isOpen = openDropdown === stat.id
+        const isHovered = hoveredCard === stat.id
+        const showDropdown = isOpen || isHovered
+
+        // Determine if this card is in the last column(s) to position dropdown correctly
+        // For 4-column grid on large screens, last 2 cards should align right
+        // For 2-column grid on medium screens, last card should align right
+        const isLastColumn = index % 4 === 3 || index % 4 === 2 // Last 2 columns in 4-col grid
+        const isLastInRow = index % 2 === 1 // Last in 2-col grid
+
         return (
-          <Card key={stat.label} className="p-6">
+          <div 
+            key={stat.id} 
+            className="relative"
+            onMouseEnter={() => !isOpen && handleCardHover(stat.id)}
+            onMouseLeave={() => !isOpen && handleCardHover(null)}
+            ref={(el) => {
+              dropdownRefs.current[stat.id] = el
+            }}
+          >
+            <Card 
+              className={`p-6 cursor-pointer transition-all ${isOpen ? 'ring-2 ring-primary' : ''}`}
+              onClick={() => handleCardClick(stat.id)}
+            >
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground mb-1">{stat.label}</p>
@@ -576,22 +862,209 @@ function StatsCards() {
               </div>
             </div>
           </Card>
+
+            {/* Breakdown Dropdown */}
+            {showDropdown && (
+              <div 
+                className={`absolute z-50 mt-2 bg-popover border border-border rounded-lg shadow-lg p-4 animate-in fade-in-0 zoom-in-95 ${
+                  stat.id === "tax-payable" ? "w-[450px]" : "w-[320px]"
+                } ${
+                  isLastColumn || isLastInRow ? "right-0" : "left-0"
+                }`}
+                onMouseEnter={() => handleCardHover(stat.id)}
+                onMouseLeave={() => !isOpen && handleCardHover(null)}
+              >
+                {stat.id === "tax-payable" && stat.taxCalculation ? (
+                  <TaxCalculationBreakdown calculation={stat.taxCalculation} formatCurrency={formatCurrency} />
+                ) : (
+                  <>
+                    <h4 className="font-semibold text-sm mb-3">{stat.label} Breakdown</h4>
+                    <div className="space-y-3">
+                      {stat.breakdown?.map((item, index) => (
+                        <div key={index} className="space-y-1.5">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">{item.label}</span>
+                            <span className="font-medium">{item.value}</span>
+                          </div>
+                          <div className="w-full bg-muted rounded-full h-2">
+                            <div 
+                              className={`h-2 rounded-full ${stat.barColor}`}
+                              style={{ width: `${item.percentage}%` }}
+                            />
+                          </div>
+                          <p className="text-xs text-muted-foreground">{item.percentage}%</p>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
         )
       })}
     </div>
   )
 }
 
-function RecentTransactions() {
+function TaxCalculationBreakdown({ calculation, formatCurrency }: { calculation: any, formatCurrency: (amount: number) => string }) {
+  const hasReliefs = calculation.totalReliefs > 0
+  const reliefs = calculation.reliefs
+
+  return (
+    <div className="space-y-4">
+      <h4 className="font-semibold text-sm mb-3">Tax Calculation Breakdown</h4>
+      
+      {/* Income and Expenses */}
+      <div className="space-y-2 border-b pb-3">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Gross Income</span>
+          <span className="font-medium">{formatCurrency(calculation.grossIncome)}</span>
+        </div>
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">Business Expenses</span>
+          <span className="font-medium text-destructive">-{formatCurrency(calculation.businessExpenses)}</span>
+        </div>
+        <div className="flex items-center justify-between text-sm font-medium pt-1 border-t">
+          <span>Adjusted Gross Income</span>
+          <span>{formatCurrency(calculation.adjustedGrossIncome)}</span>
+        </div>
+      </div>
+
+      {/* Reliefs */}
+      {hasReliefs && (
+        <div className="space-y-2 border-b pb-3">
+          <p className="text-xs font-medium text-muted-foreground mb-2">Tax Reliefs:</p>
+          {reliefs.rentRelief > 0 && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Rent Relief (20%)</span>
+              <span className="text-primary">-{formatCurrency(reliefs.rentRelief)}</span>
+            </div>
+          )}
+          {reliefs.pension > 0 && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Pension Contribution</span>
+              <span className="text-primary">-{formatCurrency(reliefs.pension)}</span>
+            </div>
+          )}
+          {reliefs.healthInsurance > 0 && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Health Insurance</span>
+              <span className="text-primary">-{formatCurrency(reliefs.healthInsurance)}</span>
+            </div>
+          )}
+          {reliefs.housingFund > 0 && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Housing Fund</span>
+              <span className="text-primary">-{formatCurrency(reliefs.housingFund)}</span>
+            </div>
+          )}
+          {reliefs.lifeInsurance > 0 && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Life Insurance</span>
+              <span className="text-primary">-{formatCurrency(reliefs.lifeInsurance)}</span>
+            </div>
+          )}
+          {reliefs.charitable > 0 && (
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground">Charitable Donations</span>
+              <span className="text-primary">-{formatCurrency(reliefs.charitable)}</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between text-sm font-medium pt-1 border-t">
+            <span>Total Reliefs</span>
+            <span className="text-primary">-{formatCurrency(calculation.totalReliefs)}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Taxable Income */}
+      <div className="space-y-2 border-b pb-3">
+        <div className="flex items-center justify-between text-sm font-medium">
+          <span>Taxable Income</span>
+          <span>{formatCurrency(calculation.taxableIncome)}</span>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Effective Rate: {calculation.effectiveRate}%
+        </p>
+      </div>
+
+      {/* Tax Brackets */}
+      <div className="space-y-2">
+        <p className="text-xs font-medium text-muted-foreground mb-2">Tax by Bracket:</p>
+        {calculation.taxBrackets.map((bracket: any, index: number) => (
+          <div key={index} className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">
+              ₦{bracket.amount.toLocaleString()} × {bracket.rate}%
+            </span>
+            <span className="font-medium">{formatCurrency(Math.round(bracket.tax))}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Total Tax */}
+      <div className="pt-3 border-t space-y-2">
+        <div className="flex items-center justify-between text-sm font-semibold">
+          <span>Annual Tax Payable</span>
+          <span className="text-accent">{formatCurrency(calculation.totalTax)}</span>
+        </div>
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Quarterly Payment</span>
+          <span>{formatCurrency(Math.round(calculation.totalTax / 4))}</span>
+        </div>
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span>Monthly Set Aside</span>
+          <span>{formatCurrency(Math.round(calculation.monthlySetAside))}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function RecentTransactions({ businessType }: { businessType: "freelancer" | "creator" | "small-business" }) {
+  const freelancerTransactions = [
+    { type: "income" as const, description: "Client Payment - Website Design", amount: "₦450,000", date: "Jan 15, 2025" },
+    { type: "expense" as const, description: "Office Rent", amount: "₦120,000", date: "Jan 10, 2025" },
+    { type: "income" as const, description: "Consulting Services", amount: "₦280,000", date: "Jan 8, 2025" },
+    { type: "expense" as const, description: "Software Subscriptions", amount: "₦35,000", date: "Jan 5, 2025" },
+  ]
+
+  const creatorTransactions = [
+    { type: "income" as const, description: "Brand Sponsorship - Tech Review", amount: "₦850,000", date: "Jan 15, 2025" },
+    { type: "income" as const, description: "YouTube Ad Revenue", amount: "₦420,000", date: "Jan 12, 2025" },
+    { type: "expense" as const, description: "Video Equipment Purchase", amount: "₦280,000", date: "Jan 10, 2025" },
+    { type: "income" as const, description: "Instagram Brand Deal", amount: "₦350,000", date: "Jan 8, 2025" },
+    { type: "expense" as const, description: "Video Editing Software", amount: "₦45,000", date: "Jan 5, 2025" },
+  ]
+
+  const smallBusinessTransactions = [
+    { type: "income" as const, description: "Product Sales - Q1 2025", amount: "₦2,500,000", date: "Jan 15, 2025" },
+    { type: "expense" as const, description: "Employee Salaries", amount: "₦850,000", date: "Jan 10, 2025" },
+    { type: "expense" as const, description: "Inventory Purchase", amount: "₦1,200,000", date: "Jan 8, 2025" },
+    { type: "income" as const, description: "Service Revenue", amount: "₦680,000", date: "Jan 5, 2025" },
+    { type: "expense" as const, description: "Office Rent & Utilities", amount: "₦350,000", date: "Jan 3, 2025" },
+  ]
+
+  const transactions = businessType === "freelancer" 
+    ? freelancerTransactions 
+    : businessType === "creator" 
+    ? creatorTransactions 
+    : smallBusinessTransactions
+
   return (
     <Card>
       <div className="p-6">
         <h2 className="text-lg font-semibold mb-4">Recent Transactions</h2>
         <div className="space-y-4">
-          <TransactionItem type="income" description="Client Payment - Website Design" amount="₦450,000" date="Jan 15, 2025" />
-          <TransactionItem type="expense" description="Office Rent" amount="₦120,000" date="Jan 10, 2025" />
-          <TransactionItem type="income" description="Consulting Services" amount="₦280,000" date="Jan 8, 2025" />
-          <TransactionItem type="expense" description="Software Subscriptions" amount="₦35,000" date="Jan 5, 2025" />
+          {transactions.map((transaction, index) => (
+            <TransactionItem 
+              key={index}
+              type={transaction.type} 
+              description={transaction.description} 
+              amount={transaction.amount} 
+              date={transaction.date} 
+            />
+          ))}
         </div>
       </div>
     </Card>
@@ -614,7 +1087,7 @@ function UpcomingReminders() {
 }
 
 interface TransactionsViewProps {
-  businessType: "freelancer" | "sme"
+  businessType: "freelancer" | "creator" | "small-business"
   isFilterOpen: boolean
   setIsFilterOpen: (open: boolean) => void
   searchTerm: string
@@ -644,15 +1117,31 @@ function TransactionsView({
     { id: 5, type: "income" as const, description: "Freelance Project", amount: 180000, date: "Jan 3, 2025", category: "Services", paymentMethod: "Mobile Money", taxDeductible: false },
   ]
 
-  const smeTransactions = [
+  const creatorTransactions = [
+    { id: 1, type: "income" as const, description: "Brand Sponsorship - Tech Review", amount: 850000, date: "Jan 15, 2025", category: "Sponsorships", paymentMethod: "Bank Transfer", taxDeductible: false },
+    { id: 2, type: "income" as const, description: "YouTube Ad Revenue", amount: 420000, date: "Jan 12, 2025", category: "Ad Revenue", paymentMethod: "Bank Transfer", taxDeductible: false },
+    { id: 3, type: "expense" as const, description: "Video Equipment Purchase", amount: 280000, date: "Jan 10, 2025", category: "Equipment", paymentMethod: "Card", taxDeductible: true },
+    { id: 4, type: "income" as const, description: "Instagram Brand Deal", amount: 350000, date: "Jan 8, 2025", category: "Brand Deals", paymentMethod: "Bank Transfer", taxDeductible: false },
+    { id: 5, type: "expense" as const, description: "Video Editing Software", amount: 45000, date: "Jan 5, 2025", category: "Software", paymentMethod: "Card", taxDeductible: true },
+    { id: 6, type: "income" as const, description: "TikTok Creator Fund", amount: 185000, date: "Jan 3, 2025", category: "Platform Revenue", paymentMethod: "Bank Transfer", taxDeductible: false },
+    { id: 7, type: "expense" as const, description: "Studio Rent", amount: 150000, date: "Jan 1, 2025", category: "Rent", paymentMethod: "Bank Transfer", taxDeductible: true },
+  ]
+
+  const smallBusinessTransactions = [
     { id: 1, type: "income" as const, description: "Product Sales", amount: 2500000, date: "Jan 15, 2025", category: "Sales Revenue", paymentMethod: "Bank Transfer", taxDeductible: false },
     { id: 2, type: "expense" as const, description: "Employee Salaries", amount: 850000, date: "Jan 10, 2025", category: "Payroll", paymentMethod: "Bank Transfer", taxDeductible: true },
     { id: 3, type: "expense" as const, description: "Office Supplies", amount: 125000, date: "Jan 8, 2025", category: "Operations", paymentMethod: "Card", taxDeductible: true },
     { id: 4, type: "income" as const, description: "Service Revenue", amount: 1200000, date: "Jan 5, 2025", category: "Services", paymentMethod: "Bank Transfer", taxDeductible: false },
     { id: 5, type: "expense" as const, description: "Marketing Campaign", amount: 450000, date: "Jan 3, 2025", category: "Marketing", paymentMethod: "Card", taxDeductible: true },
+    { id: 6, type: "expense" as const, description: "Inventory Purchase", amount: 1200000, date: "Jan 2, 2025", category: "Inventory", paymentMethod: "Bank Transfer", taxDeductible: true },
+    { id: 7, type: "income" as const, description: "Consulting Services", amount: 680000, date: "Jan 1, 2025", category: "Services", paymentMethod: "Bank Transfer", taxDeductible: false },
   ]
 
-  const transactions = businessType === "freelancer" ? freelancerTransactions : smeTransactions
+  const transactions = businessType === "freelancer" 
+    ? freelancerTransactions 
+    : businessType === "creator" 
+    ? creatorTransactions 
+    : smallBusinessTransactions
 
   const filteredTransactions = transactions.filter(transaction => {
     const matchesSearch = searchTerm === "" || transaction.description.toLowerCase().includes(searchTerm.toLowerCase())
@@ -731,6 +1220,16 @@ function TransactionsView({
                       <SelectItem value="Rent">Rent</SelectItem>
                       <SelectItem value="Software">Software</SelectItem>
                     </>
+                  ) : businessType === "creator" ? (
+                    <>
+                      <SelectItem value="Sponsorships">Sponsorships</SelectItem>
+                      <SelectItem value="Ad Revenue">Ad Revenue</SelectItem>
+                      <SelectItem value="Brand Deals">Brand Deals</SelectItem>
+                      <SelectItem value="Platform Revenue">Platform Revenue</SelectItem>
+                      <SelectItem value="Equipment">Equipment</SelectItem>
+                      <SelectItem value="Software">Software</SelectItem>
+                      <SelectItem value="Rent">Rent</SelectItem>
+                    </>
                   ) : (
                     <>
                       <SelectItem value="Sales Revenue">Sales Revenue</SelectItem>
@@ -738,6 +1237,7 @@ function TransactionsView({
                       <SelectItem value="Operations">Operations</SelectItem>
                       <SelectItem value="Services">Services</SelectItem>
                       <SelectItem value="Marketing">Marketing</SelectItem>
+                      <SelectItem value="Inventory">Inventory</SelectItem>
                     </>
                   )}
                 </SelectContent>
