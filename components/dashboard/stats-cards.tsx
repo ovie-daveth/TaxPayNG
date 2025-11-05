@@ -9,7 +9,7 @@ export function StatsCards() {
       change: "+12.5%",
       trend: "up",
       icon: ArrowUpRight,
-      color: "text-green-600",
+      color: "text-primary",
     },
     {
       label: "Total Expenses",
@@ -17,7 +17,7 @@ export function StatsCards() {
       change: "+8.2%",
       trend: "up",
       icon: ArrowDownRight,
-      color: "text-red-600",
+      color: "text-destructive",
     },
     {
       label: "Net Profit",
@@ -25,7 +25,7 @@ export function StatsCards() {
       change: "+15.3%",
       trend: "up",
       icon: TrendingUp,
-      color: "text-blue-600",
+      color: "text-chart-3",
     },
     {
       label: "Tax Payable",
@@ -33,7 +33,7 @@ export function StatsCards() {
       change: "Q1 2025",
       trend: "neutral",
       icon: Calculator,
-      color: "text-orange-600",
+      color: "text-accent",
     },
   ]
 
@@ -48,7 +48,7 @@ export function StatsCards() {
                 <p className="text-sm text-muted-foreground mb-1">{stat.label}</p>
                 <p className="text-2xl font-bold mb-2">{stat.value}</p>
                 <p
-                  className={`text-xs font-medium ${stat.trend === "up" ? "text-green-600" : "text-muted-foreground"}`}
+                  className={`text-xs font-medium ${stat.trend === "up" ? "text-primary" : "text-muted-foreground"}`}
                 >
                   {stat.change}
                 </p>

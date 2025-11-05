@@ -219,7 +219,7 @@ export function TransactionList({
                   <div className="flex items-center gap-2">
                     <div
                       className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                        transaction.type === "income" ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
+                        transaction.type === "income" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"
                       }`}
                     >
                       {transaction.type === "income" ? (
@@ -250,7 +250,7 @@ export function TransactionList({
                 <td className="py-4 px-4 text-sm text-muted-foreground">{transaction.paymentMethod}</td>
                 <td className="py-4 px-4 text-right">
                   <span
-                    className={`font-semibold ${transaction.type === "income" ? "text-green-600" : "text-red-600"}`}
+                    className={`font-semibold ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}
                   >
                     {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
                   </span>
@@ -302,7 +302,7 @@ export function TransactionList({
               <div className="flex items-center gap-3">
                 <div
                   className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                    transaction.type === "income" ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
+                    transaction.type === "income" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"
                   }`}
                 >
                   {transaction.type === "income" ? (
@@ -359,7 +359,7 @@ export function TransactionList({
                   </Badge>
                 )}
               </div>
-              <span className={`font-semibold ${transaction.type === "income" ? "text-green-600" : "text-red-600"}`}>
+              <span className={`font-semibold ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}>
                 {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
               </span>
             </div>

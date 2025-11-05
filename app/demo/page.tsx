@@ -1,293 +1,522 @@
+"use client"
+
 import Link from "next/link"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { Calculator, TrendingUp, TrendingDown, DollarSign, Receipt, FileText, Bell, ArrowRight } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Calculator, ArrowRight, Loader2, Sparkles, LayoutDashboard, Receipt, Settings, Menu, X, ChevronLeft, ChevronRight, Building2, User, Users } from "lucide-react"
+import { toast } from "sonner"
+import { db } from "@/firebase/firebase"
+import { collection, setDoc, doc, query, getDocs, where } from "firebase/firestore"
+import { TaxCalculatorForm } from "@/components/tax-calculator/tax-calculator-form"
+import { TaxRatesInfo } from "@/components/tax-calculator/tax-rates-info"
+import { ThemeToggle } from "@/components/theme-toggle"
+import OtaxLogo from "@/components/OtaxLogo"
+import { StatsCards } from "./components/stats-cards"
+import { RecentTransactions } from "./components/recent-transactions"
+import { UpcomingReminders } from "./components/upcoming-reminders"
+import { TransactionsView } from "./components/transactions-view"
+import { RemindersView } from "./components/reminders-view"
+import { TaxBreakdownModalContent } from "./components/tax-breakdown-modal-content"
+import { EmployeesView } from "./components/employees-view"
+
+type NavItem = {
+  href: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+  available: boolean
+  smallBusinessOnly?: boolean
+}
+
+const navItems: NavItem[] = [
+  { href: "#dashboard", label: "Dashboard", icon: LayoutDashboard, available: true },
+  { href: "#transactions", label: "Transactions", icon: Receipt, available: true },
+  { href: "#tax-calculator", label: "Tax Calculator", icon: Calculator, available: true },
+  { href: "#employees", label: "Employees", icon: Users, available: true, smallBusinessOnly: true },
+  { href: "#documents", label: "Documents", icon: Settings, available: false },
+  { href: "#reminders", label: "Reminders", icon: Receipt, available: true },
+  { href: "#settings", label: "Settings", icon: Settings, available: false },
+]
 
 export default function DemoPage() {
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false)
+  const [waitlistData, setWaitlistData] = useState({
+    name: "",
+    email: "",
+    phone: ""
+  })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSubmitted, setIsSubmitted] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [activeSection, setActiveSection] = useState("dashboard")
+  const [taxResult, setTaxResult] = useState<any>(null)
+  const [showTaxResults, setShowTaxResults] = useState(false)
+  const [businessType, setBusinessType] = useState<"freelancer" | "creator" | "small-business">("freelancer")
+  const [isFilterOpen, setIsFilterOpen] = useState(false)
+  const [searchTerm, setSearchTerm] = useState("")
+  const [selectedType, setSelectedType] = useState<string>("all")
+  const [selectedCategory, setSelectedCategory] = useState<string>("all")
+
+  const handleWaitlistSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+
+    try {
+      // Validate inputs (name and email are required, phone is optional)
+      if (!waitlistData.name || !waitlistData.email) {
+        toast.error("Please fill in your name and email")
+        setIsSubmitting(false)
+        return
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(waitlistData.email)) {
+        toast.error("Please enter a valid email address")
+        setIsSubmitting(false)
+        return
+      }
+
+      // Validate phone format only if provided (Nigerian phone numbers)
+      if (waitlistData.phone && waitlistData.phone.trim() !== "") {
+        const phoneRegex = /^(\+234|0)?[789][01]\d{8}$/
+        if (!phoneRegex.test(waitlistData.phone.replace(/\s/g, ""))) {
+          toast.error("Please enter a valid Nigerian phone number")
+          setIsSubmitting(false)
+          return
+        }
+      }
+
+      const q = query(collection(db, "waitlist"), where("email", "==", waitlistData.email.toLowerCase()))
+      const existing = await getDocs(q)
+      if (!existing.empty) {
+        toast.error("That email is already on the waitlist!")
+        setIsSubmitting(false)
+        return
+      }
+
+      // Save to Firestore
+      const data = {
+        name: waitlistData.name.trim(),
+        email: waitlistData.email.trim().toLowerCase(),
+        phone: waitlistData.phone ? waitlistData.phone.replace(/\s/g, "") : "",
+        createdAt: new Date().toISOString(),
+        status: "pending",
+        notified: false
+      }
+
+      const emailId = waitlistData.email.trim().toLowerCase()
+
+      await setDoc(doc(db, "waitlist", emailId), data)
+      
+      setIsSubmitted(true)
+      toast.success("🎉 You're on the waitlist! We'll notify you when we launch.")
+      
+      // Reset form
+      setWaitlistData({ name: "", email: "", phone: "" })
+    } catch (error) {
+      console.error("Error submitting waitlist:", error)
+      toast.error("Oops! Something went wrong. Please try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  const renderContent = () => {
+    switch (activeSection) {
+      case "dashboard":
+        return (
+          <div className="space-y-6">
+            <StatsCards businessType={businessType} />
+            <div className="grid lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2">
+                <RecentTransactions businessType={businessType} />
+              </div>
+              <div>
+                <UpcomingReminders />
+              </div>
+            </div>
+          </div>
+        )
+      case "transactions":
+        return (
+          <TransactionsView 
+            businessType={businessType}
+            isFilterOpen={isFilterOpen}
+            setIsFilterOpen={setIsFilterOpen}
+            searchTerm={searchTerm}
+            setSearchTerm={setSearchTerm}
+            selectedType={selectedType}
+            setSelectedType={setSelectedType}
+            selectedCategory={selectedCategory}
+            setSelectedCategory={setSelectedCategory}
+          />
+        )
+      case "tax-calculator":
+        return (
+          <>
+            <div className="grid lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-2 space-y-6">
+                <TaxCalculatorForm 
+                  onCalculate={(result) => {
+                    setTaxResult(result)
+                    setShowTaxResults(true)
+                  }} 
+                />
+              </div>
+              <div>
+                <TaxRatesInfo />
+              </div>
+            </div>
+
+            {/* Tax Results Modal */}
+            <Dialog open={showTaxResults} onOpenChange={setShowTaxResults}>
+              <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0">
+                {taxResult && (
+                  <>
+                    <DialogHeader className="px-6 pt-6 pb-4 border-b border-border">
+                      <DialogTitle className="text-2xl font-bold">Tax Calculation Results</DialogTitle>
+                      <DialogDescription>Your detailed tax breakdown and payment schedule</DialogDescription>
+                    </DialogHeader>
+                    <div className="px-6 py-6">
+                      <TaxBreakdownModalContent result={taxResult} />
+                    </div>
+                  </>
+                )}
+              </DialogContent>
+            </Dialog>
+          </>
+        )
+      case "reminders":
+        return <RemindersView onAddReminder={() => setShowWaitlistModal(true)} />
+      case "employees":
+        return <EmployeesView />
+      default:
+        return (
+          <div className="flex items-center justify-center h-64 border-2 border-dashed border-muted rounded-lg">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+                <Calculator className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold mb-2">Feature Coming Soon</h3>
+              <p className="text-sm text-muted-foreground">This feature is not available in demo mode</p>
+              <Button onClick={() => setShowWaitlistModal(true)} className="mt-4">
+                Join Waitlist
+              </Button>
+            </div>
+          </div>
+        )
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+    <div className="min-h-screen bg-background mb-10">
+      {/* Desktop Sidebar */}
+      <aside className={`hidden md:flex fixed left-0 top-0 h-screen flex-col border-r border-border bg-card transition-all duration-300 ease-in-out ${sidebarCollapsed ? "w-16" : "w-64"}`}>
+        <div className="p-6 border-b border-border flex items-center justify-between">
+          <Link href="/" className={`flex items-center gap-2 transition-all duration-300 ${sidebarCollapsed && "justify-center"}`}>
+            {!sidebarCollapsed && (
+              <>
+               <OtaxLogo />
+                <Badge variant="secondary" className="ml-2">Demo</Badge>
+              </>
+            )}
+          </Link>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="w-8 h-8 hover:bg-muted"
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+          >
+            {sidebarCollapsed ? (
+              <ChevronRight className="w-4 h-4" />
+            ) : (
+              <ChevronLeft className="w-4 h-4" />
+            )}
+          </Button>
+        </div>
+
+        <nav className="flex-1 p-4 space-y-8">
+          {navItems.map((item) => {
+            // Hide employees section if not small business
+            if (item.smallBusinessOnly && businessType !== "small-business") {
+              return null
+            }
+            
+            const Icon = item.icon
+            const isActive = activeSection === item.href.replace("#", "")
+            return (
+              <button
+                key={item.href}
+                onClick={() => item.available ? setActiveSection(item.href.replace("#", "")) : toast.info("This feature is available in the full version")}
+                className={`w-full flex items-center gap-3 px-3 my-5 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer ${
+                  isActive && item.available
+                    ? "bg-primary text-primary-foreground"
+                    : item.available
+                    ? "text-muted-foreground hover:bg-muted hover:text-foreground"
+                    : "text-muted-foreground opacity-50 cursor-not-allowed"
+                } ${sidebarCollapsed && "justify-center px-2"}`}
+                title={sidebarCollapsed ? item.label : undefined}
+                disabled={!item.available}
+              >
+                <Icon className="w-5 h-5 flex-shrink-0" />
+                {!sidebarCollapsed && (
+                  <span className="whitespace-nowrap transition-opacity duration-300">
+                    {item.label}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </nav>
+
+        <div className="p-4 border-t border-border">
+          <Button 
+            variant="ghost" 
+            className={`w-full text-muted-foreground transition-all duration-200 ${sidebarCollapsed ? "justify-center px-2" : "justify-start"}`} 
+            size="sm"
+            title={sidebarCollapsed ? "Join Waitlist" : undefined}
+            onClick={() => setShowWaitlistModal(true)}
+          >
+            <Sparkles className="w-4 h-4 flex-shrink-0" />
+            {!sidebarCollapsed && (
+              <span className="ml-2 whitespace-nowrap transition-opacity duration-300">
+                Join Waitlist
+              </span>
+            )}
+          </Button>
+        </div>
+      </aside>
+
+      {/* Mobile Header */}
+      <header className="md:hidden sticky top-0 z-50 bg-card border-b border-border">
+        <div className="flex items-center justify-between p-4">
           <Link href="/" className="flex items-center gap-2">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <Calculator className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="font-semibold text-xl">TaxPal NG</span>
+            <span className="font-semibold text-lg">OTax</span>
+            <Badge variant="secondary" className="ml-2">Demo</Badge>
           </Link>
-          <div className="flex items-center gap-3">
-            <Badge variant="secondary" className="hidden sm:flex">
-              Demo Mode
-            </Badge>
-            <Link href="/signup">
-              <Button size="sm">
-                Get Started <ArrowRight className="ml-2 w-4 h-4" />
-              </Button>
-            </Link>
-          </div>
+          <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </Button>
         </div>
+
+        {/* Mobile Menu */}
+        {mobileMenuOpen && (
+          <nav className="border-t border-border p-4 space-y-1">
+            {navItems.map((item) => {
+              // Hide employees section if not small business
+              if (item.smallBusinessOnly && businessType !== "small-business") {
+                return null
+              }
+              
+              const Icon = item.icon
+              const isActive = activeSection === item.href.replace("#", "")
+              return (
+                <button
+                  key={item.href}
+                  onClick={() => {
+                    if (item.available) {
+                      setActiveSection(item.href.replace("#", ""))
+                      setMobileMenuOpen(false)
+                    } else {
+                      toast.info("This feature is available in the full version")
+                    }
+                  }}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                    isActive && item.available
+                      ? "bg-primary text-primary-foreground"
+                      : item.available
+                      ? "text-muted-foreground hover:bg-muted hover:text-foreground"
+                      : "text-muted-foreground opacity-50 cursor-not-allowed"
+                  }`}
+                  disabled={!item.available}
+                >
+                  <Icon className="w-5 h-5" />
+                  {item.label}
+                </button>
+              )
+            })}
+            <Button 
+              variant="ghost" 
+              className="w-full justify-start text-muted-foreground mt-4" 
+              size="sm"
+              onClick={() => setShowWaitlistModal(true)}
+            >
+              <Sparkles className="w-4 h-4 mr-2" />
+              Join Waitlist
+            </Button>
+          </nav>
+        )}
       </header>
 
-      {/* Demo Banner */}
-      <div className="bg-primary/10 border-b border-primary/20">
-        <div className="container mx-auto px-4 py-4 text-center">
-          <p className="text-sm font-medium">
-            You're viewing a demo of TaxPal NG.{" "}
-            <Link href="/signup" className="underline font-semibold">
-              Sign up free
-            </Link>{" "}
-            to start managing your taxes.
-          </p>
+      {/* Main Content */}
+      <div className={`transition-all duration-300 ease-in-out ${sidebarCollapsed ? "md:ml-16" : "md:ml-64"}`}>
+        {/* Header */}
+        <div className="border-b border-border bg-card">
+          <div className="container mx-auto px-4 py-4 max-w-7xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold">
+                  {activeSection === "dashboard" && "Dashboard"}
+                  {activeSection === "transactions" && "Transactions"}
+                  {activeSection === "tax-calculator" && "Tax Calculator"}
+                  {activeSection === "employees" && "Employees"}
+                  {activeSection === "reminders" && "Reminders"}
+                </h1>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {activeSection === "dashboard" && "Welcome to OTax Demo Mode"}
+                  {activeSection === "transactions" && "View sample transaction data"}
+                  {activeSection === "tax-calculator" && "Try the tax calculator"}
+                  {activeSection === "employees" && "Manage employee payroll and PAYE"}
+                  {activeSection === "reminders" && "Sample tax deadlines"}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                {/* Business Type Toggle - Show on dashboard and transactions pages */}
+                {(activeSection === "dashboard" || activeSection === "transactions") && (
+                  <div className="flex items-center gap-2 bg-muted p-1 rounded-lg">
+                    <Button
+                      variant={businessType === "freelancer" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setBusinessType("freelancer")}
+                      className="flex items-center gap-2"
+                    >
+                      <User className="w-4 h-4" />
+                      <span className="hidden sm:inline">Freelancer</span>
+                    </Button>
+                    <Button
+                      variant={businessType === "creator" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setBusinessType("creator")}
+                      className="flex items-center gap-2"
+                    >
+                      <Sparkles className="w-4 h-4" />
+                      <span className="hidden sm:inline">Creator</span>
+                    </Button>
+                    <Button
+                      variant={businessType === "small-business" ? "default" : "ghost"}
+                      size="sm"
+                      onClick={() => setBusinessType("small-business")}
+                      className="flex items-center gap-2"
+                    >
+                      <Building2 className="w-4 h-4" />
+                      <span className="hidden sm:inline">Small Business</span>
+                    </Button>
+                  </div>
+                )}
+                <ThemeToggle />
+                <Button size="lg" onClick={() => setShowWaitlistModal(true)}>
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  Join Waitlist
+                  <ArrowRight className="ml-2 w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <main className="container mx-auto px-4 py-6 max-w-7xl">
+          {renderContent()}
+        </main>
+
+        {/* Demo Banner */}
+        <div className={`fixed bottom-0 left-0 right-0 border-t border-border bg-primary text-primary-foreground p-4 transition-all duration-300 ${sidebarCollapsed ? "md:left-16" : "md:left-64"}`}>
+          <div className="container mx-auto px-4 max-w-7xl">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5" />
+                <p className="text-sm font-medium">
+                  You're viewing the OTax demo. Join the waitlist for early access!
+                </p>
+              </div>
+              <Button variant="secondary" size="sm" onClick={() => setShowWaitlistModal(true)}>
+                Join Waitlist
+                <ArrowRight className="ml-2 w-4 h-4" />
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Demo Dashboard */}
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">Dashboard Overview</h1>
-          <p className="text-muted-foreground">Welcome to your financial command center</p>
-        </div>
+      {/* Waitlist Modal */}
+      <Dialog open={showWaitlistModal} onOpenChange={setShowWaitlistModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold text-center">Join the Waitlist</DialogTitle>
+            <DialogDescription className="text-center">
+              Be among the first to experience OTax
+            </DialogDescription>
+          </DialogHeader>
 
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Income</CardTitle>
-              <TrendingUp className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">₦2,450,000</div>
-              <p className="text-xs text-muted-foreground">+12.5% from last month</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Expenses</CardTitle>
-              <TrendingDown className="h-4 w-4 text-red-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">₦850,000</div>
-              <p className="text-xs text-muted-foreground">-3.2% from last month</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Estimated Tax</CardTitle>
-              <DollarSign className="h-4 w-4 text-orange-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">₦245,000</div>
-              <p className="text-xs text-muted-foreground">For current tax year</p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-              <TrendingUp className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">₦1,355,000</div>
-              <p className="text-xs text-muted-foreground">After tax deductions</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-8 md:grid-cols-2 mb-8">
-          {/* Recent Transactions */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Receipt className="w-5 h-5" />
-                Recent Transactions
-              </CardTitle>
-              <CardDescription>Your latest income and expenses</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <TransactionItem
-                  type="income"
-                  description="Client Payment - Website Design"
-                  amount="₦450,000"
-                  date="Jan 15, 2025"
-                />
-                <TransactionItem type="expense" description="Office Rent" amount="₦120,000" date="Jan 10, 2025" />
-                <TransactionItem type="income" description="Consulting Services" amount="₦280,000" date="Jan 8, 2025" />
-                <TransactionItem
-                  type="expense"
-                  description="Software Subscriptions"
-                  amount="₦35,000"
-                  date="Jan 5, 2025"
-                />
+          {isSubmitted ? (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Loader2 className="w-8 h-8 text-green-600" />
               </div>
-            </CardContent>
-          </Card>
-
-          {/* Tax Summary */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                Tax Summary
-              </CardTitle>
-              <CardDescription>Your tax breakdown for 2025</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center pb-2 border-b">
-                  <span className="text-sm text-muted-foreground">Gross Income</span>
-                  <span className="font-semibold">₦2,450,000</span>
-                </div>
-                <div className="flex justify-between items-center pb-2 border-b">
-                  <span className="text-sm text-muted-foreground">Tax Reliefs</span>
-                  <span className="font-semibold text-green-600">-₦350,000</span>
-                </div>
-                <div className="flex justify-between items-center pb-2 border-b">
-                  <span className="text-sm text-muted-foreground">Taxable Income</span>
-                  <span className="font-semibold">₦2,100,000</span>
-                </div>
-                <div className="flex justify-between items-center pt-2">
-                  <span className="text-sm font-medium">Total Tax Due</span>
-                  <span className="text-xl font-bold text-primary">₦245,000</span>
-                </div>
-                <div className="mt-4 p-3 bg-muted rounded-lg">
-                  <p className="text-sm text-muted-foreground mb-1">Monthly Set-Aside</p>
-                  <p className="text-2xl font-bold">₦20,417</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Upcoming Reminders */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Bell className="w-5 h-5" />
-              Upcoming Reminders
-            </CardTitle>
-            <CardDescription>Don't miss important deadlines</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <ReminderItem title="Q1 Tax Payment Due" date="March 31, 2025" priority="high" daysLeft={79} />
-              <ReminderItem
-                title="Submit Self-Assessment Report"
-                date="March 15, 2025"
-                priority="medium"
-                daysLeft={63}
-              />
-              <ReminderItem title="Renew Business Registration" date="April 30, 2025" priority="low" daysLeft={109} />
+              <h3 className="text-xl font-bold mb-2">You're in!</h3>
+              <p className="text-muted-foreground">
+                Thank you for joining our waitlist. We'll notify you as soon as we launch!
+              </p>
             </div>
-          </CardContent>
-        </Card>
-
-        {/* CTA Section */}
-        <div className="mt-12 bg-primary text-primary-foreground rounded-2xl p-8 md:p-12 text-center">
-          <h2 className="text-2xl md:text-3xl font-bold mb-4">Ready to Take Control of Your Taxes?</h2>
-          <p className="text-lg mb-6 opacity-90 max-w-2xl mx-auto">
-            Start your 14-day free trial today. No credit card required.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/signup">
-              <Button size="lg" variant="secondary">
-                Get Started Free <ArrowRight className="ml-2 w-4 h-4" />
-              </Button>
-            </Link>
-            <Link href="/pricing">
-              <Button
-                size="lg"
-                variant="outline"
-                className="bg-transparent border-primary-foreground text-primary-foreground hover:bg-primary-foreground/10"
+          ) : (
+            <form onSubmit={handleWaitlistSubmit} className="space-y-4">
+              <div>
+                <Input
+                  type="text"
+                  placeholder="Full Name"
+                  value={waitlistData.name}
+                  onChange={(e) => setWaitlistData(prev => ({ ...prev, name: e.target.value }))}
+                  required
+                  className="h-12"
+                />
+              </div>
+              <div>
+                <Input
+                  type="email"
+                  placeholder="Email Address"
+                  value={waitlistData.email}
+                  onChange={(e) => setWaitlistData(prev => ({ ...prev, email: e.target.value }))}
+                  required
+                  className="h-12"
+                />
+              </div>
+              <div>
+                <Input
+                  type="tel"
+                  placeholder="Phone Number (optional e.g., 08012345678)"
+                  value={waitlistData.phone}
+                  onChange={(e) => setWaitlistData(prev => ({ ...prev, phone: e.target.value }))}
+                  className="h-12"
+                />
+              </div>
+              <Button 
+                type="submit" 
+                className="w-full h-12" 
+                disabled={isSubmitting}
               >
-                View Pricing
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Joining...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" />
+                    Join the Waitlist
+                  </>
+                )}
               </Button>
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* Footer */}
-      <footer className="border-t border-border py-12 mt-20">
-        <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-6 h-6 bg-primary rounded flex items-center justify-center">
-                <Calculator className="w-4 h-4 text-primary-foreground" />
-              </div>
-              <span className="font-semibold">TaxPal NG</span>
-            </div>
-            <p className="text-sm text-muted-foreground">© 2025 TaxPal NG. All rights reserved.</p>
-          </div>
-        </div>
-      </footer>
-    </div>
-  )
-}
-
-function TransactionItem({
-  type,
-  description,
-  amount,
-  date,
-}: {
-  type: "income" | "expense"
-  description: string
-  amount: string
-  date: string
-}) {
-  return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-3">
-        <div
-          className={`w-10 h-10 rounded-full flex items-center justify-center ${
-            type === "income" ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
-          }`}
-        >
-          {type === "income" ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
-        </div>
-        <div>
-          <p className="font-medium text-sm">{description}</p>
-          <p className="text-xs text-muted-foreground">{date}</p>
-        </div>
-      </div>
-      <span className={`font-semibold ${type === "income" ? "text-green-600" : "text-red-600"}`}>
-        {type === "income" ? "+" : "-"}
-        {amount}
-      </span>
-    </div>
-  )
-}
-
-function ReminderItem({
-  title,
-  date,
-  priority,
-  daysLeft,
-}: {
-  title: string
-  date: string
-  priority: "high" | "medium" | "low"
-  daysLeft: number
-}) {
-  const priorityColors = {
-    high: "bg-red-100 text-red-700 border-red-200",
-    medium: "bg-orange-100 text-orange-700 border-orange-200",
-    low: "bg-blue-100 text-blue-700 border-blue-200",
-  }
-
-  return (
-    <div className={`flex items-center justify-between p-3 rounded-lg border ${priorityColors[priority]}`}>
-      <div>
-        <p className="font-medium text-sm">{title}</p>
-        <p className="text-xs opacity-80">{date}</p>
-      </div>
-      <Badge variant="secondary" className="bg-white/50">
-        {daysLeft} days
-      </Badge>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -18,11 +18,11 @@ export function TaxSummary() {
         </div>
         <div className="flex items-center justify-between py-3 border-b border-border">
           <span className="text-sm text-muted-foreground">Tax Relief</span>
-          <span className="font-semibold text-green-600">-₦200,000</span>
+          <span className="font-semibold text-primary">-₦200,000</span>
         </div>
         <div className="flex items-center justify-between py-3 border-b border-border">
           <span className="text-sm text-muted-foreground">Deductions</span>
-          <span className="font-semibold text-green-600">-₦50,000</span>
+          <span className="font-semibold text-primary">-₦50,000</span>
         </div>
         <div className="flex items-center justify-between py-3">
           <span className="text-sm font-medium">Tax Payable</span>

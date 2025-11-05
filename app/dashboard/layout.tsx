@@ -6,6 +6,7 @@ import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { DashboardNav } from "@/components/dashboard/dashboard-nav"
 import { SidebarProvider, useSidebar } from "@/lib/contexts/sidebar-context"
 import { useAuth } from "@/lib/hooks/useAuth"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { cn } from "@/lib/utils"
 
 function LayoutContent({
@@ -15,6 +16,7 @@ function LayoutContent({
 }>) {
   const { sidebarCollapsed } = useSidebar()
   const { user, loading } = useAuth()
+  const { profile, loading: profileLoading } = useUserProfile()
   const router = useRouter()
 
   useEffect(() => {
@@ -22,6 +24,23 @@ function LayoutContent({
       router.push("/login")
     }
   }, [user, loading, router])
+
+  useEffect(() => {
+    if (!profile) return
+    
+    console.log("Dashboard layout - businessType:", profile.businessType, "current path:", window.location.pathname)
+    
+    // Redirect SMEs to their dashboard
+    if (profile.businessType === 'sme' && !window.location.pathname.startsWith('/dashboard-sme')) {
+      console.log("Redirecting SME to /dashboard-sme")
+      router.push('/dashboard-sme')
+    }
+    // Redirect freelancers away from SME dashboard
+    if (profile.businessType === 'freelancer' && window.location.pathname.startsWith('/dashboard-sme')) {
+      console.log("Redirecting freelancer from /dashboard-sme to /dashboard")
+      router.push('/dashboard')
+    }
+  }, [profile, router])
 
   if (loading) {
     return (

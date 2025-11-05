@@ -67,7 +67,7 @@ export function RecentTransactions() {
           <div key={transaction.id} className="flex items-center gap-4 py-3 border-b border-border last:border-0">
             <div
               className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                transaction.type === "income" ? "bg-green-100 text-green-600" : "bg-red-100 text-red-600"
+                transaction.type === "income" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"
               }`}
             >
               {transaction.type === "income" ? (
@@ -86,7 +86,7 @@ export function RecentTransactions() {
               </div>
             </div>
             <div className="text-right">
-              <p className={`font-semibold ${transaction.type === "income" ? "text-green-600" : "text-red-600"}`}>
+              <p className={`font-semibold ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}>
                 {transaction.type === "income" ? "+" : "-"}₦{transaction.amount.toLocaleString()}
               </p>
             </div>

@@ -9,7 +9,7 @@ export async function POST(request: NextRequest) {
       file,
       fileName,
       folder,
-      useUniqueFileName: useUniqueFileName || true,
+      useUniqueFileName: useUniqueFileName !== false, // Default to true
       overwriteFile: false,
       overwriteAITags: false,
       overwriteTags: false,
@@ -21,12 +21,13 @@ export async function POST(request: NextRequest) {
       fileId: result.fileId,
       name: result.name,
       size: result.size,
-      thumbnailUrl: result.thumbnailUrl || result.url
+      thumbnailUrl: result.thumbnailUrl || result.url,
+      fileType: result.fileType // 'image' or 'video'
     })
   } catch (error) {
     console.error('ImageKit upload error:', error)
     return NextResponse.json(
-      { error: 'Failed to upload image' },
+      { error: 'Failed to upload file' },
       { status: 500 }
     )
   }

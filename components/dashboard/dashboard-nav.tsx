@@ -53,7 +53,7 @@ export function DashboardNav() {
               <Calculator className="w-5 h-5 text-primary-foreground" />
             </div>
             {!sidebarCollapsed && (
-              <span className="font-semibold text-lg whitespace-nowrap">TaxPal NG</span>
+              <span className="font-semibold text-lg whitespace-nowrap">OTax</span>
             )}
           </Link>
           <Button
@@ -126,7 +126,7 @@ export function DashboardNav() {
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <Calculator className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="font-semibold text-lg">TaxPal NG</span>
+            <span className="font-semibold text-lg">OTax</span>
           </Link>
           <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}

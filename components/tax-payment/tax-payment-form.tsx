@@ -159,6 +159,7 @@ export function TaxPaymentForm({ onPay, processing, onCheckDuplicate }: TaxPayme
       result.reliefs?.rentRelief + 
       result.reliefs?.pension + 
       result.reliefs?.healthInsurance + 
+      result.reliefs?.housingFund + 
       result.reliefs?.lifeInsurance + 
       result.reliefs?.charitable || 0
     

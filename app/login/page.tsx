@@ -10,22 +10,36 @@ import { Label } from "@/components/ui/label"
 import { Calculator } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/hooks/useAuth"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { toast } from "sonner"
 
 export default function LoginPage() {
   const router = useRouter()
   const { signIn, user, loading } = useAuth()
+  const { profile, loading: profileLoading } = useUserProfile()
   const [isLoading, setIsLoading] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
     password: ''
   })
 
+  // Redirect to waitlist during pre-launch
   useEffect(() => {
-    if (!loading && user) {
-      router.push("/dashboard")
+    router.push('/#waitlist')
+  }, [router])
+
+  useEffect(() => {
+    if (!loading && !profileLoading && user && profile) {
+      // Check if user needs to verify TIN or upload documents
+      if (!profile.taxId) {
+        router.push("/verify-tin")
+      } else if (profile.businessType === 'sme' && !profile.businessDocuments) {
+        router.push("/verify-tin")
+      } else {
+        router.push("/dashboard")
+      }
     }
-  }, [user, loading, router])
+  }, [user, loading, profile, profileLoading, router])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -40,7 +54,7 @@ export default function LoginPage() {
 
     if (result.success) {
       toast.success('Logged in successfully!')
-      router.push("/dashboard")
+      // Don't redirect here - useEffect will handle it based on TIN verification status
     } else {
       toast.error(result.error || 'Failed to log in')
     }
@@ -52,10 +66,13 @@ export default function LoginPage() {
         <div className="bg-card border border-border rounded-xl p-8 shadow-lg">
           {/* Logo */}
           <div className="flex items-center justify-center gap-2 mb-8">
-            <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+            {/* <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
               <Calculator className="w-6 h-6 text-primary-foreground" />
+            </div> */}
+             <div className="w-8 h-8 bg-primary text-primary-foreground font-bold rounded-lg flex items-center justify-center">
+              O
             </div>
-            <span className="font-semibold text-2xl">TaxPal NG</span>
+            <span className="font-semibold text-2xl">OTax</span>
           </div>
 
           <div className="text-center mb-8">

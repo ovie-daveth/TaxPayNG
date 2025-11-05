@@ -341,16 +341,16 @@ export function AddTransactionDialog({
             
             {uploadedImages.length > 0 && (
               <div className="space-y-2 mt-2">
-                <p className="text-sm font-medium text-green-600">✅ Uploaded Files:</p>
+                <p className="text-sm font-medium text-primary">✅ Uploaded Files:</p>
                 {uploadedImages.map((image, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 bg-green-50 dark:bg-green-950/20 rounded-lg border border-green-200 dark:border-green-900">
+                  <div key={index} className="flex items-center justify-between p-2 bg-primary/5 rounded-lg border border-primary/20">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 bg-green-100 dark:bg-green-900/30 rounded flex items-center justify-center">
-                        <Upload className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <div className="w-8 h-8 bg-primary/10 rounded flex items-center justify-center">
+                        <Upload className="w-4 h-4 text-primary" />
                       </div>
                       <div>
-                        <span className="text-sm font-medium text-green-800 dark:text-green-100">{image.name}</span>
-                        <p className="text-xs text-green-600 dark:text-green-400">Uploaded successfully</p>
+                        <span className="text-sm font-medium">{image.name}</span>
+                        <p className="text-xs text-muted-foreground">Uploaded successfully</p>
                       </div>
                     </div>
                     <Button
@@ -358,7 +358,7 @@ export function AddTransactionDialog({
                       variant="ghost"
                       size="sm"
                       onClick={() => handleRemoveFile(index)}
-                      className="text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
+                      className="text-destructive hover:text-destructive/80"
                     >
                       Remove
                     </Button>

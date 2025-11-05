@@ -68,28 +68,36 @@ export function useAuth() {
       })
 
       // Create user profile in Firestore
-      await userService.upsertProfile(user.uid, {
+      const profileResult = await userService.upsertProfile(user.uid, {
         email: data.email,
         firstName: data.firstName,
         lastName: data.lastName,
         businessType: data.businessType,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
-      }).then(() => {
+      })
 
-        console.log("Profile updated")
+      console.log("Profile result:", profileResult)
+
+      if (profileResult && profileResult.success) {
+        console.log("Profile updated successfully")
+        
+        // Sign out the user immediately after signup (no auto-login)
+        await signOut(auth)
         setAuthState({
-          user,
+          user: null,
           loading: false,
           error: null
         })
-  
         return { success: true }
-      }).catch((error: any) => {
-        const errorMessage = error.message || 'An error occurred during sign up'
-        setAuthState(prev => ({ ...prev, loading: false, error: errorMessage }))
+      } else {
+        const errorMessage = profileResult?.error || 'An error occurred during sign up'
+        console.log("Profile update failed:", errorMessage)
+        // Sign out on failure as well
+        await signOut(auth)
+        setAuthState({ user: null, loading: false, error: errorMessage })
         return { success: false, error: errorMessage }
-      })
+      }
       
     } catch (error: any) {
       const errorMessage = error.message || 'An error occurred during sign up'

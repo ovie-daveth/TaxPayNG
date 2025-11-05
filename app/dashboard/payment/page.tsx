@@ -184,23 +184,43 @@ export default function PaymentPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 ">
-      <Button 
-        variant="ghost" 
-        onClick={() => router.back()}
-        className="mb-6"
-      >
-        <ArrowLeft className="w-4 h-4 mr-2" />
-        Back
-      </Button>
+    <>
+      {/* Receipt Modal */}
+      {showReceipt && paymentData && (
+        <PaymentReceipt 
+          paymentData={paymentData} 
+          onDownload={() => {}} 
+          onClose={handleCloseReceipt}
+        />
+      )}
 
-      {!showReceipt ? (
+      {/* Main Content */}
+      <div className="container mx-auto px-4 py-6 ">
+        <Button 
+          variant="ghost" 
+          onClick={() => router.back()}
+          className="mb-6"
+        >
+          <ArrowLeft className="w-4 h-4 mr-2" />
+          Back
+        </Button>
+
         <div className="space-y-6">
           <Card className="p-6">
-            <h1 className="text-3xl font-bold mb-2">Pay Your Tax</h1>
-            <p className="text-muted-foreground">
-              Complete your tax payment through our secure payment gateways
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold mb-2">Pay Your Tax</h1>
+                <p className="text-muted-foreground">
+                  Complete your tax payment through our secure payment gateways
+                </p>
+              </div>
+              <Button 
+                variant="outline"
+                onClick={() => router.push("/dashboard/payment/history")}
+              >
+                View Payment History
+              </Button>
+            </div>
           </Card>
           
           <TaxPaymentForm 
@@ -209,14 +229,8 @@ export default function PaymentPage() {
             onCheckDuplicate={checkDuplicatePayment}
           />
         </div>
-      ) : paymentData ? (
-        <PaymentReceipt 
-          paymentData={paymentData} 
-          onDownload={() => {}} 
-          onClose={handleCloseReceipt}
-        />
-      ) : null}
-    </div>
+      </div>
+    </>
   )
 }
 
