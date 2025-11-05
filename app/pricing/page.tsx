@@ -100,7 +100,8 @@ export default function PricingPage() {
                   <PricingFeature>Document storage (500MB)</PricingFeature>
                   <PricingFeature>Email reminders</PricingFeature>
                   <PricingFeature>Email support</PricingFeature>
-                        <PricingFeature>Simple invoice management</PricingFeature>
+                  <PricingFeature>Simple invoice management</PricingFeature>
+                  <PricingFeature>Easy payment of tax directly using various government approved methods (e.g., Remita and Paystack)</PricingFeature>
                 </ul>
               </CardContent>
               <CardFooter>

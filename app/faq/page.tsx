@@ -4,10 +4,13 @@ import { useState, useRef, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Send, HelpCircle, Sparkles, MessageSquare, Search, X, BookOpen, Building2, User, RefreshCw, Menu, X as XIcon } from "lucide-react"
+import { Send, HelpCircle, Sparkles, MessageSquare, Search, X, BookOpen, Building2, User, RefreshCw, Menu, X as XIcon, Share2, Copy, Check } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import OtaxLogo from "@/components/OtaxLogo"
 import { faqData } from "./components/data"
+import { toast } from "sonner"
+import { conversationService, ConversationMessage } from "@/lib/services/conversationService"
+import { useRouter, useSearchParams } from "next/navigation"
 
 
 // Simple fuzzy search function
@@ -61,6 +64,8 @@ function findBestMatch(query: string, faqs: typeof faqData.individuals) {
 }
 
 export default function FAQPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [selectedCategory, setSelectedCategory] = useState<"individuals" | "businesses">("individuals")
   const [messages, setMessages] = useState<Array<{ 
     type: "user" | "assistant", 
@@ -72,8 +77,13 @@ export default function FAQPage() {
   const [isTyping, setIsTyping] = useState(false)
   const [quickQuestions, setQuickQuestions] = useState<typeof faqData.individuals[0][]>([])
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [copied, setCopied] = useState(false)
+  const [conversationId, setConversationId] = useState<string | null>(null)
+  const [isLoadingConversation, setIsLoadingConversation] = useState(false)
+  const [hasLoadedWelcome, setHasLoadedWelcome] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+  const quickQuestionTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   // Set sidebar state based on screen size
   useEffect(() => {
@@ -98,27 +108,126 @@ export default function FAQPage() {
     setQuickQuestions(shuffled.slice(0, 10))
   }, [selectedCategory])
 
+  // Load conversation from URL on mount
   useEffect(() => {
-    // Welcome message (only on initial mount)
-    if (messages.length === 0) {
-      setMessages([{
-        type: "assistant",
-        content: `👋 Hello! I'm your OTax AI assistant. I can help answer questions about Nigeria's new tax reform (Nigeria Tax Act 2025, effective January 1, 2026), including:\n\n• Tax brackets and rates (0% on first ₦800k, then 15%, 18%, 21%, 23%, 25%)\n• Tax reliefs and deductions (rent relief up to ₦500k, pension up to 8%, etc.)\n• Capital gains tax and exemptions\n• Employment income and benefits-in-kind\n• Small business exemptions (0% CIT for companies ≤ ₦100M turnover)\n• VAT regulations (7.5% rate, ₦100M threshold)\n• Tax registration and TIN requirements\n• Filing deadlines and self-assessment\n• Tax clearance certificates\n• Advance rulings and clarifications\n• Penalties and compliance\n• Tax refunds\n• Objection and appeal processes\n• PAYE obligations\n• Record keeping requirements\n• Nigeria Revenue Service (NRS) and tax administration\n• Tax Appeal Tribunal and dispute resolution\n• Tax Ombud and taxpayer rights\n• Virtual assets and cryptocurrency taxation\n• How OTax can help you\n\nWhat would you like to know?`,
-      }])
+    const loadConversationFromUrl = async () => {
+      const shareId = searchParams.get('share')
+      if (shareId && !isLoadingConversation) {
+        setIsLoadingConversation(true)
+        try {
+          const conversation = await conversationService.getConversation(shareId)
+          if (conversation) {
+            setConversationId(conversation.shareId || shareId)
+            setSelectedCategory(conversation.category)
+            setHasLoadedWelcome(true) // Prevent welcome message from showing
+            // Convert conversation messages to the format used in state
+            const formattedMessages = conversation.messages.map(msg => ({
+              type: msg.type as "user" | "assistant",
+              content: msg.content,
+              faq: msg.faq ? {
+                question: msg.faq.question,
+                answer: msg.faq.answer,
+                category: msg.faq.category,
+                keywords: msg.faq.keywords
+              } : undefined,
+              suggestedQuestions: msg.suggestedQuestions?.map(sq => ({
+                question: sq.question,
+                answer: sq.answer,
+                category: sq.category,
+                keywords: sq.keywords
+              }))
+            }))
+            setMessages(formattedMessages)
+            // toast.success("Conversation loaded!")
+          } else {
+            toast.error("Conversation not found")
+          }
+        } catch (error) {
+          console.error("Error loading conversation:", error)
+          toast.error("Failed to load conversation")
+        } finally {
+          setIsLoadingConversation(false)
+        }
+      }
     }
-    // Generate quick questions (when category changes or on mount)
-    generateQuickQuestions()
-  }, [generateQuickQuestions, messages.length])
+    
+    loadConversationFromUrl()
+  }, [searchParams])
+
+  // Auto-save conversation when messages change (but not during initial load)
+  useEffect(() => {
+    // Skip auto-save if loading from URL or if it's just the welcome message
+    if (isLoadingConversation || messages.length <= 1) {
+      return
+    }
+
+    const saveConversation = async () => {
+      try {
+        const conversationMessages: ConversationMessage[] = messages.map(msg => ({
+          type: msg.type,
+          content: msg.content,
+          faq: msg.faq ? {
+            question: msg.faq.question,
+            answer: msg.faq.answer,
+            category: msg.faq.category,
+            keywords: msg.faq.keywords
+          } : undefined,
+          suggestedQuestions: msg.suggestedQuestions?.map(sq => ({
+            question: sq.question,
+            answer: sq.answer,
+            category: sq.category,
+            keywords: sq.keywords
+          }))
+        }))
+
+        const savedId = await conversationService.saveConversation({
+          category: selectedCategory,
+          messages: conversationMessages,
+          shareId: conversationId || undefined
+        })
+        
+        if (!conversationId && savedId) {
+          setConversationId(savedId)
+          // Update URL without reload
+          router.replace(`/faq?share=${savedId}`, { scroll: false })
+        }
+      } catch (error) {
+        console.error("Error saving conversation:", error)
+        // Don't show error toast for auto-save failures
+      }
+    }
+
+    // Debounce auto-save to avoid too many writes
+    const timeoutId = setTimeout(saveConversation, 2000)
+    return () => clearTimeout(timeoutId)
+  }, [messages, selectedCategory, conversationId, isLoadingConversation, router])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages])
 
-  const handleSend = () => {
-    if (!input.trim() || isTyping) return
+  useEffect(() => {
+    // Welcome message (only on initial mount and if no conversation loaded from URL)
+    const shareId = searchParams.get('share')
+    if (!hasLoadedWelcome && messages.length === 0 && !shareId && !isLoadingConversation) {
+      setMessages([{
+        type: "assistant",
+        content: `👋 Hello! I'm your OTax AI assistant. I can help answer questions about Nigeria's new tax reform (Nigeria Tax Act 2025, effective January 1, 2026), including:\n\n• Tax brackets and rates (0% on first ₦800k, then 15%, 18%, 21%, 23%, 25%)\n• Tax reliefs and deductions (rent relief up to ₦500k, pension up to 8%, etc.)\n• Capital gains tax and exemptions\n• Employment income and benefits-in-kind\n• Small business exemptions (0% CIT for companies ≤ ₦100M turnover)\n• VAT regulations (7.5% rate, ₦100M threshold)\n• Tax registration and TIN requirements\n• Filing deadlines and self-assessment\n• Tax clearance certificates\n• Advance rulings and clarifications\n• Penalties and compliance\n• Tax refunds\n• Objection and appeal processes\n• PAYE obligations\n• Record keeping requirements\n• Nigeria Revenue Service (NRS) and tax administration\n• Tax Appeal Tribunal and dispute resolution\n• Tax Ombud and taxpayer rights\n• Virtual assets and cryptocurrency taxation\n• How OTax can help you\n\nWhat would you like to know?`,
+      }])
+      setHasLoadedWelcome(true)
+    }
+    // Generate quick questions (when category changes or on mount)
+    if (!isLoadingConversation) {
+      generateQuickQuestions()
+    }
+  }, [generateQuickQuestions, searchParams, isLoadingConversation, hasLoadedWelcome])
 
-    const userMessage = input.trim().toLowerCase()
-    const originalInput = input.trim()
+  const handleSend = (messageOverride?: string) => {
+    const inputToUse = messageOverride || input
+    if (!inputToUse.trim() || isTyping) return
+
+    const userMessage = inputToUse.trim().toLowerCase()
+    const originalInput = inputToUse.trim()
     setInput("")
     
     // Check for gratitude/acknowledgment phrases
@@ -251,11 +360,156 @@ export default function FAQPage() {
   }
 
   const handleQuickQuestion = (question: string) => {
+    // Clear any pending timeout from previous quick question click
+    if (quickQuestionTimeoutRef.current) {
+      clearTimeout(quickQuestionTimeoutRef.current)
+      quickQuestionTimeoutRef.current = null
+    }
+    
     setInput(question)
-    setTimeout(() => {
+    quickQuestionTimeoutRef.current = setTimeout(() => {
       inputRef.current?.focus()
-      handleSend()
+      handleSend(question) // Pass the question directly to avoid state timing issues
+      quickQuestionTimeoutRef.current = null
     }, 100)
+  }
+
+  // Share conversation functions
+  const formatConversation = () => {
+    if (messages.length === 0) return ""
+    
+    let formatted = `💬 OTax AI Conversation - ${selectedCategory === "individuals" ? "Individuals & Creators" : "Small Businesses"}\n\n`
+    formatted += `Date: ${new Date().toLocaleDateString()}\n\n`
+    formatted += "─".repeat(50) + "\n\n"
+    
+    messages.forEach((msg, idx) => {
+      if (msg.type === "user") {
+        formatted += `👤 You:\n${msg.content}\n\n`
+      } else {
+        // Remove markdown formatting for plain text
+        let content = msg.content
+        content = content.replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold
+        content = content.replace(/\*(.*?)\*/g, '$1') // Remove italic
+        content = content.replace(/•/g, '-') // Replace bullet points
+        
+        formatted += `🤖 OTax AI:\n${content}\n\n`
+        if (msg.faq) {
+          formatted += `📁 Category: ${msg.faq.category}\n\n`
+        }
+      }
+      formatted += "─".repeat(50) + "\n\n"
+    })
+    
+    if (typeof window !== 'undefined') {
+      formatted += `\n💡 Learn more at: ${window.location.origin}/faq`
+    }
+    return formatted
+  }
+
+  const handleShareConversation = async () => {
+    if (messages.length === 0) {
+      toast.error("No conversation to share")
+      return
+    }
+
+    // Ensure conversation is saved
+    if (!conversationId) {
+      try {
+        const conversationMessages: ConversationMessage[] = messages.map(msg => ({
+          type: msg.type,
+          content: msg.content,
+          faq: msg.faq ? {
+            question: msg.faq.question,
+            answer: msg.faq.answer,
+            category: msg.faq.category,
+            keywords: msg.faq.keywords
+          } : undefined,
+          suggestedQuestions: msg.suggestedQuestions?.map(sq => ({
+            question: sq.question,
+            answer: sq.answer,
+            category: sq.category,
+            keywords: sq.keywords
+          }))
+        }))
+
+        const savedId = await conversationService.saveConversation({
+          category: selectedCategory,
+          messages: conversationMessages
+        })
+        
+        if (savedId) {
+          setConversationId(savedId)
+          router.replace(`/faq?share=${savedId}`, { scroll: false })
+        }
+      } catch (error) {
+        console.error("Error saving conversation:", error)
+        toast.error("Failed to save conversation")
+        return
+      }
+    }
+
+    // Generate shareable link
+    const shareUrl = typeof window !== 'undefined' 
+      ? `${window.location.origin}/faq?share=${conversationId}` 
+      : ''
+    
+    const conversationText = formatConversation()
+    const shareText = `${conversationText}\n\n🔗 View full conversation: ${shareUrl}`
+
+    // Try Web Share API first (mobile devices)
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({
+          title: "OTax AI Conversation",
+          text: shareText,
+          url: shareUrl
+        })
+        toast.success("Conversation shared!")
+        return
+      } catch (error: any) {
+        // User cancelled or error occurred, fall back to copy
+        if (error.name !== 'AbortError') {
+          console.error("Error sharing:", error)
+        }
+      }
+    }
+
+    // Fallback to copy to clipboard
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      try {
+        await navigator.clipboard.writeText(shareText)
+        setCopied(true)
+        toast.success("Shareable link copied to clipboard!")
+        setTimeout(() => setCopied(false), 2000)
+      } catch (error) {
+        console.error("Error copying to clipboard:", error)
+        toast.error("Failed to copy conversation")
+      }
+    } else {
+      toast.error("Copy functionality not available in this browser")
+    }
+  }
+
+  const handleCopySingleMessage = async (content: string, type: "user" | "assistant") => {
+    if (typeof navigator === 'undefined' || !navigator.clipboard) {
+      toast.error("Copy functionality not available")
+      return
+    }
+    
+    try {
+      // Clean markdown formatting
+      let text = content
+      text = text.replace(/\*\*(.*?)\*\*/g, '$1')
+      text = text.replace(/\*(.*?)\*/g, '$1')
+      text = text.replace(/•/g, '-')
+      
+      const prefix = type === "user" ? "👤 You:\n\n" : "🤖 OTax AI:\n\n"
+      await navigator.clipboard.writeText(prefix + text)
+      toast.success("Message copied to clipboard!")
+    } catch (error) {
+      console.error("Error copying message:", error)
+      toast.error("Failed to copy message")
+    }
   }
 
   const currentFaqs = selectedCategory === "individuals" ? faqData.individuals : faqData.businesses
@@ -439,8 +693,43 @@ export default function FAQPage() {
                 Quick Questions
               </Button>
             </div>
+            {/* Chat Header with Share Button */}
+            {messages.length > 0 && (
+              <div className="hidden lg:flex items-center justify-between px-4 md:px-8 py-3 border-b flex-shrink-0">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <span className="text-sm font-medium">OTax AI Conversation</span>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleShareConversation}
+                  className="h-8 gap-2"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="w-4 h-4" />
+                      <span className="text-xs">Copied!</span>
+                    </>
+                  ) : (
+                    <>
+                      <Share2 className="w-4 h-4" />
+                      <span className="text-xs">Share</span>
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
             {/* Messages - Scrollable */}
             <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 space-y-6 scroll-smooth">
+              {isLoadingConversation ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="flex flex-col items-center gap-3">
+                    <Sparkles className="w-8 h-8 text-primary animate-pulse" />
+                    <p className="text-sm text-muted-foreground">Loading conversation...</p>
+                  </div>
+                </div>
+              ) : (
               <div className="max-w-4xl mx-auto space-y-6">
                   {messages.map((msg, idx) => (
                     <div
@@ -455,12 +744,35 @@ export default function FAQPage() {
                         </div>
                       )}
                       <div
-                        className={`max-w-[85%] md:max-w-[75%] rounded-lg p-4 ${
+                        className={`max-w-[85%] md:max-w-[75%] rounded-lg p-4 relative group ${
                           msg.type === "user"
                             ? "bg-primary text-primary-foreground"
                             : "bg-muted"
                         }`}
                       >
+                        {/* Share/Copy button for each message */}
+                        {msg.type === "assistant" && !msg.suggestedQuestions && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCopySingleMessage(msg.content, msg.type)}
+                            className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+                            title="Copy message"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </Button>
+                        )}
+                        {msg.type === "user" && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleCopySingleMessage(msg.content, msg.type)}
+                            className="absolute top-2 right-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity text-primary-foreground/70 hover:text-primary-foreground hover:bg-primary-foreground/20"
+                            title="Copy message"
+                          >
+                            <Copy className="w-3 h-3" />
+                          </Button>
+                        )}
                         {msg.type === "assistant" && msg.suggestedQuestions ? (
                           <div className="space-y-2">
                             <p className="text-sm whitespace-pre-wrap mb-3">{msg.content.split('\n\n')[0]}</p>
@@ -512,17 +824,42 @@ export default function FAQPage() {
                   )}
                   <div ref={messagesEndRef} />
                   </div>
-                </div>
+              )}
+            </div>
 
             {/* Input - Fixed at Bottom */}
             <div className="border-t bg-background flex-shrink-0 p-4">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  handleSend()
-                }}
-                className="flex gap-2 max-w-4xl mx-auto"
-              >
+              <div className="max-w-4xl mx-auto">
+                {/* Mobile Share Button */}
+                {messages.length > 0 && (
+                  <div className="lg:hidden mb-3 flex justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleShareConversation}
+                      className="h-8 gap-2"
+                    >
+                      {copied ? (
+                        <>
+                          <Check className="w-3 h-3" />
+                          <span className="text-xs">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Share2 className="w-3 h-3" />
+                          <span className="text-xs">Share Conversation</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                )}
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    handleSend()
+                  }}
+                  className="flex gap-2"
+                >
                 <Input
                   ref={inputRef}
                   value={input}
@@ -540,6 +877,7 @@ export default function FAQPage() {
                   <Send className="w-4 h-4" />
                 </Button>
               </form>
+              </div>
             </div>
           </div>
         </div>

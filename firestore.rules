@@ -278,5 +278,44 @@ service cloud.firestore {
       // Only authenticated users can delete
       allow delete: if isAuthenticated();
     }
+    
+    // FAQ Conversations Collection (public read for shared conversations, authenticated write)
+    match /faqConversations/{conversationId} {
+      // Helper function to validate conversation structure
+      function isValidConversation() {
+        // Basic structure validation
+        let isValid = request.resource.data.keys().hasAll(['category', 'messages']) &&
+                      request.resource.data.category is string &&
+                      (request.resource.data.category == 'individuals' || request.resource.data.category == 'businesses') &&
+                      request.resource.data.messages is list &&
+                      request.resource.data.messages.size() > 0 &&
+                      request.resource.data.messages.size() <= 100; // Limit to prevent abuse
+        
+        // Validate that messages array contains valid objects (basic check)
+        // Note: Firestore rules don't support iteration, so we validate structure exists
+        // Detailed message validation should be done at application level
+        
+        return isValid;
+      }
+      
+      // Helper function to validate that update doesn't reduce messages (prevents deletion)
+      function isValidUpdate() {
+        return request.resource.data.messages.size() >= resource.data.messages.size() &&
+               request.resource.data.category == resource.data.category;
+      }
+      
+      // Anyone can read conversations (for sharing via link)
+      allow read: if true;
+      
+      // Anyone can create conversations (for saving FAQ conversations) - but must be valid
+      allow create: if isValidConversation();
+      
+      // Anyone can update conversations (for continuing conversations) - but must be valid
+      // Must maintain message count (can only add, not remove) and preserve category
+      allow update: if isValidConversation() && isValidUpdate();
+      
+      // Only authenticated users can delete conversations
+      allow delete: if isAuthenticated();
+    }
   }
 }
