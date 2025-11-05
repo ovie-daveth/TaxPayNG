@@ -13,25 +13,108 @@ import { conversationService, ConversationMessage } from "@/lib/services/convers
 import { useRouter, useSearchParams } from "next/navigation"
 
 
-// Simple fuzzy search function
+// Enhanced ML-like matching algorithm with capability question detection
 function findBestMatch(query: string, faqs: typeof faqData.individuals) {
-  const lowerQuery = query.toLowerCase()
+  const lowerQuery = query.toLowerCase().trim()
   const queryWords = lowerQuery.split(/\s+/).filter(w => w.length > 2)
+  
+  // Detect capability questions (e.g., "can otax help me file returns")
+  const capabilityPatterns = [
+    /can\s+(otax|you|it)\s+(help|do|assist|support|handle|provide|file|calculate|track|manage|organize)/i,
+    /does\s+(otax|it)\s+(help|do|support|handle|provide|file|calculate|track|manage|organize|can)/i,
+    /(otax|you|it)\s+(can|will|does|helps?|help|do|assist|support|handle|provide|file|calculate|track|manage|organize)/i,
+    /(can|will|does)\s+(otax|you|it)\s+(help\s+me\s+)?(file|calculate|track|manage|organize|stay|get|register)/i,
+  ]
+  
+  const isCapabilityQuestion = capabilityPatterns.some(pattern => pattern.test(query))
+  
+  // Extract action/service from capability questions
+  let extractedAction = ""
+  if (isCapabilityQuestion) {
+    // Extract keywords after "can otax help me" or similar patterns
+    const actionPatterns = [
+      /(?:can|does|will)\s+(?:otax|you|it)\s+(?:help\s+me\s+)?(?:to\s+)?(file|calculate|track|manage|organize|stay|get|register|prepare|submit|complete|handle|assist|support|do|provide)/i,
+      /(?:help|assist|support|do|provide|file|calculate|track|manage|organize|stay|get|register|prepare|submit|complete|handle)\s+(?:me\s+)?(?:to\s+)?(?:file|calculate|track|manage|organize|stay|get|register|prepare|submit|complete|handle|returns?|tax|vat|paye|certificate|records?|compliant|refund|appeal|objection)/i,
+    ]
+    
+    for (const pattern of actionPatterns) {
+      const match = query.match(pattern)
+      if (match) {
+        extractedAction = match[1] || match[0]
+        break
+      }
+    }
+    
+    // If no specific action found, extract nouns after "help me"
+    if (!extractedAction) {
+      const helpMatch = query.match(/(?:help|assist|support)\s+(?:me\s+)?(?:to\s+)?(.+)/i)
+      if (helpMatch) {
+        extractedAction = helpMatch[1].trim()
+      }
+    }
+  }
   
   let bestMatches: Array<{ faq: typeof faqData.individuals[0], score: number }> = []
   
   faqs.forEach(faq => {
     let score = 0
-    
-    // Check question match
     const questionLower = faq.question.toLowerCase()
+    const answerLower = faq.answer.toLowerCase()
+    const keywordsLower = faq.keywords.map(k => k.toLowerCase())
+    
+    // If it's a capability question, prioritize FAQs that mention capabilities
+    if (isCapabilityQuestion) {
+      // High score for FAQs that explicitly mention OTax capabilities
+      if (answerLower.includes('otax') && (answerLower.includes('help') || answerLower.includes('can') || answerLower.includes('file') || answerLower.includes('calculate'))) {
+        score += 150
+      }
+      
+      // Boost score if FAQ question asks about OTax capabilities
+      if (questionLower.includes('otax') && (questionLower.includes('help') || questionLower.includes('can'))) {
+        score += 120
+      }
+      
+      // Match extracted action against FAQ content
+      if (extractedAction) {
+        const actionLower = extractedAction.toLowerCase()
+        // Check if action matches keywords
+        keywordsLower.forEach(keyword => {
+          if (keyword.includes(actionLower) || actionLower.includes(keyword)) {
+            score += 80
+          }
+        })
+        
+        // Check if action appears in answer
+        if (answerLower.includes(actionLower)) {
+          score += 60
+        }
+        
+        // Check if action appears in question
+        if (questionLower.includes(actionLower)) {
+          score += 50
+        }
+      }
+      
+      // Match common action keywords
+      const actionKeywords = ['file', 'calculate', 'track', 'manage', 'organize', 'help', 'stay', 'get', 'register', 'prepare', 'submit', 'complete', 'returns', 'tax', 'vat', 'paye', 'certificate', 'records', 'compliant', 'refund', 'appeal', 'objection']
+      actionKeywords.forEach(action => {
+        if (lowerQuery.includes(action)) {
+          if (answerLower.includes(action)) score += 40
+          if (questionLower.includes(action)) score += 30
+          if (keywordsLower.some(k => k.includes(action))) score += 25
+        }
+      })
+    }
+    
+    // Original matching logic (still applies)
+    // Check exact question match
     if (questionLower.includes(lowerQuery)) {
       score += 100
     }
     
     // Check keyword matches
-    faq.keywords.forEach(keyword => {
-      if (lowerQuery.includes(keyword.toLowerCase())) {
+    keywordsLower.forEach(keyword => {
+      if (lowerQuery.includes(keyword)) {
         score += 20
       }
     })
@@ -41,7 +124,7 @@ function findBestMatch(query: string, faqs: typeof faqData.individuals) {
       if (questionLower.includes(word)) {
         score += 15
       }
-      if (faq.answer.toLowerCase().includes(word)) {
+      if (answerLower.includes(word)) {
         score += 5
       }
     })
@@ -50,6 +133,31 @@ function findBestMatch(query: string, faqs: typeof faqData.individuals) {
     if (faq.category.toLowerCase().includes(lowerQuery)) {
       score += 10
     }
+    
+    // Semantic similarity: check for similar meaning words
+    const semanticGroups = [
+      ['file', 'filing', 'returns', 'submit', 'prepare'],
+      ['calculate', 'compute', 'work out', 'figure'],
+      ['help', 'assist', 'support', 'aid'],
+      ['track', 'monitor', 'follow', 'keep'],
+      ['manage', 'organize', 'handle', 'maintain'],
+      ['stay', 'remain', 'keep', 'maintain'],
+      ['tax', 'taxation', 'taxable', 'taxpayer'],
+      ['compliant', 'compliance', 'conform', 'obey'],
+    ]
+    
+    semanticGroups.forEach(group => {
+      const queryHasWord = group.some(word => lowerQuery.includes(word))
+      const faqHasWord = group.some(word => 
+        questionLower.includes(word) || 
+        answerLower.includes(word) || 
+        keywordsLower.some(k => k.includes(word))
+      )
+      
+      if (queryHasWord && faqHasWord) {
+        score += 30
+      }
+    })
     
     if (score > 0) {
       bestMatches.push({ faq, score })
