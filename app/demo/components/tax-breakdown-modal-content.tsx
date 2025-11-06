@@ -154,7 +154,7 @@ export function TaxBreakdownModalContent({ result }: TaxBreakdownModalContentPro
           {result.calculationType === "cit" && (
             <>
               {result.turnover !== undefined && (
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between text-sm mb-3">
                   <span className="text-muted-foreground">
                     Annual Turnover {result.period && result.period !== "yearly" ? `(${result.period} input annualized)` : ""}
                     {result.period && result.period !== "yearly" && result.originalInputTurnover !== undefined && (
@@ -166,41 +166,246 @@ export function TaxBreakdownModalContent({ result }: TaxBreakdownModalContentPro
                   <span className="font-medium">₦{(result.turnover || 0).toLocaleString()}</span>
                 </div>
               )}
-              {result.assessableProfit !== undefined && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    Assessable Profit {result.period && result.period !== "yearly" ? `(${result.period} input annualized)` : ""}
-                    {result.period && result.period !== "yearly" && result.originalInputProfit !== undefined && (
-                      <span className="text-xs block text-muted-foreground mt-1">
-                        Input: ₦{(result.originalInputProfit || 0).toLocaleString()} × {result.period === "monthly" ? "12" : "4"} = ₦{(result.assessableProfit || 0).toLocaleString()}
-                      </span>
-                    )}
-                  </span>
-                  <span className="font-medium">₦{(result.assessableProfit || 0).toLocaleString()}</span>
-                </div>
-              )}
               {result.totalFixedAssets !== undefined && (
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between text-sm mb-3">
                   <span className="text-muted-foreground">Total Fixed Assets</span>
                   <span className="font-medium">₦{(result.totalFixedAssets || 0).toLocaleString()}</span>
                 </div>
               )}
-              {result.assessableProfit !== undefined && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Assessable Profit</span>
-                  <span className="font-medium">₦{(result.assessableProfit || 0).toLocaleString()}</span>
-                </div>
-              )}
               {result.isSmallCompany !== undefined && (
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between text-sm mb-3">
                   <span className="text-muted-foreground">Company Status</span>
-                  <span className="font-medium">{result.isSmallCompany ? "Small Company (Exempt)" : "Large Corporation"}</span>
+                  <span className="font-medium">
+                    {result.isSmallCompany 
+                      ? "Small Company (Exempt)" 
+                      : result.isLargeMultinational 
+                        ? "Large Multinational (≥ ₦50B)" 
+                        : "Other Company (30% CIT)"}
+                  </span>
                 </div>
               )}
+              
+              {/* Revenue and COGS (Full Mode) */}
+              {result.revenue !== undefined && (
+                <div className="mb-3 pt-3 border-t border-border">
+                  <div className="flex items-center justify-between text-sm mb-2">
+                    <span className="text-muted-foreground">Total Revenue/Sales:</span>
+                    <span className="font-medium">₦{(result.revenue || 0).toLocaleString()}</span>
+                  </div>
+                  {result.costOfGoodsSold !== undefined && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Cost of Goods Sold:</span>
+                      <span className="font-medium">₦{(result.costOfGoodsSold || 0).toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Operating Expenses Breakdown (Full Mode) */}
+              {result.operatingExpensesBreakdown && Object.keys(result.operatingExpensesBreakdown).length > 0 && (
+                <div className="mb-3 pt-3 border-t border-border">
+                  <p className="text-xs text-muted-foreground mb-2 font-semibold">Operating Expenses Breakdown:</p>
+                  {Object.entries(result.operatingExpensesBreakdown).map(([key, value]: [string, any]) => {
+                    if (value === 0) return null
+                    const labels: Record<string, string> = {
+                      costOfGoodsSold: "Cost of Goods Sold",
+                      employeeCosts: "Employee Costs",
+                      pensionContributions: "Pension Contributions",
+                      trainingCosts: "Training Costs",
+                      rent: "Rent",
+                      utilities: "Utilities",
+                      repairsMaintenance: "Repairs & Maintenance",
+                      professionalFees: "Professional Fees",
+                      interestOnLoans: "Interest on Loans",
+                      badDebts: "Bad Debts Written Off",
+                      donations: "Donations (Approved)",
+                      insurancePremiums: "Insurance Premiums",
+                      staffWelfare: "Staff Welfare",
+                      transportation: "Transportation",
+                      otherExpenses: "Other Expenses",
+                    }
+                    return (
+                      <div key={key} className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-muted-foreground">{labels[key] || key}:</span>
+                        <span className="font-medium">₦{(value || 0).toLocaleString()}</span>
+                      </div>
+                    )
+                  })}
+                  <div className="flex items-center justify-between text-sm mt-2 pt-2 border-t border-border/50">
+                    <span className="text-muted-foreground">Total Operating Expenses:</span>
+                    <span className="font-medium">₦{(result.totalOperatingExpenses || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Profit Before Tax */}
+              {result.assessableProfit !== undefined && (
+                <div className="mb-3 pt-3 border-t border-border">
+                  <div className="flex items-center justify-between text-sm mb-2">
+                    <span className="text-muted-foreground">
+                      Profit Before Tax {result.period && result.period !== "yearly" ? `(${result.period} input annualized)` : ""}
+                      {result.period && result.period !== "yearly" && result.originalInputProfit !== undefined && (
+                        <span className="text-xs block text-muted-foreground mt-1">
+                          Input: ₦{(result.originalInputProfit || 0).toLocaleString()} × {result.period === "monthly" ? "12" : "4"} = ₦{(result.assessableProfit || 0).toLocaleString()}
+                        </span>
+                      )}
+                    </span>
+                    <span className="font-medium">₦{(result.assessableProfit || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Deductions Breakdown */}
+              {result.deductionsBreakdown && result.deductionsBreakdown.length > 0 && (
+                <div className="mb-3 pt-3 border-t border-border">
+                  <p className="text-xs text-muted-foreground mb-2 font-semibold">Allowable Deductions:</p>
+                  {result.deductionsBreakdown.map((deduction: any) => (
+                    <div key={deduction.id} className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-muted-foreground">{deduction.category}:</span>
+                      <span className="font-medium">₦{(deduction.amount || 0).toLocaleString()}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {/* Capital Allowances */}
+              {result.capitalAllowances && result.capitalAllowances.length > 0 && (
+                <div className="mb-3 pt-3 border-t border-border">
+                  <p className="text-xs text-muted-foreground mb-2 font-semibold">Capital Allowances:</p>
+                  {result.capitalAllowances.map((asset: any) => (
+                    <div key={asset.id} className="mb-2 p-2 bg-muted/30 rounded border border-border">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="font-medium">{asset.assetDescription}</span>
+                        <span className="text-muted-foreground">{asset.allowanceRate}%</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Asset Cost:</span>
+                        <span className="font-medium">₦{(asset.assetCost || 0).toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Allowance:</span>
+                        <span className="font-medium text-green-600">₦{(asset.allowanceAmount || 0).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between text-sm mt-2 pt-2 border-t border-border/50">
+                    <span className="text-muted-foreground">Total Capital Allowances:</span>
+                    <span className="font-medium">₦{(result.capitalAllowancesTotal || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Total Deductions */}
+              {(result.totalDeductions !== undefined || result.capitalAllowancesTotal !== undefined) && (
+                <div className="mb-3 pt-3 border-t border-border">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Total Allowable Deductions:</span>
+                    <span className="font-medium">₦{((result.totalDeductions || 0) + (result.capitalAllowancesTotal || 0)).toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Taxable Profit Calculation */}
+              {result.taxableProfit !== undefined && (
+                <div className="mt-3 pt-3 border-t border-border">
+                  <div className="bg-muted/30 p-3 rounded-lg space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Profit Before Tax:</span>
+                      <span className="font-medium">₦{(result.assessableProfit || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Less: Total Deductions:</span>
+                      <span className="font-medium text-green-600">-₦{((result.totalDeductions || 0) + (result.capitalAllowancesTotal || 0)).toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm pt-2 border-t border-border">
+                      <span className="font-semibold">Taxable Profit:</span>
+                      <span className="font-bold text-lg text-primary">₦{(result.taxableProfit || 0).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* CIT Rate and Amount */}
               {result.citRate !== undefined && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">CIT Rate</span>
-                  <span className="font-medium">{result.citRate}%</span>
+                <div className="mb-3 pt-3 border-t border-border">
+                  <div className="flex items-center justify-between text-sm mb-2">
+                    <span className="text-muted-foreground">CIT Rate:</span>
+                    <span className="font-medium">{result.citRate}%</span>
+                  </div>
+                  {result.isLargeMultinational && result.effectiveTaxRate !== undefined && (
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-muted-foreground">Effective Tax Rate (ETR):</span>
+                      <span className="font-medium">{result.effectiveTaxRate.toFixed(2)}%</span>
+                    </div>
+                  )}
+                  {result.topUpTax !== undefined && result.topUpTax > 0 && (
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-muted-foreground">ETR Top-Up Tax:</span>
+                      <span className="font-medium text-amber-600">₦{(result.topUpTax || 0).toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* CIT Calculation Explanation */}
+              {result.citRate !== undefined && result.taxableProfit !== undefined && (
+                <div className="mt-3 pt-3 border-t border-border">
+                  <div className="bg-muted/30 p-3 rounded-lg space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Taxable Profit:</span>
+                      <span className="font-medium">₦{(result.taxableProfit || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">CIT Rate:</span>
+                      <span className="font-medium">{result.citRate}%</span>
+                    </div>
+                    {result.annualTax !== undefined && (
+                      <div className="flex items-center justify-between text-sm pt-2 border-t border-border">
+                        <span className="font-semibold">Annual CIT Payable:</span>
+                        <span className="font-bold text-lg text-primary">₦{(result.annualTax || 0).toLocaleString()}</span>
+                      </div>
+                    )}
+                    {result.annualTax !== undefined && result.taxableProfit > 0 && (
+                      <p className="text-xs text-muted-foreground mt-2 italic">
+                        Calculation: ₦{(result.taxableProfit || 0).toLocaleString()} × {result.citRate}% = ₦{(result.annualTax || 0).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {/* Explanation for Zero Tax */}
+              {((result.totalTax === 0 || result.annualTax === 0) && !result.isSmallCompany) && (
+                <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded">
+                  <p className="text-xs text-blue-800 dark:text-blue-200 font-medium mb-2">
+                    ℹ️ Why is CIT ₦0?
+                  </p>
+                  {result.taxableProfit === 0 && (
+                    <p className="text-xs text-blue-800 dark:text-blue-200">
+                      Your taxable profit is ₦0 because deductions ({((result.totalDeductions || 0) + (result.capitalAllowancesTotal || 0)).toLocaleString()}) equal or exceed your profit before tax ({result.assessableProfit?.toLocaleString() || 0}). No CIT is payable when taxable profit is ₦0.
+                    </p>
+                  )}
+                  {result.taxableProfit !== undefined && result.taxableProfit > 0 && result.totalTax === 0 && (
+                    <p className="text-xs text-blue-800 dark:text-blue-200">
+                      Please check your calculation - you have taxable profit of ₦{result.taxableProfit.toLocaleString()} but CIT is showing as ₦0. This may be a calculation error.
+                    </p>
+                  )}
+                </div>
+              )}
+              
+              {result.isSmallCompany && (
+                <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded">
+                  <p className="text-xs text-green-800 dark:text-green-200 font-medium">
+                    ✅ Small Company Exemption: You are exempt from CIT (turnover ≤ ₦100M and assets ≤ ₦250M). CIT = ₦0.
+                  </p>
+                </div>
+              )}
+              
+              {result.isLargeMultinational && result.topUpTax !== undefined && result.topUpTax > 0 && (
+                <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded">
+                  <p className="text-xs text-amber-800 dark:text-amber-200 font-medium">
+                    ⚠️ Large Multinational ETR Rule: Your effective tax rate was below 15%. A top-up tax of ₦{(result.topUpTax || 0).toLocaleString()} is required to meet the minimum 15% ETR.
+                  </p>
                 </div>
               )}
             </>

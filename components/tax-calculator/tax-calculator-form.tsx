@@ -16,6 +16,7 @@ import { calculateNigerianTax } from "@/lib/tax-calculator"
 import { calculateDevelopmentLevy } from "@/lib/tax/development-levy-calculator"
 import { SMEExemptionModal } from "./sme-exemption-modal"
 import { VATForm } from "./vat-form"
+import { CITForm } from "./cit-form"
 import {
   SUPPORTED_CURRENCIES,
   type CurrencyCode,
@@ -399,14 +400,10 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
     // For business tax calculations
     if (userType === "business" && calculationType) {
       if (calculationType === "cit") {
-        // Check if annualTurnover or assessableProfit is provided
-        const hasTurnover = annualTurnover && Number.parseFloat(annualTurnover) > 0
-        const hasProfit = assessableProfit && Number.parseFloat(assessableProfit) > 0
-        const hasIncome = incomeSources.some(s => s.amount && Number.parseFloat(s.amount) > 0)
-        
-        if (!hasTurnover && !hasProfit && !hasIncome) {
-          validationErrors.push("Please enter Annual Turnover or Assessable Profit for CIT calculation")
-        }
+        // CIT calculation is handled by CITForm component with its own "Calculate CIT" button
+        // Skip validation here as CITForm handles its own validation and submission
+        // Return early to prevent main form submission for CIT
+        return
       } else if (calculationType === "development-levy") {
         // Development Levy requires: Annual Turnover, Total Fixed Assets, and Assessable Profit
         // Income sources are not needed - assessable profit is a direct financial statement figure
@@ -481,7 +478,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
     
     // Check for invalid income sources (has type but no amount, or has amount but no type)
     // Skip this validation for tax types that don't use income sources
-    if (calculationType !== "development-levy" && calculationType !== "withholding-tax" && calculationType !== "vat") {
+    if (calculationType !== "development-levy" && calculationType !== "withholding-tax" && calculationType !== "vat" && calculationType !== "cit") {
       incomeSources.forEach((source, index) => {
         if (source.type && !source.amount) {
           validationErrors.push(`Income Source #${index + 1}: Please enter an Amount`)
@@ -573,70 +570,9 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
           result.calculationType = "paye"
           result.taxType = "PAYE (Pay As You Earn)"
         } else if (calculationType === "cit") {
-          // CIT calculation - Annual tax based on annual profit
-          // Period selection is for display/payment planning purposes only
-          // CIT is always calculated on annual basis
-          let turnover = Number.parseFloat(annualTurnover) || totalIncomeAmount
-          let profit = Number.parseFloat(assessableProfit) || (totalIncomeAmount - totalBusinessExp)
-          
-          // If period is monthly/quarterly, convert to annual for calculation
-          if (period === "monthly") {
-            turnover = turnover * 12
-            profit = profit * 12
-          } else if (period === "quarterly") {
-            turnover = turnover * 4
-            profit = profit * 4
-          }
-          // If yearly, use as is
-          
-          const assets = Number.parseFloat(totalFixedAssets) || 0
-          const isSmallCompany = turnover <= 100000000 && assets <= 250000000
-          
-          let citRate = 0
-          let citAmount = 0
-          
-          if (isSmallCompany) {
-            citRate = 0
-            citAmount = 0
-          } else if (turnover > 100000000 && turnover < 500000000) {
-            // Medium companies - reduced rates (simplified calculation)
-            citRate = 20 // Approximate effective rate for medium companies
-            citAmount = (profit * citRate) / 100
-          } else {
-            // Large companies
-            citRate = 30
-            citAmount = (profit * citRate) / 100
-          }
-          
-          // Convert annual tax to selected period for display
-          let periodTax = citAmount
-          if (period === "monthly") {
-            periodTax = citAmount / 12
-          } else if (period === "quarterly") {
-            periodTax = citAmount / 4
-          }
-          
-          // Calculate original input values for display
-          const originalInputTurnover = Number.parseFloat(annualTurnover) || totalIncomeAmount
-          const originalInputProfit = Number.parseFloat(assessableProfit) || (totalIncomeAmount - totalBusinessExp)
-          
-          result = {
-            calculationType: "cit",
-            taxType: "Company Income Tax (CIT)",
-            turnover: turnover, // Store annual turnover (annualized)
-            originalInputTurnover: originalInputTurnover, // Original input before annualization
-            originalInputProfit: originalInputProfit, // Original input profit before annualization
-            totalFixedAssets: assets,
-            assessableProfit: profit, // Store annual profit (annualized)
-            isSmallCompany: isSmallCompany,
-            citRate: citRate,
-            totalTax: periodTax, // Tax for selected period
-            annualTax: citAmount, // Annual tax amount
-            monthlySetAside: citAmount / 12,
-            quarterlySetAside: citAmount / 4,
-            period: period,
-            note: "CIT is calculated annually. Values shown are adjusted for selected period."
-          }
+          // CIT calculation is handled by CITForm component
+          // This should not be reached as CITForm handles its own submission
+          return
         } else if (calculationType === "development-levy") {
         // Development Levy calculation based on new tax regime
         // Note: Development Levy only requires direct inputs (turnover, fixed assets, assessable profit)
@@ -1120,8 +1056,8 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         </div>
 
         {/* Multiple Income Sources */}
-        {/* Hide for WHT, VAT, and Development Levy - they use different input methods */}
-        {(calculationType !== "withholding-tax" && calculationType !== "vat" && calculationType !== "development-levy") && (
+        {/* Hide for WHT, VAT, CIT, and Development Levy - they use different input methods */}
+        {(calculationType !== "withholding-tax" && calculationType !== "vat" && calculationType !== "cit" && calculationType !== "development-levy") && (
         <div className="border-t border-border pt-6">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -1309,78 +1245,17 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         {userType === "business" && calculationType && (
           <div className="border-t border-border pt-6">
             {calculationType === "cit" && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <Building2 className="w-5 h-5 text-primary" />
-                  <h3 className="font-semibold">Company Income Tax (CIT) Information</h3>
-                </div>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="annualTurnover">Annual Turnover (₦)</Label>
-                    <Input
-                      id="annualTurnover"
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="0.00"
-                      value={annualTurnover}
-                      onChange={(e) => {
-                        const value = e.target.value
-                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                          setAnnualTurnover(value)
-                        }
-                      }}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Annual revenue/turnover for the year
-                    </p>
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="totalFixedAssets">Total Fixed Assets (₦)</Label>
-                    <Input
-                      id="totalFixedAssets"
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="0.00"
-                      value={totalFixedAssets}
-                      onChange={(e) => {
-                        const value = e.target.value
-                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                          setTotalFixedAssets(value)
-                        }
-                      }}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Total fixed assets value
-                    </p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="assessableProfit">Assessable Profit (₦)</Label>
-                  <Input
-                    id="assessableProfit"
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="0.00 (leave empty to auto-calculate)"
-                    value={assessableProfit}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                        setAssessableProfit(value)
-                      }
-                    }}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Profit after all deductions {period === "monthly" ? "(for this month - will be annualized)" : period === "quarterly" ? "(for this quarter - will be annualized)" : "(annual)"} (if empty, will be calculated from income - expenses)
-                  </p>
-                </div>
-                <div className="p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg">
-                  <p className="text-sm text-green-700 dark:text-green-300">
-                    <strong>Small Company:</strong> Turnover ≤ ₦100M AND Assets ≤ ₦250M → <strong>0% CIT</strong><br />
-                    <strong>Medium Company:</strong> Turnover &gt; ₦100M but &lt; ₦500M → Reduced rates<br />
-                    <strong>Large Company:</strong> Turnover ≥ ₦500M → <strong>30% CIT</strong>
-                  </p>
-                </div>
-              </div>
+              <CITForm
+                period={period}
+                annualTurnover={annualTurnover}
+                totalFixedAssets={totalFixedAssets}
+                onAnnualTurnoverChange={setAnnualTurnover}
+                onTotalFixedAssetsChange={setTotalFixedAssets}
+                onCalculate={(citResult) => {
+                  // Trigger the calculation callback
+                  onCalculate(citResult)
+                }}
+              />
             )}
 
             {calculationType === "development-levy" && (
@@ -2122,8 +1997,8 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
           </>
         )}
 
-        {/* Hide Calculate Tax button for VAT - VATForm has its own Calculate VAT button */}
-        {calculationType !== "vat" && (
+        {/* Hide Calculate Tax button for VAT and CIT - they have their own Calculate buttons */}
+        {calculationType !== "vat" && calculationType !== "cit" && (
           <Button type="submit" className="w-full" size="lg" disabled={converting}>
             <Calculator className="w-4 h-4 mr-2" />
             {converting ? "Converting Currency..." : "Calculate Tax"}
