@@ -9,8 +9,9 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
-import { Calculator, Info, Plus, X, Trash2, HelpCircle, Loader2 } from "lucide-react"
+import { Calculator, Info, Plus, X, Trash2, HelpCircle, Loader2, Users, Receipt, Building2, FileText, TrendingUp } from "lucide-react"
 import { calculateNigerianTax } from "@/lib/tax-calculator"
+import { SMEExemptionModal } from "./sme-exemption-modal"
 import {
   SUPPORTED_CURRENCIES,
   type CurrencyCode,
@@ -108,6 +109,8 @@ const INCOME_TYPE_HELP: Record<string, string> = {
 
 export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
   const [userType, setUserType] = useState("freelancer")
+  const [showSMEModal, setShowSMEModal] = useState(false)
+  const [calculationType, setCalculationType] = useState<string | null>(null) // "paye", "vat", null
   const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([
     { id: "1", type: "freelance", amount: "", currency: "NGN" },
   ])
@@ -124,6 +127,61 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
   const [dependents, setDependents] = useState("0")
   const [convertedTotalIncome, setConvertedTotalIncome] = useState<number | null>(null)
   const [convertingTotal, setConvertingTotal] = useState(false)
+  
+  // Business-specific fields for CIT calculation
+  const [annualTurnover, setAnnualTurnover] = useState("")
+  const [totalFixedAssets, setTotalFixedAssets] = useState("")
+  const [assessableProfit, setAssessableProfit] = useState("")
+  
+  // Withholding tax fields
+  const [withholdingTaxIncome, setWithholdingTaxIncome] = useState("")
+  const [withholdingTaxPayments, setWithholdingTaxPayments] = useState("")
+  
+  // VAT fields
+  const [vatTurnover, setVatTurnover] = useState("")
+  const [vatTaxableSupplies, setVatTaxableSupplies] = useState("")
+  const [vatInputTax, setVatInputTax] = useState("")
+
+  const handleUserTypeChange = (value: string) => {
+    if (value === "business") {
+      setShowSMEModal(true)
+      setCalculationType(null)
+    } else {
+      setUserType(value)
+      setCalculationType(null)
+      // Reset income sources based on user type
+      if (value === "freelancer") {
+        setIncomeSources([{ id: "1", type: "freelance", amount: "", currency: "NGN" }])
+      } else if (value === "creator") {
+        setIncomeSources([{ id: "1", type: "sponsorship", amount: "", currency: "NGN" }])
+      }
+    }
+  }
+
+  const handleSMEModalContinue = () => {
+    setShowSMEModal(false)
+    setUserType("business")
+  }
+
+  const handleCalculationTypeSelect = (type: string) => {
+    setCalculationType(type)
+    if (type === "paye") {
+      // Set up for PAYE calculation
+      setIncomeSources([{ id: "1", type: "salary", amount: "", currency: "NGN" }])
+    } else if (type === "vat") {
+      // Set up for VAT calculation
+      setIncomeSources([{ id: "1", type: "sales", amount: "", currency: "NGN" }])
+    } else if (type === "cit") {
+      // Set up for CIT calculation
+      setIncomeSources([{ id: "1", type: "business_income", amount: "", currency: "NGN" }])
+    } else if (type === "development-levy") {
+      // Set up for Development Levy calculation
+      setIncomeSources([{ id: "1", type: "business_income", amount: "", currency: "NGN" }])
+    } else if (type === "withholding-tax") {
+      // Set up for Withholding Tax calculation
+      setIncomeSources([])
+    }
+  }
 
   // Calculate raw total income (for display before conversion)
   const rawTotalIncome = incomeSources.reduce((sum, source) => {
@@ -190,6 +248,32 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
 
   // Get available income types based on user type
   const getAvailableIncomeTypes = () => {
+    // For business owners, check calculation type
+    if (userType === "business" && calculationType === "paye") {
+      return [
+        ...INCOME_TYPES.employment,
+        ...INCOME_TYPES.other,
+      ]
+    }
+    
+    if (userType === "business" && calculationType === "vat") {
+      return [
+        ...INCOME_TYPES.business,
+        ...INCOME_TYPES.other,
+      ]
+    }
+    
+    if (userType === "business" && (calculationType === "cit" || calculationType === "development-levy")) {
+      return [
+        ...INCOME_TYPES.business,
+        ...INCOME_TYPES.other,
+      ]
+    }
+    
+    if (userType === "business" && calculationType === "withholding-tax") {
+      return [] // Withholding tax doesn't use income sources
+    }
+    
     switch (userType) {
       case "creator":
         return [
@@ -314,8 +398,183 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
       // Combine business expenses (including creator expenses)
       const totalBusinessExp = (Number.parseFloat(businessExpenses) || 0) + totalCreatorExpenses
 
+      // Handle different calculation types for business owners
+      if (userType === "business" && calculationType) {
+        let result: any = {}
+
+        if (calculationType === "paye") {
+          // PAYE calculation - use individual tax calculation
+          result = calculateNigerianTax({
+            businessType: "freelancer", // Use freelancer for PAYE calculations
+            period: period,
+            income: totalIncomeAmount,
+            transportAllowance: totalTransportAllowance > 0 ? totalTransportAllowance : undefined,
+            rentPaid: Number.parseFloat(rentPaid) || 0,
+            pensionContribution: Number.parseFloat(pensionContribution) || 0,
+            healthInsurance: Number.parseFloat(healthInsurance) || 0,
+            housingFund: Number.parseFloat(housingFund) || 0,
+            lifeInsurance: Number.parseFloat(lifeInsurance) || 0,
+            charitableDonations: Number.parseFloat(charitableDonations) || 0,
+            businessExpenses: totalBusinessExp,
+            dependents: Number.parseInt(dependents) || 0,
+          })
+          result.calculationType = "paye"
+          result.taxType = "PAYE (Pay As You Earn)"
+        } else if (calculationType === "cit") {
+          // CIT calculation
+          const turnover = Number.parseFloat(annualTurnover) || totalIncomeAmount
+          const assets = Number.parseFloat(totalFixedAssets) || 0
+          const profit = Number.parseFloat(assessableProfit) || (totalIncomeAmount - totalBusinessExp)
+          
+          const isSmallCompany = turnover <= 100000000 && assets <= 250000000
+          
+          let citRate = 0
+          let citAmount = 0
+          
+          if (isSmallCompany) {
+            citRate = 0
+            citAmount = 0
+          } else if (turnover > 100000000 && turnover < 500000000) {
+            // Medium companies - reduced rates (simplified calculation)
+            citRate = 20 // Approximate effective rate for medium companies
+            citAmount = (profit * citRate) / 100
+          } else {
+            // Large companies
+            citRate = 30
+            citAmount = (profit * citRate) / 100
+          }
+          
+          result = {
+            calculationType: "cit",
+            taxType: "Company Income Tax (CIT)",
+            turnover: turnover,
+            totalFixedAssets: assets,
+            assessableProfit: profit,
+            isSmallCompany: isSmallCompany,
+            citRate: citRate,
+            totalTax: citAmount,
+            monthlySetAside: citAmount / 12,
+            quarterlySetAside: citAmount / 4,
+            period: period,
+          }
+        } else if (calculationType === "development-levy") {
+          // Development Levy calculation (4% on assessable profits)
+          const turnover = Number.parseFloat(annualTurnover) || totalIncomeAmount
+          const assets = Number.parseFloat(totalFixedAssets) || 0
+          const profit = Number.parseFloat(assessableProfit) || (totalIncomeAmount - totalBusinessExp)
+          
+          const isSmallCompany = turnover <= 100000000 && assets <= 250000000
+          
+          let levyAmount = 0
+          
+          if (isSmallCompany) {
+            levyAmount = 0 // Exempt
+          } else {
+            levyAmount = (profit * 4) / 100 // 4% of assessable profits
+          }
+          
+          result = {
+            calculationType: "development-levy",
+            taxType: "Development Levy",
+            turnover: turnover,
+            totalFixedAssets: assets,
+            assessableProfit: profit,
+            isSmallCompany: isSmallCompany,
+            levyRate: isSmallCompany ? 0 : 4,
+            totalTax: levyAmount,
+            monthlySetAside: levyAmount / 12,
+            quarterlySetAside: levyAmount / 4,
+            period: period,
+          }
+        } else if (calculationType === "withholding-tax") {
+          // Withholding Tax calculation
+          const turnover = Number.parseFloat(annualTurnover) || 0
+          const assets = Number.parseFloat(totalFixedAssets) || 0
+          const incomeReceived = Number.parseFloat(withholdingTaxIncome) || 0
+          const paymentsMade = Number.parseFloat(withholdingTaxPayments) || 0
+          
+          const isSmallCompany = turnover <= 100000000 && assets <= 250000000
+          
+          // Typical withholding tax rates: 5% on dividends, 10% on interest/rent, etc.
+          // Simplified calculation - assuming 5% on income received and payments made
+          let whtOnIncome = 0
+          let whtOnPayments = 0
+          
+          if (isSmallCompany) {
+            whtOnIncome = 0
+            whtOnPayments = 0
+          } else {
+            whtOnIncome = (incomeReceived * 5) / 100 // 5% on income received
+            whtOnPayments = (paymentsMade * 5) / 100 // 5% on payments made
+          }
+          
+          result = {
+            calculationType: "withholding-tax",
+            taxType: "Withholding Tax",
+            turnover: turnover,
+            totalFixedAssets: assets,
+            isSmallCompany: isSmallCompany,
+            incomeReceived: incomeReceived,
+            paymentsMade: paymentsMade,
+            whtOnIncome: whtOnIncome,
+            whtOnPayments: whtOnPayments,
+            totalTax: whtOnIncome + whtOnPayments,
+            period: period,
+          }
+        } else if (calculationType === "vat") {
+          // VAT calculation (7.5% on taxable supplies)
+          const turnover = Number.parseFloat(vatTurnover) || Number.parseFloat(annualTurnover) || totalIncomeAmount
+          const taxableSupplies = Number.parseFloat(vatTaxableSupplies) || totalIncomeAmount
+          const inputTax = Number.parseFloat(vatInputTax) || 0
+          
+          const isSmallCompany = turnover < 100000000
+          
+          let vatAmount = 0
+          let outputVat = 0
+          let netVat = 0
+          
+          if (isSmallCompany) {
+            vatAmount = 0 // Exempt
+            outputVat = 0
+            netVat = 0
+          } else {
+            outputVat = (taxableSupplies * 7.5) / 100 // 7.5% VAT
+            netVat = Math.max(outputVat - inputTax, 0) // VAT payable after input tax credits
+            vatAmount = netVat
+          }
+          
+          result = {
+            calculationType: "vat",
+            taxType: "Value Added Tax (VAT)",
+            turnover: turnover,
+            isSmallCompany: isSmallCompany,
+            taxableSupplies: taxableSupplies,
+            inputTax: inputTax,
+            outputVat: outputVat,
+            vatRate: isSmallCompany ? 0 : 7.5,
+            totalTax: vatAmount,
+            monthlySetAside: vatAmount / 12,
+            quarterlySetAside: vatAmount / 4,
+            period: period,
+          }
+        }
+
+        // Add income breakdown with currency information
+        result.incomeBreakdown = convertedIncomeSources.map((source) => ({
+          type: source.type,
+          amount: source.amountInNGN || 0,
+          originalAmount: source.originalAmount,
+          originalCurrency: source.originalCurrency,
+          description: source.description,
+        }))
+
+        onCalculate(result)
+        return
+      }
+
+      // Regular calculation for non-business or when no calculation type selected
       const result = calculateNigerianTax({
-        businessType: userType,
+        businessType: calculationType === "paye" ? "freelancer" : userType, // Use freelancer for PAYE calculations
         period: period,
         income: totalIncomeAmount,
         transportAllowance: totalTransportAllowance > 0 ? totalTransportAllowance : undefined,
@@ -413,21 +672,156 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="grid sm:grid-cols-2 gap-4">
+        {/* SME Exemption Modal */}
+        <SMEExemptionModal
+          open={showSMEModal}
+          onOpenChange={setShowSMEModal}
+          onContinue={handleSMEModalContinue}
+        />
+
+        {/* Calculation Type Selection for Business Owners */}
+        {userType === "business" && !calculationType && (
+          <Card className="p-6 border-2 border-primary/20">
+            <div className="text-center mb-6">
+              <Building2 className="w-12 h-12 text-primary mx-auto mb-4" />
+              <h3 className="text-lg font-semibold mb-2">What would you like to calculate?</h3>
+              <p className="text-sm text-muted-foreground">
+                As a business owner, you can calculate different types of taxes
+              </p>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <Card
+                className="p-6 cursor-pointer hover:border-primary transition-colors"
+                onClick={() => handleCalculationTypeSelect("paye")}
+              >
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Users className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-1">Employee (PAYE)</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Calculate PAYE tax for your employees
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              <Card
+                className="p-6 cursor-pointer hover:border-primary transition-colors"
+                onClick={() => handleCalculationTypeSelect("cit")}
+              >
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Building2 className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-1">Company Income Tax (CIT)</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Calculate CIT (0% for small companies)
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              <Card
+                className="p-6 cursor-pointer hover:border-primary transition-colors"
+                onClick={() => handleCalculationTypeSelect("development-levy")}
+              >
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <TrendingUp className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-1">Development Levy</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Calculate 4% levy on assessable profits
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              <Card
+                className="p-6 cursor-pointer hover:border-primary transition-colors"
+                onClick={() => handleCalculationTypeSelect("withholding-tax")}
+              >
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <FileText className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-1">Withholding Tax</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Calculate WHT on income & payments
+                    </p>
+                  </div>
+                </div>
+              </Card>
+
+              <Card
+                className="p-6 cursor-pointer hover:border-primary transition-colors"
+                onClick={() => handleCalculationTypeSelect("vat")}
+              >
+                <div className="flex flex-col items-center text-center space-y-3">
+                  <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Receipt className="w-6 h-6 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold mb-1">VAT</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Calculate VAT at 7.5% (if turnover ≥ ₦100M)
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            </div>
+            <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                <strong>Note:</strong> Small businesses (turnover &lt; ₦100M, assets &lt; ₦250M) are exempt from CIT, Development Levy, and VAT. 
+                However, you still need to calculate PAYE for your employees.
+              </p>
+            </div>
+          </Card>
+        )}
+
+        {/* Show form only if calculation type is selected for business owners, or if not a business owner */}
+        {(userType !== "business" || calculationType) && (
+          <>
+        <div className={`grid ${userType === "business" && calculationType ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-4`}>
           <div className="space-y-2">
             <Label htmlFor="userType">I am a...</Label>
-            <Select value={userType} onValueChange={setUserType}>
+            <Select value={userType} onValueChange={handleUserTypeChange}>
               <SelectTrigger id="userType">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="freelancer">Freelancer / Self-Employed</SelectItem>
                 <SelectItem value="creator">Content Creator / Influencer</SelectItem>
-                <SelectItem value="employee">Employee (PAYE)</SelectItem>
                 <SelectItem value="business">Business Owner</SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {userType === "business" && calculationType && (
+            <div className="space-y-2">
+              <Label htmlFor="taxType">Tax Type</Label>
+              <Select
+                value={calculationType}
+                onValueChange={(value) => handleCalculationTypeSelect(value)}
+              >
+                <SelectTrigger id="taxType">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="paye">Employee (PAYE)</SelectItem>
+                  <SelectItem value="cit">Company Income Tax (CIT)</SelectItem>
+                  <SelectItem value="development-levy">Development Levy</SelectItem>
+                  <SelectItem value="withholding-tax">Withholding Tax</SelectItem>
+                  <SelectItem value="vat">VAT</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="period">Calculation Period</Label>
@@ -448,6 +842,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         </div>
 
         {/* Multiple Income Sources */}
+        {(calculationType !== "withholding-tax") && (
         <div className="border-t border-border pt-6">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -629,38 +1024,362 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
             )}
           </div>
         </div>
+        )}
+
+        {/* Business Tax-Specific Fields */}
+        {userType === "business" && calculationType && (
+          <div className="border-t border-border pt-6">
+            {calculationType === "cit" && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <Building2 className="w-5 h-5 text-primary" />
+                  <h3 className="font-semibold">Company Income Tax (CIT) Information</h3>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="annualTurnover">Annual Turnover (₦)</Label>
+                    <Input
+                      id="annualTurnover"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={annualTurnover}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                          setAnnualTurnover(value)
+                        }
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Annual revenue/turnover for the year
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="totalFixedAssets">Total Fixed Assets (₦)</Label>
+                    <Input
+                      id="totalFixedAssets"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={totalFixedAssets}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                          setTotalFixedAssets(value)
+                        }
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Total fixed assets value
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="assessableProfit">Assessable Profit (₦)</Label>
+                  <Input
+                    id="assessableProfit"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00 (leave empty to auto-calculate)"
+                    value={assessableProfit}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                        setAssessableProfit(value)
+                      }
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Profit after all deductions (if empty, will be calculated from income - expenses)
+                  </p>
+                </div>
+                <div className="p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg">
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    <strong>Small Company:</strong> Turnover ≤ ₦100M AND Assets ≤ ₦250M → <strong>0% CIT</strong><br />
+                    <strong>Medium Company:</strong> Turnover &gt; ₦100M but &lt; ₦500M → Reduced rates<br />
+                    <strong>Large Company:</strong> Turnover ≥ ₦500M → <strong>30% CIT</strong>
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {calculationType === "development-levy" && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <TrendingUp className="w-5 h-5 text-primary" />
+                  <h3 className="font-semibold">Development Levy Information</h3>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="annualTurnover">Annual Turnover (₦)</Label>
+                    <Input
+                      id="annualTurnover"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={annualTurnover}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                          setAnnualTurnover(value)
+                        }
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Annual revenue/turnover for the year
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="totalFixedAssets">Total Fixed Assets (₦)</Label>
+                    <Input
+                      id="totalFixedAssets"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={totalFixedAssets}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                          setTotalFixedAssets(value)
+                        }
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Total fixed assets value
+                    </p>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="assessableProfit">Assessable Profit (₦)</Label>
+                  <Input
+                    id="assessableProfit"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00 (leave empty to auto-calculate)"
+                    value={assessableProfit}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                        setAssessableProfit(value)
+                      }
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Profit after all deductions (4% levy calculated on this)
+                  </p>
+                </div>
+                <div className="p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg">
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    <strong>Small Company:</strong> Turnover ≤ ₦100M AND Assets ≤ ₦250M → <strong>Exempt</strong><br />
+                    <strong>Other Companies:</strong> 4% levy on assessable profits
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {calculationType === "withholding-tax" && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <FileText className="w-5 h-5 text-primary" />
+                  <h3 className="font-semibold">Withholding Tax Information</h3>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="annualTurnover">Annual Turnover (₦)</Label>
+                    <Input
+                      id="annualTurnover"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={annualTurnover}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                          setAnnualTurnover(value)
+                        }
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      To determine if you qualify as small company
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="totalFixedAssets">Total Fixed Assets (₦)</Label>
+                    <Input
+                      id="totalFixedAssets"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={totalFixedAssets}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                          setTotalFixedAssets(value)
+                        }
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      To determine if you qualify as small company
+                    </p>
+                  </div>
+                </div>
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="withholdingTaxIncome">Income Received Subject to WHT (₦)</Label>
+                    <Input
+                      id="withholdingTaxIncome"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={withholdingTaxIncome}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                          setWithholdingTaxIncome(value)
+                        }
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Income received from customers (typically 5% WHT)
+                    </p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="withholdingTaxPayments">Payments Made Subject to WHT (₦)</Label>
+                    <Input
+                      id="withholdingTaxPayments"
+                      type="text"
+                      inputMode="decimal"
+                      placeholder="0.00"
+                      value={withholdingTaxPayments}
+                      onChange={(e) => {
+                        const value = e.target.value
+                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                          setWithholdingTaxPayments(value)
+                        }
+                      }}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Payments made to suppliers (typically 5% WHT)
+                    </p>
+                  </div>
+                </div>
+                <div className="p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg">
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    <strong>Small Company:</strong> Turnover ≤ ₦100M AND Assets ≤ ₦250M → <strong>Exempt</strong> from withholding tax on both income received and payments made
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {calculationType === "vat" && (
+              <div className="space-y-4">
+                <div className="flex items-center gap-2 mb-4">
+                  <Receipt className="w-5 h-5 text-primary" />
+                  <h3 className="font-semibold">VAT Information</h3>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="vatTurnover">Annual Turnover (₦)</Label>
+                  <Input
+                    id="vatTurnover"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={vatTurnover}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                        setVatTurnover(value)
+                      }
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Annual turnover to determine VAT registration requirement
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="vatTaxableSupplies">Taxable Supplies (₦)</Label>
+                  <Input
+                    id="vatTaxableSupplies"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={vatTaxableSupplies}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                        setVatTaxableSupplies(value)
+                      }
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Value of taxable supplies (VAT will be calculated at 7.5% on this)
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="vatInputTax">Input Tax Credit (₦)</Label>
+                  <Input
+                    id="vatInputTax"
+                    type="text"
+                    inputMode="decimal"
+                    placeholder="0.00"
+                    value={vatInputTax}
+                    onChange={(e) => {
+                      const value = e.target.value
+                      if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                        setVatInputTax(value)
+                      }
+                    }}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    VAT paid on business expenses (can be claimed as credit)
+                  </p>
+                </div>
+                <div className="p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg">
+                  <p className="text-sm text-green-700 dark:text-green-300">
+                    <strong>Small Company:</strong> Turnover &lt; ₦100M → <strong>Exempt</strong> from VAT<br />
+                    <strong>VAT Registered:</strong> Turnover ≥ ₦100M → Charge VAT at <strong>7.5%</strong> on taxable supplies<br />
+                    <strong>Note:</strong> Certain items are VAT-exempt (agricultural inputs, medical supplies, educational materials)
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Tax-Deductible Expenses */}
-        <div className="border-t border-border pt-6">
-          <div className="flex items-center gap-2 mb-4">
-            <h3 className="font-semibold">Tax-Deductible Expenses</h3>
-            <Info className="w-4 h-4 text-muted-foreground" />
-          </div>
-          <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
-            <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
-              💡 Enter your expenses for the selected period ({getPeriodLabel().toLowerCase()})
-            </p>
-            <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-              The calculator will automatically convert them to annual amounts for tax calculation
-            </p>
-          </div>
+        {(calculationType === "paye" || !calculationType) && (
+          <>
+          <div className="border-t border-border pt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <h3 className="font-semibold">Tax-Deductible Expenses</h3>
+              <Info className="w-4 h-4 text-muted-foreground" />
+            </div>
+            <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4">
+              <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
+                💡 Enter your expenses for the selected period ({getPeriodLabel().toLowerCase()})
+              </p>
+              <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
+                The calculator will automatically convert them to annual amounts for tax calculation
+              </p>
+            </div>
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="rentPaid">{getPeriodLabel()} Rent Paid (₦)</Label>
-              <Input
-                id="rentPaid"
-                type="text"
-                inputMode="decimal"
-                placeholder="0.00"
-                value={rentPaid}
-                onChange={(e) => {
-                  const value = e.target.value
-                  if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                    setRentPaid(value)
-                  }
-                }}
-              />
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="rentPaid">{getPeriodLabel()} Rent Paid (₦)</Label>
+                <Input
+                  id="rentPaid"
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="0.00"
+                  value={rentPaid}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                      setRentPaid(value)
+                    }
+                  }}
+                />
               <p className="text-xs text-muted-foreground">
                 20% of rent paid is deductible (max ₦500,000/year)
               </p>
@@ -894,12 +1613,16 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
             </SelectContent>
           </Select>
         </div>
+          </>
+        )}
 
         <Button type="submit" className="w-full" size="lg" disabled={converting}>
           <Calculator className="w-4 h-4 mr-2" />
           {converting ? "Converting Currency..." : "Calculate Tax"}
         </Button>
-      </form>
+          </>
+        )}
+        </form>
       </Card>
     </TooltipProvider>
   )
