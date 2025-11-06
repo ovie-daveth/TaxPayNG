@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
+import { toast } from "sonner"
 import { Card } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -389,6 +390,101 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    // Validation
+    let validationErrors: string[] = []
+    
+    // For business tax calculations
+    if (userType === "business" && calculationType) {
+      if (calculationType === "cit" || calculationType === "development-levy") {
+        // Check if annualTurnover or assessableProfit is provided
+        const hasTurnover = annualTurnover && Number.parseFloat(annualTurnover) > 0
+        const hasProfit = assessableProfit && Number.parseFloat(assessableProfit) > 0
+        const hasIncome = incomeSources.some(s => s.amount && Number.parseFloat(s.amount) > 0)
+        
+        if (!hasTurnover && !hasProfit && !hasIncome) {
+          validationErrors.push("Please enter Annual Turnover or Assessable Profit for " + (calculationType === "cit" ? "CIT" : "Development Levy") + " calculation")
+        }
+      } else if (calculationType === "withholding-tax") {
+        // Check if at least one payment is added and has required fields
+        const hasValidPayments = whtPaymentsMade.some(p => 
+          p.paymentType && p.amount && Number.parseFloat(p.amount) > 0
+        )
+        
+        if (whtPaymentsMade.length === 0) {
+          validationErrors.push("Please add at least one payment entry in 'Payments Made' section")
+        } else {
+          // Check each payment entry
+          whtPaymentsMade.forEach((payment, index) => {
+            const paymentNumber = whtPaymentsMade.length - index
+            if (!payment.paymentType) {
+              validationErrors.push(`Payment #${paymentNumber}: Please select a Payment Type`)
+            }
+            if (!payment.amount || Number.parseFloat(payment.amount) <= 0) {
+              validationErrors.push(`Payment #${paymentNumber}: Please enter a valid Amount (greater than 0)`)
+            }
+          })
+        }
+        
+        // Check if income received entries (if any) are valid
+        if (whtIncomeReceived.length > 0) {
+          whtIncomeReceived.forEach((income, index) => {
+            const incomeNumber = whtIncomeReceived.length - index
+            if (!income.paymentType && income.amount) {
+              validationErrors.push(`Income #${incomeNumber}: Please select a Payment Type`)
+            }
+            if (!income.amount && income.paymentType) {
+              validationErrors.push(`Income #${incomeNumber}: Please enter an Amount`)
+            }
+            if (income.amount && Number.parseFloat(income.amount) <= 0) {
+              validationErrors.push(`Income #${incomeNumber}: Please enter a valid Amount (greater than 0)`)
+            }
+          })
+        }
+      } else if (calculationType === "vat") {
+        // Check if taxableSupplies is provided
+        const hasTaxableSupplies = vatTaxableSupplies && Number.parseFloat(vatTaxableSupplies) > 0
+        const hasIncome = incomeSources.some(s => s.amount && Number.parseFloat(s.amount) > 0)
+        
+        if (!hasTaxableSupplies && !hasIncome) {
+          validationErrors.push("Please enter Taxable Supplies for VAT calculation")
+        }
+      } else if (calculationType === "paye") {
+        // PAYE needs income
+        const hasIncome = incomeSources.some(s => s.amount && Number.parseFloat(s.amount) > 0)
+        if (!hasIncome) {
+          validationErrors.push("Please enter at least one income source for PAYE calculation")
+        }
+      }
+    } else {
+      // For non-business users, need at least one income source
+      const hasIncome = incomeSources.some(s => s.amount && Number.parseFloat(s.amount) > 0)
+      if (!hasIncome) {
+        validationErrors.push("Please enter at least one income source")
+      }
+    }
+    
+    // Check for invalid income sources (has type but no amount, or has amount but no type)
+    incomeSources.forEach((source, index) => {
+      if (source.type && !source.amount) {
+        validationErrors.push(`Income Source #${index + 1}: Please enter an Amount`)
+      }
+      if (source.amount && !source.type) {
+        validationErrors.push(`Income Source #${index + 1}: Please select an Income Type`)
+      }
+      if (source.amount && Number.parseFloat(source.amount) <= 0) {
+        validationErrors.push(`Income Source #${index + 1}: Please enter a valid Amount (greater than 0)`)
+      }
+    })
+    
+    // Show validation errors
+    if (validationErrors.length > 0) {
+      validationErrors.forEach(error => {
+        toast.error(error)
+      })
+      return
+    }
+    
     setConverting(true)
 
     try {
@@ -459,11 +555,23 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
           result.calculationType = "paye"
           result.taxType = "PAYE (Pay As You Earn)"
         } else if (calculationType === "cit") {
-          // CIT calculation
-          const turnover = Number.parseFloat(annualTurnover) || totalIncomeAmount
-          const assets = Number.parseFloat(totalFixedAssets) || 0
-          const profit = Number.parseFloat(assessableProfit) || (totalIncomeAmount - totalBusinessExp)
+          // CIT calculation - Annual tax based on annual profit
+          // Period selection is for display/payment planning purposes only
+          // CIT is always calculated on annual basis
+          let turnover = Number.parseFloat(annualTurnover) || totalIncomeAmount
+          let profit = Number.parseFloat(assessableProfit) || (totalIncomeAmount - totalBusinessExp)
           
+          // If period is monthly/quarterly, convert to annual for calculation
+          if (period === "monthly") {
+            turnover = turnover * 12
+            profit = profit * 12
+          } else if (period === "quarterly") {
+            turnover = turnover * 4
+            profit = profit * 4
+          }
+          // If yearly, use as is
+          
+          const assets = Number.parseFloat(totalFixedAssets) || 0
           const isSmallCompany = turnover <= 100000000 && assets <= 250000000
           
           let citRate = 0
@@ -482,25 +590,51 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
             citAmount = (profit * citRate) / 100
           }
           
+          // Convert annual tax to selected period for display
+          let periodTax = citAmount
+          if (period === "monthly") {
+            periodTax = citAmount / 12
+          } else if (period === "quarterly") {
+            periodTax = citAmount / 4
+          }
+          
+          // Calculate original input values for display
+          const originalInputTurnover = Number.parseFloat(annualTurnover) || totalIncomeAmount
+          const originalInputProfit = Number.parseFloat(assessableProfit) || (totalIncomeAmount - totalBusinessExp)
+          
           result = {
             calculationType: "cit",
             taxType: "Company Income Tax (CIT)",
-            turnover: turnover,
+            turnover: turnover, // Store annual turnover (annualized)
+            originalInputTurnover: originalInputTurnover, // Original input before annualization
+            originalInputProfit: originalInputProfit, // Original input profit before annualization
             totalFixedAssets: assets,
-            assessableProfit: profit,
+            assessableProfit: profit, // Store annual profit (annualized)
             isSmallCompany: isSmallCompany,
             citRate: citRate,
-            totalTax: citAmount,
+            totalTax: periodTax, // Tax for selected period
+            annualTax: citAmount, // Annual tax amount
             monthlySetAside: citAmount / 12,
             quarterlySetAside: citAmount / 4,
             period: period,
+            note: "CIT is calculated annually. Values shown are adjusted for selected period."
           }
         } else if (calculationType === "development-levy") {
-          // Development Levy calculation (4% on assessable profits)
-          const turnover = Number.parseFloat(annualTurnover) || totalIncomeAmount
-          const assets = Number.parseFloat(totalFixedAssets) || 0
-          const profit = Number.parseFloat(assessableProfit) || (totalIncomeAmount - totalBusinessExp)
+          // Development Levy calculation (4% on assessable profits) - Annual tax
+          // Period selection is for display/payment planning purposes only
+          let turnover = Number.parseFloat(annualTurnover) || totalIncomeAmount
+          let profit = Number.parseFloat(assessableProfit) || (totalIncomeAmount - totalBusinessExp)
           
+          // If period is monthly/quarterly, convert to annual for calculation
+          if (period === "monthly") {
+            turnover = turnover * 12
+            profit = profit * 12
+          } else if (period === "quarterly") {
+            turnover = turnover * 4
+            profit = profit * 4
+          }
+          
+          const assets = Number.parseFloat(totalFixedAssets) || 0
           const isSmallCompany = turnover <= 100000000 && assets <= 250000000
           
           let levyAmount = 0
@@ -508,26 +642,49 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
           if (isSmallCompany) {
             levyAmount = 0 // Exempt
           } else {
-            levyAmount = (profit * 4) / 100 // 4% of assessable profits
+            levyAmount = (profit * 4) / 100 // 4% of annual assessable profits
           }
+          
+          // Convert annual levy to selected period for display
+          let periodLevy = levyAmount
+          if (period === "monthly") {
+            periodLevy = levyAmount / 12
+          } else if (period === "quarterly") {
+            periodLevy = levyAmount / 4
+          }
+          
+          // Calculate original input values for display
+          const originalInputTurnover = Number.parseFloat(annualTurnover) || totalIncomeAmount
+          const originalInputProfit = Number.parseFloat(assessableProfit) || (totalIncomeAmount - totalBusinessExp)
           
           result = {
             calculationType: "development-levy",
             taxType: "Development Levy",
-            turnover: turnover,
+            turnover: turnover, // Store annual turnover (annualized)
+            originalInputTurnover: originalInputTurnover, // Original input before annualization
+            originalInputProfit: originalInputProfit, // Original input profit before annualization
             totalFixedAssets: assets,
-            assessableProfit: profit,
+            assessableProfit: profit, // Store annual profit (annualized)
             isSmallCompany: isSmallCompany,
             levyRate: isSmallCompany ? 0 : 4,
-            totalTax: levyAmount,
+            totalTax: periodLevy, // Levy for selected period
+            annualTax: levyAmount, // Annual levy amount
             monthlySetAside: levyAmount / 12,
             quarterlySetAside: levyAmount / 4,
             period: period,
+            note: "Development Levy is calculated annually. Values shown are adjusted for selected period."
           }
         } else if (calculationType === "withholding-tax") {
           // Withholding Tax calculation with comprehensive rates
-          const turnover = Number.parseFloat(annualTurnover) || 0
+          let turnover = Number.parseFloat(annualTurnover) || 0
           const assets = Number.parseFloat(totalFixedAssets) || 0
+          
+          // If period is monthly/quarterly, convert to annual for small company check
+          if (period === "monthly") {
+            turnover = turnover * 12
+          } else if (period === "quarterly") {
+            turnover = turnover * 4
+          }
           
           const isSmallCompany = turnover <= 100000000 && assets <= 250000000
           
@@ -556,10 +713,21 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
             
             const paymentTypeConfig = WHT_PAYMENT_TYPES.find(t => t.value === payment.paymentType)
             
+            // Calculate base rate that would apply if not exempt
+            let baseRate = 0
+            if (paymentTypeConfig) {
+              baseRate = payment.recipientType === "resident" ? paymentTypeConfig.residentRate : paymentTypeConfig.nonResidentRate
+              // If no TIN and not exempt, show what double rate would be
+              if (!payment.hasTIN && !payment.recipientIsSmallCompany) {
+                baseRate = baseRate * 2
+              }
+            }
+            
             return {
               paymentType: paymentTypeConfig?.label || payment.paymentType,
               grossAmount: amount,
-              rate: rate,
+              rate: rate, // Actual rate applied (0% if exempt)
+              baseRate: baseRate, // Base rate that would apply if not exempt
               whtAmount: whtAmount,
               recipientType: payment.recipientType,
               hasTIN: payment.hasTIN,
@@ -608,26 +776,65 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
           
           const totalWHTOnIncome = whtIncomeBreakdown.reduce((sum, i) => sum + i.whtAmount, 0)
           
+          // WHT is calculated per payment, but period determines aggregation
+          // The amounts entered are for the selected period
+          // Monthly: Amounts are for that month
+          // Quarterly: Amounts are for that quarter (multiply by 3 for annual projection)
+          // Yearly: Amounts are for the full year
+          
+          // Calculate annual projection based on period
+          let annualWHTProjection = totalWHTOnPayments
+          if (period === "monthly") {
+            annualWHTProjection = totalWHTOnPayments * 12
+          } else if (period === "quarterly") {
+            annualWHTProjection = totalWHTOnPayments * 4
+          }
+          
+          // IMPORTANT: WHT on income received is NOT deducted from WHT remittance
+          // WHT remittance = WHT you deducted from payments you made (must be remitted)
+          // WHT on income received = Tax already paid at source (can claim as credit against CIT)
+          // You still need to remit WHT on payments made, regardless of WHT received
+          const netWHTRemittance = totalWHTOnPayments
+          
+          // Calculate original input turnover for display
+          const originalInputTurnover = Number.parseFloat(annualTurnover) || 0
+          
           result = {
             calculationType: "withholding-tax",
             taxType: "Withholding Tax",
-            turnover: turnover,
+            turnover: turnover, // Annualized turnover (for small company check and display)
+            originalInputTurnover: originalInputTurnover, // Original input value before annualization
             totalFixedAssets: assets,
             isSmallCompany: isSmallCompany,
             paymentsMadeBreakdown: whtPaymentsBreakdown,
-            totalWHTOnPayments: totalWHTOnPayments,
+            totalWHTOnPayments: totalWHTOnPayments, // WHT deducted from payments made (to remit)
+            annualWHTProjection: annualWHTProjection, // Projected annual WHT
             incomeReceivedBreakdown: whtIncomeBreakdown,
-            totalWHTOnIncome: totalWHTOnIncome,
-            totalTax: totalWHTOnPayments, // Total WHT to remit (on payments made)
+            totalWHTOnIncome: totalWHTOnIncome, // WHT deducted from income received (CIT credit available)
+            totalTax: netWHTRemittance, // Total WHT to remit (on payments made)
             period: period,
+            note: `WHT is calculated per payment. Amounts shown are for ${period} period. WHT must be remitted monthly by the 21st of the following month. WHT on income received can be claimed as credit against CIT, but does not reduce WHT remittance.`
           }
         } else if (calculationType === "vat") {
-          // VAT calculation (7.5% on taxable supplies)
-          const turnover = Number.parseFloat(vatTurnover) || Number.parseFloat(annualTurnover) || totalIncomeAmount
-          const taxableSupplies = Number.parseFloat(vatTaxableSupplies) || totalIncomeAmount
-          const inputTax = Number.parseFloat(vatInputTax) || 0
+          // VAT calculation (7.5% on taxable supplies) - Period directly affects calculation
+          // VAT returns are filed monthly, but you can calculate for any period
+          const turnoverInput = Number.parseFloat(vatTurnover) || Number.parseFloat(annualTurnover) || totalIncomeAmount
+          const taxableSuppliesInput = Number.parseFloat(vatTaxableSupplies) || totalIncomeAmount
+          const inputTaxInput = Number.parseFloat(vatInputTax) || 0
           
-          const isSmallCompany = turnover < 100000000
+          // Convert to annual for small company status check
+          let annualTurnoverForCheck = turnoverInput
+          if (period === "monthly") {
+            annualTurnoverForCheck = turnoverInput * 12
+          } else if (period === "quarterly") {
+            annualTurnoverForCheck = turnoverInput * 4
+          }
+          
+          const isSmallCompany = annualTurnoverForCheck < 100000000
+          
+          // Calculate VAT for the selected period (use input values as-is for period calculation)
+          const taxableSupplies = taxableSuppliesInput // Supplies for selected period
+          const inputTax = inputTaxInput // Input tax for selected period
           
           let vatAmount = 0
           let outputVat = 0
@@ -638,24 +845,34 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
             outputVat = 0
             netVat = 0
           } else {
-            outputVat = (taxableSupplies * 7.5) / 100 // 7.5% VAT
+            outputVat = (taxableSupplies * 7.5) / 100 // 7.5% VAT on period supplies
             netVat = Math.max(outputVat - inputTax, 0) // VAT payable after input tax credits
             vatAmount = netVat
+          }
+          
+          // Calculate annual projection for display
+          let annualVATProjection = vatAmount
+          if (period === "monthly") {
+            annualVATProjection = vatAmount * 12
+          } else if (period === "quarterly") {
+            annualVATProjection = vatAmount * 4
           }
           
           result = {
             calculationType: "vat",
             taxType: "Value Added Tax (VAT)",
-            turnover: turnover,
+            turnover: annualTurnoverForCheck, // Store annual turnover for status check
             isSmallCompany: isSmallCompany,
-            taxableSupplies: taxableSupplies,
-            inputTax: inputTax,
+            taxableSupplies: taxableSupplies, // Taxable supplies for selected period
+            inputTax: inputTax, // Input tax for selected period
             outputVat: outputVat,
             vatRate: isSmallCompany ? 0 : 7.5,
-            totalTax: vatAmount,
-            monthlySetAside: vatAmount / 12,
-            quarterlySetAside: vatAmount / 4,
+            totalTax: vatAmount, // VAT for selected period
+            annualVATProjection: annualVATProjection, // Projected annual VAT
+            monthlySetAside: period === "yearly" ? vatAmount / 12 : (period === "quarterly" ? vatAmount / 3 : vatAmount),
+            quarterlySetAside: period === "yearly" ? vatAmount / 4 : (period === "monthly" ? vatAmount * 3 : vatAmount),
             period: period,
+            note: `VAT is calculated for ${period} period. VAT returns must be filed monthly by the 21st of the following month.`
           }
         }
 
@@ -1191,7 +1408,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                     }}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Profit after all deductions (if empty, will be calculated from income - expenses)
+                    Profit after all deductions {period === "monthly" ? "(for this month - will be annualized)" : period === "quarterly" ? "(for this quarter - will be annualized)" : "(annual)"} (if empty, will be calculated from income - expenses)
                   </p>
                 </div>
                 <div className="p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg">
@@ -1266,7 +1483,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                     }}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Profit after all deductions (4% levy calculated on this)
+                    Profit after all deductions {period === "monthly" ? "(for this month - will be annualized)" : period === "quarterly" ? "(for this quarter - will be annualized)" : "(annual)"} - 4% levy calculated on annual profit
                   </p>
                 </div>
                 <div className="p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg">
@@ -1303,7 +1520,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                       }}
                     />
                     <p className="text-xs text-muted-foreground">
-                      To determine if you qualify as small company
+                      {period === "monthly" ? "Monthly turnover (will be annualized for calculation)" : period === "quarterly" ? "Quarterly turnover (will be annualized for calculation)" : "Annual turnover"} - Used to determine small company status
                     </p>
                   </div>
                   <div className="space-y-2">
@@ -1333,7 +1550,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                     <div>
                       <h4 className="font-semibold">Payments Made (Where You Deduct WHT)</h4>
                       <p className="text-sm text-muted-foreground">
-                        Add payments you made where you need to deduct and remit WHT
+                        Add payments you made where you need to deduct and remit WHT for {period === "monthly" ? "this month" : period === "quarterly" ? "this quarter" : "the year"}
                       </p>
                     </div>
                     <Button
@@ -1341,14 +1558,14 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        setWhtPaymentsMade([...whtPaymentsMade, {
+                        setWhtPaymentsMade([{
                           id: Date.now().toString(),
                           paymentType: "",
                           amount: "",
                           recipientType: "resident",
                           hasTIN: true,
                           recipientIsSmallCompany: false
-                        }])
+                        }, ...whtPaymentsMade])
                       }}
                     >
                       + Add Payment
@@ -1364,7 +1581,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                       {whtPaymentsMade.map((payment, index) => (
                         <Card key={payment.id} className="p-4">
                           <div className="flex items-start justify-between mb-3">
-                            <h5 className="font-medium">Payment #{index + 1}</h5>
+                            <h5 className="font-medium">Payment #{whtPaymentsMade.length - index}</h5>
                             <Button
                               type="button"
                               variant="ghost"
@@ -1483,7 +1700,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                     <div>
                       <h4 className="font-semibold">Income Received (Where WHT Was Deducted)</h4>
                       <p className="text-sm text-muted-foreground">
-                        Add income you received where WHT was deducted from your payment
+                        Add income you received where WHT was deducted from your payment for {period === "monthly" ? "this month" : period === "quarterly" ? "this quarter" : "the year"}
                       </p>
                     </div>
                     <Button
@@ -1491,12 +1708,12 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        setWhtIncomeReceived([...whtIncomeReceived, {
+                        setWhtIncomeReceived([{
                           id: Date.now().toString(),
                           paymentType: "",
                           amount: "",
                           payerType: "resident"
-                        }])
+                        }, ...whtIncomeReceived])
                       }}
                     >
                       + Add Income
@@ -1512,7 +1729,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                       {whtIncomeReceived.map((income, index) => (
                         <Card key={income.id} className="p-4">
                           <div className="flex items-start justify-between mb-3">
-                            <h5 className="font-medium">Income #{index + 1}</h5>
+                            <h5 className="font-medium">Income #{whtIncomeReceived.length - index}</h5>
                             <Button
                               type="button"
                               variant="ghost"
@@ -1645,7 +1862,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                     }}
                   />
                   <p className="text-xs text-muted-foreground">
-                    Value of taxable supplies (VAT will be calculated at 7.5% on this)
+                    Value of taxable supplies for {period === "monthly" ? "this month" : period === "quarterly" ? "this quarter" : "the year"} (VAT calculated at 7.5% for this period)
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -1664,7 +1881,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                     }}
                   />
                   <p className="text-xs text-muted-foreground">
-                    VAT paid on business expenses (can be claimed as credit)
+                    VAT paid on business expenses for {period === "monthly" ? "this month" : period === "quarterly" ? "this quarter" : "the year"} (can be claimed as credit)
                   </p>
                 </div>
                 <div className="p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg">
