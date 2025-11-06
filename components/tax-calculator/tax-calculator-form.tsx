@@ -17,6 +17,7 @@ import { calculateDevelopmentLevy } from "@/lib/tax/development-levy-calculator"
 import { SMEExemptionModal } from "./sme-exemption-modal"
 import { VATForm } from "./vat-form"
 import { CITForm } from "./cit-form"
+import { PAYEForm } from "./paye-form"
 import {
   SUPPORTED_CURRENCIES,
   type CurrencyCode,
@@ -210,8 +211,8 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
   const handleCalculationTypeSelect = (type: string) => {
     setCalculationType(type)
     if (type === "paye") {
-      // Set up for PAYE calculation
-      setIncomeSources([{ id: "1", type: "salary", amount: "", currency: "NGN" }])
+      // Set up for PAYE calculation - no income sources needed, PAYEForm handles its own inputs
+      setIncomeSources([])
     } else if (type === "vat") {
       // Set up for VAT calculation
       setIncomeSources([{ id: "1", type: "sales", amount: "", currency: "NGN" }])
@@ -406,6 +407,11 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         // Skip validation here as CITForm handles its own validation and submission
         // Return early to prevent main form submission for CIT
         return
+      } else if (calculationType === "paye") {
+        // PAYE calculation is handled by PAYEForm component with its own "Calculate PAYE" button
+        // Skip validation here as PAYEForm handles its own validation and submission
+        // Return early to prevent main form submission for PAYE
+        return
       } else if (calculationType === "development-levy") {
         // Development Levy requires: Annual Turnover, Total Fixed Assets, and Assessable Profit
         // Income sources are not needed - assessable profit is a direct financial statement figure
@@ -464,11 +470,8 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         // Return early to prevent main form submission for VAT
         return
       } else if (calculationType === "paye") {
-        // PAYE needs income
-        const hasIncome = incomeSources.some(s => s.amount && Number.parseFloat(s.amount) > 0)
-        if (!hasIncome) {
-          validationErrors.push("Please enter at least one income source for PAYE calculation")
-        }
+        // PAYE calculation is handled by PAYEForm component
+        // Skip validation here as PAYEForm handles its own validation
       }
     } else {
       // For non-business users, need at least one income source
@@ -480,7 +483,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
     
     // Check for invalid income sources (has type but no amount, or has amount but no type)
     // Skip this validation for tax types that don't use income sources
-    if (calculationType !== "development-levy" && calculationType !== "withholding-tax" && calculationType !== "vat" && calculationType !== "cit") {
+    if (calculationType !== "development-levy" && calculationType !== "withholding-tax" && calculationType !== "vat" && calculationType !== "cit" && calculationType !== "paye") {
       incomeSources.forEach((source, index) => {
         if (source.type && !source.amount) {
           validationErrors.push(`Income Source #${index + 1}: Please enter an Amount`)
@@ -554,23 +557,9 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         let result: any = {}
 
         if (calculationType === "paye") {
-          // PAYE calculation - use individual tax calculation
-          result = calculateNigerianTax({
-            businessType: "freelancer", // Use freelancer for PAYE calculations
-            period: period,
-            income: totalIncomeAmount,
-            transportAllowance: totalTransportAllowance > 0 ? totalTransportAllowance : undefined,
-            rentPaid: Number.parseFloat(rentPaid) || 0,
-            pensionContribution: Number.parseFloat(pensionContribution) || 0,
-            healthInsurance: Number.parseFloat(healthInsurance) || 0,
-            housingFund: Number.parseFloat(housingFund) || 0,
-            lifeInsurance: Number.parseFloat(lifeInsurance) || 0,
-            charitableDonations: Number.parseFloat(charitableDonations) || 0,
-            businessExpenses: totalBusinessExp,
-            dependents: Number.parseInt(dependents) || 0,
-          })
-          result.calculationType = "paye"
-          result.taxType = "PAYE (Pay As You Earn)"
+          // PAYE calculation is handled by PAYEForm component
+          // This should not be reached as PAYEForm handles its own submission
+          return
         } else if (calculationType === "cit") {
           // CIT calculation is handled by CITForm component
           // This should not be reached as CITForm handles its own submission
@@ -1058,8 +1047,8 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         </div>
 
         {/* Multiple Income Sources */}
-        {/* Hide for WHT, VAT, CIT, and Development Levy - they use different input methods */}
-        {(calculationType !== "withholding-tax" && calculationType !== "vat" && calculationType !== "cit" && calculationType !== "development-levy") && (
+        {/* Hide for WHT, VAT, CIT, PAYE, and Development Levy - they use different input methods */}
+        {(calculationType !== "withholding-tax" && calculationType !== "vat" && calculationType !== "cit" && calculationType !== "paye" && calculationType !== "development-levy") && (
         <div className="border-t border-border pt-6">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -1253,6 +1242,16 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         {/* Business Tax-Specific Fields */}
         {userType === "business" && calculationType && (
           <div className="border-t border-border pt-6">
+            {calculationType === "paye" && (
+              <PAYEForm
+                period={period}
+                onCalculate={(payeResult) => {
+                  // Trigger the calculation callback
+                  onCalculate(payeResult)
+                }}
+              />
+            )}
+
             {calculationType === "cit" && (
               <>
                 <div className="space-y-4 mb-6">
@@ -1786,7 +1785,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         )}
 
         {/* Tax-Deductible Expenses */}
-        {(calculationType === "paye" || !calculationType) && (
+        {!calculationType && (
           <>
           <div className="border-t border-border pt-6">
             <div className="flex items-center gap-2 mb-4">
@@ -2054,8 +2053,8 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
           </>
         )}
 
-        {/* Hide Calculate Tax button for VAT and CIT - they have their own Calculate buttons */}
-        {calculationType !== "vat" && calculationType !== "cit" && (
+        {/* Hide Calculate Tax button for VAT, CIT, and PAYE - they have their own Calculate buttons */}
+        {calculationType !== "vat" && calculationType !== "cit" && calculationType !== "paye" && (
           <Button type="submit" className="w-full" size="lg" disabled={converting}>
             <Calculator className="w-4 h-4 mr-2" />
             {converting ? "Converting Currency..." : "Calculate Tax"}

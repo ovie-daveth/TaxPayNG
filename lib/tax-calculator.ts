@@ -81,8 +81,9 @@ export function calculateNigerianTax(input: TaxInput, includeInputs: boolean = f
     annualCharitableDonations = input.charitableDonations * 4
   }
 
-  // Gross income includes all income, but transport allowance exemption will be applied as a relief
-  const grossIncome = annualIncome
+  // Gross income includes all income (salary + allowances + bonuses + transport allowance)
+  // Transport allowance exemption will be applied as a relief
+  const grossIncome = annualIncome + annualTransportAllowance
 
   // Current Nigerian tax law reliefs (CRA has been abolished)
   const rentRelief = Math.min(annualRentPaid * 0.2, 500000)

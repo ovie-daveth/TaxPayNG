@@ -996,14 +996,265 @@ export function TaxBreakdownModalContent({ result }: TaxBreakdownModalContentPro
             </>
           )}
           
-          {/* Standard tax brackets for PAYE */}
-          {result.taxableIncome !== undefined && (
+          {/* PAYE Detailed Explanation */}
+          {result.calculationType === "paye" && (
+            <>
+              {/* Employment Income Breakdown */}
+              {(result.salary !== undefined || result.housingAllowance !== undefined || result.bonuses !== undefined) && (
+                <div className="mb-4 pt-3 border-t border-border">
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 p-4 rounded-lg border-2 border-blue-200 dark:border-blue-800">
+                    <h4 className="font-semibold text-sm mb-3 text-blue-900 dark:text-blue-100 flex items-center gap-2">
+                      <span className="text-lg">💼</span>
+                      Step 1: Employment Income Breakdown
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      {result.salary !== undefined && result.salary > 0 && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-600 dark:text-gray-300">Salary:</span>
+                          <span className="font-mono font-semibold">₦{(result.salary || 0).toLocaleString()}</span>
+                        </div>
+                      )}
+                      {result.housingAllowance !== undefined && result.housingAllowance > 0 && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-600 dark:text-gray-300">Housing Allowance:</span>
+                          <span className="font-mono font-semibold">₦{(result.housingAllowance || 0).toLocaleString()}</span>
+                        </div>
+                      )}
+                      {result.bonuses !== undefined && result.bonuses > 0 && (
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-gray-600 dark:text-gray-300">Bonuses/Other Income:</span>
+                          <span className="font-mono font-semibold">₦{(result.bonuses || 0).toLocaleString()}</span>
+                        </div>
+                      )}
+                      {result.transportAllowance && result.transportAllowance.total > 0 && (
+                        <div className="mt-2 pt-2 border-t border-blue-200 dark:border-blue-700">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600 dark:text-gray-300">Transport Allowance:</span>
+                            <span className="font-mono">₦{(result.transportAllowance.total || 0).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      )}
+                      <div className="pt-2 border-t-2 border-blue-300 dark:border-blue-700">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-blue-900 dark:text-blue-100 font-semibold">Gross Income:</span>
+                          <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                            ₦{(result.grossIncome || 0).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Tax Reliefs Detailed Breakdown */}
+              {result.reliefs && result.totalReliefs > 0 && (
+                <div className="mb-4 pt-3 border-t border-border">
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 p-4 rounded-lg border-2 border-green-200 dark:border-green-800">
+                    <h4 className="font-semibold text-sm mb-3 text-green-900 dark:text-green-100 flex items-center gap-2">
+                      <span className="text-lg">💰</span>
+                      Step 2: Tax Reliefs & Deductions
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      {result.reliefs.rentRelief > 0 && (
+                        <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="text-gray-700 dark:text-gray-200 font-medium">Rent Relief:</span>
+                            <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                              -₦{(result.reliefs.rentRelief || 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            20% of rent paid, capped at ₦500,000/year
+                          </p>
+                        </div>
+                      )}
+                      {result.reliefs.pension > 0 && (
+                        <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="text-gray-700 dark:text-gray-200 font-medium">Pension Contribution:</span>
+                            <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                              -₦{(result.reliefs.pension || 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">
+                            Up to 8% of gross income
+                          </p>
+                        </div>
+                      )}
+                      {result.reliefs.healthInsurance > 0 && (
+                        <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="text-gray-700 dark:text-gray-200 font-medium">Health Insurance:</span>
+                            <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                              -₦{(result.reliefs.healthInsurance || 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">Full deduction</p>
+                        </div>
+                      )}
+                      {result.reliefs.housingFund > 0 && (
+                        <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="text-gray-700 dark:text-gray-200 font-medium">National Housing Fund:</span>
+                            <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                              -₦{(result.reliefs.housingFund || 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">Full deduction</p>
+                        </div>
+                      )}
+                      {result.reliefs.lifeInsurance > 0 && (
+                        <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="text-gray-700 dark:text-gray-200 font-medium">Life Insurance:</span>
+                            <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                              -₦{(result.reliefs.lifeInsurance || 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">Full deduction</p>
+                        </div>
+                      )}
+                      {result.reliefs.charitable > 0 && (
+                        <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="text-gray-700 dark:text-gray-200 font-medium">Charitable Donations:</span>
+                            <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                              -₦{(result.reliefs.charitable || 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">Up to 10% of gross income</p>
+                        </div>
+                      )}
+                      {result.reliefs.transportAllowance > 0 && (
+                        <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
+                          <div className="flex items-center justify-between text-xs mb-1">
+                            <span className="text-gray-700 dark:text-gray-200 font-medium">Transport Allowance Exemption:</span>
+                            <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                              -₦{(result.reliefs.transportAllowance || 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-600 dark:text-gray-400">Up to ₦30,000/month (₦360,000/year) exempt</p>
+                        </div>
+                      )}
+                      <div className="pt-2 border-t-2 border-green-300 dark:border-green-700">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-green-900 dark:text-green-100 font-semibold">Total Reliefs:</span>
+                          <span className="font-mono font-bold text-green-600 dark:text-green-400">
+                            -₦{(result.totalReliefs || 0).toLocaleString()}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Taxable Income Calculation */}
+              {result.taxableIncome !== undefined && (
+                <div className="mb-4 pt-3 border-t border-border">
+                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20 p-4 rounded-lg border-2 border-purple-200 dark:border-purple-800">
+                    <h4 className="font-semibold text-sm mb-3 text-purple-900 dark:text-purple-100 flex items-center gap-2">
+                      <span className="text-lg">📊</span>
+                      Step 3: Calculate Taxable Income
+                    </h4>
+                    <div className="space-y-2 text-sm">
+                      <div className="bg-white/60 dark:bg-gray-800/60 p-3 rounded border border-purple-200 dark:border-purple-700">
+                        <p className="text-xs text-gray-700 dark:text-gray-200 mb-2 font-medium">Formula:</p>
+                        <p className="text-xs font-mono bg-gray-100 dark:bg-gray-900 p-2 rounded border border-purple-200 dark:border-purple-700">
+                          Taxable Income = Gross Income - Total Reliefs
+                        </p>
+                        <div className="pt-2 space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600 dark:text-gray-300">Gross Income:</span>
+                            <span className="font-mono">₦{(result.grossIncome || 0).toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600 dark:text-gray-300">Less: Total Reliefs:</span>
+                            <span className="font-mono text-green-600 dark:text-green-400">-₦{(result.totalReliefs || 0).toLocaleString()}</span>
+                          </div>
+                          <div className="pt-2 border-t border-purple-200 dark:border-purple-700">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-purple-900 dark:text-purple-100 font-semibold">Taxable Income:</span>
+                              <span className="font-mono font-bold text-purple-600 dark:text-purple-400">
+                                ₦{(result.taxableIncome || 0).toLocaleString()}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono">
+                              = ₦{(result.grossIncome || 0).toLocaleString()} - ₦{(result.totalReliefs || 0).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Progressive Tax Brackets Calculation */}
+              {result.taxBrackets && result.taxBrackets.length > 0 && (
+                <div className="mb-4 pt-3 border-t border-border">
+                  <div className="bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 p-4 rounded-lg border-2 border-orange-200 dark:border-orange-800">
+                    <h4 className="font-semibold text-sm mb-3 text-orange-900 dark:text-orange-100 flex items-center gap-2">
+                      <span className="text-lg">📈</span>
+                      Step 4: Progressive Tax Brackets Calculation
+                    </h4>
+                    <div className="space-y-3 text-sm">
+                      <div className="bg-white/60 dark:bg-gray-800/60 p-3 rounded border border-orange-200 dark:border-orange-700">
+                        <p className="text-xs text-gray-700 dark:text-gray-200 mb-2 font-medium">Tax Brackets:</p>
+                        <div className="space-y-2">
+                          {result.taxBrackets.map((bracket: any, index: number) => (
+                            <div key={index} className="flex items-center justify-between text-xs py-1 border-b border-orange-100 dark:border-orange-900/50 last:border-0">
+                              <span className="text-gray-600 dark:text-gray-300">
+                                {bracket.rate === 0 ? (
+                                  <span className="text-green-600 dark:text-green-400 font-semibold">Tax-free</span>
+                                ) : (
+                                  `${bracket.rate}% on`
+                                )}{" "}
+                                ₦{(bracket.amount || 0).toLocaleString()}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                {bracket.rate > 0 && (
+                                  <span className="text-gray-500 dark:text-gray-400 text-xs font-mono">
+                                    = ₦{(bracket.amount || 0).toLocaleString()} × {bracket.rate}%
+                                  </span>
+                                )}
+                                <span className={`font-mono font-semibold ${bracket.rate === 0 ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400'}`}>
+                                  {bracket.rate === 0 ? "₦0" : `₦${(bracket.tax || 0).toLocaleString()}`}
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="pt-2 border-t-2 border-orange-300 dark:border-orange-700">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-orange-900 dark:text-orange-100 font-semibold">Total Tax:</span>
+                          <span className="font-mono font-bold text-orange-600 dark:text-orange-400 text-base">
+                            ₦{(result.totalTax || 0).toLocaleString()}
+                          </span>
+                        </div>
+                        {result.effectiveRate && (
+                          <p className="text-xs text-orange-700 dark:text-orange-300 mt-1">
+                            Effective Tax Rate: {result.effectiveRate}%
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+
+          {/* Standard tax brackets for non-PAYE */}
+          {result.calculationType !== "paye" && result.taxableIncome !== undefined && (
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Taxable Income</span>
               <span className="font-medium">₦{(result.taxableIncome || 0).toLocaleString()}</span>
             </div>
           )}
-          {result.taxBrackets && result.taxBrackets.length > 0 && result.taxBrackets.map((bracket: any, index: number) => (
+          {result.calculationType !== "paye" && result.taxBrackets && result.taxBrackets.length > 0 && result.taxBrackets.map((bracket: any, index: number) => (
             <div key={index} className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">
                 {bracket.rate === 0 ? "Tax-free" : `${bracket.rate}% on`} ₦{(bracket.amount || 0).toLocaleString()}
