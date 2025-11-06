@@ -503,47 +503,54 @@ function FAQPageContent() {
   useEffect(() => {
     const loadConversationFromUrl = async () => {
       const shareId = searchParams.get('share')
-      if (shareId && !isLoadingConversation) {
-        setIsLoadingConversation(true)
-        try {
-          const conversation = await conversationService.getConversation(shareId)
-          if (conversation) {
-            setConversationId(conversation.shareId || shareId)
-            setSelectedCategory(conversation.category)
-            setHasLoadedWelcome(true) // Prevent welcome message from showing
-            // Convert conversation messages to the format used in state
-            const formattedMessages = conversation.messages.map(msg => ({
-              type: msg.type as "user" | "assistant",
-              content: msg.content,
-              faq: msg.faq ? {
-                question: msg.faq.question,
-                answer: msg.faq.answer,
-                category: msg.faq.category,
-                keywords: msg.faq.keywords
-              } : undefined,
-              suggestedQuestions: msg.suggestedQuestions?.map(sq => ({
-                question: sq.question,
-                answer: sq.answer,
-                category: sq.category,
-                keywords: sq.keywords
-              }))
+      // Skip loading if:
+      // 1. No shareId in URL
+      // 2. Already loading
+      // 3. Already have this conversation loaded (conversationId matches AND we have messages)
+      //    This prevents reloading when we just saved and updated the URL
+      if (!shareId || isLoadingConversation || (conversationId === shareId && messages.length > 0)) {
+        return
+      }
+      
+      setIsLoadingConversation(true)
+      try {
+        const conversation = await conversationService.getConversation(shareId)
+        if (conversation) {
+          setConversationId(conversation.shareId || shareId)
+          setSelectedCategory(conversation.category)
+          setHasLoadedWelcome(true) // Prevent welcome message from showing
+          // Convert conversation messages to the format used in state
+          const formattedMessages = conversation.messages.map(msg => ({
+            type: msg.type as "user" | "assistant",
+            content: msg.content,
+            faq: msg.faq ? {
+              question: msg.faq.question,
+              answer: msg.faq.answer,
+              category: msg.faq.category,
+              keywords: msg.faq.keywords
+            } : undefined,
+            suggestedQuestions: msg.suggestedQuestions?.map(sq => ({
+              question: sq.question,
+              answer: sq.answer,
+              category: sq.category,
+              keywords: sq.keywords
             }))
-            setMessages(formattedMessages)
-            // toast.success("Conversation loaded!")
-          } else {
-            toast.error("Conversation not found")
-          }
-        } catch (error) {
-          console.error("Error loading conversation:", error)
-          toast.error("Failed to load conversation")
-        } finally {
-          setIsLoadingConversation(false)
+          }))
+          setMessages(formattedMessages)
+          // toast.success("Conversation loaded!")
+        } else {
+          toast.error("Conversation not found")
         }
+      } catch (error) {
+        console.error("Error loading conversation:", error)
+        toast.error("Failed to load conversation")
+      } finally {
+        setIsLoadingConversation(false)
       }
     }
     
     loadConversationFromUrl()
-  }, [searchParams])
+  }, [searchParams, conversationId, messages.length, isLoadingConversation])
 
   // Auto-save conversation when messages change (but not during initial load)
   useEffect(() => {

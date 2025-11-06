@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Calculator, Info, Plus, X, Trash2, HelpCircle, Loader2, Users, Receipt, Building2, FileText, TrendingUp } from "lucide-react"
 import { calculateNigerianTax } from "@/lib/tax-calculator"
@@ -136,6 +137,43 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
   // Withholding tax fields
   const [withholdingTaxIncome, setWithholdingTaxIncome] = useState("")
   const [withholdingTaxPayments, setWithholdingTaxPayments] = useState("")
+  
+  // WHT payment types - for payments made
+  interface WHTPaymentEntry {
+    id: string
+    paymentType: string
+    amount: string
+    recipientType: "resident" | "non-resident"
+    hasTIN: boolean
+    recipientIsSmallCompany: boolean
+  }
+  
+  const [whtPaymentsMade, setWhtPaymentsMade] = useState<WHTPaymentEntry[]>([])
+  
+  // WHT income received
+  interface WHTIncomeEntry {
+    id: string
+    paymentType: string
+    amount: string
+    payerType: "resident" | "non-resident"
+  }
+  
+  const [whtIncomeReceived, setWhtIncomeReceived] = useState<WHTIncomeEntry[]>([])
+  
+  // WHT Payment Types Configuration
+  const WHT_PAYMENT_TYPES = [
+    { value: "dividends", label: "Dividends", residentRate: 10, nonResidentRate: 10, exemptIfSmallCompany: true },
+    { value: "interest", label: "Interest", residentRate: 10, nonResidentRate: 10, exemptIfSmallCompany: false },
+    { value: "rent", label: "Rent (Land, Property, Equipment)", residentRate: 10, nonResidentRate: 10, exemptIfSmallCompany: false },
+    { value: "royalties", label: "Royalties", residentRate: 10, nonResidentRate: 10, exemptIfSmallCompany: false },
+    { value: "consultancy", label: "Consultancy/Management/Professional/Technical Services", residentRate: 5, nonResidentRate: 10, exemptIfSmallCompany: false },
+    { value: "construction", label: "Construction Contracts (including repairs)", residentRate: 2.5, nonResidentRate: 5, exemptIfSmallCompany: false },
+    { value: "goods-supply", label: "Supply of Goods (non-manufacturer)", residentRate: 2, nonResidentRate: 5, exemptIfSmallCompany: true },
+    { value: "commissions", label: "Commissions, Agency Fees, Brokerage", residentRate: 10, nonResidentRate: 10, exemptIfSmallCompany: false },
+    { value: "directors-fees", label: "Directors' Fees", residentRate: 10, nonResidentRate: 10, exemptIfSmallCompany: false },
+    { value: "government-bonds", label: "Interest on Government Bonds/Treasury Bills", residentRate: 0, nonResidentRate: 0, exemptIfSmallCompany: false },
+    { value: "agricultural", label: "Agricultural Produce and Inputs", residentRate: 0, nonResidentRate: 0, exemptIfSmallCompany: false },
+  ]
   
   // VAT fields
   const [vatTurnover, setVatTurnover] = useState("")
@@ -487,26 +525,88 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
             period: period,
           }
         } else if (calculationType === "withholding-tax") {
-          // Withholding Tax calculation
+          // Withholding Tax calculation with comprehensive rates
           const turnover = Number.parseFloat(annualTurnover) || 0
           const assets = Number.parseFloat(totalFixedAssets) || 0
-          const incomeReceived = Number.parseFloat(withholdingTaxIncome) || 0
-          const paymentsMade = Number.parseFloat(withholdingTaxPayments) || 0
           
           const isSmallCompany = turnover <= 100000000 && assets <= 250000000
           
-          // Typical withholding tax rates: 5% on dividends, 10% on interest/rent, etc.
-          // Simplified calculation - assuming 5% on income received and payments made
-          let whtOnIncome = 0
-          let whtOnPayments = 0
-          
-          if (isSmallCompany) {
-            whtOnIncome = 0
-            whtOnPayments = 0
-          } else {
-            whtOnIncome = (incomeReceived * 5) / 100 // 5% on income received
-            whtOnPayments = (paymentsMade * 5) / 100 // 5% on payments made
+          // Helper function to get WHT rate
+          const getWHTRate = (paymentType: string, recipientType: "resident" | "non-resident", hasTIN: boolean, isRecipientSmallCompany: boolean) => {
+            if (isRecipientSmallCompany) return 0 // Small companies are exempt
+            
+            const paymentTypeConfig = WHT_PAYMENT_TYPES.find(t => t.value === paymentType)
+            if (!paymentTypeConfig) return 0
+            
+            let baseRate = recipientType === "resident" ? paymentTypeConfig.residentRate : paymentTypeConfig.nonResidentRate
+            
+            // Double rate if no TIN
+            if (!hasTIN) {
+              baseRate = baseRate * 2
+            }
+            
+            return baseRate
           }
+          
+          // Calculate WHT on payments made
+          const whtPaymentsBreakdown = whtPaymentsMade.map(payment => {
+            const amount = Number.parseFloat(payment.amount) || 0
+            const rate = getWHTRate(payment.paymentType, payment.recipientType, payment.hasTIN, payment.recipientIsSmallCompany)
+            const whtAmount = (amount * rate) / 100
+            
+            const paymentTypeConfig = WHT_PAYMENT_TYPES.find(t => t.value === payment.paymentType)
+            
+            return {
+              paymentType: paymentTypeConfig?.label || payment.paymentType,
+              grossAmount: amount,
+              rate: rate,
+              whtAmount: whtAmount,
+              recipientType: payment.recipientType,
+              hasTIN: payment.hasTIN,
+              isSmallCompany: payment.recipientIsSmallCompany,
+              netPayment: amount - whtAmount
+            }
+          })
+          
+          // If small company, exempt from all WHT on payments made
+          const totalWHTOnPayments = isSmallCompany ? 0 : whtPaymentsBreakdown.reduce((sum, p) => sum + p.whtAmount, 0)
+          
+          // Calculate WHT on income received (for reporting purposes)
+          const whtIncomeBreakdown = whtIncomeReceived.map(income => {
+            const amount = Number.parseFloat(income.amount) || 0
+            // For income received, we calculate what WHT was likely deducted
+            // Assume recipient has TIN unless specified otherwise (for calculation)
+            const paymentTypeConfig = WHT_PAYMENT_TYPES.find(t => t.value === income.paymentType)
+            if (!paymentTypeConfig) {
+              return {
+                paymentType: income.paymentType,
+                grossAmount: 0,
+                rate: 0,
+                whtAmount: 0,
+                payerType: income.payerType,
+                netAmount: 0
+              }
+            }
+            
+            // Small companies are exempt from WHT deduction on their income
+            let rate = 0
+            if (!isSmallCompany) {
+              rate = income.payerType === "resident" ? paymentTypeConfig.residentRate : paymentTypeConfig.nonResidentRate
+            }
+            
+            const whtAmount = (amount * rate) / 100
+            
+            return {
+              paymentType: paymentTypeConfig.label,
+              grossAmount: amount,
+              rate: rate,
+              whtAmount: whtAmount,
+              payerType: income.payerType,
+              netAmount: amount - whtAmount
+            }
+          })
+          
+          const totalWHTOnIncome = whtIncomeBreakdown.reduce((sum, i) => sum + i.whtAmount, 0)
           
           result = {
             calculationType: "withholding-tax",
@@ -514,11 +614,11 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
             turnover: turnover,
             totalFixedAssets: assets,
             isSmallCompany: isSmallCompany,
-            incomeReceived: incomeReceived,
-            paymentsMade: paymentsMade,
-            whtOnIncome: whtOnIncome,
-            whtOnPayments: whtOnPayments,
-            totalTax: whtOnIncome + whtOnPayments,
+            paymentsMadeBreakdown: whtPaymentsBreakdown,
+            totalWHTOnPayments: totalWHTOnPayments,
+            incomeReceivedBreakdown: whtIncomeBreakdown,
+            totalWHTOnIncome: totalWHTOnIncome,
+            totalTax: totalWHTOnPayments, // Total WHT to remit (on payments made)
             period: period,
           }
         } else if (calculationType === "vat") {
@@ -1179,11 +1279,13 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
             )}
 
             {calculationType === "withholding-tax" && (
-              <div className="space-y-4">
+              <div className="space-y-6">
                 <div className="flex items-center gap-2 mb-4">
                   <FileText className="w-5 h-5 text-primary" />
                   <h3 className="font-semibold">Withholding Tax Information</h3>
                 </div>
+                
+                {/* Small Company Check */}
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="annualTurnover">Annual Turnover (₦)</Label>
@@ -1224,49 +1326,279 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                     </p>
                   </div>
                 </div>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="withholdingTaxIncome">Income Received Subject to WHT (₦)</Label>
-                    <Input
-                      id="withholdingTaxIncome"
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="0.00"
-                      value={withholdingTaxIncome}
-                      onChange={(e) => {
-                        const value = e.target.value
-                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                          setWithholdingTaxIncome(value)
-                        }
+                
+                {/* Payments Made Section */}
+                <div className="border-t border-border pt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h4 className="font-semibold">Payments Made (Where You Deduct WHT)</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Add payments you made where you need to deduct and remit WHT
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setWhtPaymentsMade([...whtPaymentsMade, {
+                          id: Date.now().toString(),
+                          paymentType: "",
+                          amount: "",
+                          recipientType: "resident",
+                          hasTIN: true,
+                          recipientIsSmallCompany: false
+                        }])
                       }}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Income received from customers (typically 5% WHT)
-                    </p>
+                    >
+                      + Add Payment
+                    </Button>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="withholdingTaxPayments">Payments Made Subject to WHT (₦)</Label>
-                    <Input
-                      id="withholdingTaxPayments"
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="0.00"
-                      value={withholdingTaxPayments}
-                      onChange={(e) => {
-                        const value = e.target.value
-                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                          setWithholdingTaxPayments(value)
-                        }
-                      }}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Payments made to suppliers (typically 5% WHT)
-                    </p>
-                  </div>
+                  
+                  {whtPaymentsMade.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      No payments added. Click "Add Payment" to start.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {whtPaymentsMade.map((payment, index) => (
+                        <Card key={payment.id} className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <h5 className="font-medium">Payment #{index + 1}</h5>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setWhtPaymentsMade(whtPaymentsMade.filter(p => p.id !== payment.id))
+                              }}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          <div className="grid sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Payment Type</Label>
+                              <Select
+                                value={payment.paymentType}
+                                onValueChange={(value) => {
+                                  const updated = [...whtPaymentsMade]
+                                  updated[index].paymentType = value
+                                  setWhtPaymentsMade(updated)
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select payment type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {WHT_PAYMENT_TYPES.map(type => (
+                                    <SelectItem key={type.value} value={type.value}>
+                                      {type.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Amount (₦)</Label>
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="0.00"
+                                value={payment.amount}
+                                onChange={(e) => {
+                                  const value = e.target.value
+                                  if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                                    const updated = [...whtPaymentsMade]
+                                    updated[index].amount = value
+                                    setWhtPaymentsMade(updated)
+                                  }
+                                }}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Recipient Type</Label>
+                              <Select
+                                value={payment.recipientType}
+                                onValueChange={(value: "resident" | "non-resident") => {
+                                  const updated = [...whtPaymentsMade]
+                                  updated[index].recipientType = value
+                                  setWhtPaymentsMade(updated)
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="resident">Resident</SelectItem>
+                                  <SelectItem value="non-resident">Non-Resident</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Recipient Has TIN</Label>
+                              <Select
+                                value={payment.hasTIN ? "yes" : "no"}
+                                onValueChange={(value) => {
+                                  const updated = [...whtPaymentsMade]
+                                  updated[index].hasTIN = value === "yes"
+                                  setWhtPaymentsMade(updated)
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="yes">Yes</SelectItem>
+                                  <SelectItem value="no">No (Double Rate)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2 sm:col-span-2">
+                              <div className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`recipient-small-${payment.id}`}
+                                  checked={payment.recipientIsSmallCompany}
+                                  onCheckedChange={(checked) => {
+                                    const updated = [...whtPaymentsMade]
+                                    updated[index].recipientIsSmallCompany = checked === true
+                                    setWhtPaymentsMade(updated)
+                                  }}
+                                />
+                                <Label htmlFor={`recipient-small-${payment.id}`} className="text-sm cursor-pointer">
+                                  Recipient is Small Company (Turnover ≤ ₦100M, Assets ≤ ₦250M)
+                                </Label>
+                              </div>
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
                 </div>
+                
+                {/* Income Received Section */}
+                <div className="border-t border-border pt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h4 className="font-semibold">Income Received (Where WHT Was Deducted)</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Add income you received where WHT was deducted from your payment
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setWhtIncomeReceived([...whtIncomeReceived, {
+                          id: Date.now().toString(),
+                          paymentType: "",
+                          amount: "",
+                          payerType: "resident"
+                        }])
+                      }}
+                    >
+                      + Add Income
+                    </Button>
+                  </div>
+                  
+                  {whtIncomeReceived.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground text-sm">
+                      No income entries added. Click "Add Income" to start.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {whtIncomeReceived.map((income, index) => (
+                        <Card key={income.id} className="p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <h5 className="font-medium">Income #{index + 1}</h5>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setWhtIncomeReceived(whtIncomeReceived.filter(i => i.id !== income.id))
+                              }}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                          <div className="grid sm:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label>Payment Type</Label>
+                              <Select
+                                value={income.paymentType}
+                                onValueChange={(value) => {
+                                  const updated = [...whtIncomeReceived]
+                                  updated[index].paymentType = value
+                                  setWhtIncomeReceived(updated)
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select payment type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {WHT_PAYMENT_TYPES.map(type => (
+                                    <SelectItem key={type.value} value={type.value}>
+                                      {type.label}
+                                    </SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Amount Received (₦)</Label>
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="0.00"
+                                value={income.amount}
+                                onChange={(e) => {
+                                  const value = e.target.value
+                                  if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                                    const updated = [...whtIncomeReceived]
+                                    updated[index].amount = value
+                                    setWhtIncomeReceived(updated)
+                                  }
+                                }}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Payer Type</Label>
+                              <Select
+                                value={income.payerType}
+                                onValueChange={(value: "resident" | "non-resident") => {
+                                  const updated = [...whtIncomeReceived]
+                                  updated[index].payerType = value
+                                  setWhtIncomeReceived(updated)
+                                }}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="resident">Resident</SelectItem>
+                                  <SelectItem value="non-resident">Non-Resident</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
                 <div className="p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg">
-                  <p className="text-sm text-green-700 dark:text-green-300">
-                    <strong>Small Company:</strong> Turnover ≤ ₦100M AND Assets ≤ ₦250M → <strong>Exempt</strong> from withholding tax on both income received and payments made
+                  <p className="text-sm text-green-700 dark:text-green-300 mb-2">
+                    <strong>Small Company Exemption:</strong> Turnover ≤ ₦100M AND Assets ≤ ₦250M → <strong>Fully Exempt</strong> from withholding tax on both income received and payments made
+                  </p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    <strong>⚠️ No TIN Penalty:</strong> If recipient does not have a valid TIN, you must apply <strong>double the standard rate</strong>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    <strong>Filing Deadline:</strong> WHT must be remitted by the <strong>21st day of the month following deduction</strong>
                   </p>
                 </div>
               </div>
