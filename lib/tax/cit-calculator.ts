@@ -67,22 +67,28 @@ export interface CITResult {
   annualTurnover: number
   totalFixedAssets: number
   
-  // Revenue and expenses (full mode)
+  // Revenue and expenses (full mode) - these are annualized values
   revenue?: number
   costOfGoodsSold?: number
   totalOperatingExpenses?: number
   operatingExpensesBreakdown?: Record<string, number>
   
-  // Profit calculation
+  // Profit calculation - these are annualized values
   profitBeforeTax: number
   totalDeductions: number
   capitalAllowancesTotal: number
   taxableProfit: number
   
+  // Original input values (before annualization) for display
+  originalInputRevenue?: number
+  originalInputCOGS?: number
+  originalInputProfitBeforeTax?: number
+  
   // CIT calculation
   citRate: number
   citAmount: number
-  effectiveTaxRate?: number // For large multinationals
+  effectiveTaxRate?: number // For large multinationals (final ETR after top-up if applicable)
+  originalETR?: number // Original ETR before top-up tax (for display purposes)
   topUpTax?: number // If ETR < 15% for large multinationals
   totalCITPayable: number
   
@@ -142,27 +148,85 @@ export function calculateCIT(input: CITInput): CITResult {
     period
   } = input
   
-  // Check company status
+  // Annualize inputs based on period (CIT is always calculated on annual basis)
+  let annualizedRevenue = revenue
+  let annualizedCOGS = costOfGoodsSold
+  let annualizedProfitBeforeTax = profitBeforeTax
+  let annualizedTotalDeductions = totalDeductions
+  let annualizedOperatingExpenses = operatingExpenses
+  
+  if (period === "monthly") {
+    // Monthly inputs - multiply by 12 to get annual
+    if (annualizedRevenue !== undefined) annualizedRevenue = annualizedRevenue * 12
+    if (annualizedCOGS !== undefined) annualizedCOGS = annualizedCOGS * 12
+    if (annualizedProfitBeforeTax !== undefined) annualizedProfitBeforeTax = annualizedProfitBeforeTax * 12
+    if (annualizedTotalDeductions !== undefined) annualizedTotalDeductions = annualizedTotalDeductions * 12
+    if (annualizedOperatingExpenses) {
+      annualizedOperatingExpenses = {
+        employeeCosts: (annualizedOperatingExpenses.employeeCosts || 0) * 12,
+        pensionContributions: (annualizedOperatingExpenses.pensionContributions || 0) * 12,
+        trainingCosts: (annualizedOperatingExpenses.trainingCosts || 0) * 12,
+        rent: (annualizedOperatingExpenses.rent || 0) * 12,
+        utilities: (annualizedOperatingExpenses.utilities || 0) * 12,
+        repairsMaintenance: (annualizedOperatingExpenses.repairsMaintenance || 0) * 12,
+        professionalFees: (annualizedOperatingExpenses.professionalFees || 0) * 12,
+        interestOnLoans: (annualizedOperatingExpenses.interestOnLoans || 0) * 12,
+        badDebts: (annualizedOperatingExpenses.badDebts || 0) * 12,
+        donations: (annualizedOperatingExpenses.donations || 0) * 12,
+        insurancePremiums: (annualizedOperatingExpenses.insurancePremiums || 0) * 12,
+        staffWelfare: (annualizedOperatingExpenses.staffWelfare || 0) * 12,
+        transportation: (annualizedOperatingExpenses.transportation || 0) * 12,
+        otherExpenses: (annualizedOperatingExpenses.otherExpenses || 0) * 12,
+      }
+    }
+  } else if (period === "quarterly") {
+    // Quarterly inputs - multiply by 4 to get annual
+    if (annualizedRevenue !== undefined) annualizedRevenue = annualizedRevenue * 4
+    if (annualizedCOGS !== undefined) annualizedCOGS = annualizedCOGS * 4
+    if (annualizedProfitBeforeTax !== undefined) annualizedProfitBeforeTax = annualizedProfitBeforeTax * 4
+    if (annualizedTotalDeductions !== undefined) annualizedTotalDeductions = annualizedTotalDeductions * 4
+    if (annualizedOperatingExpenses) {
+      annualizedOperatingExpenses = {
+        employeeCosts: (annualizedOperatingExpenses.employeeCosts || 0) * 4,
+        pensionContributions: (annualizedOperatingExpenses.pensionContributions || 0) * 4,
+        trainingCosts: (annualizedOperatingExpenses.trainingCosts || 0) * 4,
+        rent: (annualizedOperatingExpenses.rent || 0) * 4,
+        utilities: (annualizedOperatingExpenses.utilities || 0) * 4,
+        repairsMaintenance: (annualizedOperatingExpenses.repairsMaintenance || 0) * 4,
+        professionalFees: (annualizedOperatingExpenses.professionalFees || 0) * 4,
+        interestOnLoans: (annualizedOperatingExpenses.interestOnLoans || 0) * 4,
+        badDebts: (annualizedOperatingExpenses.badDebts || 0) * 4,
+        donations: (annualizedOperatingExpenses.donations || 0) * 4,
+        insurancePremiums: (annualizedOperatingExpenses.insurancePremiums || 0) * 4,
+        staffWelfare: (annualizedOperatingExpenses.staffWelfare || 0) * 4,
+        transportation: (annualizedOperatingExpenses.transportation || 0) * 4,
+        otherExpenses: (annualizedOperatingExpenses.otherExpenses || 0) * 4,
+      }
+    }
+  }
+  // If yearly, inputs are already annual - no change needed
+  
+  // Check company status (annualTurnover is always annual)
   const isSmall = isSmallCompany(annualTurnover, totalFixedAssets)
   const isLargeMulti = isLargeMultinational(annualTurnover)
   
-  // Calculate profit and deductions based on mode
+  // Calculate profit and deductions based on mode (using annualized values)
   let calculatedProfitBeforeTax = 0
   let calculatedTotalDeductions = 0
   let operatingExpensesBreakdown: Record<string, number> = {}
   let deductionsBreakdown: CITDeduction[] = []
   
-  if (profitBeforeTax !== undefined && totalDeductions !== undefined) {
-    // Minimal mode - use provided values
-    calculatedProfitBeforeTax = profitBeforeTax
-    calculatedTotalDeductions = totalDeductions
-  } else if (revenue !== undefined) {
-    // Full mode - calculate from revenue and expenses
-    const cogs = costOfGoodsSold || 0
-    const grossProfit = revenue - cogs
+  if (annualizedProfitBeforeTax !== undefined && annualizedTotalDeductions !== undefined) {
+    // Minimal mode - use provided values (already annualized)
+    calculatedProfitBeforeTax = annualizedProfitBeforeTax
+    calculatedTotalDeductions = annualizedTotalDeductions
+  } else if (annualizedRevenue !== undefined) {
+    // Full mode - calculate from revenue and expenses (already annualized)
+    const cogs = annualizedCOGS || 0
+    const grossProfit = annualizedRevenue - cogs
     
-    // Calculate total operating expenses
-    const expenses = operatingExpenses || {}
+    // Calculate total operating expenses (using annualized values)
+    const expenses = annualizedOperatingExpenses || {}
     const totalExpenses = 
       (expenses.employeeCosts || 0) +
       (expenses.pensionContributions || 0) +
@@ -264,6 +328,7 @@ export function calculateCIT(input: CITInput): CITResult {
   let citRate = 0
   let citAmount = 0
   let effectiveTaxRate = 0
+  let originalETR = 0
   let topUpTax = 0
   
   if (isSmall) {
@@ -274,13 +339,31 @@ export function calculateCIT(input: CITInput): CITResult {
     citAmount = (taxableProfit * citRate) / 100
     
     // Check 15% ETR rule for large multinationals
-    if (isLargeMulti && calculatedProfitBeforeTax > 0) {
-      effectiveTaxRate = (citAmount / calculatedProfitBeforeTax) * 100
-      
-      if (effectiveTaxRate < 15) {
-        const minimumTax = (calculatedProfitBeforeTax * 15) / 100
-        topUpTax = Math.max(minimumTax - citAmount, 0)
-        citAmount = minimumTax
+    // ETR rule applies if turnover >= ₦50B (₦50,000,000,000)
+    // For large multinationals, minimum Effective Tax Rate is 15% of Profit Before Tax
+    if (isLargeMulti) {
+      if (calculatedProfitBeforeTax > 0) {
+        // Calculate original effective tax rate BEFORE top-up: (CIT Paid / Profit Before Tax) × 100
+        originalETR = (citAmount / calculatedProfitBeforeTax) * 100
+        
+        // If ETR is less than 15%, apply top-up tax to reach minimum 15% ETR
+        // This ensures large multinationals pay at least 15% of Profit Before Tax
+        if (originalETR < 15) {
+          const minimumTax = (calculatedProfitBeforeTax * 15) / 100
+          topUpTax = Math.max(minimumTax - citAmount, 0)
+          citAmount = minimumTax
+          // Final ETR after top-up (should be exactly 15%)
+          effectiveTaxRate = 15
+        } else {
+          // If ETR >= 15%, no top-up is needed, final ETR equals original ETR
+          effectiveTaxRate = originalETR
+        }
+        // If ETR >= 15%, no top-up is needed, but ETR is still calculated and displayed
+      } else if (calculatedProfitBeforeTax <= 0) {
+        // If profit before tax is 0 or negative, ETR cannot be meaningfully calculated
+        // 15% of 0 is 0, so no top-up tax applies
+        effectiveTaxRate = 0
+        originalETR = 0
       }
     }
   }
@@ -303,17 +386,18 @@ export function calculateCIT(input: CITInput): CITResult {
     isLargeMultinational: isLargeMulti,
     annualTurnover,
     totalFixedAssets,
-    revenue,
-    costOfGoodsSold,
+    revenue: annualizedRevenue, // Return annualized revenue for display
+    costOfGoodsSold: annualizedCOGS, // Return annualized COGS for display
     totalOperatingExpenses: calculatedTotalDeductions,
     operatingExpensesBreakdown,
-    profitBeforeTax: calculatedProfitBeforeTax,
-    totalDeductions: calculatedTotalDeductions,
+    profitBeforeTax: calculatedProfitBeforeTax, // Annualized profit
+    totalDeductions: calculatedTotalDeductions, // Annualized deductions
     capitalAllowancesTotal,
     taxableProfit,
     citRate,
     citAmount,
     effectiveTaxRate: isLargeMulti ? effectiveTaxRate : undefined,
+    originalETR: isLargeMulti && topUpTax > 0 ? originalETR : undefined,
     topUpTax: topUpTax > 0 ? topUpTax : undefined,
     totalCITPayable,
     period,
@@ -322,6 +406,10 @@ export function calculateCIT(input: CITInput): CITResult {
     quarterlySetAside,
     deductionsBreakdown: deductionsBreakdown.length > 0 ? deductionsBreakdown : undefined,
     capitalAllowances: calculatedCapitalAllowances.length > 0 ? calculatedCapitalAllowances : undefined,
+    // Store original input values for display purposes
+    originalInputRevenue: revenue,
+    originalInputCOGS: costOfGoodsSold,
+    originalInputProfitBeforeTax: profitBeforeTax,
   }
 }
 

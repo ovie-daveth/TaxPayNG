@@ -11,6 +11,7 @@ import { Plus, X, Receipt, Info } from "lucide-react"
 import { toast } from "sonner"
 import { VAT_EXEMPT_SUPPLIES, VAT_ZERO_RATED_SUPPLIES, getVATSupplyStatus, type VATSupplyStatus } from "@/lib/tax/vat-config"
 import { calculateVAT, type VATSupply, type VATInputEntry } from "@/lib/tax/vat-calculator"
+import { formatCurrencyInput, handleCurrencyInputChange } from "@/lib/utils/currency"
 
 interface VATFormProps {
   period: "monthly" | "quarterly" | "yearly"
@@ -176,11 +177,11 @@ export function VATForm({ period, annualTurnover, onAnnualTurnoverChange, onCalc
           type="text"
           inputMode="decimal"
           placeholder="0.00"
-          value={annualTurnover}
+          value={formatCurrencyInput(annualTurnover)}
           onChange={(e) => {
-            const value = e.target.value
-            if (value === "" || /^\d*\.?\d*$/.test(value)) {
-              onAnnualTurnoverChange(value)
+            const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+            if (isValid) {
+              onAnnualTurnoverChange(rawValue)
             }
           }}
         />
@@ -242,11 +243,11 @@ export function VATForm({ period, annualTurnover, onAnnualTurnoverChange, onCalc
                       type="text"
                       inputMode="decimal"
                       placeholder="0.00"
-                      value={supply.amount}
+                      value={formatCurrencyInput(supply.amount)}
                       onChange={(e) => {
-                        const value = e.target.value
-                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                          handleSupplyChange(supply.id, "amount", value)
+                        const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                        if (isValid) {
+                          handleSupplyChange(supply.id, "amount", rawValue)
                         }
                       }}
                     />
@@ -327,11 +328,11 @@ export function VATForm({ period, annualTurnover, onAnnualTurnoverChange, onCalc
                       type="text"
                       inputMode="decimal"
                       placeholder="0.00"
-                      value={entry.amount}
+                      value={formatCurrencyInput(entry.amount)}
                       onChange={(e) => {
-                        const value = e.target.value
-                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                          handleInputVATChange(entry.id, "amount", value)
+                        const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                        if (isValid) {
+                          handleInputVATChange(entry.id, "amount", rawValue)
                         }
                       }}
                     />

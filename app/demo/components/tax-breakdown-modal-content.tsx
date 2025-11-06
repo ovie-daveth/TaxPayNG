@@ -347,6 +347,196 @@ export function TaxBreakdownModalContent({ result }: TaxBreakdownModalContentPro
                 </div>
               )}
               
+              {/* Large Multinational ETR Rule Explanation */}
+              {result.isLargeMultinational && result.assessableProfit !== undefined && result.assessableProfit > 0 && (
+                <div className="mt-3 pt-3 border-t border-border">
+                  <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 p-4 rounded-lg border-2 border-blue-200 dark:border-blue-800">
+                    <h4 className="font-semibold text-sm mb-4 text-blue-900 dark:text-blue-100 flex items-center gap-2">
+                      <span className="text-lg">📊</span>
+                      15% Effective Tax Rate (ETR) Rule for Large Multinationals
+                    </h4>
+                    <p className="text-xs text-blue-800 dark:text-blue-200 mb-4">
+                      Companies with turnover ≥ ₦50 billion must maintain a minimum Effective Tax Rate of 15% of Profit Before Tax.
+                    </p>
+                    
+                    <div className="space-y-4 text-sm">
+                      {/* Step 1: Normal CIT Calculation */}
+                      <div className="bg-white/80 dark:bg-gray-800/80 p-4 rounded-lg border-2 border-blue-300 dark:border-blue-700 shadow-sm">
+                        <p className="text-xs font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold">1</span>
+                          Normal CIT Calculation (30% of Taxable Profit)
+                        </p>
+                        <div className="space-y-2 ml-8">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600 dark:text-gray-300">Taxable Profit:</span>
+                            <span className="font-mono font-semibold">₦{(result.taxableProfit || 0).toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600 dark:text-gray-300">CIT Rate:</span>
+                            <span className="font-mono font-semibold">30%</span>
+                          </div>
+                          <div className="pt-2 border-t border-blue-200 dark:border-blue-700">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-gray-900 dark:text-gray-100 font-semibold">Normal CIT:</span>
+                              <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                                ₦{((result.annualTax || 0) - (result.topUpTax || 0)).toLocaleString()}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono">
+                              = ₦{(result.taxableProfit || 0).toLocaleString()} × 30%
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Step 2: ETR Calculation */}
+                      <div className="bg-white/80 dark:bg-gray-800/80 p-4 rounded-lg border-2 border-blue-300 dark:border-blue-700 shadow-sm">
+                        <p className="text-xs font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold">2</span>
+                          Calculate Effective Tax Rate (ETR)
+                        </p>
+                        <div className="space-y-2 ml-8">
+                          <p className="text-xs text-gray-600 dark:text-gray-300 mb-2">Formula:</p>
+                          <p className="text-xs font-mono bg-gray-100 dark:bg-gray-900 p-2 rounded border border-blue-200 dark:border-blue-700">
+                            ETR = (Company Income Tax Paid ÷ Profit Before Tax) × 100
+                          </p>
+                          <div className="pt-2 space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-gray-600 dark:text-gray-300">Normal CIT Paid:</span>
+                              <span className="font-mono">₦{((result.annualTax || 0) - (result.topUpTax || 0)).toLocaleString()}</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-gray-600 dark:text-gray-300">Profit Before Tax:</span>
+                              <span className="font-mono">₦{(result.assessableProfit || 0).toLocaleString()}</span>
+                            </div>
+                            <div className="pt-2 border-t border-blue-200 dark:border-blue-700">
+                              <div className="flex items-center justify-between text-xs">
+                                <span className="text-gray-900 dark:text-gray-100 font-semibold">Your ETR (Before Top-Up):</span>
+                                <span className={`font-mono font-bold ${((result.originalETR !== undefined ? result.originalETR : result.effectiveTaxRate) || 0) < 15 ? 'text-amber-600 dark:text-amber-400' : 'text-green-600 dark:text-green-400'}`}>
+                                  {((result.originalETR !== undefined ? result.originalETR : result.effectiveTaxRate) || 0).toFixed(2)}%
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono">
+                                = (₦{((result.annualTax || 0) - (result.topUpTax || 0)).toLocaleString()} ÷ ₦{(result.assessableProfit || 0).toLocaleString()}) × 100
+                              </p>
+                              {result.topUpTax !== undefined && result.topUpTax > 0 && (
+                                <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 font-semibold">
+                                  ⚠️ This ETR ({result.originalETR?.toFixed(2)}%) is below the 15% minimum requirement
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Step 3: Minimum Tax Requirement */}
+                      <div className="bg-white/80 dark:bg-gray-800/80 p-4 rounded-lg border-2 border-blue-300 dark:border-blue-700 shadow-sm">
+                        <p className="text-xs font-semibold text-gray-900 dark:text-gray-100 mb-3 flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs font-bold">3</span>
+                          Minimum Tax Requirement (15% of Profit Before Tax)
+                        </p>
+                        <div className="space-y-2 ml-8">
+                          <p className="text-xs text-gray-600 dark:text-gray-300 mb-2">Formula:</p>
+                          <p className="text-xs font-mono bg-gray-100 dark:bg-gray-900 p-2 rounded border border-blue-200 dark:border-blue-700">
+                            Minimum Tax = 15% × Profit Before Tax
+                          </p>
+                          <div className="pt-2 border-t border-blue-200 dark:border-blue-700">
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-gray-900 dark:text-gray-100 font-semibold">Minimum Tax Required:</span>
+                              <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                                ₦{((result.assessableProfit || 0) * 0.15).toLocaleString()}
+                              </span>
+                            </div>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono">
+                              = 15% × ₦{(result.assessableProfit || 0).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Step 4: Top-Up Tax Calculation (if applicable) */}
+                      {result.topUpTax !== undefined && result.topUpTax > 0 ? (
+                        <div className="bg-amber-50 dark:bg-amber-900/30 p-4 rounded-lg border-2 border-amber-400 dark:border-amber-600 shadow-sm">
+                          <p className="text-xs font-semibold text-amber-900 dark:text-amber-100 mb-3 flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-full bg-amber-500 text-white flex items-center justify-center text-xs font-bold">4</span>
+                            ⚠️ Top-Up Tax Calculation (ETR Below 15%)
+                          </p>
+                          <div className="space-y-2 ml-8">
+                            <p className="text-xs text-amber-800 dark:text-amber-200 mb-2">
+                              Since your ETR ({result.originalETR?.toFixed(2)}%) is below the 15% minimum, a top-up tax is required.
+                            </p>
+                            <div className="bg-white/60 dark:bg-gray-800/60 p-3 rounded border border-amber-300 dark:border-amber-700">
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-amber-900 dark:text-amber-100">Minimum Tax Required:</span>
+                                  <span className="font-mono font-semibold">₦{((result.assessableProfit || 0) * 0.15).toLocaleString()}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-xs">
+                                  <span className="text-amber-900 dark:text-amber-100">Less: Normal CIT Paid:</span>
+                                  <span className="font-mono">-₦{((result.annualTax || 0) - (result.topUpTax || 0)).toLocaleString()}</span>
+                                </div>
+                                <div className="pt-2 border-t-2 border-amber-400 dark:border-amber-600">
+                                  <div className="flex items-center justify-between text-xs">
+                                    <span className="text-amber-900 dark:text-amber-100 font-bold">Top-Up Tax:</span>
+                                    <span className="font-mono font-bold text-amber-700 dark:text-amber-300 text-base">
+                                      ₦{(result.topUpTax || 0).toLocaleString()}
+                                    </span>
+                                  </div>
+                                  <p className="text-xs text-amber-700 dark:text-amber-300 mt-1 font-mono">
+                                    = ₦{((result.assessableProfit || 0) * 0.15).toLocaleString()} - ₦{((result.annualTax || 0) - (result.topUpTax || 0)).toLocaleString()}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : result.effectiveTaxRate !== undefined && result.effectiveTaxRate >= 15 ? (
+                        <div className="bg-green-50 dark:bg-green-900/30 p-4 rounded-lg border-2 border-green-400 dark:border-green-600 shadow-sm">
+                          <p className="text-xs font-semibold text-green-900 dark:text-green-100 mb-2 flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-full bg-green-500 text-white flex items-center justify-center text-xs font-bold">✓</span>
+                            ✅ ETR Requirement Met - No Top-Up Tax Required
+                          </p>
+                          <p className="text-xs text-green-800 dark:text-green-200 ml-8">
+                            Your ETR ({result.effectiveTaxRate.toFixed(2)}%) meets or exceeds the 15% minimum requirement. 
+                            You only pay the normal CIT of ₦{((result.annualTax || 0) - (result.topUpTax || 0)).toLocaleString()}.
+                          </p>
+                        </div>
+                      ) : null}
+
+                      {/* Final Total CIT */}
+                      <div className="bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/40 dark:to-indigo-900/40 p-4 rounded-lg border-2 border-blue-400 dark:border-blue-600 shadow-md">
+                        <p className="text-xs font-bold text-blue-900 dark:text-blue-100 mb-3">Final Total CIT Payable</p>
+                        <div className="space-y-2 ml-4">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-700 dark:text-gray-200">Normal CIT:</span>
+                            <span className="font-mono">₦{((result.annualTax || 0) - (result.topUpTax || 0)).toLocaleString()}</span>
+                          </div>
+                          {result.topUpTax !== undefined && result.topUpTax > 0 && (
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="text-gray-700 dark:text-gray-200">Top-Up Tax:</span>
+                              <span className="font-mono text-amber-600 dark:text-amber-400">+₦{(result.topUpTax || 0).toLocaleString()}</span>
+                            </div>
+                          )}
+                          <div className="pt-2 border-t-2 border-blue-400 dark:border-blue-600">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-bold text-blue-900 dark:text-blue-100">Total CIT Payable:</span>
+                              <span className="text-lg font-bold text-blue-700 dark:text-blue-300 font-mono">
+                                ₦{(result.annualTax || 0).toLocaleString()}
+                              </span>
+                            </div>
+                            {result.topUpTax !== undefined && result.topUpTax > 0 && (
+                              <p className="text-xs text-blue-700 dark:text-blue-300 mt-1 font-mono">
+                                = ₦{((result.annualTax || 0) - (result.topUpTax || 0)).toLocaleString()} + ₦{(result.topUpTax || 0).toLocaleString()}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               {/* CIT Calculation Explanation */}
               {result.citRate !== undefined && result.taxableProfit !== undefined && (
                 <div className="mt-3 pt-3 border-t border-border">
@@ -365,9 +555,18 @@ export function TaxBreakdownModalContent({ result }: TaxBreakdownModalContentPro
                         <span className="font-bold text-lg text-primary">₦{(result.annualTax || 0).toLocaleString()}</span>
                       </div>
                     )}
-                    {result.annualTax !== undefined && result.taxableProfit > 0 && (
+                    {result.annualTax !== undefined && result.taxableProfit > 0 && !result.isLargeMultinational && (
                       <p className="text-xs text-muted-foreground mt-2 italic">
                         Calculation: ₦{(result.taxableProfit || 0).toLocaleString()} × {result.citRate}% = ₦{(result.annualTax || 0).toLocaleString()}
+                      </p>
+                    )}
+                    {result.isLargeMultinational && result.topUpTax !== undefined && result.topUpTax > 0 && (
+                      <p className="text-xs text-muted-foreground mt-2 italic">
+                        Normal CIT: ₦{(result.taxableProfit || 0).toLocaleString()} × {result.citRate}% = ₦{((result.annualTax || 0) - (result.topUpTax || 0)).toLocaleString()}
+                        <br />
+                        + Top-Up Tax: ₦{(result.topUpTax || 0).toLocaleString()}
+                        <br />
+                        = Total CIT: ₦{(result.annualTax || 0).toLocaleString()}
                       </p>
                     )}
                   </div>

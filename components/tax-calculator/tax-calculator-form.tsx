@@ -23,6 +23,8 @@ import {
   convertCurrency,
   formatCurrencyAmount,
   getCurrencySymbol,
+  formatCurrencyInput,
+  handleCurrencyInputChange,
 } from "@/lib/utils/currency"
 
 interface TaxCalculatorFormProps {
@@ -1138,12 +1140,19 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                           type="text"
                           inputMode="decimal"
                           placeholder="0.00"
-                          value={source.amount}
+                          value={source.currency === "NGN" ? formatCurrencyInput(source.amount) : source.amount}
                           onChange={(e) => {
                             const value = e.target.value
-                            // Allow only numbers and one decimal point
-                            if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                              updateIncomeSource(source.id, "amount", value)
+                            if (source.currency === "NGN") {
+                              const { isValid, rawValue } = handleCurrencyInputChange(value)
+                              if (isValid) {
+                                updateIncomeSource(source.id, "amount", rawValue)
+                              }
+                            } else {
+                              // For non-NGN currencies, allow only numbers and one decimal point
+                              if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                                updateIncomeSource(source.id, "amount", value)
+                              }
                             }
                           }}
                           required
@@ -1245,17 +1254,65 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         {userType === "business" && calculationType && (
           <div className="border-t border-border pt-6">
             {calculationType === "cit" && (
-              <CITForm
-                period={period}
-                annualTurnover={annualTurnover}
-                totalFixedAssets={totalFixedAssets}
-                onAnnualTurnoverChange={setAnnualTurnover}
-                onTotalFixedAssetsChange={setTotalFixedAssets}
-                onCalculate={(citResult) => {
-                  // Trigger the calculation callback
-                  onCalculate(citResult)
-                }}
-              />
+              <>
+                <div className="space-y-4 mb-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <TrendingUp className="w-5 h-5 text-primary" />
+                    <h3 className="font-semibold">Company Information</h3>
+                  </div>
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="annualTurnover-cit">Annual Turnover (₦) <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="annualTurnover-cit"
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={formatCurrencyInput(annualTurnover)}
+                        onChange={(e) => {
+                          const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                          if (isValid) {
+                            setAnnualTurnover(rawValue)
+                          }
+                        }}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Annual revenue/turnover for the year (required)
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="totalFixedAssets-cit">Total Fixed Assets (₦) <span className="text-red-500">*</span></Label>
+                      <Input
+                        id="totalFixedAssets-cit"
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={formatCurrencyInput(totalFixedAssets)}
+                        onChange={(e) => {
+                          const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                          if (isValid) {
+                            setTotalFixedAssets(rawValue)
+                          }
+                        }}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Total fixed assets for small company exemption check (required)
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                <CITForm
+                  period={period}
+                  annualTurnover={annualTurnover}
+                  totalFixedAssets={totalFixedAssets}
+                  onAnnualTurnoverChange={setAnnualTurnover}
+                  onTotalFixedAssetsChange={setTotalFixedAssets}
+                  onCalculate={(citResult) => {
+                    // Trigger the calculation callback
+                    onCalculate(citResult)
+                  }}
+                />
+              </>
             )}
 
             {calculationType === "development-levy" && (
@@ -1272,11 +1329,11 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                       type="text"
                       inputMode="decimal"
                       placeholder="0.00"
-                      value={annualTurnover}
+                      value={formatCurrencyInput(annualTurnover)}
                       onChange={(e) => {
-                        const value = e.target.value
-                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                          setAnnualTurnover(value)
+                        const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                        if (isValid) {
+                          setAnnualTurnover(rawValue)
                         }
                       }}
                     />
@@ -1291,11 +1348,11 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                       type="text"
                       inputMode="decimal"
                       placeholder="0.00"
-                      value={totalFixedAssets}
+                      value={formatCurrencyInput(totalFixedAssets)}
                       onChange={(e) => {
-                        const value = e.target.value
-                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                          setTotalFixedAssets(value)
+                        const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                        if (isValid) {
+                          setTotalFixedAssets(rawValue)
                         }
                       }}
                     />
@@ -1321,11 +1378,11 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                     type="text"
                     inputMode="decimal"
                     placeholder="Enter from your financial statement"
-                    value={assessableProfit}
+                    value={formatCurrencyInput(assessableProfit)}
                     onChange={(e) => {
-                      const value = e.target.value
-                      if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                        setAssessableProfit(value)
+                      const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                      if (isValid) {
+                        setAssessableProfit(rawValue)
                       }
                     }}
                   />
@@ -1375,11 +1432,11 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                       type="text"
                       inputMode="decimal"
                       placeholder="0.00"
-                      value={annualTurnover}
+                      value={formatCurrencyInput(annualTurnover)}
                       onChange={(e) => {
-                        const value = e.target.value
-                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                          setAnnualTurnover(value)
+                        const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                        if (isValid) {
+                          setAnnualTurnover(rawValue)
                         }
                       }}
                     />
@@ -1394,11 +1451,11 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                       type="text"
                       inputMode="decimal"
                       placeholder="0.00"
-                      value={totalFixedAssets}
+                      value={formatCurrencyInput(totalFixedAssets)}
                       onChange={(e) => {
-                        const value = e.target.value
-                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                          setTotalFixedAssets(value)
+                        const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                        if (isValid) {
+                          setTotalFixedAssets(rawValue)
                         }
                       }}
                     />
@@ -1486,12 +1543,12 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                                 type="text"
                                 inputMode="decimal"
                                 placeholder="0.00"
-                                value={payment.amount}
+                                value={formatCurrencyInput(payment.amount)}
                                 onChange={(e) => {
-                                  const value = e.target.value
-                                  if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                                  const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                                  if (isValid) {
                                     const updated = [...whtPaymentsMade]
-                                    updated[index].amount = value
+                                    updated[index].amount = rawValue
                                     setWhtPaymentsMade(updated)
                                   }
                                 }}
@@ -1634,12 +1691,12 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                                 type="text"
                                 inputMode="decimal"
                                 placeholder="0.00"
-                                value={income.amount}
+                                value={formatCurrencyInput(income.amount)}
                                 onChange={(e) => {
-                                  const value = e.target.value
-                                  if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                                  const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                                  if (isValid) {
                                     const updated = [...whtIncomeReceived]
-                                    updated[index].amount = value
+                                    updated[index].amount = rawValue
                                     setWhtIncomeReceived(updated)
                                   }
                                 }}
@@ -1753,11 +1810,11 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                   type="text"
                   inputMode="decimal"
                   placeholder="0.00"
-                  value={rentPaid}
+                  value={formatCurrencyInput(rentPaid)}
                   onChange={(e) => {
-                    const value = e.target.value
-                    if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                      setRentPaid(value)
+                    const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                    if (isValid) {
+                      setRentPaid(rawValue)
                     }
                   }}
                 />
@@ -1776,11 +1833,11 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                   type="text"
                   inputMode="decimal"
                   placeholder="0.00"
-                  value={pensionContribution}
+                  value={formatCurrencyInput(pensionContribution)}
                   onChange={(e) => {
-                    const value = e.target.value
-                    if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                      setPensionContribution(value)
+                    const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                    if (isValid) {
+                      setPensionContribution(rawValue)
                     }
                   }}
                 />
@@ -1796,11 +1853,11 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                   type="text"
                   inputMode="decimal"
                   placeholder="0.00"
-                  value={healthInsurance}
+                  value={formatCurrencyInput(healthInsurance)}
                   onChange={(e) => {
-                    const value = e.target.value
-                    if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                      setHealthInsurance(value)
+                    const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                    if (isValid) {
+                      setHealthInsurance(rawValue)
                     }
                   }}
                 />
@@ -1818,11 +1875,11 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                   type="text"
                   inputMode="decimal"
                   placeholder="0.00"
-                  value={housingFund}
+                  value={formatCurrencyInput(housingFund)}
                   onChange={(e) => {
-                    const value = e.target.value
-                    if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                      setHousingFund(value)
+                    const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                    if (isValid) {
+                      setHousingFund(rawValue)
                     }
                   }}
                 />
@@ -1836,11 +1893,11 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                   type="text"
                   inputMode="decimal"
                   placeholder="0.00"
-                  value={lifeInsurance}
+                  value={formatCurrencyInput(lifeInsurance)}
                   onChange={(e) => {
-                    const value = e.target.value
-                    if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                      setLifeInsurance(value)
+                    const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                    if (isValid) {
+                      setLifeInsurance(rawValue)
                     }
                   }}
                 />
@@ -1858,11 +1915,11 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                   type="text"
                   inputMode="decimal"
                   placeholder="0.00"
-                  value={charitableDonations}
+                  value={formatCurrencyInput(charitableDonations)}
                   onChange={(e) => {
-                    const value = e.target.value
-                    if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                      setCharitableDonations(value)
+                    const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                    if (isValid) {
+                      setCharitableDonations(rawValue)
                     }
                   }}
                 />
@@ -1916,11 +1973,11 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                           type="text"
                           inputMode="decimal"
                           placeholder="0.00"
-                          value={amount}
+                          value={formatCurrencyInput(amount)}
                           onChange={(e) => {
-                            const value = e.target.value
-                            if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                              updateCreatorExpense(expenseType, value)
+                            const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                            if (isValid) {
+                              updateCreatorExpense(expenseType, rawValue)
                             }
                           }}
                         />
@@ -1963,11 +2020,11 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                 type="text"
                 inputMode="decimal"
                 placeholder="0.00"
-                value={businessExpenses}
+                value={formatCurrencyInput(businessExpenses)}
                 onChange={(e) => {
-                  const value = e.target.value
-                  if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                    setBusinessExpenses(value)
+                  const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                  if (isValid) {
+                    setBusinessExpenses(rawValue)
                   }
                 }}
               />
