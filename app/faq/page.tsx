@@ -11,12 +11,140 @@ import { faqData } from "./components/data"
 import { toast } from "sonner"
 import { conversationService, ConversationMessage } from "@/lib/services/conversationService"
 import { useRouter, useSearchParams } from "next/navigation"
+import { Suspense } from "react"
 
 
 // Enhanced ML-like matching algorithm with capability question detection
 function findBestMatch(query: string, faqs: typeof faqData.individuals) {
   const lowerQuery = query.toLowerCase().trim()
   const queryWords = lowerQuery.split(/\s+/).filter(w => w.length > 2)
+  
+  // Handle abbreviations and synonyms
+  const abbreviations: Record<string, string[]> = {
+    'wht': ['withholding tax', 'withholding'],
+    'cit': ['company income tax', 'corporate tax'],
+    'vat': ['value added tax'],
+    'paye': ['pay as you earn'],
+    'cgt': ['capital gains tax'],
+    'nrs': ['nigeria revenue service'],
+  }
+  
+  // Handle common typos
+  const typoCorrections: Record<string, string> = {
+    'witholding': 'withholding',
+    'withold': 'withhold',
+    'witholden': 'withholding',
+    'developement': 'development',
+    'identifcation': 'identification',
+    'identifaction': 'identification',
+  }
+  
+  // Replace abbreviations with full terms
+  let normalizedQuery = lowerQuery
+  
+  // First, fix typos
+  Object.entries(typoCorrections).forEach(([typo, correct]) => {
+    const regex = new RegExp(typo, 'gi')
+    normalizedQuery = normalizedQuery.replace(regex, correct)
+  })
+  
+  // Then handle abbreviations
+  Object.entries(abbreviations).forEach(([abbr, fullTerms]) => {
+    if (normalizedQuery.includes(abbr)) {
+      normalizedQuery = normalizedQuery.replace(abbr, fullTerms[0])
+    }
+  })
+  
+  // Handle synonyms
+  const synonyms: Record<string, string[]> = {
+    'development fee': ['development levy'],
+    'development tax': ['development levy'],
+  }
+  
+  Object.entries(synonyms).forEach(([synonym, terms]) => {
+    if (normalizedQuery.includes(synonym)) {
+      normalizedQuery = normalizedQuery.replace(synonym, terms[0])
+    }
+  })
+  
+  // Extract key tax terms that should be prioritized
+  const keyTaxTerms = [
+    'withholding tax',
+    'development levy',
+    'company income tax',
+    'capital gains tax',
+    'value added tax',
+    'pay as you earn',
+    'paye',
+    'withholding',
+  ]
+  
+  let matchedKeyTerm = ''
+  // Check normalized query first (after synonym replacement)
+  for (const term of keyTaxTerms) {
+    if (normalizedQuery.includes(term)) {
+      matchedKeyTerm = term
+      break
+    }
+  }
+  // Also check original query for abbreviations
+  if (!matchedKeyTerm) {
+    for (const term of keyTaxTerms) {
+      if (lowerQuery.includes(term)) {
+        matchedKeyTerm = term
+        break
+      }
+    }
+  }
+  
+  // Detect "what is X" questions
+  const whatIsPatterns = [
+    /what\s+is\s+(?:the\s+)?(.+?)(?:\s+and|\s+or|\?|$)/i,
+    /what\s+does\s+(?:the\s+)?(.+?)\s+mean/i,
+    /explain\s+(?:what\s+is\s+)?(.+?)(?:\s+and|\s+or|\?|$)/i,
+    /tell\s+me\s+about\s+(?:the\s+)?(.+?)(?:\s+and|\s+or|\?|$)/i,
+    /define\s+(?:the\s+)?(.+?)(?:\s+and|\s+or|\?|$)/i,
+    /describe\s+(?:the\s+)?(.+?)(?:\s+and|\s+or|\?|$)/i,
+  ]
+  
+  let isDefinitionQuestion = false
+  let extractedSubject = ""
+  
+  for (const pattern of whatIsPatterns) {
+    const match = normalizedQuery.match(pattern)
+    if (match) {
+      isDefinitionQuestion = true
+      extractedSubject = match[1].trim()
+      // Apply synonym replacement to extracted subject too
+      Object.entries(synonyms).forEach(([synonym, terms]) => {
+        if (extractedSubject.includes(synonym)) {
+          extractedSubject = extractedSubject.replace(synonym, terms[0])
+        }
+      })
+      break
+    }
+  }
+  
+  // If query is just a term (like "development fee" or "WHT"), treat as definition question
+  if (!isDefinitionQuestion && queryWords.length <= 3 && !lowerQuery.includes('?')) {
+    isDefinitionQuestion = true
+    extractedSubject = normalizedQuery
+  }
+  
+  // If we have a matched key term but no extracted subject, use the key term as subject
+  if (matchedKeyTerm && !extractedSubject) {
+    extractedSubject = matchedKeyTerm
+  }
+  
+  // If we have extracted subject but no matched key term, check if subject matches a key term
+  if (extractedSubject && !matchedKeyTerm) {
+    for (const term of keyTaxTerms) {
+      if (extractedSubject.includes(term) || term.includes(extractedSubject)) {
+        matchedKeyTerm = term
+        break
+      }
+    }
+  }
   
   // Detect capability questions (e.g., "can otax help me file returns")
   const capabilityPatterns = [
@@ -62,6 +190,137 @@ function findBestMatch(query: string, faqs: typeof faqData.individuals) {
     const answerLower = faq.answer.toLowerCase()
     const keywordsLower = faq.keywords.map(k => k.toLowerCase())
     
+    // Check if this is a list/compilation FAQ (like "50 exemptions")
+    const isListFAQ = questionLower.includes('50') || 
+                      (questionLower.includes('exemptions') && questionLower.includes('reliefs')) ||
+                      questionLower.includes('all exemptions') ||
+                      questionLower.includes('complete list')
+    
+    // Track exact matches for use in generic matching skip logic
+    let hasExactSubject = false
+    let hasExactTerm = false
+    
+    // FIRST PRIORITY: If it's a definition question, prioritize definition FAQs heavily
+    if (isDefinitionQuestion && extractedSubject) {
+      const subjectLower = extractedSubject.toLowerCase()
+      const subjectWords = subjectLower.split(/\s+/).filter(w => w.length > 2)
+      
+      // Check if FAQ contains the EXACT subject (multi-word terms like "withholding tax")
+      hasExactSubject = questionLower.includes(subjectLower) || keywordsLower.some(k => k.includes(subjectLower))
+      
+      // EXTREMELY high score for FAQs that start with "What is" and contain the EXACT subject
+      if ((questionLower.startsWith('what is') || questionLower.startsWith('what are')) && hasExactSubject) {
+        score += 1500
+      }
+      
+      // Very high score for FAQs that start with "What is" and contain the subject (partial match)
+      if ((questionLower.startsWith('what is') || questionLower.startsWith('what are')) && 
+          (questionLower.includes(subjectLower) || subjectWords.some(word => questionLower.includes(word)))) {
+        score += 1000
+      }
+      
+      // High score if FAQ question contains the EXACT subject
+      if (hasExactSubject) {
+        score += 800
+      }
+      
+      // High score if FAQ keywords contain the EXACT subject
+      if (keywordsLower.some(k => k.includes(subjectLower))) {
+        score += 600
+      }
+      
+      // Medium score if FAQ question contains subject words (partial match)
+      if (subjectWords.some(word => questionLower.includes(word))) {
+        score += 200
+      }
+      
+      // LOW score if answer contains the subject (this is less important than question/keywords)
+      if (answerLower.includes(subjectLower) || subjectWords.some(word => answerLower.includes(word))) {
+        score += 100
+      }
+      
+      // HEAVILY penalize FAQs that only match on generic words when we have a specific term
+      // If subject is multi-word (like "withholding tax") but FAQ only matches on generic word (like "tax")
+      if (subjectLower.split(' ').length > 1) {
+        const genericWords = ['tax', 'fee', 'levy', 'number', 'service']
+        const hasGenericWordOnly = genericWords.some(gw => 
+          subjectLower.includes(gw) && 
+          questionLower.includes(gw) && 
+          !hasExactSubject
+        )
+        if (hasGenericWordOnly) {
+          score -= 400  // Heavy penalty for matching only on generic word
+        }
+      }
+      
+      // HEAVILY penalize list FAQs when asking for definitions
+      if (isListFAQ) {
+        score -= 600  // Heavy penalty for list FAQs
+        // Even heavier penalty if the list FAQ mentions the subject but isn't specifically about it
+        if (answerLower.includes(subjectLower) && !questionLower.includes(subjectLower)) {
+          score -= 400  // Additional penalty for mentioning it in answer but not question
+        }
+      }
+      
+      // Boost score for FAQs in relevant category
+      if (faq.category.toLowerCase().includes(subjectLower.split(' ')[0])) {
+        score += 200
+      }
+    }
+    
+    // SECOND PRIORITY: If a key tax term is matched, prioritize FAQs about that specific term
+    if (matchedKeyTerm) {
+      const termLower = matchedKeyTerm.toLowerCase()
+      hasExactTerm = questionLower.includes(termLower) || keywordsLower.some(k => k.includes(termLower))
+      
+      // Extremely high score if FAQ question contains the exact term AND starts with "What is"
+      if (hasExactTerm && (questionLower.startsWith('what is') || questionLower.startsWith('what are'))) {
+        score += 1200
+      }
+      
+      // Very high score if FAQ question contains the exact term
+      if (questionLower.includes(termLower)) {
+        score += 800
+      }
+      
+      // High score if FAQ keywords contain the exact term
+      if (keywordsLower.some(k => k.includes(termLower))) {
+        score += 600
+      }
+      
+      // LOW score if answer contains the term (less important)
+      if (answerLower.includes(termLower)) {
+        score += 100
+      }
+      
+      // HEAVILY penalize FAQs that only match on generic words when we have a specific term
+      // If term is multi-word (like "withholding tax") but FAQ only matches on generic word (like "tax")
+      if (termLower.split(' ').length > 1 && !hasExactTerm) {
+        const genericWords = ['tax', 'fee', 'levy', 'number', 'service']
+        const hasGenericWordOnly = genericWords.some(gw => 
+          termLower.includes(gw) && 
+          questionLower.includes(gw)
+        )
+        if (hasGenericWordOnly) {
+          score -= 500  // Very heavy penalty for matching only on generic word
+        }
+      }
+      
+      // HEAVILY penalize list FAQs when asking about specific terms
+      if (isListFAQ && !hasExactTerm) {
+        score -= 600
+        // Even if list FAQ mentions term in answer, heavily penalize it
+        if (answerLower.includes(termLower)) {
+          score -= 400
+        }
+      }
+      
+      // Penalize FAQs that don't match the specific term
+      if (!hasExactTerm && !answerLower.includes(termLower)) {
+        score -= 300
+      }
+    }
+    
     // If it's a capability question, prioritize FAQs that mention capabilities
     if (isCapabilityQuestion) {
       // High score for FAQs that explicitly mention OTax capabilities
@@ -106,58 +365,82 @@ function findBestMatch(query: string, faqs: typeof faqData.individuals) {
       })
     }
     
-    // Original matching logic (still applies)
-    // Check exact question match
-    if (questionLower.includes(lowerQuery)) {
-      score += 100
-    }
+    // Original matching logic (only applies if NOT a definition question with specific term)
+    // Skip generic matching when we have a definition question with a specific multi-word term
+    const skipGenericMatching = isDefinitionQuestion && matchedKeyTerm && matchedKeyTerm.split(' ').length > 1
     
-    // Check keyword matches
-    keywordsLower.forEach(keyword => {
-      if (lowerQuery.includes(keyword)) {
-        score += 20
+    if (!skipGenericMatching) {
+      // Check exact question match
+      if (questionLower.includes(normalizedQuery) || questionLower.includes(lowerQuery)) {
+        score += 100
       }
-    })
-    
-    // Check word matches
-    queryWords.forEach(word => {
-      if (questionLower.includes(word)) {
-        score += 15
-      }
-      if (answerLower.includes(word)) {
-        score += 5
-      }
-    })
-    
-    // Check category match
-    if (faq.category.toLowerCase().includes(lowerQuery)) {
-      score += 10
-    }
-    
-    // Semantic similarity: check for similar meaning words
-    const semanticGroups = [
-      ['file', 'filing', 'returns', 'submit', 'prepare'],
-      ['calculate', 'compute', 'work out', 'figure'],
-      ['help', 'assist', 'support', 'aid'],
-      ['track', 'monitor', 'follow', 'keep'],
-      ['manage', 'organize', 'handle', 'maintain'],
-      ['stay', 'remain', 'keep', 'maintain'],
-      ['tax', 'taxation', 'taxable', 'taxpayer'],
-      ['compliant', 'compliance', 'conform', 'obey'],
-    ]
-    
-    semanticGroups.forEach(group => {
-      const queryHasWord = group.some(word => lowerQuery.includes(word))
-      const faqHasWord = group.some(word => 
-        questionLower.includes(word) || 
-        answerLower.includes(word) || 
-        keywordsLower.some(k => k.includes(word))
-      )
       
-      if (queryHasWord && faqHasWord) {
-        score += 30
+      // Check keyword matches
+      keywordsLower.forEach(keyword => {
+        if (normalizedQuery.includes(keyword) || lowerQuery.includes(keyword)) {
+          score += 20
+        }
+      })
+      
+      // Check word matches
+      const normalizedWords = normalizedQuery.split(/\s+/).filter(w => w.length > 2)
+      normalizedWords.forEach(word => {
+        if (questionLower.includes(word)) {
+          score += 15
+        }
+        if (answerLower.includes(word)) {
+          score += 5
+        }
+      })
+      
+      // Also check original query words
+      queryWords.forEach(word => {
+        if (questionLower.includes(word)) {
+          score += 15
+        }
+        if (answerLower.includes(word)) {
+          score += 5
+        }
+      })
+      
+      // Check category match
+      if (faq.category.toLowerCase().includes(normalizedQuery) || faq.category.toLowerCase().includes(lowerQuery)) {
+        score += 10
       }
-    })
+      
+      // Semantic similarity: check for similar meaning words
+      const semanticGroups = [
+        ['file', 'filing', 'returns', 'submit', 'prepare'],
+        ['calculate', 'compute', 'work out', 'figure'],
+        ['help', 'assist', 'support', 'aid'],
+        ['track', 'monitor', 'follow', 'keep'],
+        ['manage', 'organize', 'handle', 'maintain'],
+        ['stay', 'remain', 'keep', 'maintain'],
+        ['tax', 'taxation', 'taxable', 'taxpayer'],
+        ['compliant', 'compliance', 'conform', 'obey'],
+      ]
+      
+      semanticGroups.forEach(group => {
+        const queryHasWord = group.some(word => normalizedQuery.includes(word) || lowerQuery.includes(word))
+        const faqHasWord = group.some(word => 
+          questionLower.includes(word) || 
+          answerLower.includes(word) || 
+          keywordsLower.some(k => k.includes(word))
+        )
+        
+        if (queryHasWord && faqHasWord) {
+          score += 30
+        }
+      })
+    } else {
+      // When we have a definition question with specific term, ONLY allow exact matches
+      // This prevents generic word matching from interfering
+      const hasExactMatch = questionLower.includes(normalizedQuery) || questionLower.includes(lowerQuery)
+      if (!hasExactMatch && !hasExactSubject && !hasExactTerm) {
+        // Penalize FAQs that don't have exact match
+        score -= 200
+      }
+    }
     
     if (score > 0) {
       bestMatches.push({ faq, score })
@@ -171,7 +454,7 @@ function findBestMatch(query: string, faqs: typeof faqData.individuals) {
     .map(m => m.faq)
 }
 
-export default function FAQPage() {
+function FAQPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [selectedCategory, setSelectedCategory] = useState<"individuals" | "businesses">("individuals")
@@ -991,6 +1274,18 @@ export default function FAQPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function FAQPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse text-muted-foreground">Loading...</div>
+      </div>
+    }>
+      <FAQPageContent />
+    </Suspense>
   )
 }
 
