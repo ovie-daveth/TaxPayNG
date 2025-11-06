@@ -33,8 +33,22 @@ const TAX_BRACKETS: TaxBracket[] = [
   { min: 50000000, max: null, rate: 25 },
 ]
 
+/**
+ * Calculate Nigerian Personal Income Tax (PIT) for individuals, freelancers, and self-employed persons
+ * 
+ * For Freelancers/Self-Employed:
+ * Step 1: Add up all income for the year (from all clients, local or overseas)
+ * Step 2: Subtract allowable business expenses (wholly, exclusively, and necessarily for business)
+ * Step 3: Calculate taxable income (after business expenses)
+ * Step 4: Apply reliefs/deductions (pension, NHF, NHIS, etc.)
+ * Step 5: Apply progressive PIT rate schedule to final taxable income
+ * Step 6: Calculate total tax payable
+ */
 export function calculateNigerianTax(input: TaxInput, includeInputs: boolean = false) {
-  // Convert income to annual amount
+  // ============================================
+  // STEP 1: CONVERT ALL INCOME TO ANNUAL AMOUNT
+  // ============================================
+  // Add up all income for the year (from all clients, local or overseas)
   let annualIncome = input.income
   if (input.period === "monthly") {
     annualIncome = input.income * 12
@@ -81,22 +95,37 @@ export function calculateNigerianTax(input: TaxInput, includeInputs: boolean = f
     annualCharitableDonations = input.charitableDonations * 4
   }
 
-  // Gross income includes all income (salary + allowances + bonuses + transport allowance)
-  // Transport allowance exemption will be applied as a relief
+  // Gross income includes all income (from all clients, local or overseas)
+  // For freelancers: includes payments from all clients, freelance work, consulting, etc.
   const grossIncome = annualIncome + annualTransportAllowance
 
-  // Current Nigerian tax law reliefs (CRA has been abolished)
-  const rentRelief = Math.min(annualRentPaid * 0.2, 500000)
-  const pensionRelief = Math.min(annualPensionContribution, grossIncome * 0.08)
-  const healthInsuranceRelief = annualHealthInsurance
-  const housingFundRelief = annualHousingFund
-  const lifeInsuranceRelief = annualLifeInsurance
-  const charitableRelief = Math.min(annualCharitableDonations, grossIncome * 0.1)
-
+  // ============================================
+  // STEP 2: SUBTRACT ALLOWABLE BUSINESS EXPENSES
+  // ============================================
+  // Allowable expenses: things spent "wholly, exclusively, and necessarily" for business
+  // Examples: internet/data, software, laptop, co-working rent, transport to client meetings
+  // This gives us the "adjusted gross income" (income after business expenses)
   const adjustedGrossIncome = grossIncome - annualBusinessExpenses
 
-  // Transport allowance exemption is treated as a relief (the exempt portion reduces taxable income)
-  const transportAllowanceRelief = transportAllowanceExempt
+  // ============================================
+  // STEP 3 & 4: APPLY RELIEFS/DEDUCTIONS
+  // ============================================
+  // Current Nigerian tax law reliefs (CRA has been abolished)
+  // Even as self-employed, you may claim certain reliefs:
+  // - Pension contributions (up to 8% of gross income)
+  // - National Housing Fund (NHF)
+  // - National Health Insurance Scheme (NHIS)
+  // - Life Insurance
+  // - Charitable Donations (up to 10% of gross income)
+  // - Rent Relief (20% of rent paid, capped at ₦500,000/year)
+  // - Transport Allowance Exemption (up to ₦360,000/year)
+  const rentRelief = Math.min(annualRentPaid * 0.2, 500000)
+  const pensionRelief = Math.min(annualPensionContribution, grossIncome * 0.08)
+  const healthInsuranceRelief = annualHealthInsurance // NHIS - full deduction
+  const housingFundRelief = annualHousingFund // NHF - full deduction
+  const lifeInsuranceRelief = annualLifeInsurance // Full deduction
+  const charitableRelief = Math.min(annualCharitableDonations, grossIncome * 0.1)
+  const transportAllowanceRelief = transportAllowanceExempt // Up to ₦360,000/year exempt
 
   const totalReliefs =
     rentRelief +
@@ -107,8 +136,23 @@ export function calculateNigerianTax(input: TaxInput, includeInputs: boolean = f
     charitableRelief +
     transportAllowanceRelief
 
+  // ============================================
+  // STEP 5: CALCULATE TAXABLE INCOME
+  // ============================================
+  // Taxable income = Adjusted Gross Income - Total Reliefs
+  // This is the amount that will be subject to progressive tax rates
   const taxableIncome = Math.max(adjustedGrossIncome - totalReliefs, 0)
 
+  // ============================================
+  // STEP 6: APPLY PROGRESSIVE PIT RATE SCHEDULE
+  // ============================================
+  // New Nigerian tax law: Progressive rates apply to taxable income
+  // First ₦800,000 is tax-free, then progressive rates:
+  // - ₦800K - ₦3M: 15%
+  // - ₦3M - ₦12M: 18%
+  // - ₦12M - ₦25M: 21%
+  // - ₦25M - ₦50M: 23%
+  // - Above ₦50M: 25%
   let remainingIncome = taxableIncome
   let totalTax = 0
   const taxBrackets = []
@@ -141,29 +185,32 @@ export function calculateNigerianTax(input: TaxInput, includeInputs: boolean = f
     { quarter: "Q4 (Oct-Dec)", amount: quarterlyAmount },
   ]
 
+  // ============================================
+  // RETURN CALCULATION RESULTS
+  // ============================================
   const result: any = {
-    grossIncome,
-    businessExpenses: annualBusinessExpenses,
-    adjustedGrossIncome,
+    grossIncome, // Step 1: Total income from all sources
+    businessExpenses: annualBusinessExpenses, // Step 2: Allowable business expenses
+    adjustedGrossIncome, // Step 2: Income after business expenses
     reliefs: {
-      rentRelief,
-      pension: pensionRelief,
-      healthInsurance: healthInsuranceRelief,
-      housingFund: housingFundRelief,
-      lifeInsurance: lifeInsuranceRelief,
-      charitable: charitableRelief,
-      transportAllowance: transportAllowanceRelief,
+      rentRelief, // 20% of rent paid, capped at ₦500,000/year
+      pension: pensionRelief, // Up to 8% of gross income
+      healthInsurance: healthInsuranceRelief, // NHIS - full deduction
+      housingFund: housingFundRelief, // NHF - full deduction
+      lifeInsurance: lifeInsuranceRelief, // Full deduction
+      charitable: charitableRelief, // Up to 10% of gross income
+      transportAllowance: transportAllowanceRelief, // Up to ₦360,000/year exempt
     },
-    totalReliefs,
-    taxableIncome,
-    taxBrackets,
-    totalTax: Math.round(totalTax),
-    monthlySetAside: Math.round(monthlySetAside),
+    totalReliefs, // Step 3 & 4: Total reliefs/deductions
+    taxableIncome, // Step 5: Final taxable income (after expenses and reliefs)
+    taxBrackets, // Step 6: Tax calculation by bracket
+    totalTax: Math.round(totalTax), // Step 6: Total tax payable
+    monthlySetAside: Math.round(monthlySetAside), // Monthly amount to set aside
     quarterlyPayments: quarterlyPayments.map((q) => ({
       ...q,
       amount: Math.round(q.amount),
-    })),
-    effectiveRate: taxableIncome > 0 ? ((totalTax / taxableIncome) * 100).toFixed(2) : 0,
+    })), // Quarterly payment schedule
+    effectiveRate: taxableIncome > 0 ? ((totalTax / taxableIncome) * 100).toFixed(2) : 0, // Effective tax rate
   }
 
   // Include transport allowance breakdown if applicable

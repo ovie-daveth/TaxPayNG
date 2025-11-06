@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button"
 import { Wallet, Download, FileText } from "lucide-react"
+import { getCurrencySymbol } from "@/lib/utils/currency"
 
 interface TaxBreakdownModalContentProps {
   result: any
@@ -26,8 +27,372 @@ export function TaxBreakdownModalContent({ result }: TaxBreakdownModalContentPro
         </div>
       )}
 
-      {/* Income Section - Only show for non-business tax types */}
-      {!isBusinessTax && result.grossIncome !== undefined && (
+      {/* Freelancer/Self-Employed Detailed Breakdown */}
+      {!isBusinessTax && (result.businessType === "freelancer" || result.businessType === "creator" || result.businessType === "employee") && result.grossIncome !== undefined && (
+        <>
+          {/* Step 1: Income Breakdown */}
+          <div className="mb-4">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 p-4 rounded-lg border-2 border-blue-200 dark:border-blue-800">
+              <h4 className="font-semibold text-sm mb-3 text-blue-900 dark:text-blue-100 flex items-center gap-2">
+                <span className="text-lg">📊</span>
+                Step 1: Add Up All Income for the Year
+              </h4>
+              <p className="text-xs text-blue-800 dark:text-blue-200 mb-3">
+                As a freelancer/self-employed person, you must include all income from all clients (local or overseas) for the year.
+              </p>
+              <div className="space-y-2 text-sm">
+                {/* Income Breakdown by Source with Calculation */}
+                {result.incomeBreakdown && result.incomeBreakdown.length > 0 && (
+                  <div className="bg-white/60 dark:bg-gray-800/60 p-3 rounded border border-blue-200 dark:border-blue-700">
+                    <p className="text-xs text-gray-700 dark:text-gray-200 mb-2 font-medium">Income Sources Calculation:</p>
+                    <div className="space-y-2">
+                      {result.incomeBreakdown.map((source: any, index: number) => {
+                        const allTypes = [
+                          { value: "salary", label: "Salary (PAYE)" },
+                          { value: "bonus", label: "Bonus" },
+                          { value: "allowance", label: "Allowances" },
+                          { value: "freelance", label: "Freelance Work" },
+                          { value: "consulting", label: "Consulting" },
+                          { value: "contract", label: "Contract Work" },
+                          { value: "retainer", label: "Retainer Fees" },
+                          { value: "platform_income", label: "Platform Income" },
+                          { value: "remote_work", label: "Remote Work" },
+                          { value: "project_based", label: "Project-Based" },
+                          { value: "hourly_work", label: "Hourly Work" },
+                          { value: "service_fees", label: "Service Fees" },
+                          { value: "commission", label: "Commission" },
+                          { value: "design_services", label: "Design Services" },
+                          { value: "development_services", label: "Development Services" },
+                          { value: "writing_editing", label: "Writing/Editing" },
+                          { value: "translation", label: "Translation" },
+                          { value: "virtual_assistant", label: "Virtual Assistant" },
+                          { value: "online_tutoring", label: "Online Tutoring" },
+                          { value: "training_workshops", label: "Training/Workshops" },
+                          { value: "digital_products", label: "Digital Products" },
+                          { value: "sponsorship", label: "Brand Sponsorships" },
+                          { value: "ad_revenue", label: "Ad Revenue" },
+                          { value: "affiliate", label: "Affiliate Income" },
+                          { value: "brand_deal", label: "Brand Deals" },
+                          { value: "content_licensing", label: "Content Licensing" },
+                          { value: "merchandise", label: "Merchandise Sales" },
+                          { value: "subscription", label: "Subscription Revenue" },
+                          { value: "courses", label: "Online Courses/Coaching" },
+                          { value: "events", label: "Events & Speaking" },
+                          { value: "business_income", label: "Business Income" },
+                          { value: "sales", label: "Product/Service Sales" },
+                          { value: "rental", label: "Rental Income" },
+                          { value: "investment", label: "Investment Income" },
+                          { value: "dividends", label: "Dividends" },
+                          { value: "other", label: "Other Income" },
+                        ]
+                        const typeLabel = allTypes.find(t => t.value === source.type)?.label || source.type.replace(/_/g, " ")
+                        const annualizedAmount = source.amount || 0
+                        const originalAmount = source.originalAmount || annualizedAmount
+                        const multiplier = result.period === "monthly" ? 12 : result.period === "quarterly" ? 4 : 1
+                        const needsAnnualization = result.period === "monthly" || result.period === "quarterly"
+                        const currencySymbol = source.originalCurrency && source.originalCurrency !== "NGN" ? getCurrencySymbol(source.originalCurrency) : "₦"
+                        
+                        return (
+                          <div key={index} className="pb-2 border-b border-blue-100 dark:border-blue-900/50 last:border-0">
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <span className="text-gray-700 dark:text-gray-200 font-medium">{typeLabel}:</span>
+                              <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">
+                                ₦{annualizedAmount.toLocaleString()}
+                              </span>
+                            </div>
+                            {needsAnnualization && originalAmount !== annualizedAmount && (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 font-mono ml-2">
+                                = {currencySymbol}{originalAmount.toLocaleString()} ({result.period === "monthly" ? "monthly" : "quarterly"}) × {multiplier} = ₦{annualizedAmount.toLocaleString()}
+                              </p>
+                            )}
+                            {!needsAnnualization && (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 font-mono ml-2">
+                                = {currencySymbol}{originalAmount.toLocaleString()} (annual)
+                              </p>
+                            )}
+                            {source.originalCurrency && source.originalCurrency !== "NGN" && (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                                Converted from {source.originalCurrency}
+                              </p>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
+                <div className="pt-2 border-t-2 border-blue-300 dark:border-blue-700">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-blue-900 dark:text-blue-100 font-semibold">Total Gross Income:</span>
+                    <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                      ₦{(result.grossIncome || 0).toLocaleString()}
+                    </span>
+                  </div>
+                  {result.incomeBreakdown && result.incomeBreakdown.length > 1 && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono">
+                      = {result.incomeBreakdown.map((s: any) => `₦${(s.amount || 0).toLocaleString()}`).join(" + ")}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Step 2: Business Expenses */}
+          {result.businessExpenses > 0 && (
+            <div className="mb-4">
+              <div className="bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 p-4 rounded-lg border-2 border-orange-200 dark:border-orange-800">
+                <h4 className="font-semibold text-sm mb-3 text-orange-900 dark:text-orange-100 flex items-center gap-2">
+                  <span className="text-lg">💼</span>
+                  Step 2: Subtract Allowable Business Expenses
+                </h4>
+                <p className="text-xs text-orange-800 dark:text-orange-200 mb-3">
+                  Allowable expenses are costs that are <strong>wholly, exclusively, and necessarily</strong> incurred in producing your income.
+                </p>
+                <div className="space-y-2 text-sm">
+                  <div className="bg-white/60 dark:bg-gray-800/60 p-3 rounded border border-orange-200 dark:border-orange-700">
+                    <p className="text-xs text-gray-700 dark:text-gray-200 mb-2 font-medium">Examples of allowable expenses:</p>
+                    <ul className="text-xs text-gray-600 dark:text-gray-400 list-disc list-inside space-y-1">
+                      <li>Internet/data costs</li>
+                      <li>Software subscriptions and licenses</li>
+                      <li>Laptop, computer equipment, and tools</li>
+                      <li>Co-working space rent</li>
+                      <li>Transport to client meetings</li>
+                      <li>Professional fees (accountants, lawyers)</li>
+                      <li>Marketing and promotion costs</li>
+                      <li>Training and professional development</li>
+                    </ul>
+                  </div>
+                  <div className="pt-2 border-t border-orange-200 dark:border-orange-700">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-600 dark:text-gray-300">Gross Income:</span>
+                      <span className="font-mono">₦{(result.grossIncome || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-gray-600 dark:text-gray-300">Less: Business Expenses:</span>
+                      <span className="font-mono text-red-600 dark:text-red-400">-₦{(result.businessExpenses || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="pt-2 border-t-2 border-orange-300 dark:border-orange-700">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-orange-900 dark:text-orange-100 font-semibold">Adjusted Gross Income:</span>
+                        <span className="font-mono font-bold text-orange-600 dark:text-orange-400">
+                          ₦{(result.adjustedGrossIncome || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono">
+                        = ₦{(result.grossIncome || 0).toLocaleString()} - ₦{(result.businessExpenses || 0).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 3: Reliefs & Deductions */}
+          {result.reliefs && result.totalReliefs > 0 && (
+            <div className="mb-4">
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 p-4 rounded-lg border-2 border-green-200 dark:border-green-800">
+                <h4 className="font-semibold text-sm mb-3 text-green-900 dark:text-green-100 flex items-center gap-2">
+                  <span className="text-lg">💰</span>
+                  Step 3: Apply Tax Reliefs & Deductions
+                </h4>
+                <p className="text-xs text-green-800 dark:text-green-200 mb-3">
+                  Even as self-employed, you may claim certain reliefs depending on your status and whether you've opted into certain schemes.
+                </p>
+                <div className="space-y-2 text-sm">
+                  {result.reliefs.rentRelief > 0 && (
+                    <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-gray-700 dark:text-gray-200 font-medium">Rent Relief:</span>
+                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                          -₦{(result.reliefs.rentRelief || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">20% of rent paid, capped at ₦500,000/year</p>
+                    </div>
+                  )}
+                  {result.reliefs.pension > 0 && (
+                    <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-gray-700 dark:text-gray-200 font-medium">Pension Contribution:</span>
+                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                          -₦{(result.reliefs.pension || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">Up to 8% of gross income</p>
+                    </div>
+                  )}
+                  {result.reliefs.healthInsurance > 0 && (
+                    <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-gray-700 dark:text-gray-200 font-medium">Health Insurance (NHIS):</span>
+                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                          -₦{(result.reliefs.healthInsurance || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">Full deduction</p>
+                    </div>
+                  )}
+                  {result.reliefs.housingFund > 0 && (
+                    <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-gray-700 dark:text-gray-200 font-medium">National Housing Fund (NHF):</span>
+                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                          -₦{(result.reliefs.housingFund || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">Full deduction</p>
+                    </div>
+                  )}
+                  {result.reliefs.lifeInsurance > 0 && (
+                    <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-gray-700 dark:text-gray-200 font-medium">Life Insurance:</span>
+                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                          -₦{(result.reliefs.lifeInsurance || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">Full deduction</p>
+                    </div>
+                  )}
+                  {result.reliefs.charitable > 0 && (
+                    <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-gray-700 dark:text-gray-200 font-medium">Charitable Donations:</span>
+                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                          -₦{(result.reliefs.charitable || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">Up to 10% of gross income</p>
+                    </div>
+                  )}
+                  {result.reliefs.transportAllowance > 0 && (
+                    <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="text-gray-700 dark:text-gray-200 font-medium">Transport Allowance Exemption:</span>
+                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                          -₦{(result.reliefs.transportAllowance || 0).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-600 dark:text-gray-400">Up to ₦30,000/month (₦360,000/year) exempt</p>
+                    </div>
+                  )}
+                  <div className="pt-2 border-t-2 border-green-300 dark:border-green-700">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-green-900 dark:text-green-100 font-semibold">Total Reliefs:</span>
+                      <span className="font-mono font-bold text-green-600 dark:text-green-400">
+                        -₦{(result.totalReliefs || 0).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 4: Calculate Taxable Income */}
+          {result.taxableIncome !== undefined && (
+            <div className="mb-4">
+              <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20 p-4 rounded-lg border-2 border-purple-200 dark:border-purple-800">
+                <h4 className="font-semibold text-sm mb-3 text-purple-900 dark:text-purple-100 flex items-center gap-2">
+                  <span className="text-lg">📈</span>
+                  Step 4: Calculate Taxable Income
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="bg-white/60 dark:bg-gray-800/60 p-3 rounded border border-purple-200 dark:border-purple-700">
+                    <p className="text-xs text-gray-700 dark:text-gray-200 mb-2 font-medium">Formula:</p>
+                    <p className="text-xs font-mono bg-gray-100 dark:bg-gray-900 p-2 rounded border border-purple-200 dark:border-purple-700">
+                      Taxable Income = Adjusted Gross Income - Total Reliefs
+                    </p>
+                    <div className="pt-2 space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-600 dark:text-gray-300">Adjusted Gross Income:</span>
+                        <span className="font-mono">₦{(result.adjustedGrossIncome || result.grossIncome || 0).toLocaleString()}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-gray-600 dark:text-gray-300">Less: Total Reliefs:</span>
+                        <span className="font-mono text-green-600 dark:text-green-400">-₦{(result.totalReliefs || 0).toLocaleString()}</span>
+                      </div>
+                      <div className="pt-2 border-t border-purple-200 dark:border-purple-700">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-purple-900 dark:text-purple-100 font-semibold">Taxable Income:</span>
+                          <span className="font-mono font-bold text-purple-600 dark:text-purple-400">
+                            ₦{(result.taxableIncome || 0).toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono">
+                          = ₦{(result.adjustedGrossIncome || result.grossIncome || 0).toLocaleString()} - ₦{(result.totalReliefs || 0).toLocaleString()}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Step 5: Progressive Tax Brackets */}
+          {result.taxBrackets && result.taxBrackets.length > 0 && (
+            <div className="mb-4">
+              <div className="bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-950/20 dark:to-violet-950/20 p-4 rounded-lg border-2 border-indigo-200 dark:border-indigo-800">
+                <h4 className="font-semibold text-sm mb-3 text-indigo-900 dark:text-indigo-100 flex items-center gap-2">
+                  <span className="text-lg">📊</span>
+                  Step 5: Apply Progressive PIT Rate Schedule
+                </h4>
+                <p className="text-xs text-indigo-800 dark:text-indigo-200 mb-3">
+                  Nigerian tax law applies progressive rates to your taxable income. The first ₦800,000 is tax-free, then rates increase progressively.
+                </p>
+                <div className="space-y-3 text-sm">
+                  <div className="bg-white/60 dark:bg-gray-800/60 p-3 rounded border border-indigo-200 dark:border-indigo-700">
+                    <p className="text-xs text-gray-700 dark:text-gray-200 mb-2 font-medium">Tax Brackets:</p>
+                    <div className="space-y-2">
+                      {result.taxBrackets.map((bracket: any, index: number) => (
+                        <div key={index} className="flex items-center justify-between text-xs py-1 border-b border-indigo-100 dark:border-indigo-900/50 last:border-0">
+                          <span className="text-gray-600 dark:text-gray-300">
+                            {bracket.rate === 0 ? (
+                              <span className="text-green-600 dark:text-green-400 font-semibold">Tax-free</span>
+                            ) : (
+                              `${bracket.rate}% on`
+                            )}{" "}
+                            ₦{(bracket.amount || 0).toLocaleString()}
+                          </span>
+                          <div className="flex items-center gap-2">
+                            {bracket.rate > 0 && (
+                              <span className="text-gray-500 dark:text-gray-400 text-xs font-mono">
+                                = ₦{(bracket.amount || 0).toLocaleString()} × {bracket.rate}%
+                              </span>
+                            )}
+                            <span className={`font-mono font-semibold ${bracket.rate === 0 ? 'text-green-600 dark:text-green-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                              {bracket.rate === 0 ? "₦0" : `₦${(bracket.tax || 0).toLocaleString()}`}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t-2 border-indigo-300 dark:border-indigo-700">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-indigo-900 dark:text-indigo-100 font-semibold">Total Tax Payable:</span>
+                      <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-base">
+                        ₦{(result.totalTax || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    {result.effectiveRate && (
+                      <p className="text-xs text-indigo-700 dark:text-indigo-300 mt-1">
+                        Effective Tax Rate: {result.effectiveRate}%
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Legacy Income Section - Only show for non-business tax types that aren't freelancer/creator/employee */}
+      {!isBusinessTax && result.businessType !== "freelancer" && result.businessType !== "creator" && result.businessType !== "employee" && result.grossIncome !== undefined && (
         <div className="bg-muted/50 rounded-lg p-4 mb-4">
           <h3 className="font-semibold text-sm mb-3">Income</h3>
           <div className="space-y-2">
@@ -95,8 +460,8 @@ export function TaxBreakdownModalContent({ result }: TaxBreakdownModalContentPro
         </div>
       )}
 
-      {/* Reliefs & Deductions - Only show for non-business tax types */}
-      {!isBusinessTax && result.reliefs && (
+      {/* Legacy Reliefs & Deductions - Only show for non-business tax types that aren't freelancer/creator/employee */}
+      {!isBusinessTax && result.businessType !== "freelancer" && result.businessType !== "creator" && result.businessType !== "employee" && result.reliefs && (
         <div className="bg-muted/50 rounded-lg p-4 mb-4">
           <h3 className="font-semibold text-sm mb-3">Tax Reliefs & Deductions</h3>
           <div className="space-y-2">
@@ -205,6 +570,9 @@ export function TaxBreakdownModalContent({ result }: TaxBreakdownModalContentPro
               {result.operatingExpensesBreakdown && Object.keys(result.operatingExpensesBreakdown).length > 0 && (
                 <div className="mb-3 pt-3 border-t border-border">
                   <p className="text-xs text-muted-foreground mb-2 font-semibold">Operating Expenses Breakdown:</p>
+                  <p className="text-xs text-muted-foreground mb-3 italic">
+                    These expenses reduce Revenue to calculate Profit Before Tax. They are also allowable deductions for CIT purposes.
+                  </p>
                   {Object.entries(result.operatingExpensesBreakdown).map(([key, value]: [string, any]) => {
                     if (value === 0) return null
                     const labels: Record<string, string> = {
@@ -252,21 +620,16 @@ export function TaxBreakdownModalContent({ result }: TaxBreakdownModalContentPro
                     </span>
                     <span className="font-medium">₦{(result.assessableProfit || 0).toLocaleString()}</span>
                   </div>
+                  {result.revenue !== undefined && result.totalOperatingExpenses !== undefined && (
+                    <p className="text-xs text-muted-foreground mt-1 italic">
+                      = Revenue (₦{(result.revenue || 0).toLocaleString()}) - COGS (₦{(result.costOfGoodsSold || 0).toLocaleString()}) - Operating Expenses (₦{(result.totalOperatingExpenses || 0).toLocaleString()})
+                    </p>
+                  )}
                 </div>
               )}
               
-              {/* Deductions Breakdown */}
-              {result.deductionsBreakdown && result.deductionsBreakdown.length > 0 && (
-                <div className="mb-3 pt-3 border-t border-border">
-                  <p className="text-xs text-muted-foreground mb-2 font-semibold">Allowable Deductions:</p>
-                  {result.deductionsBreakdown.map((deduction: any) => (
-                    <div key={deduction.id} className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-muted-foreground">{deduction.category}:</span>
-                      <span className="font-medium">₦{(deduction.amount || 0).toLocaleString()}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              {/* Note: Operating Expenses are already shown above, so we don't show deductionsBreakdown separately */}
+              {/* The operating expenses ARE the allowable deductions (excluding COGS which is not deductible) */}
               
               {/* Capital Allowances */}
               {result.capitalAllowances && result.capitalAllowances.length > 0 && (
@@ -298,10 +661,22 @@ export function TaxBreakdownModalContent({ result }: TaxBreakdownModalContentPro
               {/* Total Deductions */}
               {(result.totalDeductions !== undefined || result.capitalAllowancesTotal !== undefined) && (
                 <div className="mb-3 pt-3 border-t border-border">
+                  <div className="bg-blue-50 dark:bg-blue-950/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800 mb-2">
+                    <p className="text-xs text-blue-800 dark:text-blue-200 mb-2">
+                      <strong>Note:</strong> Operating expenses (shown above) are allowable deductions for CIT. 
+                      They are deducted from Profit Before Tax along with Capital Allowances to calculate Taxable Profit.
+                    </p>
+                    <p className="text-xs text-blue-800 dark:text-blue-200">
+                      Total deductions = Operating Expenses (excluding COGS) + Capital Allowances
+                    </p>
+                  </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-muted-foreground">Total Allowable Deductions:</span>
                     <span className="font-medium">₦{((result.totalDeductions || 0) + (result.capitalAllowancesTotal || 0)).toLocaleString()}</span>
                   </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    = Operating Expenses (₦{(result.totalDeductions || 0).toLocaleString()}) + Capital Allowances (₦{(result.capitalAllowancesTotal || 0).toLocaleString()})
+                  </p>
                 </div>
               )}
               
@@ -314,13 +689,22 @@ export function TaxBreakdownModalContent({ result }: TaxBreakdownModalContentPro
                       <span className="font-medium">₦{(result.assessableProfit || 0).toLocaleString()}</span>
                     </div>
                     <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Less: Total Deductions:</span>
-                      <span className="font-medium text-green-600">-₦{((result.totalDeductions || 0) + (result.capitalAllowancesTotal || 0)).toLocaleString()}</span>
+                      <span className="text-muted-foreground">Less: Operating Expenses (Allowable Deductions):</span>
+                      <span className="font-medium text-green-600">-₦{(result.totalDeductions || 0).toLocaleString()}</span>
                     </div>
+                    {result.capitalAllowancesTotal !== undefined && result.capitalAllowancesTotal > 0 && (
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Less: Capital Allowances:</span>
+                        <span className="font-medium text-green-600">-₦{(result.capitalAllowancesTotal || 0).toLocaleString()}</span>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between text-sm pt-2 border-t border-border">
                       <span className="font-semibold">Taxable Profit:</span>
                       <span className="font-bold text-lg text-primary">₦{(result.taxableProfit || 0).toLocaleString()}</span>
                     </div>
+                    <p className="text-xs text-muted-foreground mt-2 italic">
+                      = Profit Before Tax - Operating Expenses - Capital Allowances
+                    </p>
                   </div>
                 </div>
               )}
@@ -1247,14 +1631,22 @@ export function TaxBreakdownModalContent({ result }: TaxBreakdownModalContentPro
             </>
           )}
 
-          {/* Standard tax brackets for non-PAYE */}
-          {result.calculationType !== "paye" && result.taxableIncome !== undefined && (
+          {/* Standard tax brackets for non-PAYE and non-freelancer/creator/employee */}
+          {result.calculationType !== "paye" && 
+           result.businessType !== "freelancer" && 
+           result.businessType !== "creator" && 
+           result.businessType !== "employee" && 
+           result.taxableIncome !== undefined && (
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">Taxable Income</span>
               <span className="font-medium">₦{(result.taxableIncome || 0).toLocaleString()}</span>
             </div>
           )}
-          {result.calculationType !== "paye" && result.taxBrackets && result.taxBrackets.length > 0 && result.taxBrackets.map((bracket: any, index: number) => (
+          {result.calculationType !== "paye" && 
+           result.businessType !== "freelancer" && 
+           result.businessType !== "creator" && 
+           result.businessType !== "employee" && 
+           result.taxBrackets && result.taxBrackets.length > 0 && result.taxBrackets.map((bracket: any, index: number) => (
             <div key={index} className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground">
                 {bracket.rate === 0 ? "Tax-free" : `${bracket.rate}% on`} ₦{(bracket.amount || 0).toLocaleString()}
@@ -1262,10 +1654,15 @@ export function TaxBreakdownModalContent({ result }: TaxBreakdownModalContentPro
               <span className="font-medium">{bracket.rate === 0 ? "₦0" : `₦${(bracket.tax || 0).toLocaleString()}`}</span>
             </div>
           ))}
-          <div className="flex items-center justify-between pt-3 border-t-2 border-primary/20">
-            <span className="font-semibold text-base">Total Tax Payable</span>
-            <span className="font-bold text-xl text-primary">₦{(result.totalTax || 0).toLocaleString()}</span>
-          </div>
+          {/* Total Tax Payable - Show for all except freelancer/creator/employee (they have it in Step 5) */}
+          {result.businessType !== "freelancer" && 
+           result.businessType !== "creator" && 
+           result.businessType !== "employee" && (
+            <div className="flex items-center justify-between pt-3 border-t-2 border-primary/20">
+              <span className="font-semibold text-base">Total Tax Payable</span>
+              <span className="font-bold text-xl text-primary">₦{(result.totalTax || 0).toLocaleString()}</span>
+            </div>
+          )}
         </div>
       </div>
 
