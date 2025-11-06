@@ -208,8 +208,14 @@ export function TaxBreakdownModalContent({ result }: TaxBreakdownModalContentPro
           
           {result.calculationType === "development-levy" && (
             <>
+              {result.yearOfAssessment !== undefined && (
+                <div className="flex items-center justify-between text-sm mb-3">
+                  <span className="text-muted-foreground">Year of Assessment</span>
+                  <span className="font-medium">{result.yearOfAssessment}</span>
+                </div>
+              )}
               {result.turnover !== undefined && (
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between text-sm mb-3">
                   <span className="text-muted-foreground">
                     Annual Turnover {result.period && result.period !== "yearly" ? `(${result.period} input annualized)` : ""}
                     {result.period && result.period !== "yearly" && result.originalInputTurnover !== undefined && (
@@ -221,25 +227,82 @@ export function TaxBreakdownModalContent({ result }: TaxBreakdownModalContentPro
                   <span className="font-medium">₦{(result.turnover || 0).toLocaleString()}</span>
                 </div>
               )}
+              {result.totalFixedAssets !== undefined && (
+                <div className="flex items-center justify-between text-sm mb-3">
+                  <span className="text-muted-foreground">Total Fixed Assets</span>
+                  <span className="font-medium">₦{(result.totalFixedAssets || 0).toLocaleString()}</span>
+                </div>
+              )}
+              {result.isSmallCompany !== undefined && (
+                <div className="flex items-center justify-between text-sm mb-3">
+                  <span className="text-muted-foreground">Company Status</span>
+                  <span className="font-medium">{result.isSmallCompany ? "Small Company (Exempt)" : "Large Company"}</span>
+                </div>
+              )}
               {result.assessableProfit !== undefined && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">
-                    Assessable Profit {result.period && result.period !== "yearly" ? `(${result.period} input annualized)` : ""}
-                    {result.period && result.period !== "yearly" && result.originalInputProfit !== undefined && (
-                      <span className="text-xs block text-muted-foreground mt-1">
-                        Input: ₦{(result.originalInputProfit || 0).toLocaleString()} × {result.period === "monthly" ? "12" : "4"} = ₦{(result.assessableProfit || 0).toLocaleString()}
-                      </span>
-                    )}
-                  </span>
-                  <span className="font-medium">₦{(result.assessableProfit || 0).toLocaleString()}</span>
+                <div className="mb-3 pt-3 border-t border-border">
+                  <div className="flex items-center justify-between text-sm mb-2">
+                    <span className="text-muted-foreground">
+                      Assessable Profit {result.period && result.period !== "yearly" ? `(${result.period} input annualized)` : ""}
+                      {result.period && result.period !== "yearly" && result.originalInputProfit !== undefined && (
+                        <span className="text-xs block text-muted-foreground mt-1">
+                          Input: ₦{(result.originalInputProfit || 0).toLocaleString()} × {result.period === "monthly" ? "12" : "4"} = ₦{(result.assessableProfit || 0).toLocaleString()}
+                        </span>
+                      )}
+                    </span>
+                    <span className="font-medium">₦{(result.assessableProfit || 0).toLocaleString()}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground italic">
+                    ℹ️ Assessable profit = Profit before tax depreciation and losses
+                  </p>
                 </div>
               )}
               {result.levyRate !== undefined && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Development Levy Rate</span>
-                  <span className="font-medium">{result.levyRate}%</span>
+                <div className="mb-3 pt-3 border-t border-border">
+                  <div className="flex items-center justify-between text-sm mb-2">
+                    <span className="text-muted-foreground">Development Levy Rate</span>
+                    <span className="font-medium">{result.levyRate}%</span>
+                  </div>
+                  {result.levyRate > 0 && (
+                    <div className="text-xs text-muted-foreground space-y-1">
+                      <p className="font-semibold mb-1">Rate Schedule:</p>
+                      <p>• 2025-2026: 4%</p>
+                      <p>• 2027-2029: 3%</p>
+                      <p>• 2030 onwards: 2%</p>
+                    </div>
+                  )}
                 </div>
               )}
+              {result.assessableProfit !== undefined && result.levyRate !== undefined && result.levyRate > 0 && (
+                <div className="mt-3 pt-3 border-t border-border">
+                  <div className="bg-muted/30 p-3 rounded-lg space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Assessable Profit:</span>
+                      <span className="font-medium">₦{(result.assessableProfit || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Development Levy Rate:</span>
+                      <span className="font-medium">{result.levyRate}%</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm pt-2 border-t border-border">
+                      <span className="font-semibold">Annual Development Levy:</span>
+                      <span className="font-bold text-lg text-primary">₦{(result.annualTax || 0).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {result.isSmallCompany && (
+                <div className="mt-3 p-3 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded">
+                  <p className="text-xs text-green-800 dark:text-green-200 font-medium">
+                    ✅ Small Company Exemption: You are exempt from Development Levy (turnover ≤ ₦100M and assets ≤ ₦250M)
+                  </p>
+                </div>
+              )}
+              <div className="mt-3 p-3 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded">
+                <p className="text-xs text-amber-800 dark:text-amber-200 font-medium">
+                  ⚠️ Important: Development Levy cannot be used as a deduction against CIT. It is calculated and paid separately.
+                </p>
+              </div>
             </>
           )}
           

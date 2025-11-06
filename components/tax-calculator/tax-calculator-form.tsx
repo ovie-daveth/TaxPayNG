@@ -13,6 +13,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Calculator, Info, Plus, X, Trash2, HelpCircle, Loader2, Users, Receipt, Building2, FileText, TrendingUp } from "lucide-react"
 import { calculateNigerianTax } from "@/lib/tax-calculator"
+import { calculateDevelopmentLevy } from "@/lib/tax/development-levy-calculator"
 import { SMEExemptionModal } from "./sme-exemption-modal"
 import { VATForm } from "./vat-form"
 import {
@@ -215,8 +216,8 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
       // Set up for CIT calculation
       setIncomeSources([{ id: "1", type: "business_income", amount: "", currency: "NGN" }])
     } else if (type === "development-levy") {
-      // Set up for Development Levy calculation
-      setIncomeSources([{ id: "1", type: "business_income", amount: "", currency: "NGN" }])
+      // Set up for Development Levy calculation - no income sources needed
+      setIncomeSources([])
     } else if (type === "withholding-tax") {
       // Set up for Withholding Tax calculation
       setIncomeSources([])
@@ -397,14 +398,30 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
     
     // For business tax calculations
     if (userType === "business" && calculationType) {
-      if (calculationType === "cit" || calculationType === "development-levy") {
+      if (calculationType === "cit") {
         // Check if annualTurnover or assessableProfit is provided
         const hasTurnover = annualTurnover && Number.parseFloat(annualTurnover) > 0
         const hasProfit = assessableProfit && Number.parseFloat(assessableProfit) > 0
         const hasIncome = incomeSources.some(s => s.amount && Number.parseFloat(s.amount) > 0)
         
         if (!hasTurnover && !hasProfit && !hasIncome) {
-          validationErrors.push("Please enter Annual Turnover or Assessable Profit for " + (calculationType === "cit" ? "CIT" : "Development Levy") + " calculation")
+          validationErrors.push("Please enter Annual Turnover or Assessable Profit for CIT calculation")
+        }
+      } else if (calculationType === "development-levy") {
+        // Development Levy requires: Annual Turnover, Total Fixed Assets, and Assessable Profit
+        // Income sources are not needed - assessable profit is a direct financial statement figure
+        const hasTurnover = annualTurnover && Number.parseFloat(annualTurnover) > 0
+        const hasProfit = assessableProfit && Number.parseFloat(assessableProfit) > 0
+        
+        if (!hasTurnover) {
+          validationErrors.push("Please enter Annual Turnover for Development Levy calculation")
+        }
+        if (!hasProfit) {
+          validationErrors.push("Please enter Assessable Profit for Development Levy calculation (profit before tax depreciation and losses)")
+        }
+        const hasAssets = totalFixedAssets && Number.parseFloat(totalFixedAssets) > 0
+        if (!hasAssets) {
+          validationErrors.push("Please enter Total Fixed Assets for Development Levy calculation (for small company exemption check)")
         }
       } else if (calculationType === "withholding-tax") {
         // Check if at least one payment is added and has required fields
@@ -463,17 +480,20 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
     }
     
     // Check for invalid income sources (has type but no amount, or has amount but no type)
-    incomeSources.forEach((source, index) => {
-      if (source.type && !source.amount) {
-        validationErrors.push(`Income Source #${index + 1}: Please enter an Amount`)
-      }
-      if (source.amount && !source.type) {
-        validationErrors.push(`Income Source #${index + 1}: Please select an Income Type`)
-      }
-      if (source.amount && Number.parseFloat(source.amount) <= 0) {
-        validationErrors.push(`Income Source #${index + 1}: Please enter a valid Amount (greater than 0)`)
-      }
-    })
+    // Skip this validation for tax types that don't use income sources
+    if (calculationType !== "development-levy" && calculationType !== "withholding-tax" && calculationType !== "vat") {
+      incomeSources.forEach((source, index) => {
+        if (source.type && !source.amount) {
+          validationErrors.push(`Income Source #${index + 1}: Please enter an Amount`)
+        }
+        if (source.amount && !source.type) {
+          validationErrors.push(`Income Source #${index + 1}: Please select an Income Type`)
+        }
+        if (source.amount && Number.parseFloat(source.amount) <= 0) {
+          validationErrors.push(`Income Source #${index + 1}: Please enter a valid Amount (greater than 0)`)
+        }
+      })
+    }
     
     // Show validation errors
     if (validationErrors.length > 0) {
@@ -618,10 +638,15 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
             note: "CIT is calculated annually. Values shown are adjusted for selected period."
           }
         } else if (calculationType === "development-levy") {
-          // Development Levy calculation (4% on assessable profits) - Annual tax
-          // Period selection is for display/payment planning purposes only
-          let turnover = Number.parseFloat(annualTurnover) || totalIncomeAmount
-          let profit = Number.parseFloat(assessableProfit) || (totalIncomeAmount - totalBusinessExp)
+        // Development Levy calculation based on new tax regime
+        // Note: Development Levy only requires direct inputs (turnover, fixed assets, assessable profit)
+        // Income sources are not needed as assessable profit is a direct financial statement figure
+        let turnover = Number.parseFloat(annualTurnover) || 0
+        let profit = Number.parseFloat(assessableProfit) || 0
+          
+          // Store original inputs before annualization
+          const originalInputTurnover = turnover
+          const originalInputProfit = profit
           
           // If period is monthly/quarterly, convert to annual for calculation
           if (period === "monthly") {
@@ -633,44 +658,34 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
           }
           
           const assets = Number.parseFloat(totalFixedAssets) || 0
-          const isSmallCompany = turnover <= 100000000 && assets <= 250000000
+          const currentYear = new Date().getFullYear()
           
-          let levyAmount = 0
-          
-          if (isSmallCompany) {
-            levyAmount = 0 // Exempt
-          } else {
-            levyAmount = (profit * 4) / 100 // 4% of annual assessable profits
-          }
-          
-          // Convert annual levy to selected period for display
-          let periodLevy = levyAmount
-          if (period === "monthly") {
-            periodLevy = levyAmount / 12
-          } else if (period === "quarterly") {
-            periodLevy = levyAmount / 4
-          }
-          
-          // Calculate original input values for display
-          const originalInputTurnover = Number.parseFloat(annualTurnover) || totalIncomeAmount
-          const originalInputProfit = Number.parseFloat(assessableProfit) || (totalIncomeAmount - totalBusinessExp)
+          // Calculate Development Levy using the new calculator
+          const levyResult = calculateDevelopmentLevy({
+            assessableProfit: profit,
+            annualTurnover: turnover,
+            totalFixedAssets: assets,
+            year: currentYear,
+            period: period
+          })
           
           result = {
             calculationType: "development-levy",
             taxType: "Development Levy",
-            turnover: turnover, // Store annual turnover (annualized)
+            turnover: levyResult.annualTurnover, // Store annual turnover (annualized)
             originalInputTurnover: originalInputTurnover, // Original input before annualization
             originalInputProfit: originalInputProfit, // Original input profit before annualization
-            totalFixedAssets: assets,
-            assessableProfit: profit, // Store annual profit (annualized)
-            isSmallCompany: isSmallCompany,
-            levyRate: isSmallCompany ? 0 : 4,
-            totalTax: periodLevy, // Levy for selected period
-            annualTax: levyAmount, // Annual levy amount
-            monthlySetAside: levyAmount / 12,
-            quarterlySetAside: levyAmount / 4,
+            totalFixedAssets: levyResult.totalFixedAssets,
+            assessableProfit: levyResult.assessableProfit, // Store annual profit (annualized)
+            isSmallCompany: levyResult.isSmallCompany,
+            levyRate: levyResult.levyRate,
+            yearOfAssessment: levyResult.yearOfAssessment,
+            totalTax: levyResult.periodLevy, // Levy for selected period
+            annualTax: levyResult.levyAmount, // Annual levy amount
+            monthlySetAside: levyResult.monthlySetAside,
+            quarterlySetAside: levyResult.quarterlySetAside,
             period: period,
-            note: "Development Levy is calculated annually. Values shown are adjusted for selected period."
+            note: `Development Levy is calculated annually at ${levyResult.levyRate}% of assessable profits for Year ${levyResult.yearOfAssessment}. Values shown are adjusted for selected period. Note: This levy cannot be used as a deduction against CIT.`
           }
         } else if (calculationType === "withholding-tax") {
           // Withholding Tax calculation with comprehensive rates
@@ -998,7 +1013,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                   <div>
                     <h4 className="font-semibold mb-1">Development Levy</h4>
                     <p className="text-sm text-muted-foreground">
-                      Calculate 4% levy on assessable profits
+                      Calculate levy on assessable profits (4% for 2025-2026)
                     </p>
                   </div>
                 </div>
@@ -1105,8 +1120,8 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         </div>
 
         {/* Multiple Income Sources */}
-        {/* Hide for WHT and VAT - they use different input methods */}
-        {(calculationType !== "withholding-tax" && calculationType !== "vat") && (
+        {/* Hide for WHT, VAT, and Development Levy - they use different input methods */}
+        {(calculationType !== "withholding-tax" && calculationType !== "vat" && calculationType !== "development-levy") && (
         <div className="border-t border-border pt-6">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -1415,12 +1430,22 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="assessableProfit">Assessable Profit (₦)</Label>
+                  <Label htmlFor="assessableProfit">
+                    Assessable Profit (₦)
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-3 h-3 inline-block ml-1 cursor-help text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p>Assessable Profit is your company's profit BEFORE tax depreciation allowances and tax losses are deducted. This comes from your Profit & Loss statement - typically your "Profit Before Tax" or "Operating Profit". It is NOT calculated from income sources.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </Label>
                   <Input
                     id="assessableProfit"
                     type="text"
                     inputMode="decimal"
-                    placeholder="0.00 (leave empty to auto-calculate)"
+                    placeholder="Enter from your financial statement"
                     value={assessableProfit}
                     onChange={(e) => {
                       const value = e.target.value
@@ -1429,14 +1454,31 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                       }
                     }}
                   />
-                  <p className="text-xs text-muted-foreground">
-                    Profit after all deductions {period === "monthly" ? "(for this month - will be annualized)" : period === "quarterly" ? "(for this quarter - will be annualized)" : "(annual)"} - 4% levy calculated on annual profit
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <p className="text-xs font-semibold text-blue-900 dark:text-blue-100 mb-2">📊 How to find your Assessable Profit:</p>
+                    <p className="text-xs text-blue-800 dark:text-blue-200 mb-2">
+                      <strong>Assessable Profit</strong> comes from your company's Profit & Loss (P&L) statement or Income Statement. It is your profit <strong>before</strong> tax depreciation allowances and tax losses are deducted.
+                    </p>
+                    <p className="text-xs text-blue-800 dark:text-blue-200 mb-2">
+                      <strong>Formula:</strong> Revenue - Cost of Goods Sold - Operating Expenses = <strong>Assessable Profit</strong>
+                    </p>
+                    <p className="text-xs text-blue-800 dark:text-blue-200">
+                      <strong>Where to find it:</strong> Look at your P&L statement for "Profit Before Tax" or "Operating Profit" - this is typically your assessable profit (or very close to it). If you're not sure, use your profit before tax depreciation and losses.
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Development Levy rate varies by year: <strong>4%</strong> for 2025-2026, <strong>3%</strong> for 2027-2029, <strong>2%</strong> from 2030 onwards.
                   </p>
                 </div>
                 <div className="p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg">
                   <p className="text-sm text-green-700 dark:text-green-300">
                     <strong>Small Company:</strong> Turnover ≤ ₦100M AND Assets ≤ ₦250M → <strong>Exempt</strong><br />
-                    <strong>Other Companies:</strong> 4% levy on assessable profits
+                    <strong>Other Companies:</strong> Rate varies by year (4% for 2025-2026)
+                  </p>
+                </div>
+                <div className="p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg">
+                  <p className="text-xs text-amber-800 dark:text-amber-200">
+                    ⚠️ <strong>Important:</strong> Development Levy cannot be used as a deduction against CIT. It is calculated and paid separately.
                   </p>
                 </div>
               </div>
