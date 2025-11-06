@@ -402,23 +402,128 @@ export function TaxBreakdownModalContent({ result }: TaxBreakdownModalContentPro
           {result.calculationType === "vat" && (
             <>
               {result.turnover !== undefined && (
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between text-sm mb-3">
                   <span className="text-muted-foreground">
                     Annual Turnover {result.period && result.period !== "yearly" ? `(${result.period} input annualized for exemption check)` : "(for exemption check)"}
                   </span>
                   <span className="font-medium">₦{(result.turnover || 0).toLocaleString()}</span>
                 </div>
               )}
-              {result.taxableSupplies !== undefined && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Taxable Supplies</span>
-                  <span className="font-medium">₦{(result.taxableSupplies || 0).toLocaleString()}</span>
+              {result.isSmallCompany !== undefined && (
+                <div className="flex items-center justify-between text-sm mb-3">
+                  <span className="text-muted-foreground">Company Status</span>
+                  <span className="font-medium">{result.isSmallCompany ? "Small Company (Exempt)" : "VAT Registered"}</span>
                 </div>
               )}
-              {result.inputTax !== undefined && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Input Tax Credit</span>
-                  <span className="font-medium text-green-600">-₦{(result.inputTax || 0).toLocaleString()}</span>
+              
+              {/* Supplies Breakdown */}
+              {result.supplies && result.supplies.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-border">
+                  <p className="text-xs text-muted-foreground mb-2 font-semibold">Supplies Breakdown:</p>
+                  {result.supplies.map((supply: any, index: number) => (
+                    <div key={index} className="mb-2 p-2 bg-muted/30 rounded border border-border">
+                      <div className="flex items-center justify-between text-xs mb-1">
+                        <span className="font-medium">{supply.description}</span>
+                        <span className={`text-xs px-2 py-0.5 rounded ${
+                          supply.status === "taxable" ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-100" :
+                          supply.status === "exempt" ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" :
+                          "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100"
+                        }`}>
+                          {supply.status === "taxable" ? "Taxable (7.5%)" : supply.status === "exempt" ? "Exempt" : "Zero-Rated"}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Amount:</span>
+                        <span className="font-medium">₦{(supply.amount || 0).toLocaleString()}</span>
+                      </div>
+                      {supply.vatAmount > 0 && (
+                        <div className="flex items-center justify-between text-xs mt-1">
+                          <span className="text-muted-foreground">VAT:</span>
+                          <span className="font-medium text-primary">₦{(supply.vatAmount || 0).toLocaleString()}</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-border">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Taxable</p>
+                      <p className="font-semibold text-sm">₦{(result.taxableSupplies || 0).toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Exempt</p>
+                      <p className="font-semibold text-sm">₦{(result.exemptSupplies || 0).toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Zero-Rated</p>
+                      <p className="font-semibold text-sm">₦{(result.zeroRatedSupplies || 0).toLocaleString()}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Output VAT */}
+              {result.outputVat !== undefined && (
+                <div className="flex items-center justify-between text-sm mt-3 pt-3 border-t border-border">
+                  <span className="text-muted-foreground">Output VAT (7.5% on taxable supplies):</span>
+                  <span className="font-medium">₦{(result.outputVat || 0).toLocaleString()}</span>
+                </div>
+              )}
+              
+              {/* Input VAT Breakdown */}
+              {result.inputVATEntries && result.inputVATEntries.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-border">
+                  <p className="text-xs text-muted-foreground mb-2 font-semibold">Input VAT Breakdown:</p>
+                  {result.inputVATEntries.map((entry: any, index: number) => (
+                    <div key={index} className="mb-1 flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">{entry.description} {entry.eligibleForCredit ? '(Eligible)' : '(Not Eligible)'}</span>
+                      <span className="font-medium">₦{(entry.amount || 0).toLocaleString()}</span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between text-sm mt-2 pt-2 border-t border-border/50">
+                    <span className="text-muted-foreground">Total Input VAT:</span>
+                    <span className="font-medium">₦{(result.inputTax || 0).toLocaleString()}</span>
+                  </div>
+                  {result.eligibleInputVAT !== undefined && (
+                    <div className="flex items-center justify-between text-sm mt-1">
+                      <span className="text-muted-foreground">Eligible Input VAT (Credit):</span>
+                      <span className="font-medium text-green-600 dark:text-green-400">-₦{(result.eligibleInputVAT || 0).toLocaleString()}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {/* Net VAT Calculation */}
+              {result.outputVat !== undefined && result.eligibleInputVAT !== undefined && (
+                <div className="mt-3 pt-3 border-t border-border">
+                  <div className="bg-muted/30 p-3 rounded-lg space-y-2">
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Output VAT:</span>
+                      <span className="font-medium">₦{(result.outputVat || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Less: Eligible Input VAT:</span>
+                      <span className="font-medium text-green-600 dark:text-green-400">-₦{(result.eligibleInputVAT || 0).toLocaleString()}</span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm pt-2 border-t border-border">
+                      <span className="font-semibold">Net VAT Payable:</span>
+                      <span className="font-bold text-lg text-primary">₦{(result.totalTax || 0).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Net VAT (fallback if calculation section isn't shown) */}
+              {(!result.outputVat || result.eligibleInputVAT === undefined) && (
+                <div className="flex items-center justify-between text-sm mt-3 pt-3 border-t-2 border-primary/30">
+                  <span className="font-semibold">Net VAT Payable:</span>
+                  <span className="font-bold text-lg text-primary">₦{(result.totalTax || 0).toLocaleString()}</span>
+                </div>
+              )}
+              
+              {result.annualNetVATProjection !== undefined && result.period !== "yearly" && (
+                <div className="flex items-center justify-between text-xs mt-2 text-muted-foreground">
+                  <span>Annual Projection:</span>
+                  <span>₦{(result.annualNetVATProjection || 0).toLocaleString()}</span>
                 </div>
               )}
             </>

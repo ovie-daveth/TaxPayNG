@@ -14,6 +14,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Calculator, Info, Plus, X, Trash2, HelpCircle, Loader2, Users, Receipt, Building2, FileText, TrendingUp } from "lucide-react"
 import { calculateNigerianTax } from "@/lib/tax-calculator"
 import { SMEExemptionModal } from "./sme-exemption-modal"
+import { VATForm } from "./vat-form"
 import {
   SUPPORTED_CURRENCIES,
   type CurrencyCode,
@@ -442,13 +443,10 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
           })
         }
       } else if (calculationType === "vat") {
-        // Check if taxableSupplies is provided
-        const hasTaxableSupplies = vatTaxableSupplies && Number.parseFloat(vatTaxableSupplies) > 0
-        const hasIncome = incomeSources.some(s => s.amount && Number.parseFloat(s.amount) > 0)
-        
-        if (!hasTaxableSupplies && !hasIncome) {
-          validationErrors.push("Please enter Taxable Supplies for VAT calculation")
-        }
+        // VAT calculation is handled by VATForm component with its own "Calculate VAT" button
+        // Skip validation here as VATForm handles its own validation and submission
+        // Return early to prevent main form submission for VAT
+        return
       } else if (calculationType === "paye") {
         // PAYE needs income
         const hasIncome = incomeSources.some(s => s.amount && Number.parseFloat(s.amount) > 0)
@@ -816,64 +814,12 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
             note: `WHT is calculated per payment. Amounts shown are for ${period} period. WHT must be remitted monthly by the 21st of the following month. WHT on income received can be claimed as credit against CIT, but does not reduce WHT remittance.`
           }
         } else if (calculationType === "vat") {
-          // VAT calculation (7.5% on taxable supplies) - Period directly affects calculation
-          // VAT returns are filed monthly, but you can calculate for any period
-          const turnoverInput = Number.parseFloat(vatTurnover) || Number.parseFloat(annualTurnover) || totalIncomeAmount
-          const taxableSuppliesInput = Number.parseFloat(vatTaxableSupplies) || totalIncomeAmount
-          const inputTaxInput = Number.parseFloat(vatInputTax) || 0
-          
-          // Convert to annual for small company status check
-          let annualTurnoverForCheck = turnoverInput
-          if (period === "monthly") {
-            annualTurnoverForCheck = turnoverInput * 12
-          } else if (period === "quarterly") {
-            annualTurnoverForCheck = turnoverInput * 4
-          }
-          
-          const isSmallCompany = annualTurnoverForCheck < 100000000
-          
-          // Calculate VAT for the selected period (use input values as-is for period calculation)
-          const taxableSupplies = taxableSuppliesInput // Supplies for selected period
-          const inputTax = inputTaxInput // Input tax for selected period
-          
-          let vatAmount = 0
-          let outputVat = 0
-          let netVat = 0
-          
-          if (isSmallCompany) {
-            vatAmount = 0 // Exempt
-            outputVat = 0
-            netVat = 0
-          } else {
-            outputVat = (taxableSupplies * 7.5) / 100 // 7.5% VAT on period supplies
-            netVat = Math.max(outputVat - inputTax, 0) // VAT payable after input tax credits
-            vatAmount = netVat
-          }
-          
-          // Calculate annual projection for display
-          let annualVATProjection = vatAmount
-          if (period === "monthly") {
-            annualVATProjection = vatAmount * 12
-          } else if (period === "quarterly") {
-            annualVATProjection = vatAmount * 4
-          }
-          
-          result = {
-            calculationType: "vat",
-            taxType: "Value Added Tax (VAT)",
-            turnover: annualTurnoverForCheck, // Store annual turnover for status check
-            isSmallCompany: isSmallCompany,
-            taxableSupplies: taxableSupplies, // Taxable supplies for selected period
-            inputTax: inputTax, // Input tax for selected period
-            outputVat: outputVat,
-            vatRate: isSmallCompany ? 0 : 7.5,
-            totalTax: vatAmount, // VAT for selected period
-            annualVATProjection: annualVATProjection, // Projected annual VAT
-            monthlySetAside: period === "yearly" ? vatAmount / 12 : (period === "quarterly" ? vatAmount / 3 : vatAmount),
-            quarterlySetAside: period === "yearly" ? vatAmount / 4 : (period === "monthly" ? vatAmount * 3 : vatAmount),
-            period: period,
-            note: `VAT is calculated for ${period} period. VAT returns must be filed monthly by the 21st of the following month.`
-          }
+          // VAT calculation is now handled by VATForm component
+          // This code path is kept for backward compatibility but shouldn't be reached
+          // VATForm handles its own calculation via the "Calculate VAT" button
+          toast.error("Please use the 'Calculate VAT' button in the VAT section")
+          setConverting(false)
+          return
         }
 
         // Add income breakdown with currency information
@@ -1159,7 +1105,8 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         </div>
 
         {/* Multiple Income Sources */}
-        {(calculationType !== "withholding-tax") && (
+        {/* Hide for WHT and VAT - they use different input methods */}
+        {(calculationType !== "withholding-tax" && calculationType !== "vat") && (
         <div className="border-t border-border pt-6">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -1822,76 +1769,44 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
             )}
 
             {calculationType === "vat" && (
-              <div className="space-y-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <Receipt className="w-5 h-5 text-primary" />
-                  <h3 className="font-semibold">VAT Information</h3>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="vatTurnover">Annual Turnover (₦)</Label>
-                  <Input
-                    id="vatTurnover"
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    value={vatTurnover}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                        setVatTurnover(value)
-                      }
-                    }}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Annual turnover to determine VAT registration requirement
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="vatTaxableSupplies">Taxable Supplies (₦)</Label>
-                  <Input
-                    id="vatTaxableSupplies"
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    value={vatTaxableSupplies}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                        setVatTaxableSupplies(value)
-                      }
-                    }}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Value of taxable supplies for {period === "monthly" ? "this month" : period === "quarterly" ? "this quarter" : "the year"} (VAT calculated at 7.5% for this period)
-                  </p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="vatInputTax">Input Tax Credit (₦)</Label>
-                  <Input
-                    id="vatInputTax"
-                    type="text"
-                    inputMode="decimal"
-                    placeholder="0.00"
-                    value={vatInputTax}
-                    onChange={(e) => {
-                      const value = e.target.value
-                      if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                        setVatInputTax(value)
-                      }
-                    }}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    VAT paid on business expenses for {period === "monthly" ? "this month" : period === "quarterly" ? "this quarter" : "the year"} (can be claimed as credit)
-                  </p>
-                </div>
-                <div className="p-4 bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-800 rounded-lg">
-                  <p className="text-sm text-green-700 dark:text-green-300">
-                    <strong>Small Company:</strong> Turnover &lt; ₦100M → <strong>Exempt</strong> from VAT<br />
-                    <strong>VAT Registered:</strong> Turnover ≥ ₦100M → Charge VAT at <strong>7.5%</strong> on taxable supplies<br />
-                    <strong>Note:</strong> Certain items are VAT-exempt (agricultural inputs, medical supplies, educational materials)
-                  </p>
-                </div>
-              </div>
+              <VATForm
+                period={period}
+                annualTurnover={vatTurnover || annualTurnover}
+                onAnnualTurnoverChange={(value) => {
+                  setVatTurnover(value)
+                  setAnnualTurnover(value)
+                }}
+                onCalculate={(vatResult) => {
+                  // Format result to match expected structure
+                  const result = {
+                    calculationType: "vat",
+                    taxType: "Value Added Tax (VAT)",
+                    turnover: vatResult.annualTurnover,
+                    isSmallCompany: vatResult.isSmallCompany,
+                    taxableSupplies: vatResult.totalTaxableSupplies,
+                    exemptSupplies: vatResult.totalExemptSupplies,
+                    zeroRatedSupplies: vatResult.totalZeroRatedSupplies,
+                    supplies: vatResult.supplies,
+                    inputVATEntries: vatResult.inputVATEntries,
+                    outputVat: vatResult.outputVAT,
+                    inputTax: vatResult.totalInputVAT,
+                    eligibleInputVAT: vatResult.eligibleInputVAT,
+                    vatRate: vatResult.isSmallCompany ? 0 : 7.5,
+                    totalTax: vatResult.netVATPayable,
+                    periodOutputVAT: vatResult.periodOutputVAT,
+                    periodNetVAT: vatResult.periodNetVAT,
+                    annualOutputVATProjection: vatResult.annualOutputVATProjection,
+                    annualNetVATProjection: vatResult.annualNetVATProjection,
+                    monthlySetAside: period === "yearly" ? vatResult.netVATPayable / 12 : (period === "quarterly" ? vatResult.netVATPayable / 3 : vatResult.netVATPayable),
+                    quarterlySetAside: period === "yearly" ? vatResult.netVATPayable / 4 : (period === "monthly" ? vatResult.netVATPayable * 3 : vatResult.netVATPayable),
+                    period: period,
+                    note: `VAT is calculated for ${period} period. VAT returns must be filed monthly by the 21st of the following month.`
+                  }
+                  
+                  // Trigger the calculation callback
+                  onCalculate(result)
+                }}
+              />
             )}
           </div>
         )}
@@ -2165,10 +2080,13 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
           </>
         )}
 
-        <Button type="submit" className="w-full" size="lg" disabled={converting}>
-          <Calculator className="w-4 h-4 mr-2" />
-          {converting ? "Converting Currency..." : "Calculate Tax"}
-        </Button>
+        {/* Hide Calculate Tax button for VAT - VATForm has its own Calculate VAT button */}
+        {calculationType !== "vat" && (
+          <Button type="submit" className="w-full" size="lg" disabled={converting}>
+            <Calculator className="w-4 h-4 mr-2" />
+            {converting ? "Converting Currency..." : "Calculate Tax"}
+          </Button>
+        )}
           </>
         )}
         </form>
