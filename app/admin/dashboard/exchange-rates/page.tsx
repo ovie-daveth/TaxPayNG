@@ -10,7 +10,7 @@ import { useAuth } from "@/lib/hooks/useAuth"
 import { useAdmin } from "@/lib/hooks/useAdmin"
 import { exchangeRateService, type ExchangeRate } from "@/lib/services/exchangeRateService"
 import { toast } from "sonner"
-import { Save, RefreshCw, Plus, Trash2, Edit } from "lucide-react"
+import { Save, RefreshCw, Plus, Trash2, Edit, Loader2 } from "lucide-react"
 import { AdminTableSkeleton } from "@/components/ui/skeletons"
 import { SUPPORTED_CURRENCIES } from "@/lib/utils/currency"
 import {
@@ -334,10 +334,10 @@ export default function AdminExchangeRatesPage() {
                                 step="0.01"
                                 min="0.01"
                                 className="w-32"
-                                value={editedRate.rate}
+                                value={editedRate?.rate || 0}
                                 onChange={(e) =>
                                   setEditingRate({
-                                    ...editedRate,
+                                    ...editedRate!,
                                     rate: Number.parseFloat(e.target.value) || 0,
                                   })
                                 }
@@ -347,7 +347,7 @@ export default function AdminExchangeRatesPage() {
                             <Button
                               size="sm"
                               onClick={() => {
-                                handleSave(editedRate)
+                                handleSave(editedRate!)
                                 setEditingRate(null)
                               }}
                               disabled={saving === rate.id}

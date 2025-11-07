@@ -14,6 +14,8 @@ import { TaxCalculatorForm } from "@/components/tax-calculator/form/tax-calculat
 import { TaxRatesInfo } from "@/components/tax-calculator/tax-rates-info"
 import { ThemeToggle } from "@/components/theme-toggle"
 import OtaxLogo from "@/components/OtaxLogo"
+import { sendWaitlistVerification } from "@/lib/utils/emailVerification"
+import { TokenInputDialog } from "@/components/waitlist/token-input-dialog"
 import { StatsCards } from "./components/stats-cards"
 import { RecentTransactions } from "./components/recent-transactions"
 import { UpcomingReminders } from "./components/upcoming-reminders"
@@ -49,6 +51,8 @@ export default function DemoPage() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
+  const [showTokenDialog, setShowTokenDialog] = useState(false)
+  const [pendingEmail, setPendingEmail] = useState("")
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [activeSection, setActiveSection] = useState("dashboard")
@@ -90,33 +94,26 @@ export default function DemoPage() {
         }
       }
 
-      const q = query(collection(db, "waitlist"), where("email", "==", waitlistData.email.toLowerCase()))
-      const existing = await getDocs(q)
-      if (!existing.empty) {
-        toast.error("That email is already on the waitlist!")
+      // Send verification token via email
+      const verificationToast = toast.loading("Sending verification code...")
+      const verificationResult = await sendWaitlistVerification(
+        waitlistData.email.trim(),
+        waitlistData.name.trim(),
+        waitlistData.phone
+      )
+      
+      toast.dismiss(verificationToast)
+
+      if (!verificationResult.success) {
+        toast.error(verificationResult.error || "Failed to send verification code")
         setIsSubmitting(false)
         return
       }
 
-      // Save to Firestore
-      const data = {
-        name: waitlistData.name.trim(),
-        email: waitlistData.email.trim().toLowerCase(),
-        phone: waitlistData.phone ? waitlistData.phone.replace(/\s/g, "") : "",
-        createdAt: new Date().toISOString(),
-        status: "pending",
-        notified: false
-      }
-
-      const emailId = waitlistData.email.trim().toLowerCase()
-
-      await setDoc(doc(db, "waitlist", emailId), data)
-      
-      setIsSubmitted(true)
-      toast.success("🎉 You're on the waitlist! We'll notify you when we launch.")
-      
-      // Reset form
-      setWaitlistData({ name: "", email: "", phone: "" })
+      // Show token input dialog
+      setPendingEmail(verificationResult.email || waitlistData.email.trim())
+      setShowTokenDialog(true)
+      setIsSubmitting(false)
     } catch (error) {
       console.error("Error submitting waitlist:", error)
       toast.error("Oops! Something went wrong. Please try again.")
@@ -517,6 +514,18 @@ export default function DemoPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Token Input Dialog */}
+      <TokenInputDialog
+        open={showTokenDialog}
+        onOpenChange={setShowTokenDialog}
+        email={pendingEmail}
+        onVerified={() => {
+          setIsSubmitted(true)
+          setWaitlistData({ name: "", email: "", phone: "" })
+          setShowTokenDialog(false)
+        }}
+      />
     </div>
   )
 }

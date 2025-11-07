@@ -12,8 +12,11 @@ import { useAuth } from "@/lib/hooks/useAuth"
 import { toast } from "sonner"
 import { db } from "@/firebase/firebase"
 import { collection, addDoc, query, where, getDocs, setDoc, doc } from "firebase/firestore"
+import { useEffect } from "react"
 import OtaxLogo from "@/components/OtaxLogo"
 import Footer from "@/components/footer"
+import { sendWaitlistVerification } from "@/lib/utils/emailVerification"
+import { TokenInputDialog } from "@/components/waitlist/token-input-dialog"
 
 export default function HomePage() {
   const { user, logout, loading } = useAuth()
@@ -26,6 +29,29 @@ export default function HomePage() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
+  const [showTokenDialog, setShowTokenDialog] = useState(false)
+  const [pendingEmail, setPendingEmail] = useState("")
+
+  // Check for verification status in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const verified = params.get('verified')
+    const email = params.get('email')
+    
+    if (verified === 'true') {
+      toast.success(`✅ Email verified! ${email ? `Welcome ${email}` : 'You\'re now on the waitlist!'}`)
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname)
+    } else if (params.get('error')) {
+      const error = params.get('error')
+      let errorMessage = 'Verification failed'
+      if (error === 'invalid_token') errorMessage = 'Invalid verification link'
+      else if (error === 'token_expired') errorMessage = 'Verification link expired. Please sign up again.'
+      else if (error === 'not_found') errorMessage = 'Email not found in waitlist'
+      toast.error(errorMessage)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
 
   const handleLogout = async () => {
     const result = await logout()
@@ -68,35 +94,26 @@ export default function HomePage() {
         }
       }
 
-   
-      const q = query(collection(db, "waitlist"), where("email", "==", waitlistData.email.toLowerCase()))
-      const existing = await getDocs(q)
-      if (!existing.empty) {
-        toast.error("That email is already on the waitlist!")
+      // Send verification token via email
+      const verificationToast = toast.loading("Sending verification code...")
+      const verificationResult = await sendWaitlistVerification(
+        waitlistData.email.trim(),
+        waitlistData.name.trim(),
+        waitlistData.phone
+      )
+      
+      toast.dismiss(verificationToast)
+
+      if (!verificationResult.success) {
+        toast.error(verificationResult.error || "Failed to send verification code")
         setIsSubmitting(false)
         return
       }
 
-      // Save to Firestore
-      const data = {
-        name: waitlistData.name.trim(),
-        email: waitlistData.email.trim().toLowerCase(),
-        phone: waitlistData.phone ? waitlistData.phone.replace(/\s/g, "") : "",
-        createdAt: new Date().toISOString(),
-        status: "pending",
-        notified: false
-      }
-
-      const emailId = waitlistData.email.trim().toLowerCase()
-
-      await setDoc(doc(db, "waitlist", emailId), data)
-
-      
-      setIsSubmitted(true)
-      toast.success("🎉 You're on the waitlist! We'll notify you when we launch.")
-      
-      // Reset form
-      setWaitlistData({ name: "", email: "", phone: "" })
+      // Show token input dialog
+      setPendingEmail(verificationResult.email || waitlistData.email.trim())
+      setShowTokenDialog(true)
+      setIsSubmitting(false)
     } catch (error) {
       console.error("Error submitting waitlist:", error)
       toast.error("Oops! Something went wrong. Please try again.")
@@ -522,6 +539,18 @@ export default function HomePage() {
 
       {/* Footer */}
       <Footer />
+
+      {/* Token Input Dialog */}
+      <TokenInputDialog
+        open={showTokenDialog}
+        onOpenChange={setShowTokenDialog}
+        email={pendingEmail}
+        onVerified={() => {
+          setIsSubmitted(true)
+          setWaitlistData({ name: "", email: "", phone: "" })
+          setShowTokenDialog(false)
+        }}
+      />
     </div>
   )
 }

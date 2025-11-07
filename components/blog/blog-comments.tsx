@@ -10,6 +10,8 @@ import { db } from "@/firebase/firebase"
 import { collection, addDoc, query, where, getDocs, orderBy, onSnapshot, doc, getDoc, setDoc } from "firebase/firestore"
 import { toast } from "sonner"
 import { format } from "date-fns"
+import { sendWaitlistVerification } from "@/lib/utils/emailVerification"
+import { TokenInputDialog } from "@/components/waitlist/token-input-dialog"
 
 interface Comment {
   id: string
@@ -46,6 +48,8 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
   })
   const [isSubmittingWaitlist, setIsSubmittingWaitlist] = useState(false)
   const [isWaitlistSubmitted, setIsWaitlistSubmitted] = useState(false)
+  const [showTokenDialog, setShowTokenDialog] = useState(false)
+  const [pendingEmail, setPendingEmail] = useState("")
 
   // Check if email is on waitlist
   const checkWaitlistStatus = async (email: string) => {
@@ -236,52 +240,26 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
         }
       }
 
-      const emailLower = waitlistForm.email.toLowerCase().trim()
-      const waitlistDoc = await getDoc(doc(db, "waitlist", emailLower))
+      // Send verification token via email
+      const verificationToast = toast.loading("Sending verification code...")
+      const verificationResult = await sendWaitlistVerification(
+        waitlistForm.email.trim(),
+        waitlistForm.name.trim(),
+        waitlistForm.phone
+      )
       
-      if (waitlistDoc.exists()) {
-        toast.error("That email is already on the waitlist!")
+      toast.dismiss(verificationToast)
+
+      if (!verificationResult.success) {
+        toast.error(verificationResult.error || "Failed to send verification code")
         setIsSubmittingWaitlist(false)
         return
       }
 
-      await setDoc(doc(db, "waitlist", emailLower), {
-        name: waitlistForm.name.trim(),
-        email: emailLower,
-        phone: waitlistForm.phone ? waitlistForm.phone.replace(/\s/g, "") : "",
-        createdAt: new Date().toISOString(),
-        status: "pending",
-        notified: false
-      })
-
-      setIsWaitlistSubmitted(true)
-      setIsOnWaitlist(true)
-      toast.success("🎉 You're on the waitlist! You can now comment.")
-      
-      // Auto-submit comment after joining waitlist
-      setTimeout(async () => {
-        try {
-          const commentData = {
-            blogId: blogId.toString(),
-            name: waitlistForm.name.trim(),
-            email: emailLower,
-            comment: commentForm.comment.trim(),
-            createdAt: new Date().toISOString()
-          }
-          
-          console.log("Auto-submitting comment after waitlist:", commentData)
-          const docRef = await addDoc(collection(db, "blogComments"), commentData)
-          console.log("Comment submitted with ID:", docRef.id)
-          
-          toast.success("Comment posted successfully!")
-          setCommentForm({ name: "", email: "", comment: "" })
-          setShowWaitlistModal(false)
-          setIsWaitlistSubmitted(false)
-        } catch (error) {
-          console.error("Error submitting comment:", error)
-          toast.error("Failed to post comment. Please try again.")
-        }
-      }, 1500)
+      // Show token input dialog
+      setPendingEmail(verificationResult.email || waitlistForm.email.trim())
+      setShowTokenDialog(true)
+      setIsSubmittingWaitlist(false)
     } catch (error) {
       console.error("Error submitting waitlist:", error)
       toast.error("Oops! Something went wrong. Please try again.")
@@ -492,6 +470,39 @@ export function BlogComments({ blogId }: BlogCommentsProps) {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Token Input Dialog */}
+      <TokenInputDialog
+        open={showTokenDialog}
+        onOpenChange={setShowTokenDialog}
+        email={pendingEmail}
+        onVerified={async () => {
+          setIsWaitlistSubmitted(true)
+          setIsOnWaitlist(true)
+          setShowWaitlistModal(false)
+          setShowTokenDialog(false)
+          
+          // Auto-submit comment after verification
+          try {
+            const emailLower = pendingEmail.toLowerCase().trim()
+            const commentData = {
+              blogId: blogId.toString(),
+              name: waitlistForm.name.trim(),
+              email: emailLower,
+              comment: commentForm.comment.trim(),
+              createdAt: new Date().toISOString()
+            }
+            
+            const docRef = await addDoc(collection(db, "blogComments"), commentData)
+            toast.success("Comment posted successfully!")
+            setCommentForm({ name: "", email: "", comment: "" })
+            setIsWaitlistSubmitted(false)
+          } catch (error) {
+            console.error("Error submitting comment:", error)
+            toast.error("Failed to post comment. Please try again.")
+          }
+        }}
+      />
     </div>
   )
 }
