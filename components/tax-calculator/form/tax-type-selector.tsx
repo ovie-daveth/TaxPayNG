@@ -12,18 +12,18 @@ export function TaxTypeSelector({ calculationType, onCalculationTypeChange }: Ta
   if (!calculationType) return null
 
   return (
-    <div className="space-y-2">
-      <Label htmlFor="taxType">Tax Type</Label>
+    <div className="space-y-1.5 sm:space-y-2">
+      <Label htmlFor="taxType" className="text-sm sm:text-base">Tax Type</Label>
       <Select value={calculationType} onValueChange={onCalculationTypeChange}>
-        <SelectTrigger id="taxType">
+        <SelectTrigger id="taxType" className="h-9 sm:h-10 text-sm sm:text-base">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="paye">Employee (PAYE)</SelectItem>
-          <SelectItem value="cit">Company Income Tax (CIT)</SelectItem>
-          <SelectItem value="development-levy">Development Levy</SelectItem>
-          <SelectItem value="withholding-tax">Withholding Tax</SelectItem>
-          <SelectItem value="vat">VAT</SelectItem>
+          <SelectItem value="paye" className="text-sm">Employee (PAYE)</SelectItem>
+          <SelectItem value="cit" className="text-sm">Company Income Tax (CIT)</SelectItem>
+          <SelectItem value="development-levy" className="text-sm">Development Levy</SelectItem>
+          <SelectItem value="withholding-tax" className="text-sm">Withholding Tax</SelectItem>
+          <SelectItem value="vat" className="text-sm">VAT</SelectItem>
         </SelectContent>
       </Select>
     </div>

@@ -41,11 +41,11 @@ export function IncomeSourcesSection({
   incomeTypeHelp,
 }: IncomeSourcesSectionProps) {
   return (
-    <div className="border-t border-border pt-6">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h3 className="font-semibold">Income Sources</h3>
-          <p className="text-sm text-muted-foreground">
+    <div className="border-t border-border pt-4 sm:pt-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-3 sm:mb-4">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-base sm:text-lg font-semibold">Income Sources</h3>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
             Add all your income streams - we'll automatically calculate the total
           </p>
         </div>
@@ -54,35 +54,35 @@ export function IncomeSourcesSection({
           variant="outline"
           size="sm"
           onClick={onAddIncomeSource}
-          className="flex items-center gap-2"
+          className="flex items-center gap-1.5 sm:gap-2 self-start sm:self-auto shrink-0"
         >
-          <Plus className="w-4 h-4" />
-          Add Income
+          <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+          <span className="text-xs sm:text-sm">Add Income</span>
         </Button>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {incomeSources.map((source, index) => {
           const availableTypes = getAvailableIncomeTypes()
           return (
             <div
               key={source.id}
-              className="flex flex-col sm:flex-row gap-3 p-4 border border-border rounded-lg bg-muted/30"
+              className="flex flex-col sm:flex-row gap-3 p-3 sm:p-4 border border-border rounded-lg bg-muted/30"
             >
               <div className="flex-1 grid sm:grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor={`income-type-${source.id}`}>
+                <div className="space-y-1.5 sm:space-y-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <Label htmlFor={`income-type-${source.id}`} className="text-xs sm:text-sm">
                       Income Type {index + 1}
                     </Label>
                     {incomeTypeHelp[source.type] && (
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                            <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground cursor-help flex-shrink-0" />
                           </TooltipTrigger>
                           <TooltipContent className="max-w-xs">
-                            <p className="text-sm">{incomeTypeHelp[source.type]}</p>
+                            <p className="text-xs sm:text-sm">{incomeTypeHelp[source.type]}</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -98,12 +98,12 @@ export function IncomeSourcesSection({
                       }
                     }}
                   >
-                    <SelectTrigger id={`income-type-${source.id}`}>
+                    <SelectTrigger id={`income-type-${source.id}`} className="h-9 sm:h-10 text-xs sm:text-sm">
                       <SelectValue placeholder="Select income type" />
                     </SelectTrigger>
                     <SelectContent>
                       {availableTypes.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
+                        <SelectItem key={type.value} value={type.value} className="text-xs sm:text-sm">
                           {type.label}
                         </SelectItem>
                       ))}
@@ -111,8 +111,8 @@ export function IncomeSourcesSection({
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor={`income-amount-${source.id}`}>
+                <div className="space-y-1.5 sm:space-y-2">
+                  <Label htmlFor={`income-amount-${source.id}`} className="text-xs sm:text-sm">
                     Amount ({getPeriodLabel()})
                   </Label>
                   <div className="flex gap-2">
@@ -136,7 +136,7 @@ export function IncomeSourcesSection({
                         }
                       }}
                       required
-                      className="flex-1"
+                      className="flex-1 h-9 sm:h-10 text-xs sm:text-sm"
                     />
                     <Select
                       value={source.currency || "NGN"}
@@ -144,12 +144,12 @@ export function IncomeSourcesSection({
                         onUpdateIncomeSource(source.id, "currency", value)
                       }
                     >
-                      <SelectTrigger className="w-[120px]">
+                      <SelectTrigger className="w-[100px] sm:w-[120px] h-9 sm:h-10 text-xs sm:text-sm">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
                         {SUPPORTED_CURRENCIES.map((currency) => (
-                          <SelectItem key={currency.code} value={currency.code}>
+                          <SelectItem key={currency.code} value={currency.code} className="text-xs sm:text-sm">
                             {currency.code} ({currency.symbol})
                           </SelectItem>
                         ))}
@@ -157,7 +157,7 @@ export function IncomeSourcesSection({
                     </Select>
                   </div>
                   {source.currency && source.currency !== "NGN" && source.amount && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">
                       Will be converted to NGN for tax calculation
                     </p>
                   )}
@@ -166,25 +166,25 @@ export function IncomeSourcesSection({
 
               {/* Allowance Type Selector */}
               {source.type === "allowance" && (
-                <div className="space-y-2 mt-2">
-                  <Label htmlFor={`allowance-type-${source.id}`}>Allowance Type</Label>
+                <div className="space-y-1.5 sm:space-y-2 mt-2">
+                  <Label htmlFor={`allowance-type-${source.id}`} className="text-xs sm:text-sm">Allowance Type</Label>
                   <Select
                     value={source.allowanceType || "other"}
                     onValueChange={(value: "transport" | "housing" | "other") =>
                       onUpdateIncomeSource(source.id, "allowanceType", value)
                     }
                   >
-                    <SelectTrigger id={`allowance-type-${source.id}`}>
+                    <SelectTrigger id={`allowance-type-${source.id}`} className="h-9 sm:h-10 text-xs sm:text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="transport">Transport Allowance (Up to ₦30k/month exempt)</SelectItem>
-                      <SelectItem value="housing">Housing Allowance</SelectItem>
-                      <SelectItem value="other">Other Allowances</SelectItem>
+                      <SelectItem value="transport" className="text-xs sm:text-sm">Transport Allowance (Up to ₦30k/month exempt)</SelectItem>
+                      <SelectItem value="housing" className="text-xs sm:text-sm">Housing Allowance</SelectItem>
+                      <SelectItem value="other" className="text-xs sm:text-sm">Other Allowances</SelectItem>
                     </SelectContent>
                   </Select>
                   {source.allowanceType === "transport" && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">
                       Transport allowance up to ₦30,000/month (₦360,000/year) is tax-exempt under the Personal Income Tax Act (PITA)
                     </p>
                   )}
@@ -197,7 +197,7 @@ export function IncomeSourcesSection({
                   variant="ghost"
                   size="icon"
                   onClick={() => onRemoveIncomeSource(source.id)}
-                  className="shrink-0"
+                  className="shrink-0 w-9 h-9 sm:w-10 sm:h-10 self-start sm:self-center"
                 >
                   <Trash2 className="w-4 h-4 text-destructive" />
                 </Button>
@@ -208,20 +208,20 @@ export function IncomeSourcesSection({
       </div>
 
       {/* Total Income Display */}
-      <div className="mt-4 p-4 bg-primary/5 border border-primary/20 rounded-lg">
-        <div className="flex items-center justify-between">
-          <span className="font-medium">Total {getPeriodLabel()} Income:</span>
+      <div className="mt-3 sm:mt-4 p-3 sm:p-4 bg-primary/5 border border-primary/20 rounded-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
+          <span className="text-sm sm:text-base font-medium">Total {getPeriodLabel()} Income:</span>
           <div className="flex items-center gap-2">
             {convertingTotal && (
-              <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+              <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin text-muted-foreground" />
             )}
-            <span className="text-lg font-bold text-primary">
+            <span className="text-base sm:text-lg font-bold text-primary">
               ₦{totalIncome.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </span>
           </div>
         </div>
         {incomeSources.some((s) => s.currency && s.currency !== "NGN" && s.amount) && (
-          <p className="text-xs text-muted-foreground mt-2">
+          <p className="text-[10px] sm:text-xs text-muted-foreground mt-2">
             💱 Foreign currency amounts converted to NGN using current exchange rates
             {convertingTotal && " (converting...)"}
           </p>

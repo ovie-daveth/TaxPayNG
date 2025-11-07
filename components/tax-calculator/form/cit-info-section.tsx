@@ -19,14 +19,14 @@ export function CITInfoSection({
   onTotalFixedAssetsChange,
 }: CITInfoSectionProps) {
   return (
-    <div className="space-y-4 mb-6">
-      <div className="flex items-center gap-2 mb-4">
-        <TrendingUp className="w-5 h-5 text-primary" />
-        <h3 className="font-semibold">Company Information</h3>
+    <div className="space-y-3 sm:space-y-4 mb-4 sm:mb-6">
+      <div className="flex items-center gap-2 mb-3 sm:mb-4">
+        <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
+        <h3 className="text-base sm:text-lg font-semibold">Company Information</h3>
       </div>
-      <div className="grid sm:grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="annualTurnover-cit">Annual Turnover (₦) <span className="text-red-500">*</span></Label>
+      <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
+        <div className="space-y-1.5 sm:space-y-2">
+          <Label htmlFor="annualTurnover-cit" className="text-xs sm:text-sm">Annual Turnover (₦) <span className="text-red-500">*</span></Label>
           <Input
             id="annualTurnover-cit"
             type="text"
@@ -39,13 +39,14 @@ export function CITInfoSection({
                 onAnnualTurnoverChange(rawValue)
               }
             }}
+            className="h-9 sm:h-10 text-xs sm:text-sm"
           />
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[10px] sm:text-xs text-muted-foreground">
             Annual revenue/turnover for the year (required)
           </p>
         </div>
-        <div className="space-y-2">
-          <Label htmlFor="totalFixedAssets-cit">Total Fixed Assets (₦) <span className="text-red-500">*</span></Label>
+        <div className="space-y-1.5 sm:space-y-2">
+          <Label htmlFor="totalFixedAssets-cit" className="text-xs sm:text-sm">Total Fixed Assets (₦) <span className="text-red-500">*</span></Label>
           <Input
             id="totalFixedAssets-cit"
             type="text"
@@ -58,8 +59,9 @@ export function CITInfoSection({
                 onTotalFixedAssetsChange(rawValue)
               }
             }}
+            className="h-9 sm:h-10 text-xs sm:text-sm"
           />
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[10px] sm:text-xs text-muted-foreground">
             Total fixed assets for small company exemption check (required)
           </p>
         </div>

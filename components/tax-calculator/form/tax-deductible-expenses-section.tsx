@@ -29,6 +29,7 @@ interface TaxDeductibleExpensesSectionProps {
   onUpdateCreatorExpense: (expenseType: string, value: string) => void
   totalCreatorExpenses: number
   getPeriodLabel: () => string
+  showExplanations?: boolean
 }
 
 export function TaxDeductibleExpensesSection({
@@ -54,25 +55,26 @@ export function TaxDeductibleExpensesSection({
   onUpdateCreatorExpense,
   totalCreatorExpenses,
   getPeriodLabel,
+  showExplanations = true,
 }: TaxDeductibleExpensesSectionProps) {
   return (
-    <div className="border-t border-border pt-6">
-      <div className="flex items-center gap-2 mb-4">
-        <h3 className="font-semibold">Tax-Deductible Expenses</h3>
-        <Info className="w-4 h-4 text-muted-foreground" />
+    <div className="border-t border-border pt-4 sm:pt-6">
+      <div className="flex items-center gap-2 mb-3 sm:mb-4">
+        <h3 className="text-base sm:text-lg font-semibold">Tax-Deductible Expenses</h3>
+        <Info className="w-4 h-4 text-muted-foreground flex-shrink-0" />
       </div>
       
-      {/* Business Expenses Info Box - Hidden for creators */}
+      {/* Business Expenses Info Box - Hidden for creators, toggleable on mobile */}
       {userType !== "creator" && (
-        <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
-          <p className="text-sm text-blue-700 dark:text-blue-300 font-medium mb-2">
+        <div className={`bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4 ${showExplanations ? 'block' : 'hidden md:block'}`}>
+          <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-300 font-medium mb-1.5 sm:mb-2">
             💡 Allowable Business Expenses for Freelancers/Self-Employed
           </p>
-          <p className="text-xs text-blue-600 dark:text-blue-400 mb-2">
+          <p className="text-[11px] sm:text-xs text-blue-600 dark:text-blue-400 mb-1.5 sm:mb-2 leading-relaxed">
             Enter expenses that are <strong>wholly, exclusively, and necessarily</strong> incurred in producing your income. These will be deducted from your gross income before calculating tax.
           </p>
-          <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold mt-2 mb-1">Examples of allowable expenses:</p>
-          <ul className="text-xs text-blue-600 dark:text-blue-400 list-disc list-inside space-y-1">
+          <p className="text-[11px] sm:text-xs text-blue-600 dark:text-blue-400 font-semibold mt-1.5 sm:mt-2 mb-1">Examples of allowable expenses:</p>
+          <ul className="text-[11px] sm:text-xs text-blue-600 dark:text-blue-400 list-disc list-inside space-y-0.5 sm:space-y-1">
             <li>Internet/data costs</li>
             <li>Software subscriptions and licenses</li>
             <li>Laptop, computer equipment, and tools</li>
@@ -82,15 +84,15 @@ export function TaxDeductibleExpensesSection({
             <li>Marketing and promotion costs</li>
             <li>Training and professional development</li>
           </ul>
-          <p className="text-xs text-blue-600 dark:text-blue-400 mt-2">
+          <p className="text-[11px] sm:text-xs text-blue-600 dark:text-blue-400 mt-1.5 sm:mt-2">
             💰 Enter expenses for the selected period ({getPeriodLabel().toLowerCase()}) - they will be automatically converted to annual amounts for tax calculation
           </p>
         </div>
       )}
 
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="rentPaid">{getPeriodLabel()} Rent Paid (₦)</Label>
+      <div className="space-y-3 sm:space-y-4">
+        <div className="space-y-1.5 sm:space-y-2">
+          <Label htmlFor="rentPaid" className="text-xs sm:text-sm">{getPeriodLabel()} Rent Paid (₦)</Label>
           <Input
             id="rentPaid"
             type="text"
@@ -103,15 +105,16 @@ export function TaxDeductibleExpensesSection({
                 onRentPaidChange(rawValue)
               }
             }}
+            className="h-9 sm:h-10 text-xs sm:text-sm"
           />
-          <p className="text-xs text-muted-foreground">
+          <p className="text-[10px] sm:text-xs text-muted-foreground">
             20% of rent paid is deductible (max ₦500,000/year)
           </p>
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="pensionContribution">
+        <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
+          <div className="space-y-1.5 sm:space-y-2">
+            <Label htmlFor="pensionContribution" className="text-xs sm:text-sm">
               {getPeriodLabel()} Pension Contributions (₦)
             </Label>
             <Input
@@ -126,12 +129,13 @@ export function TaxDeductibleExpensesSection({
                   onPensionContributionChange(rawValue)
                 }
               }}
+              className="h-9 sm:h-10 text-xs sm:text-sm"
             />
-            <p className="text-xs text-muted-foreground">Up to 8% of annual income</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">Up to 8% of annual income</p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="healthInsurance">
+          <div className="space-y-1.5 sm:space-y-2">
+            <Label htmlFor="healthInsurance" className="text-xs sm:text-sm">
               {getPeriodLabel()} Health Insurance (₦)
             </Label>
             <Input
@@ -146,14 +150,15 @@ export function TaxDeductibleExpensesSection({
                   onHealthInsuranceChange(rawValue)
                 }
               }}
+              className="h-9 sm:h-10 text-xs sm:text-sm"
             />
-            <p className="text-xs text-muted-foreground">NHIS or private HMO premiums</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">NHIS or private HMO premiums</p>
           </div>
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="housingFund">
+        <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
+          <div className="space-y-1.5 sm:space-y-2">
+            <Label htmlFor="housingFund" className="text-xs sm:text-sm">
               {getPeriodLabel()} National Housing Fund (NHF) (₦)
             </Label>
             <Input
@@ -168,12 +173,13 @@ export function TaxDeductibleExpensesSection({
                   onHousingFundChange(rawValue)
                 }
               }}
+              className="h-9 sm:h-10 text-xs sm:text-sm"
             />
-            <p className="text-xs text-muted-foreground">NHF contributions (2.5% of basic salary)</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">NHF contributions (2.5% of basic salary)</p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="lifeInsurance">{getPeriodLabel()} Life Insurance (₦)</Label>
+          <div className="space-y-1.5 sm:space-y-2">
+            <Label htmlFor="lifeInsurance" className="text-xs sm:text-sm">{getPeriodLabel()} Life Insurance (₦)</Label>
             <Input
               id="lifeInsurance"
               type="text"
@@ -186,14 +192,15 @@ export function TaxDeductibleExpensesSection({
                   onLifeInsuranceChange(rawValue)
                 }
               }}
+              className="h-9 sm:h-10 text-xs sm:text-sm"
             />
-            <p className="text-xs text-muted-foreground">Premium payments for life insurance</p>
+            <p className="text-[10px] sm:text-xs text-muted-foreground">Premium payments for life insurance</p>
           </div>
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label htmlFor="charitableDonations">
+        <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
+          <div className="space-y-1.5 sm:space-y-2">
+            <Label htmlFor="charitableDonations" className="text-xs sm:text-sm">
               {getPeriodLabel()} Charitable Donations (₦)
             </Label>
             <Input
@@ -208,8 +215,9 @@ export function TaxDeductibleExpensesSection({
                   onCharitableDonationsChange(rawValue)
                 }
               }}
+              className="h-9 sm:h-10 text-xs sm:text-sm"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
               To approved NGOs (max 10% of annual income)
             </p>
           </div>
@@ -228,8 +236,8 @@ export function TaxDeductibleExpensesSection({
 
         {/* General Business Expenses - Hidden for creators */}
         {userType !== "creator" && (
-          <div className="space-y-2">
-            <Label htmlFor="businessExpenses">
+          <div className="space-y-1.5 sm:space-y-2">
+            <Label htmlFor="businessExpenses" className="text-xs sm:text-sm">
               {getPeriodLabel()} Other Business Expenses (₦)
             </Label>
             <Input
@@ -244,8 +252,9 @@ export function TaxDeductibleExpensesSection({
                   onBusinessExpensesChange(rawValue)
                 }
               }}
+              className="h-9 sm:h-10 text-xs sm:text-sm"
             />
-            <p className="text-xs text-muted-foreground">
+            <p className="text-[10px] sm:text-xs text-muted-foreground">
               Costs wholly, exclusively, and necessarily incurred in producing income
               {userType === "freelancer" && " (e.g., internet, software, equipment, co-working rent, transport to clients)"}
             </p>

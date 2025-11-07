@@ -11,18 +11,18 @@ import { toast } from "sonner"
 import { db } from "@/firebase/firebase"
 import { collection, setDoc, doc, query, getDocs, where } from "firebase/firestore"
 import { TaxCalculatorForm } from "@/components/tax-calculator/form/tax-calculator-form"
-import { TaxRatesInfo } from "@/components/tax-calculator/tax-rates-info"
-import { ThemeToggle } from "@/components/theme-toggle"
-import OtaxLogo from "@/components/OtaxLogo"
-import { sendWaitlistVerification } from "@/lib/utils/emailVerification"
-import { TokenInputDialog } from "@/components/waitlist/token-input-dialog"
+import { TaxBreakdownModalContent } from "./components/tax-breakdown-modal-content"
+import { EmployeesView } from "./components/employees-view"
 import { StatsCards } from "./components/stats-cards"
 import { RecentTransactions } from "./components/recent-transactions"
 import { UpcomingReminders } from "./components/upcoming-reminders"
 import { TransactionsView } from "./components/transactions-view"
 import { RemindersView } from "./components/reminders-view"
-import { TaxBreakdownModalContent } from "./components/tax-breakdown-modal-content"
-import { EmployeesView } from "./components/employees-view"
+import { ThemeToggle } from "@/components/theme-toggle"
+import { TokenInputDialog } from "@/components/waitlist/token-input-dialog"
+import OtaxLogo from "@/components/OtaxLogo"
+import { sendWaitlistVerification } from "@/lib/utils/emailVerification"
+import { TaxRatesInfo } from "@/components/tax-calculator/tax-rates-info"
 
 type NavItem = {
   href: string
@@ -150,13 +150,14 @@ export default function DemoPage() {
             setSelectedType={setSelectedType}
             selectedCategory={selectedCategory}
             setSelectedCategory={setSelectedCategory}
+            sidebarCollapsed={sidebarCollapsed}
           />
         )
       case "tax-calculator":
         return (
           <>
-            <div className={`grid ${sidebarCollapsed ? 'md:grid-cols-2 lg:grid-cols-3' : 'md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3'} gap-4 sm:gap-4 md:gap-5 lg:gap-6`}>
-              <div className={`${sidebarCollapsed ? 'lg:col-span-2' : 'xl:col-span-2 lg:col-span-1'} space-y-4 sm:space-y-4 md:space-y-5 lg:space-y-6`}>
+            <div className={`flex flex-col lg:flex-row lg:items-start gap-6 w-full ${sidebarCollapsed ? 'md:max-w-3xl lg:max-w-5xl' : 'lg:max-w-6xl'} mx-auto`}>
+              <div className="flex-1 min-w-0">
                 <TaxCalculatorForm 
                   onCalculate={(result) => {
                     setTaxResult(result)
@@ -164,7 +165,7 @@ export default function DemoPage() {
                   }} 
                 />
               </div>
-              <div>
+              <div className="hidden lg:block w-full max-w-sm">
                 <TaxRatesInfo />
               </div>
             </div>
@@ -348,6 +349,14 @@ export default function DemoPage() {
               <Sparkles className="w-4 h-4 mr-2 flex-shrink-0" />
               Join Waitlist
             </Button>
+            
+            {/* Theme Toggle - Show in mobile menu */}
+            <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-border">
+              <div className="flex items-center justify-between">
+                <span className="text-xs sm:text-sm font-medium text-muted-foreground">Theme</span>
+                <ThemeToggle />
+              </div>
+            </div>
           </nav>
         )}
       </header>
@@ -386,8 +395,8 @@ export default function DemoPage() {
                       title="Freelancer"
                     >
                       <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
-                      <span>Freelancer</span>
-                      {/* <span className={sidebarCollapsed ? "xl:hidden lg:inline md:hidden" : "2xl:hidden xl:inline lg:hidden md:inline"}>Free.</span> */}
+                      <span className="hidden sm:inline">Freelancer</span>
+                      <span className="sm:hidden">Free.</span>
                     </Button>
                     <Button
                       variant={businessType === "creator" ? "default" : "ghost"}
@@ -397,8 +406,8 @@ export default function DemoPage() {
                       title="Creator"
                     >
                       <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
-                      <span >Creator</span>
-                      {/* <span className={sidebarCollapsed ? "md:hidden lg:inline xl:hidden" : "lg:hidden lg:inline xl:hidden"}>Create.</span> */}
+                      <span className="hidden sm:inline">Creator</span>
+                      <span className="sm:hidden">Create.</span>
                     </Button>
                     <Button
                       variant={businessType === "small-business" ? "default" : "ghost"}
@@ -408,13 +417,15 @@ export default function DemoPage() {
                       title="Small Business"
                     >
                       <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0" />
-                      <span className={sidebarCollapsed ? "hidden xl:inline" : "hidden 2xl:inline"}>Small Business</span>
-                      <span className={sidebarCollapsed ? "xl:hidden lg:inline md:hidden" : "2xl:hidden xl:inline lg:hidden md:inline"}>SME</span>
+                      <span className={sidebarCollapsed ? "hidden xl:inline" : "hidden 2xl:inline sm:inline"}>Small Business</span>
+                      <span className={sidebarCollapsed ? "xl:hidden lg:inline md:hidden" : "2xl:hidden xl:inline lg:hidden md:inline sm:hidden"}>SME</span>
                     </Button>
                   </div>
                 )}
-                <ThemeToggle />
-                <Button size="sm" className={`text-xs md:text-sm h-8 md:h-9 px-2 sm:px-3 md:px-4 ${!sidebarCollapsed ? 'xl:px-4' : 'lg:px-4'}`} onClick={() => setShowWaitlistModal(true)}>
+                <div className="hidden md:flex">
+                  <ThemeToggle />
+                </div>
+                <Button size="sm" className={`hidden md:flex text-xs md:text-sm h-8 md:h-9 px-2 sm:px-3 md:px-4 ${!sidebarCollapsed ? 'xl:px-4' : 'lg:px-4'}`} onClick={() => setShowWaitlistModal(true)}>
                   <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:mr-1.5 flex-shrink-0" />
                   <span className={sidebarCollapsed ? "hidden xl:inline" : "hidden 2xl:inline"}>Join Waitlist</span>
                   <span className={sidebarCollapsed ? "xl:hidden" : "2xl:hidden"}>Join</span>

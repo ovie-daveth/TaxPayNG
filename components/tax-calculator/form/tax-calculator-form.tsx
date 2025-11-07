@@ -9,7 +9,9 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { Calculator } from "lucide-react"
+import { Calculator, Info, ChevronDown, ChevronUp } from "lucide-react"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
+import { TaxRatesInfo } from "../tax-rates-info"
 import { calculateNigerianTax } from "@/lib/tax-calculator"
 import { calculateDevelopmentLevy } from "@/lib/tax/development-levy-calculator"
 import { SMEExemptionModal } from "../sme-exemption-modal"
@@ -151,6 +153,8 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
   const [userType, setUserType] = useState("freelancer")
   const [showSMEModal, setShowSMEModal] = useState(false)
   const [calculationType, setCalculationType] = useState<string | null>(null) // "paye", "vat", null
+  const [showExplanations, setShowExplanations] = useState(false) // Mobile-only toggle for explanations
+  const [showRatesSheet, setShowRatesSheet] = useState(false) // Control sheet visibility
   const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([
     { id: "1", type: "freelance", amount: "", currency: "NGN" },
   ])
@@ -920,7 +924,6 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
 
       // Add period to result for display clarity
       result.period = period
-
       onCalculate(result)
     } catch (error) {
       console.error("Error converting currency:", error)
@@ -952,6 +955,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         description: source.description,
       }))
 
+      result.period = period
       onCalculate(result)
     } finally {
       setConverting(false)
@@ -976,15 +980,55 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
 
   return (
     <TooltipProvider>
-      <Card className="p-6">
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold">Calculate Your Tax</h2>
-          <p className="text-sm text-muted-foreground mt-1">
-            Enter your multiple income streams and expenses - we'll calculate everything automatically
-          </p>
+      <Card className="p-4 sm:p-6">
+        <div className="mb-4 sm:mb-6">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <h2 className="text-lg sm:text-xl font-semibold">Calculate Your Tax</h2>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                Enter your multiple income streams and expenses - we'll calculate everything automatically
+              </p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Calculator icon button - always visible */}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowRatesSheet(true)}
+                className="flex items-center gap-1.5 lg:hidden"
+                title="View Tax Rates"
+              >
+                <Calculator className="w-4 h-4" />
+                <span className="hidden sm:inline">Tax Rates</span>
+              </Button>
+              {/* Mobile-only toggle for explanations */}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowExplanations(!showExplanations)}
+                className="md:hidden flex items-center gap-1.5 shrink-0"
+              >
+                <Info className="w-4 h-4" />
+                {showExplanations ? (
+                  <>
+                    <span className="hidden sm:inline">Hide Info</span>
+                    <ChevronUp className="w-4 h-4" />
+                  </>
+                ) : (
+                  <>
+                    <span className="hidden sm:inline">Show Info</span>
+                    <ChevronDown className="w-4 h-4" />
+                  </>
+                )}
+                <span className="sm:hidden">Info</span>
+              </Button>
+            </div>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
         {/* SME Exemption Modal */}
         <SMEExemptionModal
           open={showSMEModal}
@@ -1000,7 +1044,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         {/* Show form only if calculation type is selected for business owners, or if not a business owner */}
         {(userType !== "business" || calculationType) && (
           <>
-        <div className={`grid ${userType === "business" && calculationType ? "sm:grid-cols-3" : "sm:grid-cols-2"} gap-4`}>
+        <div className={`grid ${userType === "business" && calculationType ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2"} gap-3 sm:gap-4`}>
           <UserTypeSelector userType={userType} onUserTypeChange={handleUserTypeChange} />
           {userType === "business" && calculationType && (
             <TaxTypeSelector calculationType={calculationType} onCalculationTypeChange={handleCalculationTypeSelect} />
@@ -1028,12 +1072,11 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
 
         {/* Business Tax-Specific Fields */}
         {userType === "business" && calculationType && (
-          <div className="border-t border-border pt-6">
+          <div className="border-t border-border pt-4 sm:pt-6">
             {calculationType === "paye" && (
               <PAYEForm
                 period={period}
                 onCalculate={(payeResult) => {
-                  // Trigger the calculation callback
                   onCalculate(payeResult)
                 }}
               />
@@ -1054,7 +1097,6 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                   onAnnualTurnoverChange={setAnnualTurnover}
                   onTotalFixedAssetsChange={setTotalFixedAssets}
                   onCalculate={(citResult) => {
-                    // Trigger the calculation callback
                     onCalculate(citResult)
                   }}
                 />
@@ -1099,6 +1141,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                   setVatTurnover(value)
                   setAnnualTurnover(value)
                 }}
+                showExplanations={showExplanations}
                 onCalculate={(vatResult) => {
                   // Format result to match expected structure
                   const result = {
@@ -1126,7 +1169,6 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                     note: `VAT is calculated for ${period} period. VAT returns must be filed monthly by the 21st of the following month.`
                   }
                   
-                  // Trigger the calculation callback
                   onCalculate(result)
                 }}
               />
@@ -1160,19 +1202,20 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
               onUpdateCreatorExpense={updateCreatorExpense}
               totalCreatorExpenses={totalCreatorExpenses}
               getPeriodLabel={getPeriodLabel}
+              showExplanations={showExplanations}
             />
-            <div className="space-y-2">
-              <Label htmlFor="dependents">Number of Dependents</Label>
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label htmlFor="dependents" className="text-xs sm:text-sm">Number of Dependents</Label>
               <Select value={dependents} onValueChange={setDependents}>
-                <SelectTrigger id="dependents">
+                <SelectTrigger id="dependents" className="h-9 sm:h-10 text-xs sm:text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="0">0</SelectItem>
-                  <SelectItem value="1">1</SelectItem>
-                  <SelectItem value="2">2</SelectItem>
-                  <SelectItem value="3">3</SelectItem>
-                  <SelectItem value="4">4+</SelectItem>
+                  <SelectItem value="0" className="text-xs sm:text-sm">0</SelectItem>
+                  <SelectItem value="1" className="text-xs sm:text-sm">1</SelectItem>
+                  <SelectItem value="2" className="text-xs sm:text-sm">2</SelectItem>
+                  <SelectItem value="3" className="text-xs sm:text-sm">3</SelectItem>
+                  <SelectItem value="4" className="text-xs sm:text-sm">4+</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1182,12 +1225,28 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         {/* Hide Calculate Tax button for VAT, CIT, and PAYE - they have their own Calculate buttons */}
         {calculationType !== "vat" && calculationType !== "cit" && calculationType !== "paye" && (
           <Button type="submit" className="w-full" size="lg" disabled={converting}>
-            <Calculator className="w-4 h-4 mr-2" />
-            {converting ? "Converting Currency..." : "Calculate Tax"}
+            <Calculator className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">{converting ? "Converting Currency..." : "Calculate Tax"}</span>
+            <span className="sm:hidden">{converting ? "Converting..." : "Calculate"}</span>
           </Button>
         )}
         </form>
       </Card>
+
+      {/* Tax Rates Sheet - especially useful on mobile to avoid long scrolls */}
+      <Sheet open={showRatesSheet} onOpenChange={setShowRatesSheet}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Tax Rates Reference</SheetTitle>
+            <SheetDescription>
+              Updated Nigerian tax rate information at a glance
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6">
+            <TaxRatesInfo />
+          </div>
+        </SheetContent>
+      </Sheet>
     </TooltipProvider>
   )
 }
