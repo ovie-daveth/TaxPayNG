@@ -32,39 +32,39 @@ const reminders = [
 
 export function UpcomingReminders() {
   return (
-    <Card className="p-6">
-      <div className="flex items-center justify-between mb-6">
+    <Card className="p-4 sm:p-5 md:p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mb-4 sm:mb-5 md:mb-6">
         <div>
-          <h3 className="text-lg font-semibold">Upcoming Reminders</h3>
-          <p className="text-sm text-muted-foreground">Don't miss important dates</p>
+          <h3 className="text-base sm:text-lg font-semibold">Upcoming Reminders</h3>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">Don't miss important dates</p>
         </div>
-        <Link href="/dashboard/reminders">
-          <Button variant="ghost" size="sm">
+        <Link href="/dashboard/reminders" className="self-start sm:self-auto">
+          <Button variant="ghost" size="sm" className="text-xs sm:text-sm">
             View All
           </Button>
         </Link>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {reminders.map((reminder) => {
           const Icon = reminder.icon
           return (
-            <div key={reminder.id} className="flex items-start gap-3 py-3 border-b border-border last:border-0">
-              <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${reminder.color}`}>
-                <Icon className="w-5 h-5" />
+            <div key={reminder.id} className="flex items-start gap-3 py-2.5 sm:py-3 border-b border-border last:border-0">
+              <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${reminder.color}`}>
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium text-sm">{reminder.title}</p>
-                <p className="text-xs text-muted-foreground mt-1">{reminder.date}</p>
+                <p className="font-medium text-xs sm:text-sm">{reminder.title}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">{reminder.date}</p>
               </div>
             </div>
           )
         })}
       </div>
 
-      <Link href="/dashboard/reminders" className="block mt-6">
-        <Button className="w-full bg-transparent" variant="outline">
-          <Bell className="w-4 h-4 mr-2" />
+      <Link href="/dashboard/reminders" className="block mt-4 sm:mt-5 md:mt-6">
+        <Button className="w-full bg-transparent text-xs sm:text-sm" variant="outline" size="sm">
+          <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
           Manage Reminders
         </Button>
       </Link>

@@ -9,12 +9,85 @@ import { TaxCalculationBreakdown } from "./tax-calculation-breakdown"
 
 interface StatsCardsProps {
   businessType: "freelancer" | "creator" | "small-business"
+  sidebarCollapsed?: boolean
 }
 
-export function StatsCards({ businessType }: StatsCardsProps) {
+export function StatsCards({ businessType, sidebarCollapsed = false }: StatsCardsProps) {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
   const [hoveredCard, setHoveredCard] = useState<string | null>(null)
+  const [isHoverEnabled, setIsHoverEnabled] = useState(false)
+  const [showTapHint, setShowTapHint] = useState(false)
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
+  const hintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const hasShownHintRef = useRef(false)
+
+  // Check if device supports hover (desktop) vs touch (mobile/tablet)
+  useEffect(() => {
+    const checkHoverSupport = () => {
+      // Check if device has hover capability (desktop) vs touch (mobile/tablet)
+      // Use media query to detect hover capability
+      if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+        // Only enable hover on larger screens (lg breakpoint: 1024px+)
+        setIsHoverEnabled(window.innerWidth >= 1024)
+      } else {
+        setIsHoverEnabled(false)
+      }
+    }
+
+    checkHoverSupport()
+    window.addEventListener('resize', checkHoverSupport)
+    
+    return () => {
+      window.removeEventListener('resize', checkHoverSupport)
+    }
+  }, [])
+
+  // Show tap hint on mobile/tablet when component is in view, hide after 3 seconds
+  useEffect(() => {
+    if (isHoverEnabled || hasShownHintRef.current || !containerRef.current) {
+      setShowTapHint(false)
+      return
+    }
+
+    let showTimer: ReturnType<typeof setTimeout> | null = null
+
+    // Use Intersection Observer to detect when component is visible
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && !hasShownHintRef.current && !isHoverEnabled) {
+            // Prevent multiple triggers
+            hasShownHintRef.current = true
+            // Disconnect observer since we only want to show hint once
+            observer.disconnect()
+            
+            // Component is in view, show hint after a brief delay
+            showTimer = setTimeout(() => {
+              setShowTapHint(true)
+              // Hide hint after 3 seconds
+              hintTimeoutRef.current = setTimeout(() => {
+                setShowTapHint(false)
+              }, 3000)
+            }, 500) // Small delay to ensure component is fully rendered
+          }
+        })
+      },
+      { threshold: 0.1 } // Trigger when 10% of component is visible
+    )
+
+    observer.observe(containerRef.current)
+
+    return () => {
+      observer.disconnect()
+      if (showTimer) {
+        clearTimeout(showTimer)
+      }
+      if (hintTimeoutRef.current) {
+        clearTimeout(hintTimeoutRef.current)
+      }
+    }
+  }, [isHoverEnabled])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -270,6 +343,15 @@ export function StatsCards({ businessType }: StatsCardsProps) {
 
   const handleCardClick = (statId: string) => {
     setOpenDropdown(openDropdown === statId ? null : statId)
+    // Hide tap hint immediately when user clicks any card
+    if (showTapHint) {
+      setShowTapHint(false)
+      hasShownHintRef.current = true
+      if (hintTimeoutRef.current) {
+        clearTimeout(hintTimeoutRef.current)
+        hintTimeoutRef.current = null
+      }
+    }
   }
 
   const handleCardHover = (statId: string | null) => {
@@ -277,50 +359,64 @@ export function StatsCards({ businessType }: StatsCardsProps) {
   }
 
   return (
-    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div 
+      ref={containerRef}
+      className={`grid grid-cols-1 sm:grid-cols-2 ${sidebarCollapsed ? 'lg:grid-cols-4' : 'lg:grid-cols-2 xl:grid-cols-4'} gap-3 sm:gap-4`}
+    >
       {stats.map((stat, index) => {
         const Icon = stat.icon
         const isOpen = openDropdown === stat.id
-        const isHovered = hoveredCard === stat.id
-        const showDropdown = isOpen || isHovered
+        const isHovered = hoveredCard === stat.id && isHoverEnabled
+        // Only show dropdown on click for mobile/tablet, allow hover on desktop
+        const showDropdown = isOpen || (isHovered && isHoverEnabled)
 
         // Determine if this card is in the last column(s) to position dropdown correctly
-        // For 4-column grid on large screens, last 2 cards should align right
-        // For 2-column grid on medium screens, last card should align right
-        const isLastColumn = index % 4 === 3 || index % 4 === 2 // Last 2 columns in 4-col grid
-        const isLastInRow = index % 2 === 1 // Last in 2-col grid
+        // Adjust based on sidebar state: when collapsed, use 4-col logic; when expanded, use 2-col at lg, 4-col at xl
+        // For safety, align right for last 2 cards in 4-col grid, or last card in 2-col grid
+        const isLastColumn4 = index % 4 === 3 || index % 4 === 2 // Last 2 columns in 4-col grid
+        const isLastInRow2 = index % 2 === 1 // Last in 2-col grid
+        // Use more conservative approach: align right if it's last in 2-col OR last 2 in 4-col
+        const shouldAlignRight = isLastInRow2 || isLastColumn4
 
         return (
           <div 
             key={stat.id} 
             className="relative"
-            onMouseEnter={() => !isOpen && handleCardHover(stat.id)}
-            onMouseLeave={() => !isOpen && handleCardHover(null)}
+            onMouseEnter={() => isHoverEnabled && !isOpen && handleCardHover(stat.id)}
+            onMouseLeave={() => isHoverEnabled && !isOpen && handleCardHover(null)}
             ref={(el) => {
               dropdownRefs.current[stat.id] = el
             }}
           >
             <Card 
-              className={`p-6 cursor-pointer transition-all relative ${isOpen ? 'ring-2 ring-primary' : ''}`}
+              className={`p-4 sm:p-5 md:p-6 cursor-pointer transition-all relative ${isOpen ? 'ring-2 ring-primary' : ''}`}
               onClick={() => handleCardClick(stat.id)}
             >
-            {/* Click to pin hint - only show when hovered but not pinned */}
-            {isHovered && !isOpen && (
+            {/* Click to pin hint - only show when hovered but not pinned (desktop only) */}
+            {isHovered && !isOpen && isHoverEnabled && (
               <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-primary/10 dark:bg-primary/20 text-primary text-xs px-2 py-1 rounded-md border border-primary/20">
                 <Info className="w-3 h-3" />
-                <span>Click to pin</span>
+                <span className="hidden sm:inline">Click to pin</span>
+                <span className="sm:hidden">Pin</span>
+              </div>
+            )}
+            {/* Tap hint for mobile/tablet - show on first card only, for 3 seconds when component is in view */}
+            {!isOpen && !isHoverEnabled && showTapHint && index === 0 && (
+              <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-primary/10 dark:bg-primary/20 text-primary text-xs px-2 py-1 rounded-md border border-primary/20 animate-in fade-in-0 zoom-in-95 duration-300 z-10">
+                <Info className="w-3 h-3" />
+                <span>Tap for details</span>
               </div>
             )}
             <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="text-sm text-muted-foreground mb-1">{stat.label}</p>
-                <p className="text-2xl font-bold mb-2">{stat.value}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">{stat.label}</p>
+                <p className="text-xl sm:text-2xl font-bold mb-1.5 sm:mb-2 truncate">{stat.value}</p>
                 <p className={`text-xs font-medium ${stat.trend === "up" ? "text-primary" : "text-muted-foreground"}`}>
                   {stat.change}
                 </p>
               </div>
-              <div className={`w-10 h-10 rounded-lg bg-muted flex items-center justify-center ${stat.color}`}>
-                <Icon className="w-5 h-5" />
+              <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 ml-2 ${stat.color}`}>
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
             </div>
           </Card>
@@ -328,13 +424,13 @@ export function StatsCards({ businessType }: StatsCardsProps) {
             {/* Breakdown Dropdown */}
             {showDropdown && (
               <div 
-                className={`absolute z-50 mt-2 bg-popover border border-border rounded-lg shadow-lg p-4 animate-in fade-in-0 zoom-in-95 ${
-                  stat.id === "tax-payable" ? "w-[450px]" : "w-[320px]"
+                className={`absolute z-50 mt-2 bg-popover border border-border rounded-lg shadow-lg p-3 sm:p-4 animate-in fade-in-0 zoom-in-95 ${
+                  stat.id === "tax-payable" ? "w-[280px] sm:w-[380px] md:w-[450px]" : "w-[260px] sm:w-[300px] md:w-[320px]"
                 } ${
-                  isLastColumn || isLastInRow ? "right-0" : "left-0"
+                  shouldAlignRight ? "right-0" : "left-0"
                 }`}
-                onMouseEnter={() => handleCardHover(stat.id)}
-                onMouseLeave={() => !isOpen && handleCardHover(null)}
+                onMouseEnter={() => isHoverEnabled && handleCardHover(stat.id)}
+                onMouseLeave={() => isHoverEnabled && !isOpen && handleCardHover(null)}
               >
                 {stat.id === "tax-payable" && (stat as any).isSmallBusinessExempt ? (
                   <SmallBusinessExemptionInfo />
