@@ -630,6 +630,20 @@ function FAQPageContent() {
     const originalInput = inputToUse.trim()
     setInput("")
     
+    const greetingPatterns = /\b(hi|hello|hey|good\s+morning|good\s+afternoon|good\s+evening|greetings|what'?s\s+up|howdy)\b/
+    if (greetingPatterns.test(userMessage)) {
+      setMessages(prev => [...prev, { type: "user", content: originalInput }])
+      setIsTyping(true)
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          type: "assistant",
+          content: "Hi, I'm your OTax Assistant. I can help with questions about Nigeria's new tax reform, reliefs, VAT, PAYE, and more. What would you like to explore today?"
+        }])
+        setIsTyping(false)
+      }, 500)
+      return
+    }
+    
     // Check for gratitude/acknowledgment phrases
     const gratitudePatterns = /\b(thanks?|thank you|thx|appreciate it|appreciate|good to know|got it|understood|ok thanks|okay thanks|perfect|great|awesome|nice)\b/
     if (gratitudePatterns.test(userMessage)) {
