@@ -2,12 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { TaxCalculatorForm } from "@/components/tax-calculator/form/tax-calculator-form"
-import { TaxBreakdown } from "@/components/tax-calculator/tax-breakdown"
 import { TaxRatesInfo } from "@/components/tax-calculator/tax-rates-info"
 import { TaxCalculatorSkeleton } from "@/components/ui/skeletons"
 
 export default function TaxCalculatorPage() {
-  const [taxResult, setTaxResult] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -26,12 +24,11 @@ export default function TaxCalculatorPage() {
   return (
     <div className="">
         <main className="container mx-auto px-4 py-6 max-w-7xl">
-          <div className="grid lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 space-y-6">
-              <TaxCalculatorForm onCalculate={setTaxResult} />
-              {taxResult && <TaxBreakdown result={taxResult} />}
+          <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-6">
+            <div className="max-w-4xl mx-auto lg:mx-0 lg:max-w-none">
+              <TaxCalculatorForm onCalculate={() => {}} />
             </div>
-            <div>
+            <div className="hidden lg:block">
               <TaxRatesInfo />
             </div>
           </div>

@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { Calculator, Info, ChevronDown, ChevronUp } from "lucide-react"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
+import { TaxRatesInfo } from "../tax-rates-info"
 import { calculateNigerianTax } from "@/lib/tax-calculator"
 import { calculateDevelopmentLevy } from "@/lib/tax/development-levy-calculator"
 import { SMEExemptionModal } from "../sme-exemption-modal"
@@ -152,6 +154,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
   const [showSMEModal, setShowSMEModal] = useState(false)
   const [calculationType, setCalculationType] = useState<string | null>(null) // "paye", "vat", null
   const [showExplanations, setShowExplanations] = useState(false) // Mobile-only toggle for explanations
+  const [showRatesSheet, setShowRatesSheet] = useState(false) // Control sheet visibility
   const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([
     { id: "1", type: "freelance", amount: "", currency: "NGN" },
   ])
@@ -921,7 +924,6 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
 
       // Add period to result for display clarity
       result.period = period
-
       onCalculate(result)
     } catch (error) {
       console.error("Error converting currency:", error)
@@ -953,6 +955,7 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         description: source.description,
       }))
 
+      result.period = period
       onCalculate(result)
     } finally {
       setConverting(false)
@@ -986,28 +989,42 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                 Enter your multiple income streams and expenses - we'll calculate everything automatically
               </p>
             </div>
-            {/* Mobile-only toggle for explanations */}
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowExplanations(!showExplanations)}
-              className="md:hidden flex items-center gap-1.5 shrink-0"
-            >
-              <Info className="w-4 h-4" />
-              {showExplanations ? (
-                <>
-                  <span className="hidden sm:inline">Hide Info</span>
-                  <ChevronUp className="w-4 h-4" />
-                </>
-              ) : (
-                <>
-                  <span className="hidden sm:inline">Show Info</span>
-                  <ChevronDown className="w-4 h-4" />
-                </>
-              )}
-              <span className="sm:hidden">Info</span>
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Calculator icon button - always visible */}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowRatesSheet(true)}
+                className="flex items-center gap-1.5 lg:hidden"
+                title="View Tax Rates"
+              >
+                <Calculator className="w-4 h-4" />
+                <span className="hidden sm:inline">Tax Rates</span>
+              </Button>
+              {/* Mobile-only toggle for explanations */}
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowExplanations(!showExplanations)}
+                className="md:hidden flex items-center gap-1.5 shrink-0"
+              >
+                <Info className="w-4 h-4" />
+                {showExplanations ? (
+                  <>
+                    <span className="hidden sm:inline">Hide Info</span>
+                    <ChevronUp className="w-4 h-4" />
+                  </>
+                ) : (
+                  <>
+                    <span className="hidden sm:inline">Show Info</span>
+                    <ChevronDown className="w-4 h-4" />
+                  </>
+                )}
+                <span className="sm:hidden">Info</span>
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -1060,7 +1077,6 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
               <PAYEForm
                 period={period}
                 onCalculate={(payeResult) => {
-                  // Trigger the calculation callback
                   onCalculate(payeResult)
                 }}
               />
@@ -1081,7 +1097,6 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                   onAnnualTurnoverChange={setAnnualTurnover}
                   onTotalFixedAssetsChange={setTotalFixedAssets}
                   onCalculate={(citResult) => {
-                    // Trigger the calculation callback
                     onCalculate(citResult)
                   }}
                 />
@@ -1154,7 +1169,6 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                     note: `VAT is calculated for ${period} period. VAT returns must be filed monthly by the 21st of the following month.`
                   }
                   
-                  // Trigger the calculation callback
                   onCalculate(result)
                 }}
               />
@@ -1218,6 +1232,21 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         )}
         </form>
       </Card>
+
+      {/* Tax Rates Sheet - especially useful on mobile to avoid long scrolls */}
+      <Sheet open={showRatesSheet} onOpenChange={setShowRatesSheet}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Tax Rates Reference</SheetTitle>
+            <SheetDescription>
+              Updated Nigerian tax rate information at a glance
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6">
+            <TaxRatesInfo />
+          </div>
+        </SheetContent>
+      </Sheet>
     </TooltipProvider>
   )
 }

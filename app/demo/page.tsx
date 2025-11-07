@@ -11,18 +11,18 @@ import { toast } from "sonner"
 import { db } from "@/firebase/firebase"
 import { collection, setDoc, doc, query, getDocs, where } from "firebase/firestore"
 import { TaxCalculatorForm } from "@/components/tax-calculator/form/tax-calculator-form"
-import { TaxRatesInfo } from "@/components/tax-calculator/tax-rates-info"
-import { ThemeToggle } from "@/components/theme-toggle"
-import OtaxLogo from "@/components/OtaxLogo"
-import { sendWaitlistVerification } from "@/lib/utils/emailVerification"
-import { TokenInputDialog } from "@/components/waitlist/token-input-dialog"
+import { TaxBreakdownModalContent } from "./components/tax-breakdown-modal-content"
+import { EmployeesView } from "./components/employees-view"
 import { StatsCards } from "./components/stats-cards"
 import { RecentTransactions } from "./components/recent-transactions"
 import { UpcomingReminders } from "./components/upcoming-reminders"
 import { TransactionsView } from "./components/transactions-view"
 import { RemindersView } from "./components/reminders-view"
-import { TaxBreakdownModalContent } from "./components/tax-breakdown-modal-content"
-import { EmployeesView } from "./components/employees-view"
+import { ThemeToggle } from "@/components/theme-toggle"
+import { TokenInputDialog } from "@/components/waitlist/token-input-dialog"
+import OtaxLogo from "@/components/OtaxLogo"
+import { sendWaitlistVerification } from "@/lib/utils/emailVerification"
+import { TaxRatesInfo } from "@/components/tax-calculator/tax-rates-info"
 
 type NavItem = {
   href: string
@@ -156,8 +156,8 @@ export default function DemoPage() {
       case "tax-calculator":
         return (
           <>
-            <div className={`grid ${sidebarCollapsed ? 'md:grid-cols-2 lg:grid-cols-3' : 'md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3'} gap-4 sm:gap-4 md:gap-5 lg:gap-6`}>
-              <div className={`${sidebarCollapsed ? 'lg:col-span-2' : 'xl:col-span-2 lg:col-span-1'} space-y-4 sm:space-y-4 md:space-y-5 lg:space-y-6`}>
+            <div className={`flex flex-col lg:flex-row lg:items-start gap-6 w-full ${sidebarCollapsed ? 'md:max-w-3xl lg:max-w-5xl' : 'lg:max-w-6xl'} mx-auto`}>
+              <div className="flex-1 min-w-0">
                 <TaxCalculatorForm 
                   onCalculate={(result) => {
                     setTaxResult(result)
@@ -165,7 +165,7 @@ export default function DemoPage() {
                   }} 
                 />
               </div>
-              <div>
+              <div className="hidden lg:block w-full max-w-sm">
                 <TaxRatesInfo />
               </div>
             </div>
