@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/firebase/firebase'
-import { doc, setDoc, getDoc } from 'firebase/firestore'
+import { getAdminDb } from '@/lib/firebase-admin'
 import crypto from 'crypto'
 import { createTransporter } from '@/lib/utils/nodemailer'
 
@@ -31,12 +30,13 @@ export async function POST(request: NextRequest) {
     }
 
     const emailLower = email.toLowerCase().trim()
+    const adminDb = getAdminDb()
 
     // Check if already verified and on waitlist
-    const waitlistDoc = await getDoc(doc(db, 'waitlist', emailLower))
-    if (waitlistDoc.exists()) {
+    const waitlistDoc = await adminDb.collection('waitlist').doc(emailLower).get()
+    if (waitlistDoc.exists) {
       const waitlistData = waitlistDoc.data()
-      if (waitlistData.emailVerified) {
+      if (waitlistData?.emailVerified) {
         return NextResponse.json(
           { error: 'This email is already verified and on the waitlist' },
           { status: 400 }
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     const verificationToken = Math.floor(100000 + Math.random() * 900000).toString()
 
     // Store pending verification (NOT in waitlist yet)
-    await setDoc(doc(db, 'waitlistVerifications', emailLower), {
+    await adminDb.collection('waitlistVerifications').doc(emailLower).set({
       name: name.trim(),
       email: emailLower,
       phone: phone ? phone.replace(/\s/g, '') : '',

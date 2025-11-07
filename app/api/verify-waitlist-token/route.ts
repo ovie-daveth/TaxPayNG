@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/firebase/firebase'
-import { doc, getDoc, deleteDoc, setDoc } from 'firebase/firestore'
+import { getAdminDb } from '@/lib/firebase-admin'
 
 /**
  * Verify waitlist token and add to waitlist
@@ -21,11 +20,12 @@ export async function POST(request: NextRequest) {
 
     const emailLower = email.toLowerCase().trim()
     const tokenStr = token.toString().trim()
+    const adminDb = getAdminDb()
 
     // Get pending verification
-    const verificationDoc = await getDoc(doc(db, 'waitlistVerifications', emailLower))
+    const verificationDoc = await adminDb.collection('waitlistVerifications').doc(emailLower).get()
 
-    if (!verificationDoc.exists()) {
+    if (!verificationDoc.exists) {
       return NextResponse.json(
         { error: 'No verification found. Please request a new verification code.' },
         { status: 400 }
@@ -33,19 +33,24 @@ export async function POST(request: NextRequest) {
     }
 
     const verificationData = verificationDoc.data()
+    if (!verificationData) {
+      return NextResponse.json(
+        { error: 'Invalid verification data.' },
+        { status: 400 }
+      )
+    }
 
     // Check if token matches
     if (verificationData.verificationToken !== tokenStr) {
       // Increment attempts
       const attempts = (verificationData.attempts || 0) + 1
-      await setDoc(doc(db, 'waitlistVerifications', emailLower), {
-        ...verificationData,
+      await adminDb.collection('waitlistVerifications').doc(emailLower).update({
         attempts
-      }, { merge: true })
+      })
 
       if (attempts >= 5) {
         // Delete after too many attempts
-        await deleteDoc(doc(db, 'waitlistVerifications', emailLower))
+        await adminDb.collection('waitlistVerifications').doc(emailLower).delete()
         return NextResponse.json(
           { error: 'Too many failed attempts. Please request a new verification code.' },
           { status: 400 }
@@ -61,7 +66,7 @@ export async function POST(request: NextRequest) {
     // Check if expired
     const expiresAt = new Date(verificationData.expiresAt)
     if (new Date() > expiresAt) {
-      await deleteDoc(doc(db, 'waitlistVerifications', emailLower))
+      await adminDb.collection('waitlistVerifications').doc(emailLower).delete()
       return NextResponse.json(
         { error: 'Verification code expired. Please request a new one.' },
         { status: 400 }
@@ -69,7 +74,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Token is valid! Add to waitlist
-    await setDoc(doc(db, 'waitlist', emailLower), {
+    await adminDb.collection('waitlist').doc(emailLower).set({
       name: verificationData.name,
       email: emailLower,
       phone: verificationData.phone || '',
@@ -81,7 +86,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Delete pending verification
-    await deleteDoc(doc(db, 'waitlistVerifications', emailLower))
+    await adminDb.collection('waitlistVerifications').doc(emailLower).delete()
 
     return NextResponse.json({
       success: true,
