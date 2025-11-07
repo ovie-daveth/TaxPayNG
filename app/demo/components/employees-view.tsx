@@ -144,53 +144,53 @@ export function EmployeesView() {
   const totalMonthlyTax = totalAnnualTax / 12
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 sm:space-y-6">
       {/* Summary Cards */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Card className="p-4 sm:p-6">
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Total Employees</p>
-              <p className="text-2xl font-bold">{sampleEmployees.length}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mb-1">Total Employees</p>
+              <p className="text-xl sm:text-2xl font-bold">{sampleEmployees.length}</p>
             </div>
-            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-              <Users className="w-5 h-5 text-primary" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-primary/10 flex items-center justify-center">
+              <Users className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
             </div>
           </div>
         </Card>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
+        <Card className="p-4 sm:p-6">
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Monthly Payroll</p>
-              <p className="text-2xl font-bold">{formatCurrency(totalMonthlySalaries)}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mb-1">Monthly Payroll</p>
+              <p className="text-xl sm:text-2xl font-bold">{formatCurrency(totalMonthlySalaries)}</p>
             </div>
-            <div className="w-10 h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-green-600" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-green-500/10 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-green-600" />
             </div>
           </div>
         </Card>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
+        <Card className="p-4 sm:p-6">
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Annual Payroll</p>
-              <p className="text-2xl font-bold">{formatCurrency(totalAnnualSalaries)}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mb-1">Annual Payroll</p>
+              <p className="text-xl sm:text-2xl font-bold">{formatCurrency(totalAnnualSalaries)}</p>
             </div>
-            <div className="w-10 h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-              <TrendingUp className="w-5 h-5 text-blue-600" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600" />
             </div>
           </div>
         </Card>
 
-        <Card className="p-6">
-          <div className="flex items-center justify-between">
+        <Card className="p-4 sm:p-6">
+          <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-sm text-muted-foreground mb-1">Monthly PAYE</p>
-              <p className="text-2xl font-bold">{formatCurrency(totalMonthlyTax)}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground mb-1">Monthly PAYE</p>
+              <p className="text-xl sm:text-2xl font-bold">{formatCurrency(totalMonthlyTax)}</p>
             </div>
-            <div className="w-10 h-10 rounded-lg bg-accent/10 flex items-center justify-center">
-              <Calculator className="w-5 h-5 text-accent" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-accent/10 flex items-center justify-center">
+              <Calculator className="w-4 h-4 sm:w-5 sm:h-5 text-accent" />
             </div>
           </div>
         </Card>
@@ -198,26 +198,26 @@ export function EmployeesView() {
 
       {/* Employees List */}
       <Card>
-        <div className="p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h2 className="text-lg font-semibold">Employee Salary Breakdown</h2>
-              <p className="text-sm text-muted-foreground mt-1">
+        <div className="p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+            <div className="space-y-1">
+              <h2 className="text-base sm:text-lg font-semibold">Employee Salary Breakdown</h2>
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 View employee salaries, allowances, and tax calculations
               </p>
             </div>
-            <div className="relative w-64">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <div className="relative w-full sm:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
               <Input
                 placeholder="Search employees..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 text-sm"
               />
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3 sm:space-y-4">
             {filteredEmployees.map((employee) => (
               <EmployeeItem
                 key={employee.id}
@@ -232,9 +232,9 @@ export function EmployeesView() {
           </div>
 
           {filteredEmployees.length === 0 && (
-            <div className="text-center py-12">
-              <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No employees found matching your search</p>
+            <div className="text-center py-10 sm:py-12">
+              <Users className="w-10 h-10 sm:w-12 sm:h-12 text-muted-foreground mx-auto mb-3 sm:mb-4" />
+              <p className="text-sm text-muted-foreground">No employees found matching your search</p>
             </div>
           )}
         </div>
