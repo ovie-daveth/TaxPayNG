@@ -37,11 +37,11 @@ export function CreatorExpensesSection({
   totalCreatorExpenses,
 }: CreatorExpensesSectionProps) {
   return (
-    <div className="space-y-4 p-4 bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-      <div className="flex items-center justify-between">
-        <div>
-          <h4 className="font-semibold text-sm">Creator Business Expenses</h4>
-          <p className="text-xs text-muted-foreground">
+    <div className="space-y-3 sm:space-y-4 p-3 sm:p-4 bg-purple-50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div className="flex-1 min-w-0">
+          <h4 className="text-sm sm:text-base font-semibold">Creator Business Expenses</h4>
+          <p className="text-xs text-muted-foreground mt-0.5">
             Add expenses specific to your content creation business
           </p>
         </div>
@@ -52,7 +52,7 @@ export function CreatorExpensesSection({
             }
           }}
         >
-          <SelectTrigger className="w-[200px]">
+          <SelectTrigger className="w-full sm:w-[200px] h-9 sm:h-10 text-xs sm:text-sm">
             <SelectValue placeholder="Add Expense Type" />
           </SelectTrigger>
           <SelectContent>
@@ -61,6 +61,7 @@ export function CreatorExpensesSection({
                 key={expense.value}
                 value={expense.value}
                 disabled={!!creatorExpenses[expense.value]}
+                className="text-xs sm:text-sm"
               >
                 {expense.label}
               </SelectItem>
@@ -72,9 +73,9 @@ export function CreatorExpensesSection({
       {Object.entries(creatorExpenses).map(([expenseType, amount]) => {
         const expenseLabel = CREATOR_EXPENSES.find((e) => e.value === expenseType)?.label
         return (
-          <div key={expenseType} className="flex gap-3 items-end">
-            <div className="flex-1 space-y-2">
-              <Label>{expenseLabel}</Label>
+          <div key={expenseType} className="flex gap-2 sm:gap-3 items-end">
+            <div className="flex-1 space-y-1.5 sm:space-y-2">
+              <Label className="text-xs sm:text-sm">{expenseLabel}</Label>
               <Input
                 type="text"
                 inputMode="decimal"
@@ -86,6 +87,7 @@ export function CreatorExpensesSection({
                     onUpdateCreatorExpense(expenseType, rawValue)
                   }
                 }}
+                className="h-9 sm:h-10 text-xs sm:text-sm"
               />
             </div>
             <Button
@@ -93,6 +95,7 @@ export function CreatorExpensesSection({
               variant="ghost"
               size="icon"
               onClick={() => onRemoveCreatorExpense(expenseType)}
+              className="h-9 w-9 sm:h-10 sm:w-10 shrink-0"
             >
               <X className="w-4 h-4" />
             </Button>
@@ -102,7 +105,7 @@ export function CreatorExpensesSection({
 
       {Object.keys(creatorExpenses).length > 0 && (
         <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
-          <div className="flex items-center justify-between text-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-xs sm:text-sm">
             <span className="font-medium">Total Creator Expenses:</span>
             <span className="font-bold">
               ₦{totalCreatorExpenses.toLocaleString("en-NG", {

@@ -10,16 +10,16 @@ interface UserTypeSelectorProps {
 
 export function UserTypeSelector({ userType, onUserTypeChange }: UserTypeSelectorProps) {
   return (
-    <div className="space-y-2">
-      <Label htmlFor="userType">I am a...</Label>
+    <div className="space-y-1.5 sm:space-y-2">
+      <Label htmlFor="userType" className="text-sm sm:text-base">I am a...</Label>
       <Select value={userType} onValueChange={onUserTypeChange}>
-        <SelectTrigger id="userType">
+        <SelectTrigger id="userType" className="h-9 sm:h-10 text-sm sm:text-base">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="freelancer">Freelancer / Self-Employed</SelectItem>
-          <SelectItem value="creator">Content Creator / Influencer</SelectItem>
-          <SelectItem value="business">Business Owner</SelectItem>
+          <SelectItem value="freelancer" className="text-sm">Freelancer / Self-Employed</SelectItem>
+          <SelectItem value="creator" className="text-sm">Content Creator / Influencer</SelectItem>
+          <SelectItem value="business" className="text-sm">Business Owner</SelectItem>
         </SelectContent>
       </Select>
     </div>
