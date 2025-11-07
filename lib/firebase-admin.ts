@@ -1,5 +1,6 @@
 import { initializeApp, getApps, cert, App } from 'firebase-admin/app'
 import { getFirestore, Firestore } from 'firebase-admin/firestore'
+import { getAuth, Auth } from 'firebase-admin/auth'
 
 let adminApp: App | null = null
 let adminDb: Firestore | null = null
@@ -8,9 +9,9 @@ let adminDb: Firestore | null = null
  * Initialize Firebase Admin SDK
  * This bypasses Firestore security rules for server-side operations
  */
-export function getAdminDb(): Firestore {
-  if (adminDb) {
-    return adminDb
+function initializeAdminApp(): App {
+  if (adminApp) {
+    return adminApp
   }
 
   // Check if already initialized
@@ -39,7 +40,29 @@ export function getAdminDb(): Firestore {
     adminApp = getApps()[0]
   }
 
-  adminDb = getFirestore(adminApp)
+  return adminApp
+}
+
+/**
+ * Get Firestore instance (Admin SDK)
+ * This bypasses Firestore security rules for server-side operations
+ */
+export function getAdminDb(): Firestore {
+  if (adminDb) {
+    return adminDb
+  }
+
+  const app = initializeAdminApp()
+  adminDb = getFirestore(app)
   return adminDb
+}
+
+/**
+ * Get Auth instance (Admin SDK)
+ * Used for creating users, managing authentication, etc.
+ */
+export function getAdminAuth(): Auth {
+  const app = initializeAdminApp()
+  return getAuth(app)
 }
 

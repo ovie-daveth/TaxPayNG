@@ -195,8 +195,14 @@ export default function AdminLoginPage() {
           )}
           
           {!isLoggedIn && (
-            <div className="text-center text-sm text-muted-foreground">
+            <div className="text-center text-sm text-muted-foreground space-y-2">
               <p>Admin or Editor access only</p>
+              <p>
+                Need to create a user account?{" "}
+                <Link href="/admin/signup" className="text-primary hover:underline">
+                  Sign up here
+                </Link>
+              </p>
             </div>
           )}
         </div>
