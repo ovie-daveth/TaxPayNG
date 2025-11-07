@@ -1,9 +1,10 @@
 "use client"
 
-import { useState, useRef, useEffect, useCallback } from "react"
+import { useState, useRef, useEffect, useCallback, useMemo } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
 import { Send, HelpCircle, Sparkles, MessageSquare, Search, X, BookOpen, Building2, User, RefreshCw, Menu, X as XIcon, Share2, Copy, Check } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import OtaxLogo from "@/components/OtaxLogo"
@@ -12,6 +13,7 @@ import { toast } from "sonner"
 import { conversationService, ConversationMessage } from "@/lib/services/conversationService"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Suspense } from "react"
+import ReactMarkdown, { type Components as MarkdownComponents } from "react-markdown"
 
 
 // Enhanced ML-like matching algorithm with capability question detection
@@ -162,7 +164,7 @@ function findBestMatch(query: string, faqs: typeof faqData.individuals) {
     // Extract keywords after "can otax help me" or similar patterns
     const actionPatterns = [
       /(?:can|does|will)\s+(?:otax|you|it)\s+(?:help\s+me\s+)?(?:to\s+)?(file|calculate|track|manage|organize|stay|get|register|prepare|submit|complete|handle|assist|support|do|provide)/i,
-      /(?:help|assist|support|do|provide|file|calculate|track|manage|organize|stay|get|register|prepare|submit|complete|handle)\s+(?:me\s+)?(?:to\s+)?(?:file|calculate|track|manage|organize|stay|get|register|prepare|submit|complete|handle|returns?|tax|vat|paye|certificate|records?|compliant|refund|appeal|objection)/i,
+      /(?:help|assist|support|do|provide|file|calculate|track|manage|organize|stay|get|register|prepare|submit|complete|handle|returns?|tax|vat|paye|certificate|records?|compliant|refund|appeal|objection)/i,
     ]
     
     for (const pattern of actionPatterns) {
@@ -628,6 +630,20 @@ function FAQPageContent() {
     const originalInput = inputToUse.trim()
     setInput("")
     
+    const greetingPatterns = /\b(hi|hello|hey|good\s+morning|good\s+afternoon|good\s+evening|greetings|what'?s\s+up|howdy)\b/
+    if (greetingPatterns.test(userMessage)) {
+      setMessages(prev => [...prev, { type: "user", content: originalInput }])
+      setIsTyping(true)
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          type: "assistant",
+          content: "Hi, I'm your OTax Assistant. I can help with questions about Nigeria's new tax reform, reliefs, VAT, PAYE, and more. What would you like to explore today?"
+        }])
+        setIsTyping(false)
+      }, 500)
+      return
+    }
+    
     // Check for gratitude/acknowledgment phrases
     const gratitudePatterns = /\b(thanks?|thank you|thx|appreciate it|appreciate|good to know|got it|understood|ok thanks|okay thanks|perfect|great|awesome|nice)\b/
     if (gratitudePatterns.test(userMessage)) {
@@ -910,8 +926,24 @@ function FAQPageContent() {
     }
   }
 
-  const currentFaqs = selectedCategory === "individuals" ? faqData.individuals : faqData.businesses
-  const categories = [...new Set(currentFaqs.map(f => f.category))]
+  const currentFaqs = useMemo(() => (selectedCategory === "individuals" ? faqData.individuals : faqData.businesses), [selectedCategory])
+  const categories = useMemo(() => [...new Set(currentFaqs.map(f => f.category))], [currentFaqs])
+
+  const preprocessMarkdown = (content: string) =>
+    content
+      .replace(/\u2022/g, "- ")
+      .replace(/•/g, "- ")
+
+  const markdownComponents: MarkdownComponents = {
+    p: ({ children }) => <p className="leading-relaxed whitespace-pre-wrap">{children}</p>,
+    strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+    ul: ({ children }) => <ul className="list-disc pl-5 space-y-1">{children}</ul>,
+    ol: ({ children }) => <ol className="list-decimal pl-5 space-y-1">{children}</ol>,
+    li: ({ children }) => <li className="mt-1">{children}</li>,
+    h1: ({ children }) => <p className="font-semibold text-base mt-2">{children}</p>,
+    h2: ({ children }) => <p className="font-semibold text-base mt-2">{children}</p>,
+    h3: ({ children }) => <p className="font-semibold text-sm mt-2">{children}</p>,
+  }
 
   return (
     <div className="h-screen flex flex-col bg-background overflow-hidden">
@@ -1173,7 +1205,11 @@ function FAQPageContent() {
                         )}
                         {msg.type === "assistant" && msg.suggestedQuestions ? (
                           <div className="space-y-2">
-                            <p className="text-sm whitespace-pre-wrap mb-3">{msg.content.split('\n\n')[0]}</p>
+                            <div className="text-sm mb-3 space-y-2">
+                              <ReactMarkdown components={markdownComponents}>
+                                {preprocessMarkdown(msg.content.split('\n\n')[0])}
+                              </ReactMarkdown>
+                            </div>
                             <div className="space-y-2 pt-2 border-t border-border/50">
                               {msg.suggestedQuestions.map((suggestedQ, qIdx) => (
                                 <button
@@ -1190,7 +1226,11 @@ function FAQPageContent() {
                             </p>
                           </div>
                         ) : (
-                          <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                          <div className="text-sm space-y-2">
+                            <ReactMarkdown components={markdownComponents}>
+                              {preprocessMarkdown(msg.content)}
+                            </ReactMarkdown>
+                          </div>
                         )}
                         {msg.faq && (
                           <div className="mt-2 pt-2 border-t border-border/50">
