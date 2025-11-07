@@ -6,7 +6,7 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { ArrowRight, BarChart3, Calculator, FileText, Bell, CheckCircle2, Loader2, Sparkles, Shield, TrendingUp, Clock, Users, Zap, Award, DollarSign, ScanLine, FolderArchive, CreditCard, Layers, Receipt, FileCheck, Smartphone, Building2 } from "lucide-react"
+import { ArrowRight, BarChart3, Calculator, FileText, Bell, CheckCircle2, Loader2, Sparkles, Shield, TrendingUp, Clock, Users, Zap, Award, DollarSign, ScanLine, FolderArchive, CreditCard, Layers, Receipt, FileCheck, Smartphone, Building2, Menu, X } from "lucide-react"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { toast } from "sonner"
@@ -31,6 +31,7 @@ export default function HomePage() {
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [showTokenDialog, setShowTokenDialog] = useState(false)
   const [pendingEmail, setPendingEmail] = useState("")
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   // Check for verification status in URL
   useEffect(() => {
@@ -126,31 +127,57 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border">
-        <div className="px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-[150px] mx-auto py-3 sm:py-4 flex items-center justify-between">
-         <OtaxLogo />
-          <nav className="hidden md:flex items-center gap-4 lg:gap-6">
-            <Link href="#features" className="text-xs lg:text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Features
-            </Link>
-            <Link href="/pricing" className="text-xs lg:text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Pricing
-            </Link>
-            <Link href="/blog" className="text-xs lg:text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Blog
-            </Link>
-            <Link href="/faq" className="text-xs lg:text-sm text-muted-foreground hover:text-foreground transition-colors">
-              FAQ
-            </Link>
-          </nav>
-          <div className="flex items-center gap-2 sm:gap-3">
-            <ThemeToggle />
-            <a href="#waitlist">
-              <Button size="sm" className="md:h-10 md:px-4 text-xs sm:text-sm md:text-base">
-                <span className="relative z-10 hidden sm:inline">Join the Waitlist</span>
-                <span className="relative z-10 sm:hidden">Join</span>
-              </Button>
-            </a>
+        <div className="px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-[150px] mx-auto py-3 sm:py-4">
+          <div className="flex items-center justify-between gap-4">
+            <OtaxLogo />
+            <nav className="hidden md:flex items-center gap-4 lg:gap-6">
+              <Link href="#features" className="text-xs lg:text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Features
+              </Link>
+              <Link href="/pricing" className="text-xs lg:text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Pricing
+              </Link>
+              <Link href="/blog" className="text-xs lg:text-sm text-muted-foreground hover:text-foreground transition-colors">
+                Blog
+              </Link>
+              <Link href="/faq" className="text-xs lg:text-sm text-muted-foreground hover:text-foreground transition-colors">
+                FAQ
+              </Link>
+            </nav>
+            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-2 sm:gap-3">
+              <ThemeToggle />
+              <a href="#waitlist">
+                <Button size="sm" className="md:h-10 md:px-4 text-xs sm:text-sm md:text-base">
+                  <span className="relative z-10 hidden sm:inline">Join the Waitlist</span>
+                  <span className="relative z-10 sm:hidden">Join</span>
+                </Button>
+              </a>
+            </div>
+            <button
+              type="button"
+              className="md:hidden inline-flex items-center justify-center rounded-md border border-border p-2 text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              aria-label="Toggle menu"
+              onClick={() => setMobileMenuOpen((prev) => !prev)}
+            >
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
+            </div>
           </div>
+          {mobileMenuOpen && (
+            <nav className="mt-3 flex flex-col md:hidden border-t border-border pt-3 gap-2 text-sm text-muted-foreground">
+              {[{ label: "Features", href: "#features" }, { label: "Pricing", href: "/pricing" }, { label: "Blog", href: "/blog" }, { label: "FAQ", href: "/faq" }].map((item) => (
+                <Link
+                  key={item.label}
+                  href={item.href}
+                  className="px-1 py-2 rounded-md hover:text-foreground hover:bg-muted/60 transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+          )}
         </div>
       </header>
 
@@ -412,7 +439,7 @@ export default function HomePage() {
               Join Our <span className="text-primary">Exclusive Waitlist</span>
             </h2>
             <p className="text-base sm:text-lg md:text-xl text-muted-foreground mb-3 sm:mb-4 px-4">
-              Be among the first 1,000 users to experience the future of tax management
+              Affordable tax management for every freelancer, creator, and small business — early users enjoy exclusive launch discounts.
             </p>
             <p className="text-xs sm:text-sm text-muted-foreground px-4">
               Get early access, lifetime discounts, and priority support

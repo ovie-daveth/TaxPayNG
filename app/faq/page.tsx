@@ -1026,14 +1026,15 @@ function FAQPageContent() {
           />
         )}
         {/* Sidebar */}
-        <div className={`${sidebarOpen ? 'w-80 lg:w-80' : 'w-0'} transition-all duration-300 overflow-hidden flex-shrink-0 ${sidebarOpen ? 'block' : 'hidden lg:block'} ${sidebarOpen ? 'fixed lg:relative z-30 h-full left-0 top-0 lg:left-auto lg:top-auto' : ''}`}>
+        <div className={`${sidebarOpen ? 'w-80 lg:w-80 lg:mt-0 mt-12' : 'w-0 mt-12 lg:mt-0'} transition-all duration-300 overflow-hidden flex-shrink-0 ${sidebarOpen ? 'block' : 'hidden lg:block'} ${sidebarOpen ? 'fixed lg:relative z-30 h-full left-0 top-0 lg:left-auto lg:top-auto' : ''}`}>
           {sidebarOpen && (
             <div className="h-full flex flex-col border-r bg-background shadow-lg lg:shadow-none">
                   <div className="p-4 pb-3 flex-shrink-0 border-b">
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
                         <HelpCircle className="w-5 h-5 text-primary" />
-                        <h3 className="font-semibold">Quick Questions</h3>
+                        <h3 className="font-semibold block lg:hidden">OTax Assistant</h3>
+                        <h3 className="font-semibold hidden lg:block">Quick Questions</h3>
                       </div>
                       <div className="flex items-center gap-1">
                         <Button
@@ -1104,7 +1105,7 @@ function FAQPageContent() {
               variant="ghost"
               size="sm"
               onClick={() => setSidebarOpen(true)}
-              className="absolute left-4 top-4 z-20 h-9 w-9 p-0 bg-background border shadow-sm"
+              className="absolute left-3 top-4 z-20 h-9 w-9 p-0 bg-background border shadow-sm"
               title="Open sidebar"
             >
               <Menu className="w-4 h-4" />
@@ -1120,7 +1121,7 @@ function FAQPageContent() {
                 className="h-8 px-3"
               >
                 <Menu className="w-4 h-4 mr-2" />
-                Quick Questions
+                OTax Assistant
               </Button>
             </div>
             {/* Chat Header with Share Button */}
