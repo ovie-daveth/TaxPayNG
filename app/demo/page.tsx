@@ -172,7 +172,7 @@ export default function DemoPage() {
 
             {/* Tax Results Modal */}
             <Dialog open={showTaxResults} onOpenChange={setShowTaxResults}>
-              <DialogContent className="max-w-full sm:max-w-2xl md:max-w-4xl max-h-[90vh] overflow-y-auto p-0 mx-4 sm:mx-auto">
+              <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-2xl md:max-w-4xl max-h-[90vh] overflow-y-auto p-0">
                 {taxResult && (
                   <>
                     <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b border-border">
@@ -463,7 +463,7 @@ export default function DemoPage() {
 
       {/* Waitlist Modal */}
       <Dialog open={showWaitlistModal} onOpenChange={setShowWaitlistModal}>
-        <DialogContent className="max-w-full sm:max-w-md mx-4 sm:mx-auto">
+        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl sm:text-2xl font-bold text-center">Join the Waitlist</DialogTitle>
             <DialogDescription className="text-center text-xs sm:text-sm">
