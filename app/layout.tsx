@@ -10,6 +10,11 @@ export const metadata: Metadata = {
   title: 'OTax App',
   description: 'OTax App',
   generator: 'OTax App',
+  icons: {
+    icon: '/otax_dark.png',
+    shortcut: '/otax_dark.png',
+    apple: '/otax_dark.png',
+  },
 }
 
 export default function RootLayout({
