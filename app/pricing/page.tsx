@@ -1,17 +1,108 @@
 "use client"
 
 import type React from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { Check, Calculator } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Check, CheckCircle2, Calculator, Loader2 } from "lucide-react"
 import OtaxLogo from "@/components/OtaxLogo"
 import Footer from "@/components/footer"
 import { ThemeToggle } from "@/components/theme-toggle"
+import { Badge } from "@/components/ui/badge"
+import { toast } from "sonner"
+import { TokenInputDialog } from "@/components/waitlist/token-input-dialog"
+import { sendWaitlistVerification } from "@/lib/utils/emailVerification"
 
 export default function PricingPage() {
+  const [showWaitlistModal, setShowWaitlistModal] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
+  const [waitlistForm, setWaitlistForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+  })
+  const [isSubmittingWaitlist, setIsSubmittingWaitlist] = useState(false)
+  const [isWaitlistSubmitted, setIsWaitlistSubmitted] = useState(false)
+  const [showTokenDialog, setShowTokenDialog] = useState(false)
+  const [pendingEmail, setPendingEmail] = useState("")
+
+  const handleOpenWaitlist = (plan: string) => {
+    setSelectedPlan(plan)
+    setShowWaitlistModal(true)
+  }
+
+  const handleWaitlistModalChange = (open: boolean) => {
+    setShowWaitlistModal(open)
+    if (!open) {
+      setIsWaitlistSubmitted(false)
+      setIsSubmittingWaitlist(false)
+      setWaitlistForm({ name: "", email: "", phone: "" })
+      setSelectedPlan(null)
+    }
+  }
+
+  const handleWaitlistSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    setIsSubmittingWaitlist(true)
+
+    try {
+      if (!waitlistForm.name || !waitlistForm.email) {
+        toast.error("Please provide your name and email")
+        setIsSubmittingWaitlist(false)
+        return
+      }
+
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(waitlistForm.email.trim())) {
+        toast.error("Please enter a valid email address")
+        setIsSubmittingWaitlist(false)
+        return
+      }
+
+      if (waitlistForm.phone && waitlistForm.phone.trim() !== "") {
+        const phoneRegex = /^(\+234|0)?[789][01]\d{8}$/
+        if (!phoneRegex.test(waitlistForm.phone.replace(/\s/g, ""))) {
+          toast.error("Please enter a valid Nigerian phone number")
+          setIsSubmittingWaitlist(false)
+          return
+        }
+      }
+
+      const toastId = toast.loading("Sending verification code...")
+      const verificationResult = await sendWaitlistVerification(
+        waitlistForm.email.trim(),
+        waitlistForm.name.trim(),
+        waitlistForm.phone.trim() || undefined
+      )
+      toast.dismiss(toastId)
+
+      if (!verificationResult.success) {
+        toast.error(verificationResult.error || "Failed to send verification code")
+        setIsSubmittingWaitlist(false)
+        return
+      }
+
+      toast.success("Verification code sent! Please check your email.")
+      setPendingEmail(verificationResult.email || waitlistForm.email.trim())
+      setShowTokenDialog(true)
+    } catch (error) {
+      console.error("Waitlist submission error:", error)
+      toast.error("Oops! Something went wrong. Please try again.")
+    } finally {
+      setIsSubmittingWaitlist(false)
+    }
+  }
+
+  const handleVerified = () => {
+    setIsWaitlistSubmitted(true)
+    setPendingEmail("")
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -59,7 +150,7 @@ export default function PricingPage() {
           <div className="text-center mb-16">
             <h1 className="text-4xl md:text-5xl font-bold mb-4">Simple, Transparent Pricing</h1>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Choose the plan that fits your business needs. All plans include a 14-day free trial.
+              Choose the plan that fits your business needs. All plans include a 30-day free trial.
             </p>
           </div>
 
@@ -86,9 +177,15 @@ export default function PricingPage() {
                       <CardDescription>
                         Perfect for tech freelancers, VAs, copywriters, and independent professionals
                       </CardDescription>
-                <div className="mt-4">
-                  <span className="text-4xl font-bold">₦5,000</span>
-                  <span className="text-muted-foreground">/month</span>
+                <div className="mt-4 space-y-1">
+                  <span className="text-sm font-medium text-muted-foreground line-through">₦5,000</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl font-bold text-foreground">₦2,500</span>
+                    <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-1 text-xs font-semibold">
+                      50% OFF
+                    </Badge>
+                  </div>
+                  <span className="text-sm text-muted-foreground">per month (launch discount)</span>
                 </div>
               </CardHeader>
               <CardContent className="flex-1">
@@ -105,11 +202,14 @@ export default function PricingPage() {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Link href="/signup" className="w-full">
-                  <Button className="w-full bg-transparent hover:bg-muted hover:text-foreground transition-all duration-200 hover:scale-105 hover:shadow-lg" variant="outline">
-                    Start Free Trial
-                  </Button>
-                </Link>
+                <Button
+                  type="button"
+                  className="w-full bg-transparent hover:bg-muted hover:text-foreground transition-all duration-200 hover:scale-105 hover:shadow-lg"
+                  variant="outline"
+                  onClick={() => handleOpenWaitlist("PRO")}
+                >
+                  Start Free Trial
+                </Button>
               </CardFooter>
             </Card>
 
@@ -129,8 +229,16 @@ export default function PricingPage() {
                         Ideal for content creators, influencers, and digital creators managing multiple income streams
                       </CardDescription>
                       <div className="mt-4">
-                        <span className="text-4xl font-bold">₦12,000</span>
-                        <span className="text-muted-foreground">/month</span>
+                        <div className="mt-4 space-y-1">
+                          <span className="text-sm font-medium text-muted-foreground line-through">₦12,000</span>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-4xl font-bold">₦6,000</span>
+                            <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-1 text-xs font-semibold">
+                              50% OFF
+                            </Badge>
+                          </div>
+                          <span className="text-sm text-muted-foreground">per month (launch discount)</span>
+                        </div>
                       </div>
                     </CardHeader>
                     <CardContent className="flex-1">
@@ -148,9 +256,13 @@ export default function PricingPage() {
                       </ul>
                     </CardContent>
                     <CardFooter>
-                      <Link href="/signup" className="w-full">
-                        <Button className="w-full hover:bg-primary/90 hover:scale-105 transition-all duration-200 hover:shadow-lg">Start Free Trial</Button>
-                      </Link>
+                      <Button
+                        type="button"
+                        className="w-full hover:bg-primary/90 hover:scale-105 transition-all duration-200 hover:shadow-lg"
+                        onClick={() => handleOpenWaitlist("GOLD")}
+                      >
+                        Start Free Trial
+                      </Button>
                     </CardFooter>
                   </Card>
 
@@ -167,8 +279,16 @@ export default function PricingPage() {
                         For established creators with complex tax situations, multiple businesses, and team collaborations
                       </CardDescription>
                       <div className="mt-4">
-                        <span className="text-4xl font-bold">₦25,000</span>
-                        <span className="text-muted-foreground">/month</span>
+                        <div className="mt-4 space-y-1">
+                          <span className="text-sm font-medium text-muted-foreground line-through">₦25,000</span>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-4xl font-bold">₦12,500</span>
+                            <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-1 text-xs font-semibold">
+                              50% OFF
+                            </Badge>
+                          </div>
+                        </div>
+                        <span className="text-sm text-muted-foreground">per month (launch discount)</span>
                       </div>
                     </CardHeader>
                     <CardContent className="flex-1">
@@ -187,11 +307,14 @@ export default function PricingPage() {
                       </ul>
                     </CardContent>
                     <CardFooter>
-                      <Link href="/signup" className="w-full">
-                        <Button className="w-full bg-transparent hover:bg-muted hover:text-foreground transition-all duration-200 hover:scale-105 hover:shadow-lg" variant="outline">
-                          Start Free Trial
-                        </Button>
-                      </Link>
+                      <Button
+                        type="button"
+                        className="w-full bg-transparent hover:bg-muted hover:text-foreground transition-all duration-200 hover:scale-105 hover:shadow-lg"
+                        variant="outline"
+                        onClick={() => handleOpenWaitlist("PLATINUM")}
+                      >
+                        Start Free Trial
+                      </Button>
                     </CardFooter>
                   </Card>
                 </div>
@@ -240,9 +363,15 @@ export default function PricingPage() {
                         <p>For businesses with annual turnover ≤ ₦50-100 million and fixed assets ≤ ₦250 million (excluding professional services).</p>
                         <p className="text-xs font-medium text-primary">May qualify for tax exemptions under NTA 2025</p>
                       </CardDescription>
-                <div className="mt-4">
-                  <span className="text-4xl font-bold">₦25,000</span>
-                  <span className="text-muted-foreground">/month</span>
+                <div className="mt-4 space-y-1">
+                  <span className="text-sm font-medium text-muted-foreground line-through">₦25,000</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-4xl font-bold">₦12,500</span>
+                    <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-1 text-xs font-semibold">
+                      50% OFF
+                    </Badge>
+                  </div>
+                  <span className="text-sm text-muted-foreground">per month (launch discount)</span>
                 </div>
               </CardHeader>
               <CardContent className="flex-1">
@@ -260,9 +389,13 @@ export default function PricingPage() {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Link href="/signup" className="w-full">
-                  <Button className="w-full hover:bg-primary/90 hover:scale-105 transition-all duration-200 hover:shadow-lg">Start Free Trial</Button>
-                </Link>
+                <Button
+                  type="button"
+                  className="w-full hover:bg-primary/90 hover:scale-105 transition-all duration-200 hover:shadow-lg"
+                  onClick={() => handleOpenWaitlist("Small Business")}
+                >
+                  Start Free Trial
+                </Button>
               </CardFooter>
             </Card>
 
@@ -277,9 +410,15 @@ export default function PricingPage() {
                         <p>For businesses with turnover above small business threshold, fixed assets exceeding ₦250 million, or providing professional services.</p>
                         <p className="text-xs font-medium text-muted-foreground">Subject to full corporate tax regime</p>
                       </CardDescription>
-                <div className="mt-4">
-                        <span className="text-4xl font-bold">₦75,000</span>
-                  <span className="text-muted-foreground">/month</span>
+                <div className="mt-4 space-y-1">
+                        <span className="text-sm font-medium text-muted-foreground line-through">₦75,000</span>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-4xl font-bold">₦37,500</span>
+                          <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-1 text-xs font-semibold">
+                            50% OFF
+                          </Badge>
+                        </div>
+                  <span className="text-sm text-muted-foreground">per month (launch discount)</span>
                 </div>
               </CardHeader>
               <CardContent className="flex-1">
@@ -320,7 +459,7 @@ export default function PricingPage() {
                     Do you offer a free trial?
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground">
-                    Yes! All plans come with a 14-day free trial. No credit card required to start. You can explore all features and see how OTax simplifies your tax management before committing.
+                    Yes! All plans come with a 30-day free trial. No credit card required to start. You can explore all features and see how OTax simplifies your tax management before committing.
                   </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="general-2" className="border border-border rounded-lg px-4 mb-4">
@@ -579,6 +718,93 @@ export default function PricingPage() {
 
       {/* Footer */}
       <Footer />
+
+      <Dialog open={showWaitlistModal} onOpenChange={handleWaitlistModalChange}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Join the Waitlist</DialogTitle>
+            <DialogDescription>
+              {selectedPlan ? `Secure your ${selectedPlan} launch discount.` : "Get early access to OTax and enjoy launch perks."}
+            </DialogDescription>
+          </DialogHeader>
+
+          {isWaitlistSubmitted ? (
+            <div className="py-6 flex flex-col items-center gap-4">
+              <CheckCircle2 className="w-12 h-12 text-emerald-500" />
+              <div className="text-center space-y-2">
+                <p className="text-base font-semibold">You're all set!</p>
+                <p className="text-sm text-muted-foreground">
+                  Thanks for joining our waitlist. We'll notify you as soon as we launch.
+                </p>
+              </div>
+              <Button onClick={() => handleWaitlistModalChange(false)}>Close</Button>
+            </div>
+          ) : (
+            <form onSubmit={handleWaitlistSubmit} className="space-y-4 mt-4">
+              <div className="space-y-1">
+                <label htmlFor="waitlist-name" className="text-sm font-medium">
+                  Full Name
+                </label>
+                <Input
+                  id="waitlist-name"
+                  placeholder="Jane Doe"
+                  value={waitlistForm.name}
+                  onChange={(e) => setWaitlistForm((prev) => ({ ...prev, name: e.target.value }))}
+                  required
+                  disabled={isSubmittingWaitlist}
+                />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="waitlist-email" className="text-sm font-medium">
+                  Email Address
+                </label>
+                <Input
+                  id="waitlist-email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={waitlistForm.email}
+                  onChange={(e) => setWaitlistForm((prev) => ({ ...prev, email: e.target.value }))}
+                  required
+                  disabled={isSubmittingWaitlist}
+                />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="waitlist-phone" className="text-sm font-medium">
+                  Phone Number <span className="text-xs text-muted-foreground">(optional)</span>
+                </label>
+                <Input
+                  id="waitlist-phone"
+                  placeholder="0801 234 5678"
+                  value={waitlistForm.phone}
+                  onChange={(e) => setWaitlistForm((prev) => ({ ...prev, phone: e.target.value }))}
+                  disabled={isSubmittingWaitlist}
+                />
+              </div>
+              <Button type="submit" className="w-full" disabled={isSubmittingWaitlist}>
+                {isSubmittingWaitlist ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" /> Sending...
+                  </>
+                ) : (
+                  "Join Waitlist"
+                )}
+              </Button>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <TokenInputDialog
+        open={showTokenDialog}
+        onOpenChange={(open) => {
+          setShowTokenDialog(open)
+          if (!open && !isWaitlistSubmitted) {
+            setPendingEmail("")
+          }
+        }}
+        email={pendingEmail}
+        onVerified={handleVerified}
+      />
     </div>
   )
 }
