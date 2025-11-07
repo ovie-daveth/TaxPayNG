@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { TaxCalculatorForm } from "@/components/tax-calculator/tax-calculator-form"
+import { TaxCalculatorForm } from "@/components/tax-calculator/form/tax-calculator-form"
 import { TaxBreakdown } from "@/components/tax-calculator/tax-breakdown"
 import { TaxRatesInfo } from "@/components/tax-calculator/tax-rates-info"
 import { TaxCalculatorSkeleton } from "@/components/ui/skeletons"

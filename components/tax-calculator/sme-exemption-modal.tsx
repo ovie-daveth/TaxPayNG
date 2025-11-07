@@ -1,8 +1,11 @@
 "use client"
 
+import { useState } from "react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
+import { Label } from "@/components/ui/label"
 import { CheckCircle2, X } from "lucide-react"
 
 interface SMEExemptionModalProps {
@@ -12,8 +15,24 @@ interface SMEExemptionModalProps {
 }
 
 export function SMEExemptionModal({ open, onOpenChange, onContinue }: SMEExemptionModalProps) {
+  const [confirmed, setConfirmed] = useState(false)
+
+  // Reset confirmation when modal closes
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen) {
+      setConfirmed(false)
+    }
+    onOpenChange(newOpen)
+  }
+
+  const handleContinue = () => {
+    if (confirmed) {
+      onContinue()
+      setConfirmed(false)
+    }
+  }
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold">Small Business Tax Exemptions</DialogTitle>
@@ -139,13 +158,51 @@ export function SMEExemptionModal({ open, onOpenChange, onContinue }: SMEExempti
               </li>
             </ul>
           </div>
+
+          {/* Large Corporation Notice */}
+          <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+            <h3 className="font-semibold text-lg mb-3 text-amber-900 dark:text-amber-100">
+              ⚠️ Large Corporation Calculations
+            </h3>
+            <p className="text-sm text-amber-800 dark:text-amber-200 mb-3">
+              By clicking <strong>"Continue"</strong>, you confirm that:
+            </p>
+            <ul className="space-y-2 text-sm text-amber-800 dark:text-amber-200 mb-4">
+              <li className="flex items-start gap-2">
+                <span className="font-semibold">•</span>
+                <span>You have read and understood the small business exemption requirements above</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="font-semibold">•</span>
+                <span>Your business does <strong>NOT</strong> qualify as a small company (turnover &gt; ₦100M OR assets &gt; ₦250M)</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="font-semibold">•</span>
+                <span>You are proceeding with <strong>large corporation tax calculations</strong> (CIT at 30%, Development Levy at 4%, VAT at 7.5%, etc.)</span>
+              </li>
+            </ul>
+            <div className="flex items-start gap-3 pt-3 border-t border-amber-300 dark:border-amber-700">
+              <Checkbox
+                id="confirm-large-corp"
+                checked={confirmed}
+                onCheckedChange={(checked) => setConfirmed(checked === true)}
+                className="mt-1"
+              />
+              <Label
+                htmlFor="confirm-large-corp"
+                className="text-sm font-medium text-amber-900 dark:text-amber-100 cursor-pointer leading-relaxed"
+              >
+                I confirm that I have read the information above and understand that I am entering large corporation tax calculations. My business does not qualify for small company exemptions.
+              </Label>
+            </div>
+          </div>
         </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t border-border">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>
             Cancel
           </Button>
-          <Button onClick={onContinue}>
+          <Button onClick={handleContinue} disabled={!confirmed}>
             Continue to Calculator
           </Button>
         </div>

@@ -13,7 +13,7 @@ import { toast } from "sonner"
 import { PAYMENT_METHODS, PaymentMethodCard } from "./payment-method-card"
 import { PERIODS, PaymentPeriodCard } from "./payment-period-card"
 import { PaymentStepsIndicator } from "./payment-steps-indicator"
-import { TaxCalculatorForm } from "@/components/tax-calculator/tax-calculator-form"
+import { TaxCalculatorForm } from "@/components/tax-calculator/form/tax-calculator-form"
 import { TaxDurationSelector } from "./tax-duration-selector"
 import { RRRPaymentForm } from "./rrr-payment-form"
 

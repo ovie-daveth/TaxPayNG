@@ -503,47 +503,54 @@ function FAQPageContent() {
   useEffect(() => {
     const loadConversationFromUrl = async () => {
       const shareId = searchParams.get('share')
-      if (shareId && !isLoadingConversation) {
-        setIsLoadingConversation(true)
-        try {
-          const conversation = await conversationService.getConversation(shareId)
-          if (conversation) {
-            setConversationId(conversation.shareId || shareId)
-            setSelectedCategory(conversation.category)
-            setHasLoadedWelcome(true) // Prevent welcome message from showing
-            // Convert conversation messages to the format used in state
-            const formattedMessages = conversation.messages.map(msg => ({
-              type: msg.type as "user" | "assistant",
-              content: msg.content,
-              faq: msg.faq ? {
-                question: msg.faq.question,
-                answer: msg.faq.answer,
-                category: msg.faq.category,
-                keywords: msg.faq.keywords
-              } : undefined,
-              suggestedQuestions: msg.suggestedQuestions?.map(sq => ({
-                question: sq.question,
-                answer: sq.answer,
-                category: sq.category,
-                keywords: sq.keywords
-              }))
+      // Skip loading if:
+      // 1. No shareId in URL
+      // 2. Already loading
+      // 3. Already have this conversation loaded (conversationId matches AND we have messages)
+      //    This prevents reloading when we just saved and updated the URL
+      if (!shareId || isLoadingConversation || (conversationId === shareId && messages.length > 0)) {
+        return
+      }
+      
+      setIsLoadingConversation(true)
+      try {
+        const conversation = await conversationService.getConversation(shareId)
+        if (conversation) {
+          setConversationId(conversation.shareId || shareId)
+          setSelectedCategory(conversation.category)
+          setHasLoadedWelcome(true) // Prevent welcome message from showing
+          // Convert conversation messages to the format used in state
+          const formattedMessages = conversation.messages.map(msg => ({
+            type: msg.type as "user" | "assistant",
+            content: msg.content,
+            faq: msg.faq ? {
+              question: msg.faq.question,
+              answer: msg.faq.answer,
+              category: msg.faq.category,
+              keywords: msg.faq.keywords
+            } : undefined,
+            suggestedQuestions: msg.suggestedQuestions?.map(sq => ({
+              question: sq.question,
+              answer: sq.answer,
+              category: sq.category,
+              keywords: sq.keywords
             }))
-            setMessages(formattedMessages)
-            // toast.success("Conversation loaded!")
-          } else {
-            toast.error("Conversation not found")
-          }
-        } catch (error) {
-          console.error("Error loading conversation:", error)
-          toast.error("Failed to load conversation")
-        } finally {
-          setIsLoadingConversation(false)
+          }))
+          setMessages(formattedMessages)
+          // toast.success("Conversation loaded!")
+        } else {
+          toast.error("Conversation not found")
         }
+      } catch (error) {
+        console.error("Error loading conversation:", error)
+        toast.error("Failed to load conversation")
+      } finally {
+        setIsLoadingConversation(false)
       }
     }
     
     loadConversationFromUrl()
-  }, [searchParams])
+  }, [searchParams, conversationId, messages.length, isLoadingConversation])
 
   // Auto-save conversation when messages change (but not during initial load)
   useEffect(() => {
@@ -603,7 +610,7 @@ function FAQPageContent() {
     if (!hasLoadedWelcome && messages.length === 0 && !shareId && !isLoadingConversation) {
       setMessages([{
         type: "assistant",
-        content: `👋 Hello! I'm your OTax AI assistant. I can help answer questions about Nigeria's new tax reform (Nigeria Tax Act 2025, effective January 1, 2026), including:\n\n• Tax brackets and rates (0% on first ₦800k, then 15%, 18%, 21%, 23%, 25%)\n• Tax reliefs and deductions (rent relief up to ₦500k, pension up to 8%, etc.)\n• Capital gains tax and exemptions\n• Employment income and benefits-in-kind\n• Small business exemptions (0% CIT for companies ≤ ₦100M turnover)\n• VAT regulations (7.5% rate, ₦100M threshold)\n• Tax registration and TIN requirements\n• Filing deadlines and self-assessment\n• Tax clearance certificates\n• Advance rulings and clarifications\n• Penalties and compliance\n• Tax refunds\n• Objection and appeal processes\n• PAYE obligations\n• Record keeping requirements\n• Nigeria Revenue Service (NRS) and tax administration\n• Tax Appeal Tribunal and dispute resolution\n• Tax Ombud and taxpayer rights\n• Virtual assets and cryptocurrency taxation\n• How OTax can help you\n\nWhat would you like to know?`,
+        content: `👋 Hello! I'm your OTax assistant. I can help answer questions about Nigeria's new tax reform (Nigeria Tax Act 2025, effective January 1, 2026), including:\n\n• Tax brackets and rates (0% on first ₦800k, then 15%, 18%, 21%, 23%, 25%)\n• Tax reliefs and deductions (rent relief up to ₦500k, pension up to 8%, etc.)\n• Capital gains tax and exemptions\n• Employment income and benefits-in-kind\n• Small business exemptions (0% CIT for companies ≤ ₦100M turnover)\n• VAT regulations (7.5% rate, ₦100M threshold)\n• Tax registration and TIN requirements\n• Filing deadlines and self-assessment\n• Tax clearance certificates\n• Advance rulings and clarifications\n• Penalties and compliance\n• Tax refunds\n• Objection and appeal processes\n• PAYE obligations\n• Record keeping requirements\n• Nigeria Revenue Service (NRS) and tax administration\n• Tax Appeal Tribunal and dispute resolution\n• Tax Ombud and taxpayer rights\n• Virtual assets and cryptocurrency taxation\n• How OTax can help you\n\nWhat would you like to know?`,
       }])
       setHasLoadedWelcome(true)
     }
@@ -769,7 +776,7 @@ function FAQPageContent() {
   const formatConversation = () => {
     if (messages.length === 0) return ""
     
-    let formatted = `💬 OTax AI Conversation - ${selectedCategory === "individuals" ? "Individuals & Creators" : "Small Businesses"}\n\n`
+    let formatted = `💬 OTax Assistant - ${selectedCategory === "individuals" ? "Individuals & Creators" : "Small Businesses"}\n\n`
     formatted += `Date: ${new Date().toLocaleDateString()}\n\n`
     formatted += "─".repeat(50) + "\n\n"
     
@@ -851,7 +858,7 @@ function FAQPageContent() {
     if (typeof navigator !== 'undefined' && navigator.share) {
       try {
         await navigator.share({
-          title: "OTax AI Conversation",
+          title: "OTax Assistant",
           text: shareText,
           url: shareUrl
         })
@@ -1089,7 +1096,7 @@ function FAQPageContent() {
               <div className="hidden lg:flex items-center justify-between px-4 md:px-8 py-3 border-b flex-shrink-0">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-primary" />
-                  <span className="text-sm font-medium">OTax AI Conversation</span>
+                  <span className="text-sm font-medium">OTax Assistant</span>
                 </div>
                 <Button
                   variant="ghost"

@@ -173,7 +173,7 @@ export default function HomePage() {
             </a>
             <Link href="/demo">
               <Button size="lg" variant="outline" className="w-full sm:w-auto bg-transparent text-lg h-14 px-8">
-                Watch Demo
+                Run Demo
               </Button>
             </Link>
           </div>
@@ -511,7 +511,7 @@ export default function HomePage() {
                 </a>
                 <Link href="/demo">
                   <Button size="lg" variant="outline" className="text-lg h-14 px-8 border-2 border-primary-foreground/20 bg-transparent hover:bg-primary-foreground/10">
-                    Watch Demo
+                    Run Demo
                   </Button>
                 </Link>
               </div>

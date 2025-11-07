@@ -10,7 +10,7 @@ import { Calculator, ArrowRight, Loader2, Sparkles, LayoutDashboard, Receipt, Se
 import { toast } from "sonner"
 import { db } from "@/firebase/firebase"
 import { collection, setDoc, doc, query, getDocs, where } from "firebase/firestore"
-import { TaxCalculatorForm } from "@/components/tax-calculator/tax-calculator-form"
+import { TaxCalculatorForm } from "@/components/tax-calculator/form/tax-calculator-form"
 import { TaxRatesInfo } from "@/components/tax-calculator/tax-rates-info"
 import { ThemeToggle } from "@/components/theme-toggle"
 import OtaxLogo from "@/components/OtaxLogo"

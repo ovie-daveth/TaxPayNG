@@ -152,3 +152,71 @@ export async function batchConvertCurrency(
   return results
 }
 
+/**
+ * Format currency input as user types (adds commas for thousands)
+ * Returns formatted display value
+ */
+export function formatCurrencyInput(value: string): string {
+  if (!value || value === "") return ""
+  
+  // Remove all non-digit characters except decimal point
+  const numericValue = value.replace(/[^\d.]/g, "")
+  
+  // Split by decimal point
+  const parts = numericValue.split(".")
+  const integerPart = parts[0] || ""
+  const decimalPart = parts[1] || ""
+  
+  // Add commas to integer part
+  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
+  
+  // Combine with decimal part if exists
+  return decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger
+}
+
+/**
+ * Parse formatted currency string to raw numeric string (removes commas)
+ */
+export function parseCurrencyInput(value: string): string {
+  // Remove commas and keep only digits and decimal point
+  return value.replace(/,/g, "")
+}
+
+/**
+ * Handle currency input change - validates and formats
+ * Returns { isValid: boolean, rawValue: string, displayValue: string }
+ */
+export function handleCurrencyInputChange(value: string): {
+  isValid: boolean
+  rawValue: string
+  displayValue: string
+} {
+  // Allow empty string
+  if (value === "") {
+    return { isValid: true, rawValue: "", displayValue: "" }
+  }
+
+  // Remove all non-digit characters except decimal point
+  const cleaned = value.replace(/[^\d.]/g, "")
+  
+  // Prevent multiple decimal points
+  const parts = cleaned.split(".")
+  if (parts.length > 2) {
+    return { isValid: false, rawValue: "", displayValue: "" }
+  }
+
+  // Limit decimal places to 2
+  if (parts[1] && parts[1].length > 2) {
+    return { isValid: false, rawValue: "", displayValue: "" }
+  }
+
+  // Format for display (with commas)
+  const displayValue = formatCurrencyInput(cleaned)
+  
+  return {
+    isValid: true,
+    rawValue: cleaned,
+    displayValue,
+  }
+}
+
