@@ -17,6 +17,7 @@ interface TransactionsViewProps {
   setSelectedType: (type: string) => void
   selectedCategory: string
   setSelectedCategory: (category: string) => void
+  sidebarCollapsed?: boolean
 }
 
 export function TransactionsView({ 
@@ -28,7 +29,8 @@ export function TransactionsView({
   selectedType,
   setSelectedType,
   selectedCategory,
-  setSelectedCategory
+  setSelectedCategory,
+  sidebarCollapsed = false
 }: TransactionsViewProps) {
   const freelancerTransactions = [
     { id: 1, type: "income" as const, description: "Client Payment - Website Design", amount: 450000, date: "Jan 15, 2025", category: "Services", paymentMethod: "Bank Transfer", taxDeductible: false },
@@ -80,43 +82,54 @@ export function TransactionsView({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 sm:space-y-4">
       {/* Search and Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-3">
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
           <Input 
             placeholder="Search transactions..." 
-            className="pl-9"
+            className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <Button variant="outline" onClick={() => setIsFilterOpen(!isFilterOpen)}>
-          <Filter className="w-4 h-4 mr-2" />
-          Filters
+        <Button 
+          variant="outline" 
+          onClick={() => setIsFilterOpen(!isFilterOpen)}
+          className="h-9 sm:h-10 text-sm"
+        >
+          <Filter className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-2" />
+          <span className="hidden sm:inline">Filters</span>
+          <span className="sm:hidden">Filter</span>
         </Button>
       </div>
 
       {/* Filters Panel */}
       {isFilterOpen && (
-        <Card className="p-4">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold text-sm">Filters</h3>
-            <Button variant="ghost" size="sm" onClick={() => {
-              setSelectedType("all")
-              setSelectedCategory("all")
-              setIsFilterOpen(false)
-            }}>
-              <X className="w-4 h-4 mr-1" />
-              Clear All
+        <Card className="p-3 sm:p-4">
+          <div className="flex items-center justify-between mb-3 sm:mb-4">
+            <h3 className="font-semibold text-xs sm:text-sm">Filters</h3>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => {
+                setSelectedType("all")
+                setSelectedCategory("all")
+                setIsFilterOpen(false)
+              }}
+              className="h-8 sm:h-9 text-xs sm:text-sm"
+            >
+              <X className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-1" />
+              <span className="hidden sm:inline">Clear All</span>
+              <span className="sm:hidden">Clear</span>
             </Button>
           </div>
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Type</label>
+          <div className="grid sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-1.5 sm:space-y-2">
+              <label className="text-xs sm:text-sm font-medium">Type</label>
               <Select value={selectedType} onValueChange={setSelectedType}>
-                <SelectTrigger>
+                <SelectTrigger className="h-9 sm:h-10 text-sm">
                   <SelectValue placeholder="All types" />
                 </SelectTrigger>
                 <SelectContent>
@@ -126,10 +139,10 @@ export function TransactionsView({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Category</label>
+            <div className="space-y-1.5 sm:space-y-2">
+              <label className="text-xs sm:text-sm font-medium">Category</label>
               <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger>
+                <SelectTrigger className="h-9 sm:h-10 text-sm">
                   <SelectValue placeholder="All categories" />
                 </SelectTrigger>
                 <SelectContent>
@@ -170,41 +183,41 @@ export function TransactionsView({
 
       {/* Transactions Table */}
       <Card className="overflow-hidden">
-        {/* Desktop View */}
-        <div className="hidden md:block overflow-x-auto">
+        {/* Desktop View - Full Table with responsive columns */}
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full">
             <thead className="bg-muted/50 border-b border-border">
               <tr>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Description</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Category</th>
-                <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Payment Method</th>
-                <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Amount</th>
-                <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
+                <th className="text-left py-2.5 sm:py-3 lg:px-3 xl:px-4 text-xs sm:text-sm font-medium text-muted-foreground">Date</th>
+                <th className="text-left py-2.5 sm:py-3 lg:px-3 xl:px-4 text-xs sm:text-sm font-medium text-muted-foreground">Description</th>
+                <th className="text-left py-2.5 sm:py-3 lg:px-3 xl:px-4 text-xs sm:text-sm font-medium text-muted-foreground hidden xl:table-cell">Category</th>
+                <th className="text-left py-2.5 sm:py-3 lg:px-3 xl:px-4 text-xs sm:text-sm font-medium text-muted-foreground hidden xl:table-cell">Payment Method</th>
+                <th className="text-right py-2.5 sm:py-3 lg:px-3 xl:px-4 text-xs sm:text-sm font-medium text-muted-foreground">Amount</th>
+                <th className="text-center py-2.5 sm:py-3 lg:px-3 xl:px-4 text-xs sm:text-sm font-medium text-muted-foreground hidden xl:table-cell">Status</th>
               </tr>
             </thead>
             <tbody>
               {filteredTransactions.map((transaction) => (
                 <tr key={transaction.id} className="border-b border-border last:border-0 hover:bg-muted/30">
-                  <td className="py-4 px-4 text-sm">{transaction.date}</td>
-                  <td className="py-4 px-4">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${transaction.type === "income" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"}`}>
-                        {transaction.type === "income" ? <ArrowUpRight className="w-4 h-4" /> : <ArrowDownRight className="w-4 h-4" />}
+                  <td className="py-3 sm:py-4 lg:px-3 xl:px-4 text-xs sm:text-sm">{transaction.date}</td>
+                  <td className="py-3 sm:py-4 lg:px-3 xl:px-4">
+                    <div className="flex items-center gap-1.5 sm:gap-2">
+                      <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${transaction.type === "income" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"}`}>
+                        {transaction.type === "income" ? <ArrowUpRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> : <ArrowDownRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />}
                       </div>
-                      <span className="text-sm font-medium">{transaction.description}</span>
+                      <span className={`text-xs sm:text-sm font-medium truncate ${sidebarCollapsed ? 'lg:max-w-[180px] xl:max-w-none' : 'lg:max-w-[150px] xl:max-w-none'}`} title={transaction.description}>{transaction.description}</span>
                     </div>
                   </td>
-                  <td className="py-4 px-4">
+                  <td className="py-3 sm:py-4 lg:px-3 xl:px-4 hidden xl:table-cell">
                     <Badge variant="secondary" className="text-xs">{transaction.category}</Badge>
                   </td>
-                  <td className="py-4 px-4 text-sm text-muted-foreground">{transaction.paymentMethod}</td>
-                  <td className="py-4 px-4 text-right">
-                    <span className={`font-semibold ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}>
+                  <td className="py-3 sm:py-4 lg:px-3 xl:px-4 text-xs sm:text-sm text-muted-foreground hidden xl:table-cell">{transaction.paymentMethod}</td>
+                  <td className="py-3 sm:py-4 lg:px-3 xl:px-4 text-right">
+                    <span className={`text-xs sm:text-sm font-semibold ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}>
                       {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
                     </span>
                   </td>
-                  <td className="py-4 px-4 text-center">
+                  <td className="py-3 sm:py-4 lg:px-3 xl:px-4 text-center hidden xl:table-cell">
                     {transaction.taxDeductible ? (
                       <Badge variant="outline" className="text-xs">Tax Deductible</Badge>
                     ) : (
@@ -217,31 +230,76 @@ export function TransactionsView({
           </table>
         </div>
 
+        {/* Tablet View - Simplified Table (md to lg) */}
+        <div className="hidden md:block lg:hidden overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-muted/50 border-b border-border">
+              <tr>
+                <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Date</th>
+                <th className="text-left py-3 px-3 text-xs font-medium text-muted-foreground">Description</th>
+                <th className="text-right py-3 px-3 text-xs font-medium text-muted-foreground">Amount</th>
+                <th className="text-center py-3 px-3 text-xs font-medium text-muted-foreground">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredTransactions.map((transaction) => (
+                <tr key={transaction.id} className="border-b border-border last:border-0 hover:bg-muted/30">
+                  <td className="py-3 px-3 text-xs">{transaction.date}</td>
+                  <td className="py-3 px-3">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${transaction.type === "income" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"}`}>
+                        {transaction.type === "income" ? <ArrowUpRight className="w-3.5 h-3.5" /> : <ArrowDownRight className="w-3.5 h-3.5" />}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-xs font-medium truncate block max-w-[150px]" title={transaction.description}>{transaction.description}</span>
+                        <Badge variant="secondary" className="text-[10px] mt-0.5">{transaction.category}</Badge>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-3 px-3 text-right">
+                    <span className={`text-xs font-semibold ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}>
+                      {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
+                    </span>
+                  </td>
+                  <td className="py-3 px-3 text-center">
+                    {transaction.taxDeductible ? (
+                      <Badge variant="outline" className="text-[10px]">Tax Ded.</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-[10px]">Non-ded.</Badge>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
         {/* Mobile View */}
         <div className="md:hidden divide-y divide-border">
           {filteredTransactions.map((transaction) => (
-            <div key={transaction.id} className="p-4">
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${transaction.type === "income" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"}`}>
-                    {transaction.type === "income" ? <ArrowUpRight className="w-5 h-5" /> : <ArrowDownRight className="w-5 h-5" />}
+            <div key={transaction.id} className="p-3 sm:p-4">
+              <div className="flex items-start justify-between mb-2.5 sm:mb-3">
+                <div className="flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
+                  <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${transaction.type === "income" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"}`}>
+                    {transaction.type === "income" ? <ArrowUpRight className="w-4 h-4 sm:w-5 sm:h-5" /> : <ArrowDownRight className="w-4 h-4 sm:w-5 sm:h-5" />}
                   </div>
-                  <div>
-                    <p className="font-medium text-sm">{transaction.description}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{transaction.date}</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-xs sm:text-sm truncate" title={transaction.description}>{transaction.description}</p>
+                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">{transaction.date}</p>
                   </div>
                 </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">{transaction.category}</Badge>
-                  {transaction.taxDeductible && (
-                    <Badge variant="outline" className="text-xs">Tax Deductible</Badge>
-                  )}
-                </div>
-                <span className={`font-semibold ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}>
+                <span className={`text-sm sm:text-base font-semibold ml-2 flex-shrink-0 ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}>
                   {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
                 </span>
+              </div>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                  <Badge variant="secondary" className="text-[10px] sm:text-xs">{transaction.category}</Badge>
+                  {transaction.taxDeductible && (
+                    <Badge variant="outline" className="text-[10px] sm:text-xs">Tax Deductible</Badge>
+                  )}
+                </div>
+                <span className="text-[10px] sm:text-xs text-muted-foreground">{transaction.paymentMethod}</span>
               </div>
             </div>
           ))}
