@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useState, cloneElement, isValidElement } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -126,110 +126,110 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b border-border">
-        <div className="px-[150px] mx-auto py-4 flex items-center justify-between">
+        <div className="px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-[150px] mx-auto py-3 sm:py-4 flex items-center justify-between">
          <OtaxLogo />
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <nav className="hidden md:flex items-center gap-4 lg:gap-6">
+            <Link href="#features" className="text-xs lg:text-sm text-muted-foreground hover:text-foreground transition-colors">
               Features
             </Link>
-            <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <Link href="/pricing" className="text-xs lg:text-sm text-muted-foreground hover:text-foreground transition-colors">
               Pricing
             </Link>
-            <Link href="/blog" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <Link href="/blog" className="text-xs lg:text-sm text-muted-foreground hover:text-foreground transition-colors">
               Blog
             </Link>
-            <Link href="/faq" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <Link href="/faq" className="text-xs lg:text-sm text-muted-foreground hover:text-foreground transition-colors">
               FAQ
             </Link>
           </nav>
-          <div className="flex items-center gap-3">
-        
+          <div className="flex items-center gap-2 sm:gap-3">
             <ThemeToggle />
-                <a href="#waitlist">
-                  <Button size="lg" className="">
-                    <span className="relative z-10">Join the Waitlist</span>
-                  </Button>
-                </a>
-           
+            <a href="#waitlist">
+              <Button size="sm" className="md:h-10 md:px-4 text-xs sm:text-sm md:text-base">
+                <span className="relative z-10 hidden sm:inline">Join the Waitlist</span>
+                <span className="relative z-10 sm:hidden">Join</span>
+              </Button>
+            </a>
           </div>
         </div>
       </header>
 
       {/* Hero Section */}
-      <section className="mx-[200px] mx-auto px-4 py-20 md:py-32 relative overflow-hidden">
+      <section className="container mx-auto px-4 sm:px-6 lg:px-8 xl:px-12 2xl:px-[200px] py-12 sm:py-16 md:py-20 lg:py-28 xl:py-32 relative overflow-hidden">
         {/* Animated background gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-green-50/50 via-transparent to-blue-50/50 dark:from-green-950/20 dark:via-transparent dark:to-blue-950/20 pointer-events-none" />
         
         <div className="max-w-5xl mx-auto text-center relative z-10">
           {/* Badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 border border-primary/20 rounded-full mb-8 animate-in fade-in slide-in-from-top duration-700 animate-blink-shimmer relative">
-            <Sparkles className="w-4 h-4 text-primary relative z-10" />
-            <span className="text-sm font-medium text-primary relative z-10">
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-primary/10 border border-primary/20 rounded-full mb-6 sm:mb-8 animate-in fade-in slide-in-from-top duration-700 animate-blink-shimmer relative">
+            <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-primary relative z-10" />
+            <span className="text-xs sm:text-sm font-medium text-primary relative z-10 px-1">
               The Future of Tax Management in Nigeria
             </span>
           </div>
           
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-balance mb-6 animate-in fade-in slide-in-from-bottom duration-1000">
+          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight text-balance mb-4 sm:mb-6 px-2 animate-in fade-in slide-in-from-bottom duration-1000">
             Don't Lose Sleep Over
-            <span className="bg-gradient-to-r from-green-600 via-green-700 to-green-600 bg-clip-text text-transparent animate-gradient"> Tax Compliance</span>
+            <span className="bg-gradient-to-r from-green-600 via-green-700 to-green-600 bg-clip-text text-transparent animate-gradient block sm:inline"> Tax Compliance</span>
           </h1>
-          <p className="text-xl md:text-2xl text-muted-foreground text-balance mb-6 max-w-3xl mx-auto leading-relaxed animate-in fade-in slide-in-from-bottom duration-1200">
+          <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-muted-foreground text-balance mb-4 sm:mb-6 max-w-3xl mx-auto leading-relaxed px-4 animate-in fade-in slide-in-from-bottom duration-1200">
             OTax helps Nigerian freelancers and small businesses effortlessly manage their taxes, 
             track expenses, and stay compliant with IRS & NRS regulations—all in one intelligent platform.
           </p>
-          <p className="text-base text-muted-foreground mb-10 max-w-2xl mx-auto animate-in fade-in slide-in-from-bottom duration-1400">
+          <p className="text-sm sm:text-base text-muted-foreground mb-8 sm:mb-10 max-w-2xl mx-auto px-4 animate-in fade-in slide-in-from-bottom duration-1400">
             Join other professionals who've simplified their tax journey and saved hundreds of hours each year
           </p>
           
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-12 animate-in fade-in slide-in-from-bottom duration-1600">
-            <a href="#waitlist">
-              <Button size="lg" className="w-full sm:w-auto text-lg h-14 px-8 group animate-button-shimmer relative">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4 mb-8 sm:mb-12 px-4 animate-in fade-in slide-in-from-bottom duration-1600">
+            <a href="#waitlist" className="w-full sm:w-auto">
+              <Button size="lg" className="w-full sm:w-auto text-base sm:text-lg h-12 sm:h-14 px-6 sm:px-8 group animate-button-shimmer relative">
                 <span className="relative z-10">Join the Waitlist</span>
-                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform relative z-10" />
+                <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform relative z-10" />
               </Button>
             </a>
-            <Link href="/demo">
-              <Button size="lg" variant="outline" className="w-full sm:w-auto bg-transparent text-lg h-14 px-8">
+            <Link href="/demo" className="w-full sm:w-auto">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto bg-transparent text-base sm:text-lg h-12 sm:h-14 px-6 sm:px-8">
                 Run Demo
               </Button>
             </Link>
           </div>
 
           {/* Social Proof */}
-          <div className="flex flex-wrap items-center justify-center gap-8 text-sm text-muted-foreground animate-in fade-in duration-1800">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
+          <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 lg:gap-8 text-xs sm:text-sm text-muted-foreground animate-in fade-in duration-1800 px-4">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 flex-shrink-0" />
               <span>No Credit Card Required</span>
             </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 flex-shrink-0" />
               <span>30-Day Money Back</span>
             </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 flex-shrink-0" />
               <span>IRS & NRS Compliant</span>
             </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
-              <span>Based on the latest NRS regulations</span>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 flex-shrink-0" />
+              <span className="hidden sm:inline">Based on the latest NRS regulations</span>
+              <span className="sm:hidden">Latest NRS regulations</span>
             </div>
           </div>
         </div>
       </section>
 
       {/* Features Section */}
-      <section id="features" className="container mx-auto px-4 py-24 relative">
+      <section id="features" className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 md:py-20 lg:py-24 relative">
         <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
+          <div className="text-center mb-10 sm:mb-12 md:mb-16">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 px-4 bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent">
               Everything You Need in One Platform
             </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
               Built specifically for the Nigerian tax landscape. Simple, powerful, and fully compliant.
             </p>
           </div>
           
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 mb-12 sm:mb-16">
             <FeatureCard
               icon={<BarChart3 className="w-8 h-8" />}
               title="Income & Expense Tracking"
@@ -305,7 +305,7 @@ export default function HomePage() {
           </div>
 
           {/* Stats Section */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-20">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 mt-12 sm:mt-16 md:mt-20">
             <StatItem 
               icon={<Users className="w-6 h-6" />}
               number="500+"
@@ -339,18 +339,18 @@ export default function HomePage() {
       </section>
 
       {/* Benefits Section */}
-      <section className="container mx-auto px-4 py-24 bg-gradient-to-br from-primary/5 via-transparent to-primary/5">
+      <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 md:py-20 lg:py-24 bg-gradient-to-br from-primary/5 via-transparent to-primary/5">
         <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold mb-6">
+          <div className="text-center mb-10 sm:mb-12 md:mb-16">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 px-4">
               Why Choose <span className="text-primary">OTax?</span>
             </h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto px-4">
               Join thousands of Nigerian businesses transforming their tax management experience
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8 mb-20">
+          <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8 mb-12 sm:mb-16 md:mb-20">
             <BenefitCard
               icon={<DollarSign className="w-8 h-8" />}
               title="Save Money"
@@ -372,23 +372,23 @@ export default function HomePage() {
           </div>
 
           {/* Testimonial Section */}
-          <div className="bg-card border-2 border-primary/20 rounded-3xl p-12 md:p-16 shadow-2xl">
-            <div className="flex items-start gap-6">
-              <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0">
-                <Users className="w-8 h-8 text-primary" />
+          <div className="bg-card border-2 border-primary/20 rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-12 lg:p-16 shadow-2xl">
+            <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0 mx-auto sm:mx-0">
+                <Users className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-primary" />
               </div>
-              <div className="flex-1">
-                <p className="text-xl md:text-2xl font-medium text-foreground mb-4 italic">
+              <div className="flex-1 text-center sm:text-left">
+                <p className="text-base sm:text-lg md:text-xl lg:text-2xl font-medium text-foreground mb-4 sm:mb-6 italic">
                 "Going through the process of getting my tax calculations was a breeze. OTax did all the heavy lifting for me. Just going through the Demo was enough to convince me to join the waitlist."
                 </p>
-                <div className="flex items-center gap-4">
-                  <div>
-                    <p className="font-semibold text-lg">Daniel Becon</p>
-                    <p className="text-sm text-muted-foreground">Freelance Software Developer, Lagos</p>
+                <div className="flex flex-col sm:flex-row items-center sm:items-center gap-3 sm:gap-4">
+                  <div className="text-center sm:text-left">
+                    <p className="font-semibold text-base sm:text-lg">Daniel Becon</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Freelance Software Developer, Lagos</p>
                   </div>
                   <div className="flex gap-1 text-yellow-500">
                     {"⭐⭐⭐⭐⭐".split("").map((star, i) => (
-                      <span key={i} className="text-2xl">{star}</span>
+                      <span key={i} className="text-lg sm:text-xl md:text-2xl">{star}</span>
                     ))}
                   </div>
                 </div>
@@ -399,33 +399,33 @@ export default function HomePage() {
       </section>
 
       {/* Waitlist Section */}
-      <section id="waitlist" className="container mx-auto px-4 py-24">
+      <section id="waitlist" className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 md:py-20 lg:py-24">
         <div className="max-w-2xl mx-auto">
-          <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-full mb-6 duration-700 animate-blink-shimmer relative">
-              <Sparkles className="w-4 h-4 text-green-600 dark:text-green-400" />
-              <span className="text-sm font-medium text-green-700 dark:text-green-300">
+          <div className="text-center mb-8 sm:mb-10 md:mb-12">
+            <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-full mb-4 sm:mb-6 duration-700 animate-blink-shimmer relative">
+              <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-green-600 dark:text-green-400" />
+              <span className="text-xs sm:text-sm font-medium text-green-700 dark:text-green-300">
                 Limited Early Access
               </span>
             </div>
-            <h2 className="text-4xl md:text-5xl font-bold mb-4">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 px-4">
               Join Our <span className="text-primary">Exclusive Waitlist</span>
             </h2>
-            <p className="text-xl text-muted-foreground mb-4">
+            <p className="text-base sm:text-lg md:text-xl text-muted-foreground mb-3 sm:mb-4 px-4">
               Be among the first 1,000 users to experience the future of tax management
             </p>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-xs sm:text-sm text-muted-foreground px-4">
               Get early access, lifetime discounts, and priority support
             </p>
           </div>
 
           {isSubmitted ? (
-            <div className="bg-card border-2 border-green-200 dark:border-green-800 rounded-2xl p-8 text-center shadow-lg">
-              <div className="w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle2 className="w-8 h-8 text-green-600 dark:text-green-400" />
+            <div className="bg-card border-2 border-green-200 dark:border-green-800 rounded-xl sm:rounded-2xl p-6 sm:p-8 text-center shadow-lg">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                <CheckCircle2 className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-green-600 dark:text-green-400" />
               </div>
-              <h3 className="text-xl font-bold mb-2">You're in!</h3>
-              <p className="text-muted-foreground mb-6">
+              <h3 className="text-lg sm:text-xl font-bold mb-2">You're in!</h3>
+              <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">
                 Thank you for joining our waitlist. We'll notify you as soon as we launch!
               </p>
               <Button 
@@ -438,8 +438,8 @@ export default function HomePage() {
             </div>
           ) : (
             <form onSubmit={handleWaitlistSubmit} className="space-y-4">
-              <div className="bg-card border border-border rounded-2xl p-6 shadow-xl">
-                <div className="space-y-4">
+              <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-xl">
+                <div className="space-y-3 sm:space-y-4">
                   <div>
                     <Input
                       type="text"
@@ -448,7 +448,7 @@ export default function HomePage() {
                       value={waitlistData.name}
                       onChange={(e) => setWaitlistData(prev => ({ ...prev, name: e.target.value }))}
                       required
-                      className="h-12 text-base"
+                      className="h-11 sm:h-12 text-sm sm:text-base"
                       disabled={isSubmitting}
                     />
                   </div>
@@ -460,7 +460,7 @@ export default function HomePage() {
                       value={waitlistData.email}
                       onChange={(e) => setWaitlistData(prev => ({ ...prev, email: e.target.value }))}
                       required
-                      className="h-12 text-base"
+                      className="h-11 sm:h-12 text-sm sm:text-base"
                       disabled={isSubmitting}
                     />
                   </div>
@@ -468,21 +468,21 @@ export default function HomePage() {
                     <Input
                       type="tel"
                       name="phone"
-                      placeholder="Phone Number (Optional, e.g., 08012345678)"
+                      placeholder="Phone Number (Optional)"
                       value={waitlistData.phone}
                       onChange={(e) => setWaitlistData(prev => ({ ...prev, phone: e.target.value }))}
-                      className="h-12 text-base"
+                      className="h-11 sm:h-12 text-sm sm:text-base"
                       disabled={isSubmitting}
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground text-center -mt-2">
+                  <p className="text-xs text-muted-foreground text-center -mt-1 sm:-mt-2 px-2">
                     🔒 We respect your privacy. We'll never spam your email or phone number. 
                     We'll only contact you when we launch or have important updates.
                   </p>
                   <Button 
                     type="submit" 
                     size="lg" 
-                    className="w-full h-12 text-base animate-button-shimmer relative"
+                    className="w-full h-11 sm:h-12 text-sm sm:text-base animate-button-shimmer relative"
                     disabled={isSubmitting}
                   >
                     {isSubmitting ? (
@@ -505,29 +505,29 @@ export default function HomePage() {
       </section>
 
       {/* CTA Section */}
-      <section className="container mx-auto px-4 py-24">
+      <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 md:py-20 lg:py-24">
         <div className="max-w-5xl mx-auto relative overflow-hidden">
           {/* Background decoration */}
-          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-primary/10 to-transparent rounded-3xl blur-3xl" />
+          <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-primary/10 to-transparent rounded-2xl sm:rounded-3xl blur-3xl" />
           
-          <div className="relative bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-3xl p-12 md:p-16 text-center shadow-2xl border border-primary/50">
+          <div className="relative bg-gradient-to-br from-primary to-primary/90 text-primary-foreground rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-12 lg:p-16 text-center shadow-2xl border border-primary/50">
             <div className="max-w-3xl mx-auto">
-              <h2 className="text-4xl md:text-5xl font-bold mb-6">
+              <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-4 sm:mb-6 px-2">
                 Ready to Transform Your Tax Experience?
               </h2>
-              <p className="text-xl md:text-2xl mb-10 opacity-95 leading-relaxed">
+              <p className="text-base sm:text-lg md:text-xl lg:text-2xl mb-6 sm:mb-8 md:mb-10 opacity-95 leading-relaxed px-2">
                 Join thousands of Nigerian freelancers and SMEs who've made tax compliance effortless. 
                 Start your free trial today—no credit card required.
               </p>
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <a href="#waitlist">
-                  <Button size="lg" variant="secondary" className="text-lg h-14 px-8 group animate-button-shimmer relative">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3 sm:gap-4">
+                <a href="#waitlist" className="w-full sm:w-auto">
+                  <Button size="lg" variant="secondary" className="w-full sm:w-auto text-base sm:text-lg h-12 sm:h-14 px-6 sm:px-8 group animate-button-shimmer relative">
                     <span className="relative z-10">Join the Waitlist</span>
-                    <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform relative z-10" />
+                    <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform relative z-10" />
                   </Button>
                 </a>
-                <Link href="/demo">
-                  <Button size="lg" variant="outline" className="text-lg h-14 px-8 border-2 border-primary-foreground/20 bg-transparent hover:bg-primary-foreground/10">
+                <Link href="/demo" className="w-full sm:w-auto">
+                  <Button size="lg" variant="outline" className="w-full sm:w-auto text-base sm:text-lg h-12 sm:h-14 px-6 sm:px-8 border-2 border-primary-foreground/20 bg-transparent hover:bg-primary-foreground/10">
                     Run Demo
                   </Button>
                 </Link>
@@ -556,16 +556,23 @@ export default function HomePage() {
 }
 
 function FeatureCard({ icon, title, description, delay }: { icon: React.ReactNode; title: string; description: string; delay: string }) {
+  // Clone icon with responsive sizing
+  const responsiveIcon = isValidElement(icon)
+    ? cloneElement(icon as React.ReactElement<{ className?: string }>, {
+        className: `w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 ${(icon as React.ReactElement<{ className?: string }>).props?.className || ''}`
+      })
+    : icon
+
   return (
     <div 
-      className="bg-card border border-border rounded-2xl p-8 hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 group "
+      className="bg-card border border-border rounded-xl sm:rounded-2xl p-5 sm:p-6 md:p-8 hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 group"
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div className="w-14 h-14 bg-primary/10 rounded-xl flex items-center justify-center mb-6 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
-        {icon}
+      <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-primary/10 rounded-lg sm:rounded-xl flex items-center justify-center mb-4 sm:mb-5 md:mb-6 text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors duration-300">
+        {responsiveIcon}
       </div>
-      <h3 className="font-bold text-xl mb-3">{title}</h3>
-      <p className="text-base text-muted-foreground leading-relaxed">{description}</p>
+      <h3 className="font-bold text-lg sm:text-xl mb-2 sm:mb-3">{title}</h3>
+      <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">{description}</p>
     </div>
   )
 }
@@ -573,15 +580,15 @@ function FeatureCard({ icon, title, description, delay }: { icon: React.ReactNod
 function StatItem({ icon, number, label, color, delay }: { icon: React.ReactNode; number: string; label: string; color: string; delay?: string }) {
   return (
     <div 
-      className="text-center p-6 rounded-2xl hover:shadow-lg transition-shadow animate-stat-shimmer relative"
+      className="text-center p-4 sm:p-5 md:p-6 rounded-xl sm:rounded-2xl hover:shadow-lg transition-shadow animate-stat-shimmer relative"
       style={{ '--shimmer-delay': delay || '0s' } as React.CSSProperties}
     >
-      <div className={`flex items-center justify-center mb-3 ${color} relative z-10 stat-shine-icon`}>
+      <div className={`flex items-center justify-center mb-2 sm:mb-3 ${color} relative z-10 stat-shine-icon`}>
         {icon}
       </div>
-      <div className="relative z-10 mb-2">
+      <div className="relative z-10 mb-1 sm:mb-2">
         <div 
-          className="text-4xl font-bold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent stat-shine-text"
+          className="text-2xl sm:text-3xl md:text-4xl font-bold bg-gradient-to-br from-foreground to-foreground/70 bg-clip-text text-transparent stat-shine-text"
           style={{ '--shimmer-delay': delay || '0s' } as React.CSSProperties}
         >
           {number}
@@ -589,7 +596,7 @@ function StatItem({ icon, number, label, color, delay }: { icon: React.ReactNode
       </div>
       <div className="relative z-10">
         <div 
-          className="text-sm font-medium text-muted-foreground stat-shine-text"
+          className="text-xs sm:text-sm font-medium text-muted-foreground stat-shine-text px-1"
           style={{ '--shimmer-delay': delay || '0s' } as React.CSSProperties}
         >
           {label}
@@ -602,14 +609,14 @@ function StatItem({ icon, number, label, color, delay }: { icon: React.ReactNode
 function BenefitCard({ icon, title, description, delay }: { icon: React.ReactNode; title: string; description: string; delay: string }) {
   return (
     <div 
-      className="text-center p-8 rounded-2xl hover:shadow-xl transition-all duration-300"
+      className="text-center p-5 sm:p-6 md:p-8 rounded-xl sm:rounded-2xl hover:shadow-xl transition-all duration-300"
       style={{ animationDelay: `${delay}ms` }}
     >
-      <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-6 text-primary">
+      <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-primary/10 rounded-xl sm:rounded-2xl flex items-center justify-center mx-auto mb-4 sm:mb-5 md:mb-6 text-primary">
         {icon}
       </div>
-      <h3 className="font-bold text-2xl mb-4">{title}</h3>
-      <p className="text-base text-muted-foreground leading-relaxed">{description}</p>
+      <h3 className="font-bold text-xl sm:text-2xl mb-3 sm:mb-4">{title}</h3>
+      <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">{description}</p>
     </div>
   )
 }

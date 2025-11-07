@@ -38,23 +38,23 @@ export function StatsCards() {
   ]
 
   return (
-    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
       {stats.map((stat) => {
         const Icon = stat.icon
         return (
-          <Card key={stat.label} className="p-6">
+          <Card key={stat.label} className="p-4 sm:p-5 md:p-6">
             <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <p className="text-sm text-muted-foreground mb-1">{stat.label}</p>
-                <p className="text-2xl font-bold mb-2">{stat.value}</p>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1 sm:mb-1.5">{stat.label}</p>
+                <p className="text-xl sm:text-2xl font-bold mb-1.5 sm:mb-2 truncate">{stat.value}</p>
                 <p
                   className={`text-xs font-medium ${stat.trend === "up" ? "text-primary" : "text-muted-foreground"}`}
                 >
                   {stat.change}
                 </p>
               </div>
-              <div className={`w-10 h-10 rounded-lg bg-muted flex items-center justify-center ${stat.color}`}>
-                <Icon className="w-5 h-5" />
+              <div className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 ml-2 ${stat.color}`}>
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
             </div>
           </Card>

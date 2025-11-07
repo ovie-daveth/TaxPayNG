@@ -93,21 +93,23 @@ export function DashboardHeader() {
 
   return (
     <div className="border-b border-border bg-card">
-      <div className="container mx-auto px-4 py-4 max-w-7xl">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">{pageInfo.title}</h1>
-            <p className="text-sm text-muted-foreground mt-1">{pageInfo.subtitle}</p>
+      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 max-w-7xl">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl sm:text-2xl font-bold">{pageInfo.title}</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 line-clamp-2">{pageInfo.subtitle}</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-shrink-0">
             <ThemeToggle />
             {pageInfo.showExportButton && (
               <Button 
                 variant="outline" 
+                size="sm"
                 onClick={() => console.log("Export transactions")}
+                className="text-xs sm:text-sm"
               >
-                <Download className="w-4 h-4 mr-2" />
-                Export
+                <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Export</span>
               </Button>
             )}
             {/* Show Add Reminder button on non-reminder pages */}
@@ -115,6 +117,7 @@ export function DashboardHeader() {
               <Button 
                 variant="outline" 
                 size="icon"
+                className="h-9 w-9 sm:h-10 sm:w-10"
                 onClick={() => setIsAddReminderDialogOpen(true)}
                 title="Add Reminder"
               >
@@ -123,9 +126,14 @@ export function DashboardHeader() {
             )}
             {/* Show main action button except on reminders page */}
             {pathname !== "/dashboard/reminders" && (
-              <Button onClick={pageInfo.buttonAction}>
-                <ButtonIcon className="w-4 h-4 mr-2" />
-                {pageInfo.buttonText}
+              <Button 
+                onClick={pageInfo.buttonAction}
+                size="sm"
+                className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-3"
+              >
+                <ButtonIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-1.5 md:mr-2" />
+                <span className="hidden sm:inline">{pageInfo.buttonText}</span>
+                <span className="sm:hidden">{pageInfo.buttonText.split(' ')[0]}</span>
               </Button>
             )}
           </div>

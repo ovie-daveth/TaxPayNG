@@ -19,21 +19,21 @@ export default function DashboardPage() {
 
   if (isLoading) {
     return (
-          <main className="container mx-auto px-4 py-6 max-w-7xl">
+          <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5 md:py-6 max-w-7xl">
             <DashboardSkeleton />
           </main>
     )
   }
 
   return (
-    <main className="container mx-auto px-4 py-6 max-w-7xl">
-      <div className="space-y-6">
+    <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5 md:py-6 max-w-7xl">
+      <div className="space-y-4 sm:space-y-5 md:space-y-6">
         {/* Stats Overview */}
         <StatsCards />
 
         {/* Charts and Summary */}
-        <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
+        <div className="grid md:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
+          <div className="md:col-span-2">
             <IncomeExpenseChart />
           </div>
           <div>
@@ -42,8 +42,8 @@ export default function DashboardPage() {
         </div>
 
         {/* Recent Activity */}
-        <div className="grid lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
+        <div className="grid md:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
+          <div className="md:col-span-2">
             <RecentTransactions />
           </div>
           <div>
