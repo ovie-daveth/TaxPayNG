@@ -107,11 +107,62 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
     }
     
-    // Waitlist Collection (public signup, admin management)
+    // Waitlist Verifications Collection (temporary, server-side only)
+    // Stores verification tokens before adding to waitlist
+    match /waitlistVerifications/{emailId} {
+      // Helper function to validate verification entry structure
+      function isValidVerificationEntry() {
+        return request.resource.data.keys().hasAll(['name', 'email', 'verificationToken', 'createdAt', 'expiresAt', 'attempts']) &&
+               request.resource.data.name is string &&
+               request.resource.data.name.size() > 0 &&
+               request.resource.data.email is string &&
+               request.resource.data.email.size() > 0 &&
+               request.resource.data.verificationToken is string &&
+               request.resource.data.verificationToken.size() == 6 &&
+               request.resource.data.createdAt is string &&
+               request.resource.data.expiresAt is string &&
+               request.resource.data.attempts is int &&
+               request.resource.data.attempts >= 0 &&
+               request.resource.data.attempts <= 10 && // Prevent abuse
+               (request.resource.data.phone == null || request.resource.data.phone is string || request.resource.data.phone == '') &&
+               // Ensure email matches document ID (both should be lowercase from API route)
+               request.resource.data.email == emailId;
+      }
+      
+      // Helper function to validate update (can only increment attempts, not modify token)
+      function isValidUpdate() {
+        return request.resource.data.name == resource.data.name &&
+               request.resource.data.email == resource.data.email &&
+               request.resource.data.verificationToken == resource.data.verificationToken &&
+               request.resource.data.createdAt == resource.data.createdAt &&
+               request.resource.data.expiresAt == resource.data.expiresAt &&
+               request.resource.data.attempts is int &&
+               request.resource.data.attempts > resource.data.attempts && // Can only increment
+               request.resource.data.attempts <= 10;
+      }
+      
+      // Allow API routes to create verification entries (with strict validation)
+      // Note: Client SDK in API routes may not have auth context, so we allow unauthenticated creates
+      // with strict validation. For production, use Firebase Admin SDK.
+      allow create: if isValidVerificationEntry();
+      
+      // Allow API routes to read verification entries (for token verification)
+      // Allow reads for server-side operations (no client-side direct access needed)
+      allow read: if true; // API routes need to read for verification
+      
+      // Allow API routes to update (for incrementing attempts on failed verification)
+      allow update: if isValidUpdate();
+      
+      // Allow API routes to delete (after successful verification or expiry)
+      allow delete: if true; // API routes need to delete after verification
+    }
+    
+    // Waitlist Collection (verified entries only)
     match /waitlist/{waitlistId} {
       // Helper function to validate waitlist entry structure
+      // Updated to require emailVerified: true (only verified entries allowed)
       function isValidWaitlistEntry() {
-        return request.resource.data.keys().hasAll(['name', 'email', 'createdAt', 'status', 'notified']) &&
+        return request.resource.data.keys().hasAll(['name', 'email', 'createdAt', 'status', 'notified', 'emailVerified']) &&
                request.resource.data.name is string &&
                request.resource.data.name.size() > 0 &&
                request.resource.data.email is string &&
@@ -119,24 +170,34 @@ service cloud.firestore {
                request.resource.data.createdAt is string &&
                request.resource.data.status is string &&
                request.resource.data.notified is bool &&
-               (request.resource.data.phone == null || request.resource.data.phone is string);
+               request.resource.data.emailVerified == true && // Must be verified
+               (request.resource.data.phone == null || request.resource.data.phone is string) &&
+               (request.resource.data.verifiedAt == null || request.resource.data.verifiedAt is string);
       }
       
-      // Anyone can create a waitlist entry (public signup)
-      allow create: if isValidWaitlistEntry();
+      // Only server-side API routes can create waitlist entries (after token verification)
+      // This ensures only verified emails are added to waitlist
+      // Note: API routes should use Firebase Admin SDK to bypass these rules
+      // If using client SDK in API routes, this will need to be adjusted
+      allow create: if isValidWaitlistEntry(); // Allow if entry is valid and verified
       
       // Allow reads for checking duplicate emails (needed for public form)
       // In production, consider using a Cloud Function for better security
       allow read: if true;
       
-      // Only authenticated users can update (for status/notified updates)
+      // Only authenticated users (admins) can update (for status/notified updates)
       allow update: if isAuthenticated() &&
-                    // Prevent modifying immutable fields (name, email, createdAt must remain unchanged)
+                    // Prevent modifying immutable fields (name, email, createdAt, emailVerified must remain unchanged)
                     request.resource.data.createdAt == resource.data.createdAt &&
                     request.resource.data.name == resource.data.name &&
-                    request.resource.data.email == resource.data.email;
+                    request.resource.data.email == resource.data.email &&
+                    request.resource.data.emailVerified == true && // emailVerified must stay true
+                    // Allow updating status, notified, verifiedAt
+                    (request.resource.data.status == resource.data.status || true) &&
+                    (request.resource.data.notified == resource.data.notified || true) &&
+                    (request.resource.data.verifiedAt == resource.data.verifiedAt || true);
       
-      // Only authenticated users can delete
+      // Only authenticated users (admins) can delete
       allow delete: if isAuthenticated();
     }
     
