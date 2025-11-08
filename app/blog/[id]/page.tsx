@@ -6,8 +6,6 @@ import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { ArrowLeft, Calendar, Clock, User, Share2, BookOpen, Tag, Edit } from "lucide-react"
 import { BlogDetailSkeleton } from "@/components/ui/skeletons"
-import { ThemeToggle } from "@/components/theme-toggle"
-import OtaxLogo from "@/components/OtaxLogo"
 import Footer from "@/components/footer"
 import { Badge } from "@/components/ui/badge"
 import { BlogComments } from "@/components/blog/blog-comments"
@@ -17,6 +15,7 @@ import { format } from "date-fns"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useEditor } from "@/lib/hooks/useEditor"
 import { useAdmin } from "@/lib/hooks/useAdmin"
+import { SiteHeader } from "@/components/site-header"
 
 interface BlogPost {
   id: string
@@ -132,33 +131,24 @@ export default function BlogDetailPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50">
-        <div className="px-[150px] mx-auto py-5 flex items-center justify-between">
-          <Link href="/">
-            <OtaxLogo />
-          </Link>
-          <nav className="hidden md:flex items-center gap-6">
-            <Link href="/#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Features
-            </Link>
-            <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Pricing
-            </Link>
-            <Link href="/blog" className="text-sm font-medium text-foreground">
-              Blog
-            </Link>
-          </nav>
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-            <Link href="/#waitlist">
-              <Button size="lg">
-                <span className="relative z-10">Join the Waitlist</span>
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </header>
+      <SiteHeader
+        logoHref="/"
+        highlightHref="/blog"
+        wrapperClassName="border-b border-border sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-50"
+        containerClassName="py-5"
+        navItems={[
+          { label: "Features", href: "/#features" },
+          { label: "Pricing", href: "/pricing" },
+          { label: "Blog", href: "/blog" },
+          { label: "FAQ", href: "/faq" },
+        ]}
+        cta={{
+          href: "/#waitlist",
+          label: "Join the Waitlist",
+          mobileLabel: "Join",
+          showOnMobile: true,
+        }}
+      />
 
       {/* Article Content */}
       <article className="container mx-auto px-4 pt-12 pb-16 md:pt-20 md:pb-24">
