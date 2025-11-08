@@ -8,14 +8,36 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'OTax App',
-  description: 'OTax App',
-  generator: 'OTax App',
+  description: 'Simplifying tax processes with OTax App.',
+  openGraph: {
+    title: 'OTax App',
+    description: 'Simplifying tax processes with OTax App.',
+    url: 'https://otaxng.com',
+    siteName: 'OTax',
+    images: [
+      {
+        url: '/otax_dark.png',
+        width: 800,
+        height: 600,
+        alt: 'OTax Logo',
+      },
+    ],
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'OTax App',
+    description: 'Simplifying tax processes with OTax App.',
+    images: ['/otax_dark.png'],
+  },
   icons: {
     icon: '/otax_dark.png',
     shortcut: '/otax_dark.png',
     apple: '/otax_dark.png',
   },
 }
+
 
 export default function RootLayout({
   children,
