@@ -8,6 +8,9 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'OTax App',
+  metadataBase: new URL('https://otaxng.com'),
+  keywords: ['Nigeria tax filing', 'SME tax management', 'Freelancer tax management', 'Tax filing', 'Tax management', 'Tax preparation', 'Tax calculation', 'Tax return', 'Tax return preparation', 'Tax return calculation', 'Tax return filing', 'Tax return filing preparation', 'Tax return filing calculation', 'Tax filing software', 'Tax management software', 'Tax preparation software', 'Tax calculation software', 'Tax return software', 'Tax return preparation software', 'Tax return calculation software', 'Tax return filing software', 'Tax return filing preparation software', 'Tax return filing calculation software, Tax, Tax filing, Tax management, Tax preparation, Tax calculation, Tax return, Tax return preparation, Tax return calculation, Tax return filing, Tax return filing preparation, Tax return filing calculation', 'NTA 2025', 'OTax'],
+  alternates: { canonical: 'https://otaxng.com' },
   description: 'Simplifying tax processes with OTax App.',
   openGraph: {
     title: 'OTax App',
