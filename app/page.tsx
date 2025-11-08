@@ -290,13 +290,20 @@ export default function HomePage() {
           </div>
 
           {/* Stats Section */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 mt-12 sm:mt-16 md:mt-20">
-            <StatItem 
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 mt-12 sm:mt-16 md:mt-20">
+            {/* <StatItem 
               icon={<Users className="w-6 h-6" />}
               number="500+"
               label="Active Users on the Waitlist"
               color="text-blue-600"
               delay="0s"
+            /> */}
+            <StatItem 
+              icon={<TrendingUp className="w-6 h-6" />}
+              number="100%"
+              label="Compliant with NRS & FIRS"
+              color="text-green-600"
+              delay="0.5s"
             />
             <StatItem 
               icon={<TrendingUp className="w-6 h-6" />}
