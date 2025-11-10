@@ -1,12 +1,242 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { ImageIcon, Video, Loader2, Bold, Italic, List, ListOrdered, Heading1, Heading2, Heading3, Undo, Redo, Link as LinkIcon } from "lucide-react"
+import { ImageIcon, Video, Loader2, Bold, Italic, List, ListOrdered, Heading1, Heading2, Heading3, Undo, Redo, Link as LinkIcon, Table as TableIcon } from "lucide-react"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
 import { toast } from "sonner"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+
+const ALLOWED_TAGS = new Set([
+  "p",
+  "br",
+  "strong",
+  "b",
+  "em",
+  "i",
+  "u",
+  "span",
+  "div",
+  "blockquote",
+  "pre",
+  "code",
+  "ul",
+  "ol",
+  "li",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "h5",
+  "h6",
+  "table",
+  "thead",
+  "tbody",
+  "tr",
+  "th",
+  "td",
+  "colgroup",
+  "col",
+  "a",
+  "img",
+  "figure",
+  "figcaption",
+  "hr"
+])
+
+const ALLOWED_ATTRS: Record<string, string[]> = {
+  "*": ["class", "style"],
+  a: ["href", "title", "target", "rel"],
+  img: ["src", "alt", "title", "width", "height"],
+  col: ["span", "width", "style"]
+}
+
+const ALLOWED_STYLE_PROPERTIES = new Set([
+  "text-align",
+  "font-weight",
+  "font-style",
+  "text-decoration",
+  "border",
+  "border-top",
+  "border-right",
+  "border-bottom",
+  "border-left",
+  "border-collapse",
+  "table-layout",
+  "margin",
+  "margin-left",
+  "margin-right",
+  "margin-top",
+  "margin-bottom",
+  "padding",
+  "padding-left",
+  "padding-right",
+  "padding-top",
+  "padding-bottom",
+  "width",
+  "min-width",
+  "max-width",
+  "height",
+  "min-height",
+  "max-height",
+  "color",
+  "background-color",
+  "font-size",
+  "line-height",
+  "letter-spacing"
+])
+
+const sanitizeStyleValue = (styleValue: string): string => {
+  const safeRules = styleValue
+    .split(";")
+    .map((rule) => rule.trim())
+    .filter(Boolean)
+    .map((rule) => {
+      const [property, ...valueParts] = rule.split(":")
+      if (!property || valueParts.length === 0) return null
+
+      const propName = property.trim().toLowerCase()
+      const propValue = valueParts.join(":").trim()
+
+      if (!ALLOWED_STYLE_PROPERTIES.has(propName)) return null
+
+      const forbiddenPatterns = /(expression|url\s*\(|javascript:|vbscript:)/i
+      if (forbiddenPatterns.test(propValue)) return null
+
+      if (propName === "direction" || propName === "unicode-bidi") return null
+
+      if (propName === "width" || propName === "min-width" || propName === "max-width") {
+        if (!/^(\d+(\.\d+)?)(px|%)$/.test(propValue)) {
+          return null
+        }
+      }
+
+      if (propName === "height" || propName === "min-height" || propName === "max-height") {
+        if (!/^(\d+(\.\d+)?)(px|%)$/.test(propValue)) {
+          return null
+        }
+      }
+
+      return `${propName}: ${propValue}`
+    })
+    .filter((rule): rule is string => Boolean(rule))
+
+  return safeRules.join("; ")
+}
+
+const isSafeUrl = (url: string) => {
+  const trimmed = url.trim().toLowerCase()
+  if (trimmed === "") return false
+  if (trimmed.startsWith("javascript:") || trimmed.startsWith("data:")) return false
+  return true
+}
+
+const plainTextToHtml = (text: string): string => {
+  const cleaned = text.replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "")
+  const normalized = cleaned.replace(/\r\n?/g, "\n")
+  const paragraphs = normalized.split(/\n{2,}/)
+
+  return paragraphs
+    .map((para) => {
+      const trimmed = para.trim()
+      if (!trimmed) {
+        return "<p><br /></p>"
+      }
+      const lines = trimmed.split("\n")
+      const htmlLines = lines.map((line) => line || "<br />")
+      return `<p>${htmlLines.join("<br />")}</p>`
+    })
+    .join("")
+}
+
+const sanitizePastedContent = (rawHtml: string): string => {
+  const parser = new DOMParser()
+  const parsedDoc = parser.parseFromString(rawHtml, "text/html")
+
+  if (!parsedDoc || !parsedDoc.body || parsedDoc.querySelector("parsererror")) {
+    return ""
+  }
+
+  const walk = (node: Node) => {
+    if (node.nodeType === Node.ELEMENT_NODE) {
+      const el = node as HTMLElement
+      const tagName = el.tagName.toLowerCase()
+
+      if (!ALLOWED_TAGS.has(tagName)) {
+        const parent = el.parentNode
+        if (parent) {
+          while (el.firstChild) {
+            parent.insertBefore(el.firstChild, el)
+          }
+          parent.removeChild(el)
+        }
+        return
+      }
+
+      const allowedAttrs = new Set([
+        ...(ALLOWED_ATTRS["*"] || []),
+        ...(ALLOWED_ATTRS[tagName] || [])
+      ])
+
+      Array.from(el.attributes).forEach((attr) => {
+        const attrName = attr.name.toLowerCase()
+        const attrValue = attr.value
+
+        if (attrName.startsWith("on")) {
+          el.removeAttribute(attr.name)
+          return
+        }
+
+        if (!allowedAttrs.has(attrName)) {
+          el.removeAttribute(attr.name)
+          return
+        }
+
+        if (attrName === "style") {
+          const sanitizedStyle = sanitizeStyleValue(attrValue)
+          if (sanitizedStyle) {
+            el.setAttribute("style", sanitizedStyle)
+          } else {
+            el.removeAttribute("style")
+          }
+          return
+        }
+
+        if (attrName === "href") {
+          if (!isSafeUrl(attrValue)) {
+            el.removeAttribute("href")
+            return
+          }
+          el.setAttribute("target", "_blank")
+          el.setAttribute("rel", "noopener noreferrer")
+        }
+
+        if (attrName === "src" && !isSafeUrl(attrValue)) {
+          el.removeAttribute("src")
+        }
+
+        if (attrName === "dir") {
+          el.setAttribute("dir", "ltr")
+        }
+      })
+    }
+
+    const children = Array.from(node.childNodes)
+    children.forEach(walk)
+  }
+
+  const root = parsedDoc.body
+  if (!root) {
+    return ""
+  }
+
+  walk(root)
+
+  return root.innerHTML.replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, "")
+}
+
+const MIN_COLUMN_WIDTH_PX = 60
 
 interface RichTextEditorProps {
   content: string
@@ -20,6 +250,186 @@ export function RichTextEditor({ content, onChange, placeholder = "Start writing
   const [showLinkDialog, setShowLinkDialog] = useState(false)
   const [linkUrl, setLinkUrl] = useState("")
   const [selectedText, setSelectedText] = useState("")
+  const [showTableDialog, setShowTableDialog] = useState(false)
+  const [tableRows, setTableRows] = useState(2)
+  const [tableCols, setTableCols] = useState(2)
+  const savedSelectionRef = useRef<Range | null>(null)
+  const columnResizeStateRef = useRef<{
+    table: HTMLTableElement
+    colIndex: number
+    cell: HTMLElement
+    startX: number
+    startWidthLeft: number
+    startWidthRight: number
+    initialTableWidth: number
+    colElements: HTMLTableColElement[]
+    wrapper: HTMLElement | null
+  } | null>(null)
+  const tableResizeStateRef = useRef<{
+    wrapper: HTMLElement
+    table: HTMLTableElement
+    startX: number
+    startWidth: number
+    minWidth: number
+  } | null>(null)
+
+  const wrapTableForResize = useCallback((table: HTMLTableElement): HTMLElement => {
+    const existingWrapper = table.closest('.table-resize-wrapper') as HTMLElement | null
+    if (existingWrapper) {
+      return existingWrapper
+    }
+
+    const wrapper = document.createElement('div')
+    wrapper.className = 'table-resize-wrapper'
+    table.parentNode?.insertBefore(wrapper, table)
+    wrapper.appendChild(table)
+    return wrapper
+  }, [])
+
+  const ensureColGroup = useCallback((table: HTMLTableElement): HTMLTableColElement[] => {
+    let colgroup = table.querySelector('colgroup')
+    const columnCount = table.rows[0]?.cells.length ?? 0
+
+    if (columnCount === 0) {
+      return []
+    }
+
+    const defaultWidth = 100 / columnCount
+
+    if (!colgroup) {
+      colgroup = document.createElement('colgroup')
+      for (let i = 0; i < columnCount; i++) {
+        const col = document.createElement('col')
+        col.style.width = `${defaultWidth}%`
+        colgroup.appendChild(col)
+      }
+      table.insertBefore(colgroup, table.firstChild)
+    } else {
+      const currentCols = colgroup.children.length
+
+      if (currentCols < columnCount) {
+        for (let i = currentCols; i < columnCount; i++) {
+          const col = document.createElement('col')
+          col.style.width = `${defaultWidth}%`
+          colgroup.appendChild(col)
+        }
+      } else if (currentCols > columnCount) {
+        for (let i = currentCols - 1; i >= columnCount; i--) {
+          colgroup.children[i]?.remove()
+        }
+      }
+
+      const cols = Array.from(colgroup.children) as HTMLTableColElement[]
+      const hasWidths = cols.some((col) => col.style.width)
+      if (!hasWidths) {
+        cols.forEach((col) => {
+          col.style.width = `${defaultWidth}%`
+        })
+      }
+    }
+
+    return Array.from(table.querySelectorAll('colgroup col')) as HTMLTableColElement[]
+  }, [])
+
+  const normalizeColumnWidths = useCallback(
+    (table: HTMLTableElement, colElements: HTMLTableColElement[]) => {
+      const firstRow = table.rows[0]
+      if (!firstRow || colElements.length === 0) {
+        return
+      }
+
+      const tableRect = table.getBoundingClientRect()
+      const totalWidth = tableRect.width || colElements.length * MIN_COLUMN_WIDTH_PX
+      const fallback = totalWidth / colElements.length || MIN_COLUMN_WIDTH_PX
+
+      Array.from(firstRow.cells).forEach((cell, index) => {
+        const cellElement = cell as HTMLElement
+        const width = Math.max(MIN_COLUMN_WIDTH_PX, cellElement.getBoundingClientRect().width || fallback)
+        if (colElements[index]) {
+          const percent = (width / totalWidth) * 100
+          colElements[index].style.width = `${percent}%`
+        }
+      })
+
+      colElements.forEach((col, index) => {
+        if (index >= firstRow.cells.length) {
+          const percent = (fallback / totalWidth) * 100
+          col.style.width = `${percent}%`
+        }
+      })
+    },
+    []
+  )
+
+  const addColumnHandles = useCallback((table: HTMLTableElement) => {
+    const allCells = Array.from(table.querySelectorAll('th, td')) as HTMLElement[]
+    allCells.forEach((cell) => {
+      cell.style.position = 'relative'
+      if (!cell.style.minWidth) {
+        cell.style.minWidth = `${MIN_COLUMN_WIDTH_PX}px`
+      }
+    })
+
+    const firstRow = table.rows[0]
+    if (!firstRow) {
+      return
+    }
+
+    Array.from(firstRow.cells).forEach((cell, index, cells) => {
+      const cellElement = cell as HTMLElement
+      cellElement.querySelectorAll('.column-resize-handle').forEach((handle) => handle.remove())
+
+      if (index === cells.length - 1) {
+        return
+      }
+
+      const handle = document.createElement('span')
+      handle.className = 'column-resize-handle'
+      handle.dataset.colIndex = String(index)
+      cellElement.appendChild(handle)
+    })
+  }, [])
+
+  const addCornerHandle = useCallback((wrapper: HTMLElement) => {
+    let handle = wrapper.querySelector('.table-corner-handle') as HTMLElement | null
+    if (!handle) {
+      handle = document.createElement('span')
+      handle.className = 'table-corner-handle'
+      wrapper.appendChild(handle)
+    }
+  }, [])
+
+  const prepareTableForResize = useCallback(
+    (table: HTMLTableElement) => {
+      const wrapper = wrapTableForResize(table)
+
+      table.style.borderCollapse = 'collapse'
+      table.style.tableLayout = 'fixed'
+      if (!table.style.width) {
+        table.style.width = '100%'
+      }
+
+      const colElements = ensureColGroup(table)
+      normalizeColumnWidths(table, colElements)
+      addColumnHandles(table)
+      addCornerHandle(wrapper)
+
+      const tableWidth = table.getBoundingClientRect().width || table.offsetWidth || 0
+      if (!wrapper.style.width) {
+        wrapper.style.width = tableWidth ? `${tableWidth}px` : '100%'
+      }
+      wrapper.style.maxWidth = '100%'
+      wrapper.style.minWidth = `${colElements.length * MIN_COLUMN_WIDTH_PX}px`
+
+      table.dataset.tableResizeReady = 'true'
+    },
+    [addColumnHandles, addCornerHandle, ensureColGroup, normalizeColumnWidths, wrapTableForResize]
+  )
+
+  const initializeTables = useCallback((root: HTMLElement) => {
+    const tables = Array.from(root.querySelectorAll('table'))
+    tables.forEach((table) => prepareTableForResize(table as HTMLTableElement))
+  }, [prepareTableForResize])
 
   // Update editor content when prop changes
   useEffect(() => {
@@ -38,6 +448,8 @@ export function RichTextEditor({ content, onChange, placeholder = "Start writing
       
       // Force LTR on all elements
       forceLTR(editorRef.current)
+
+      initializeTables(editorRef.current)
       
       // Try to restore cursor position
       if (range && cursorOffset !== null) {
@@ -81,16 +493,40 @@ export function RichTextEditor({ content, onChange, placeholder = "Start writing
     handleContentChange()
   }
 
-  const handleContentChange = () => {
-    if (editorRef.current) {
-      forceLTR(editorRef.current)
-      
-      let htmlContent = editorRef.current.innerHTML
-      htmlContent = htmlContent.replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '')
-      
-      onChange(htmlContent)
+  const getSerializableContent = useCallback(() => {
+    if (!editorRef.current) {
+      return ""
     }
-  }
+
+    const clone = editorRef.current.cloneNode(true) as HTMLElement
+
+    clone.querySelectorAll('.column-resize-handle').forEach((handle) => handle.remove())
+    clone.querySelectorAll('.table-corner-handle').forEach((handle) => handle.remove())
+    clone.querySelectorAll('.table-resize-wrapper').forEach((wrapper) => {
+      const table = wrapper.querySelector('table')
+      if (table) {
+        wrapper.replaceWith(table)
+      } else {
+        wrapper.remove()
+      }
+    })
+    clone.querySelectorAll('table').forEach((table) => {
+      const tableEl = table as HTMLElement
+      tableEl.removeAttribute('data-table-resize-ready')
+    })
+
+    return clone.innerHTML.replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '')
+  }, [])
+
+  const handleContentChange = useCallback(() => {
+    if (!editorRef.current) {
+      return
+    }
+
+    forceLTR(editorRef.current)
+    const htmlContent = getSerializableContent()
+    onChange(htmlContent)
+  }, [getSerializableContent, onChange])
 
   const handleImageUpload = async () => {
     const input = document.createElement('input')
@@ -201,6 +637,292 @@ export function RichTextEditor({ content, onChange, placeholder = "Start writing
     input.click()
   }
 
+  const insertTable = (rows: number, cols: number) => {
+    const safeRows = Math.min(Math.max(Math.floor(rows), 1), 10)
+    const safeCols = Math.min(Math.max(Math.floor(cols), 1), 10)
+
+    const table = document.createElement('table')
+    table.className = 'my-4'
+    table.style.border = '1px solid #d1d5db'
+    table.style.borderCollapse = 'collapse'
+    table.style.tableLayout = 'fixed'
+    table.style.width = '100%'
+    table.style.minWidth = 'unset'
+
+    const tbody = document.createElement('tbody')
+
+    for (let r = 0; r < safeRows; r++) {
+      const tr = document.createElement('tr')
+      for (let c = 0; c < safeCols; c++) {
+        const td = document.createElement('td')
+        td.className = 'align-top'
+        td.style.border = '1px solid #d1d5db'
+        td.style.padding = '0.75rem'
+        td.appendChild(document.createElement('br'))
+        tr.appendChild(td)
+      }
+      tbody.appendChild(tr)
+    }
+
+    table.appendChild(tbody)
+
+    const selection = window.getSelection()
+
+    if (savedSelectionRef.current && selection) {
+      selection.removeAllRanges()
+      selection.addRange(savedSelectionRef.current)
+      savedSelectionRef.current = null
+    }
+
+    if ((!selection || selection.rangeCount === 0) && editorRef.current) {
+      const fallbackRange = document.createRange()
+      fallbackRange.selectNodeContents(editorRef.current)
+      fallbackRange.collapse(false)
+      selection?.removeAllRanges()
+      selection?.addRange(fallbackRange)
+    }
+
+    editorRef.current?.focus()
+
+    if (!selection || selection.rangeCount === 0) {
+      if (editorRef.current) {
+        editorRef.current.appendChild(table)
+        prepareTableForResize(table)
+      }
+      handleContentChange()
+      return
+    }
+
+    const range = selection.getRangeAt(0)
+    range.deleteContents()
+    range.insertNode(table)
+    prepareTableForResize(table)
+
+    const newRange = document.createRange()
+    const firstCell = table.querySelector('td')
+    if (firstCell) {
+      const focusNode = firstCell.firstChild || firstCell
+      newRange.setStart(focusNode, 0)
+    } else {
+      newRange.setStartAfter(table)
+    }
+    newRange.collapse(true)
+    selection.removeAllRanges()
+    selection.addRange(newRange)
+    handleContentChange()
+  }
+
+  useEffect(() => {
+    const editor = editorRef.current
+    if (!editor) {
+      return
+    }
+
+    initializeTables(editor)
+
+    const observer = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        mutation.addedNodes.forEach((node) => {
+          if (node instanceof HTMLTableElement) {
+            prepareTableForResize(node)
+          } else if (node instanceof HTMLElement) {
+            const nestedTables = Array.from(node.querySelectorAll('table'))
+            nestedTables.forEach((tbl) => prepareTableForResize(tbl as HTMLTableElement))
+          }
+        })
+      })
+    })
+
+    observer.observe(editor, { childList: true, subtree: true })
+
+    const handleMouseDown = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+
+      if (target.classList.contains('table-corner-handle')) {
+        event.preventDefault()
+        event.stopPropagation()
+
+        const wrapper = target.closest('.table-resize-wrapper') as HTMLElement | null
+        const table = wrapper?.querySelector('table') as HTMLTableElement | null
+
+        if (!wrapper || !table) {
+          return
+        }
+
+        const colElements = ensureColGroup(table)
+        normalizeColumnWidths(table, colElements)
+        const wrapperRect = wrapper.getBoundingClientRect()
+        const tableRect = table.getBoundingClientRect()
+        const columnCount = colElements.length || table.rows[0]?.cells.length || 1
+        const startWidth = wrapperRect.width || tableRect.width || columnCount * MIN_COLUMN_WIDTH_PX
+        const minWidth = columnCount * MIN_COLUMN_WIDTH_PX
+
+        table.style.width = `${startWidth}px`
+
+        tableResizeStateRef.current = {
+          wrapper,
+          table,
+          startX: event.clientX,
+          startWidth,
+          minWidth
+        }
+
+        wrapper.classList.add('resizing-table')
+        document.body.style.cursor = 'nwse-resize'
+        window.getSelection()?.removeAllRanges()
+        return
+      }
+
+      if (!target.classList.contains('column-resize-handle')) {
+        return
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+
+      const cell = target.closest('td, th') as HTMLElement | null
+      const table = cell?.closest('table') as HTMLTableElement | null
+
+      if (!cell || !table) {
+        return
+      }
+
+      prepareTableForResize(table)
+
+      const wrapper = table.closest('.table-resize-wrapper') as HTMLElement | null
+      const row = cell.parentElement as HTMLTableRowElement | null
+      if (!row) {
+        return
+      }
+
+      const colIndex = target.dataset.colIndex
+        ? Number(target.dataset.colIndex)
+        : Array.from(row.cells).indexOf(cell as HTMLTableCellElement)
+
+      if (colIndex < 0) {
+        return
+      }
+
+      const nextCell = row.cells[colIndex + 1] as HTMLElement | undefined
+      if (!nextCell) {
+        return
+      }
+
+      const colElements = ensureColGroup(table)
+      if (!colElements[colIndex] || !colElements[colIndex + 1]) {
+        return
+      }
+
+      const leftRect = cell.getBoundingClientRect()
+      const rightRect = nextCell.getBoundingClientRect()
+      const tableRect = table.getBoundingClientRect()
+      const initialTableWidth =
+        tableRect.width ||
+        Array.from(row.cells).reduce((sum, currentCell) => sum + currentCell.getBoundingClientRect().width, 0) ||
+        MIN_COLUMN_WIDTH_PX * colElements.length
+
+      columnResizeStateRef.current = {
+        table,
+        colIndex,
+        cell,
+        startX: event.clientX,
+        startWidthLeft: leftRect.width,
+        startWidthRight: rightRect.width,
+        initialTableWidth,
+        colElements,
+        wrapper
+      }
+
+      wrapper?.classList.add('resizing')
+      document.body.style.cursor = 'col-resize'
+      window.getSelection()?.removeAllRanges()
+    }
+
+    const handleMouseMove = (event: MouseEvent) => {
+      const tableState = tableResizeStateRef.current
+      if (tableState) {
+        event.preventDefault()
+
+        const deltaX = event.clientX - tableState.startX
+        const newWidth = Math.max(tableState.minWidth, tableState.startWidth + deltaX)
+
+        tableState.wrapper.style.width = `${newWidth}px`
+        tableState.table.style.width = `${newWidth}px`
+        return
+      }
+
+      const state = columnResizeStateRef.current
+      if (!state) {
+        return
+      }
+
+      event.preventDefault()
+
+      const total = state.startWidthLeft + state.startWidthRight
+      if (total <= 0) {
+        return
+      }
+
+      const min = Math.min(MIN_COLUMN_WIDTH_PX, total / 2)
+      let newLeft = state.startWidthLeft + (event.clientX - state.startX)
+      newLeft = Math.max(min, Math.min(newLeft, total - min))
+      const newRight = total - newLeft
+
+      const tableWidth = state.table.getBoundingClientRect().width || state.initialTableWidth
+      const percentLeft = (newLeft / tableWidth) * 100
+      const percentRight = (newRight / tableWidth) * 100
+
+      state.colElements[state.colIndex].style.width = `${percentLeft}%`
+      state.colElements[state.colIndex + 1].style.width = `${percentRight}%`
+    }
+
+    const handleMouseUp = () => {
+      const tableState = tableResizeStateRef.current
+      if (tableState) {
+        tableState.wrapper.classList.remove('resizing-table')
+        tableResizeStateRef.current = null
+        document.body.style.cursor = ''
+        handleContentChange()
+        return
+      }
+
+      const state = columnResizeStateRef.current
+      if (!state) {
+        return
+      }
+
+      const selection = window.getSelection()
+      if (selection) {
+        const focusNode = state.cell.firstChild || state.cell
+        const offset =
+          focusNode.nodeType === Node.TEXT_NODE
+            ? (focusNode as Text).length
+            : focusNode.childNodes.length
+        const range = document.createRange()
+        range.setStart(focusNode, offset)
+        range.collapse(true)
+        selection.removeAllRanges()
+        selection.addRange(range)
+      }
+
+      state.wrapper?.classList.remove('resizing')
+      columnResizeStateRef.current = null
+      document.body.style.cursor = ''
+      handleContentChange()
+    }
+
+    editor.addEventListener('mousedown', handleMouseDown)
+    document.addEventListener('mousemove', handleMouseMove)
+    document.addEventListener('mouseup', handleMouseUp)
+
+    return () => {
+      observer.disconnect()
+      editor.removeEventListener('mousedown', handleMouseDown)
+      document.removeEventListener('mousemove', handleMouseMove)
+      document.removeEventListener('mouseup', handleMouseUp)
+    }
+  }, [handleContentChange, ensureColGroup, initializeTables, normalizeColumnWidths, prepareTableForResize])
+
   const handleLink = () => {
     const selection = window.getSelection()
     const selectedText = selection?.toString() || ""
@@ -301,6 +1023,90 @@ export function RichTextEditor({ content, onChange, placeholder = "Start writing
         .rich-text-editor ul, .rich-text-editor ol {
           margin: 1rem 0;
           padding-left: 2rem;
+        }
+        .table-resize-wrapper {
+          display: inline-block;
+          max-width: 100%;
+          padding: 0.5rem;
+          margin: 1rem 0;
+          border: 1px solid hsl(var(--border));
+          border-radius: 0.5rem;
+          background: hsl(var(--background));
+          box-sizing: border-box;
+          position: relative;
+          overflow: hidden;
+        }
+        .table-resize-wrapper.resizing {
+          cursor: col-resize;
+        }
+        .table-resize-wrapper.resizing-table {
+          cursor: nwse-resize;
+        }
+        .table-corner-handle {
+          position: absolute;
+          width: 14px;
+          height: 14px;
+          bottom: 4px;
+          right: 4px;
+          border-radius: 4px;
+          background: hsl(var(--muted));
+          border: 1px solid hsl(var(--border));
+          cursor: nwse-resize;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .table-corner-handle::after {
+          content: "";
+          width: 6px;
+          height: 6px;
+          border-right: 1px solid hsl(var(--primary));
+          border-bottom: 1px solid hsl(var(--primary));
+          transform: rotate(45deg);
+        }
+        .rich-text-editor table {
+          border-collapse: collapse;
+          margin: 1rem 0;
+          width: 100%;
+          min-width: 0;
+          max-width: 100%;
+        }
+        .rich-text-editor th,
+        .rich-text-editor td {
+          border: 1px solid hsl(var(--border));
+          padding: 0.75rem;
+          vertical-align: top;
+        }
+        .rich-text-editor th {
+          background: hsl(var(--muted));
+          font-weight: 600;
+        }
+        .column-resize-handle {
+          position: absolute;
+          top: 0;
+          right: -4px;
+          width: 8px;
+          cursor: col-resize;
+          user-select: none;
+          height: 100%;
+          z-index: 5;
+        }
+        .column-resize-handle::after {
+          content: "";
+          position: absolute;
+          top: 0;
+          bottom: 0;
+          left: 50%;
+          width: 2px;
+          transform: translateX(-50%);
+          background: hsl(var(--border));
+          opacity: 0;
+          transition: opacity 0.15s ease;
+        }
+        .column-resize-handle:hover::after,
+        td:hover > .column-resize-handle::after,
+        th:hover > .column-resize-handle::after {
+          opacity: 1;
         }
         .rich-text-editor blockquote {
           border-left: 4px solid hsl(var(--border));
@@ -404,6 +1210,25 @@ export function RichTextEditor({ content, onChange, placeholder = "Start writing
           type="button"
           variant="ghost"
           size="sm"
+          onClick={() => {
+            const selection = window.getSelection()
+            if (selection && selection.rangeCount > 0) {
+              savedSelectionRef.current = selection.getRangeAt(0).cloneRange()
+            } else {
+              savedSelectionRef.current = null
+            }
+            setTableRows(2)
+            setTableCols(2)
+            setShowTableDialog(true)
+          }}
+        >
+          <TableIcon className="w-4 h-4" />
+        </Button>
+
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
           onClick={handleImageUpload}
           disabled={uploading}
         >
@@ -459,22 +1284,64 @@ export function RichTextEditor({ content, onChange, placeholder = "Start writing
           onInput={handleContentChange}
           onPaste={(e) => {
             e.preventDefault()
-            const text = e.clipboardData.getData('text/plain')
-            
-            if (text) {
-              const cleanText = text.replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '')
-              const selection = window.getSelection()
-              if (selection && selection.rangeCount > 0) {
-                const range = selection.getRangeAt(0)
-                range.deleteContents()
-                const textNode = document.createTextNode(cleanText)
-                range.insertNode(textNode)
-                range.setStartAfter(textNode)
-                range.collapse(true)
-                selection.removeAllRanges()
-                selection.addRange(range)
-                handleContentChange()
-              }
+            const clipboardData = e.clipboardData
+            const htmlData = clipboardData.getData("text/html")
+            const textData = clipboardData.getData("text/plain")
+
+            const selection = window.getSelection()
+            if (!selection || selection.rangeCount === 0) {
+              return
+            }
+
+            const range = selection.getRangeAt(0)
+            range.deleteContents()
+
+            let contentToInsert = ""
+
+            if (htmlData) {
+              contentToInsert = sanitizePastedContent(htmlData)
+            }
+
+            if (!contentToInsert && textData) {
+              contentToInsert = plainTextToHtml(textData)
+            }
+
+            if (!contentToInsert) {
+              return
+            }
+
+            const container = document.createElement("div")
+            container.innerHTML = contentToInsert
+
+            const fragment = document.createDocumentFragment()
+            const nodes = Array.from(container.childNodes)
+
+            nodes.forEach((node) => {
+              fragment.appendChild(node)
+            })
+
+            const lastNode = nodes[nodes.length - 1] || null
+            range.insertNode(fragment)
+
+            if (lastNode) {
+              const newRange = document.createRange()
+              newRange.setStartAfter(lastNode)
+              newRange.collapse(true)
+              selection.removeAllRanges()
+              selection.addRange(newRange)
+            } else {
+              range.collapse(false)
+              selection.removeAllRanges()
+              selection.addRange(range)
+            }
+
+            if (editorRef.current) {
+              forceLTR(editorRef.current)
+            }
+
+            handleContentChange()
+            if (editorRef.current) {
+              initializeTables(editorRef.current)
             }
           }}
           dir="ltr"
@@ -508,6 +1375,70 @@ export function RichTextEditor({ content, onChange, placeholder = "Start writing
               </Button>
               <Button onClick={insertLink}>
                 Add Link
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={showTableDialog}
+        onOpenChange={(open) => {
+          if (!open) {
+            savedSelectionRef.current = null
+          }
+          setShowTableDialog(open)
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Insert Table</DialogTitle>
+            <DialogDescription>Select the number of rows and columns</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 mt-4">
+            <div className="grid gap-2">
+              <label className="text-sm font-medium" htmlFor="table-rows">
+                Rows
+              </label>
+              <Input
+                id="table-rows"
+                type="number"
+                min={1}
+                max={10}
+                value={tableRows}
+                onChange={(e) => setTableRows(Number(e.target.value) || 1)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <label className="text-sm font-medium" htmlFor="table-cols">
+                Columns
+              </label>
+              <Input
+                id="table-cols"
+                type="number"
+                min={1}
+                max={10}
+                value={tableCols}
+                onChange={(e) => setTableCols(Number(e.target.value) || 1)}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  savedSelectionRef.current = null
+                  setShowTableDialog(false)
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  insertTable(tableRows, tableCols)
+                  setShowTableDialog(false)
+                }}
+              >
+                Insert Table
               </Button>
             </div>
           </div>
