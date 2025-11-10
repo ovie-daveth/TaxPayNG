@@ -272,6 +272,12 @@ export function RichTextEditor({ content, onChange, placeholder = "Start writing
     startWidth: number
     minWidth: number
   } | null>(null)
+  const tableDragStateRef = useRef<{
+    wrapper: HTMLElement | null
+  }>({ wrapper: null })
+  const isApplyingContentRef = useRef(false)
+  const pendingContentUpdateRef = useRef<string | null>(null)
+  const pendingChangeTimeoutRef = useRef<number | null>(null)
 
   const wrapTableForResize = useCallback((table: HTMLTableElement): HTMLElement => {
     const existingWrapper = table.closest('.table-resize-wrapper') as HTMLElement | null
@@ -399,6 +405,33 @@ export function RichTextEditor({ content, onChange, placeholder = "Start writing
     }
   }, [])
 
+  const addTableToolbar = useCallback((wrapper: HTMLElement) => {
+    let toolbar = wrapper.querySelector('.table-toolbar') as HTMLElement | null
+    if (!toolbar) {
+      toolbar = document.createElement('div')
+      toolbar.className = 'table-toolbar'
+
+      const dragButton = document.createElement('button')
+      dragButton.type = 'button'
+      dragButton.className = 'table-toolbar-button table-toolbar-drag'
+      dragButton.title = 'Select table'
+      dragButton.dataset.action = 'select-table'
+      dragButton.setAttribute('aria-label', 'Select table')
+      dragButton.draggable = true
+
+      const deleteButton = document.createElement('button')
+      deleteButton.type = 'button'
+      deleteButton.className = 'table-toolbar-button table-toolbar-delete'
+      deleteButton.title = 'Delete table'
+      deleteButton.dataset.action = 'delete-table'
+      deleteButton.setAttribute('aria-label', 'Delete table')
+
+      toolbar.appendChild(dragButton)
+      toolbar.appendChild(deleteButton)
+      wrapper.appendChild(toolbar)
+    }
+  }, [])
+
   const prepareTableForResize = useCallback(
     (table: HTMLTableElement) => {
       const wrapper = wrapTableForResize(table)
@@ -413,6 +446,7 @@ export function RichTextEditor({ content, onChange, placeholder = "Start writing
       normalizeColumnWidths(table, colElements)
       addColumnHandles(table)
       addCornerHandle(wrapper)
+      addTableToolbar(wrapper)
 
       const tableWidth = table.getBoundingClientRect().width || table.offsetWidth || 0
       if (!wrapper.style.width) {
@@ -423,51 +457,97 @@ export function RichTextEditor({ content, onChange, placeholder = "Start writing
 
       table.dataset.tableResizeReady = 'true'
     },
-    [addColumnHandles, addCornerHandle, ensureColGroup, normalizeColumnWidths, wrapTableForResize]
+    [addColumnHandles, addCornerHandle, addTableToolbar, ensureColGroup, normalizeColumnWidths, wrapTableForResize]
   )
 
   const initializeTables = useCallback((root: HTMLElement) => {
     const tables = Array.from(root.querySelectorAll('table'))
     tables.forEach((table) => prepareTableForResize(table as HTMLTableElement))
+    requestAnimationFrame(() => {
+      const selection = window.getSelection()
+      if (selection && selection.rangeCount > 0) {
+        editorRef.current?.focus()
+      }
+    })
   }, [prepareTableForResize])
 
   // Update editor content when prop changes
   useEffect(() => {
     if (editorRef.current && content !== editorRef.current.innerHTML) {
       const selection = window.getSelection()
-      const range = selection?.rangeCount ? selection.getRangeAt(0).cloneRange() : null
-      const cursorOffset = range ? range.startOffset : null
-      
+      let savedRange: Range | null = null
+      let savedNode: Node | null = null
+      let savedOffset = 0
+
+      if (selection && selection.rangeCount > 0) {
+        savedRange = selection.getRangeAt(0).cloneRange()
+        savedNode = savedRange.startContainer
+        savedOffset = savedRange.startOffset
+      }
+
       // Clean content and ensure LTR
       let cleanContent = content
       cleanContent = cleanContent.replace(/dir=["']rtl["']/gi, 'dir="ltr"')
       cleanContent = cleanContent.replace(/style="[^"]*direction:\s*rtl[^"]*"/gi, '')
       cleanContent = cleanContent.replace(/[\u200E\u200F\u202A-\u202E\u2066-\u2069]/g, '')
-      
+
+      isApplyingContentRef.current = true
       editorRef.current.innerHTML = cleanContent
-      
+
       // Force LTR on all elements
       forceLTR(editorRef.current)
 
       initializeTables(editorRef.current)
-      
-      // Try to restore cursor position
-      if (range && cursorOffset !== null) {
+
+      // Restore cursor position
+      if (savedNode && selection) {
         try {
-          const newRange = document.createRange()
-          const textNode = editorRef.current.childNodes[0] as Text
-          if (textNode && textNode.nodeType === Node.TEXT_NODE) {
-            newRange.setStart(textNode, Math.min(cursorOffset, textNode.length))
-            newRange.collapse(true)
-            selection?.removeAllRanges()
-            selection?.addRange(newRange)
+          const walker = document.createTreeWalker(
+            editorRef.current,
+            NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+            null
+          )
+
+          walker.currentNode = editorRef.current
+          let currentNode: Node | null = walker.nextNode()
+          let found = false
+
+          while (currentNode) {
+            if (
+              currentNode === savedNode ||
+              (currentNode.nodeType === savedNode.nodeType &&
+                currentNode.textContent === savedNode.textContent)
+            ) {
+              const newRange = document.createRange()
+              const maxOffset =
+                currentNode.nodeType === Node.TEXT_NODE
+                  ? (currentNode as Text).length
+                  : currentNode.childNodes.length
+              newRange.setStart(currentNode, Math.min(savedOffset, maxOffset))
+              newRange.collapse(true)
+              selection.removeAllRanges()
+              selection.addRange(newRange)
+              found = true
+              break
+            }
+            currentNode = walker.nextNode()
+          }
+
+          if (!found && editorRef.current.childNodes.length > 0) {
+            const lastChild = editorRef.current.childNodes[editorRef.current.childNodes.length - 1]
+            const newRange = document.createRange()
+            newRange.selectNodeContents(lastChild)
+            newRange.collapse(false)
+            selection.removeAllRanges()
+            selection.addRange(newRange)
           }
         } catch (e) {
           // Ignore cursor restoration errors
         }
       }
+      isApplyingContentRef.current = false
     }
-  }, [content])
+  }, [content, initializeTables])
 
   const forceLTR = (element: HTMLElement) => {
     element.setAttribute('dir', 'ltr')
@@ -519,13 +599,25 @@ export function RichTextEditor({ content, onChange, placeholder = "Start writing
   }, [])
 
   const handleContentChange = useCallback(() => {
+    if (isApplyingContentRef.current) {
+      return
+    }
     if (!editorRef.current) {
       return
     }
 
     forceLTR(editorRef.current)
     const htmlContent = getSerializableContent()
-    onChange(htmlContent)
+    if (pendingChangeTimeoutRef.current) {
+      window.clearTimeout(pendingChangeTimeoutRef.current)
+    }
+    pendingContentUpdateRef.current = htmlContent
+    pendingChangeTimeoutRef.current = window.setTimeout(() => {
+      if (pendingContentUpdateRef.current !== null) {
+        onChange(pendingContentUpdateRef.current)
+        pendingContentUpdateRef.current = null
+      }
+    }, 100)
   }, [getSerializableContent, onChange])
 
   const handleImageUpload = async () => {
@@ -911,15 +1003,219 @@ export function RichTextEditor({ content, onChange, placeholder = "Start writing
       handleContentChange()
     }
 
+    const handleToolbarClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      const button = target.closest('.table-toolbar-button') as HTMLElement | null
+      if (!button) {
+        return
+      }
+
+      event.preventDefault()
+      event.stopPropagation()
+
+      const wrapper = button.closest('.table-resize-wrapper') as HTMLElement | null
+      const table = wrapper?.querySelector('table') as HTMLTableElement | null
+
+      if (!wrapper || !table) {
+        return
+      }
+
+      const action = button.dataset.action
+      if (action === 'delete-table') {
+        const parentNode = wrapper.parentNode
+        const nextSibling = wrapper.nextSibling
+        const scrollY = window.scrollY
+
+        wrapper.remove()
+
+        const selection = window.getSelection()
+        if (selection && parentNode) {
+          const rangeAfter = document.createRange()
+          if (nextSibling) {
+            const index = Array.prototype.indexOf.call(parentNode.childNodes, nextSibling)
+            rangeAfter.setStart(parentNode, index)
+          } else {
+            rangeAfter.setStart(parentNode, parentNode.childNodes.length)
+          }
+          rangeAfter.collapse(true)
+          selection.removeAllRanges()
+          selection.addRange(rangeAfter)
+        }
+
+        window.scrollTo({ top: scrollY })
+        editor.focus()
+        handleContentChange()
+        return
+      }
+
+      if (action === 'select-table') {
+        const range = document.createRange()
+        range.selectNode(table)
+        const selection = window.getSelection()
+        selection?.removeAllRanges()
+        selection?.addRange(range)
+        editor.focus()
+      }
+    }
+
+    const getDropRange = (event: DragEvent): Range | null => {
+      if (document.caretRangeFromPoint) {
+        const range = document.caretRangeFromPoint(event.clientX, event.clientY)
+        if (range) return range
+      }
+      const caretPosition = (document as any).caretPositionFromPoint?.(event.clientX, event.clientY)
+      if (caretPosition) {
+        const range = document.createRange()
+        range.setStart(caretPosition.offsetNode, caretPosition.offset)
+        range.collapse(true)
+        return range
+      }
+      const selection = window.getSelection()
+      if (selection && selection.rangeCount > 0) {
+        return selection.getRangeAt(0).cloneRange()
+      }
+      return null
+    }
+
+    const handleDragStart = (event: DragEvent) => {
+      const target = event.target as HTMLElement
+      const dragButton = target.closest('.table-toolbar-drag') as HTMLElement | null
+      if (!dragButton) {
+        return
+      }
+
+      const wrapper = dragButton.closest('.table-resize-wrapper') as HTMLElement | null
+      if (!wrapper) {
+        return
+      }
+
+      tableDragStateRef.current.wrapper = wrapper
+      wrapper.classList.add('dragging-table')
+      event.dataTransfer?.setData('text/plain', 'table-drag')
+      event.dataTransfer?.setDragImage(wrapper, Math.min(24, wrapper.offsetWidth / 2), 12)
+      event.dataTransfer?.setData('application/x-table-drag', 'true')
+      if (event.dataTransfer) {
+        event.dataTransfer.effectAllowed = 'move'
+      }
+    }
+
+    const handleDragOver = (event: DragEvent) => {
+      if (!tableDragStateRef.current.wrapper) {
+        return
+      }
+      if (!editor.contains(event.target as Node)) {
+        return
+      }
+      event.preventDefault()
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = 'move'
+      }
+    }
+
+    const handleDrop = (event: DragEvent) => {
+      const wrapper = tableDragStateRef.current.wrapper
+      if (!wrapper) {
+        return
+      }
+      if (!editor.contains(event.target as Node)) {
+        return
+      }
+      event.preventDefault()
+      event.stopPropagation()
+
+      const range = getDropRange(event)
+      const parent = wrapper.parentNode
+
+      wrapper.setAttribute('data-moving-table', 'moving')
+      const html = wrapper.outerHTML
+      wrapper.classList.remove('dragging-table')
+
+      if (parent) {
+        parent.removeChild(wrapper)
+      } else {
+        wrapper.remove()
+      }
+
+      const selection = window.getSelection()
+      if (!range || !selection) {
+        tableDragStateRef.current.wrapper = null
+        initializeTables(editor)
+        handleContentChange()
+        return
+      }
+
+      selection.removeAllRanges()
+      range.collapse(true)
+      selection.addRange(range)
+
+      const scrollY = window.scrollY
+      let inserted = false
+      let insertedWrapper: HTMLElement | null = null
+      try {
+        inserted = document.execCommand('insertHTML', false, html)
+      } catch (error) {
+        inserted = false
+      }
+
+      if (!inserted) {
+        const temp = document.createElement('div')
+        temp.innerHTML = html
+        const fallbackWrapper = temp.firstElementChild as HTMLElement | null
+        if (fallbackWrapper) {
+          insertedWrapper = fallbackWrapper
+          range.insertNode(insertedWrapper)
+        }
+      }
+
+      window.scrollTo({ top: scrollY })
+
+      const newWrapper =
+        insertedWrapper ||
+        (editor.querySelector('.table-resize-wrapper[data-moving-table="moving"]') as HTMLElement | null)
+      if (newWrapper) {
+        newWrapper.removeAttribute('data-moving-table')
+        const afterRange = document.createRange()
+        const parentNode = newWrapper.parentNode
+        if (parentNode) {
+          afterRange.setStartAfter(newWrapper)
+          afterRange.collapse(true)
+          selection.removeAllRanges()
+          selection.addRange(afterRange)
+        }
+      }
+
+      tableDragStateRef.current.wrapper = null
+      initializeTables(editor)
+      handleContentChange()
+    }
+
+    const handleDragEnd = () => {
+      const wrapper = tableDragStateRef.current.wrapper
+      if (wrapper) {
+        wrapper.classList.remove('dragging-table')
+      }
+      tableDragStateRef.current.wrapper = null
+    }
+
     editor.addEventListener('mousedown', handleMouseDown)
     document.addEventListener('mousemove', handleMouseMove)
     document.addEventListener('mouseup', handleMouseUp)
+    editor.addEventListener('click', handleToolbarClick)
+    editor.addEventListener('dragstart', handleDragStart)
+    editor.addEventListener('dragover', handleDragOver)
+    editor.addEventListener('drop', handleDrop)
+    editor.addEventListener('dragend', handleDragEnd)
 
     return () => {
       observer.disconnect()
       editor.removeEventListener('mousedown', handleMouseDown)
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
+      editor.removeEventListener('click', handleToolbarClick)
+      editor.removeEventListener('dragstart', handleDragStart)
+      editor.removeEventListener('dragover', handleDragOver)
+      editor.removeEventListener('drop', handleDrop)
+      editor.removeEventListener('dragend', handleDragEnd)
     }
   }, [handleContentChange, ensureColGroup, initializeTables, normalizeColumnWidths, prepareTableForResize])
 
@@ -1035,19 +1331,73 @@ export function RichTextEditor({ content, onChange, placeholder = "Start writing
           box-sizing: border-box;
           position: relative;
           overflow: hidden;
+          transition: border-color 0.2s ease, box-shadow 0.2s ease;
         }
         .table-resize-wrapper.resizing {
           cursor: col-resize;
+          border-color: hsl(var(--primary));
+          box-shadow: 0 0 0 1px hsl(var(--primary));
         }
         .table-resize-wrapper.resizing-table {
           cursor: nwse-resize;
+          border-color: hsl(var(--primary));
+          box-shadow: 0 0 0 1px hsl(var(--primary));
+        }
+        .table-resize-wrapper.dragging-table {
+          opacity: 0.6;
+        }
+        .table-toolbar {
+          position: absolute;
+          top: 4px;
+          right: 4px;
+          display: inline-flex;
+          gap: 4px;
+          padding: 2px;
+          border-radius: 0.375rem;
+          background: hsla(var(--background), 0.9);
+          border: 1px solid hsl(var(--border));
+          backdrop-filter: blur(4px);
+          box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+          z-index: 6;
+        }
+        .table-toolbar-button {
+          width: 20px;
+          height: 20px;
+          border: none;
+          background: transparent;
+          color: hsl(var(--muted-foreground));
+          display: inline-flex;
+          align-items: center;
+          justify-content: center;
+          border-radius: 0.25rem;
+          cursor: pointer;
+          font-size: 12px;
+          line-height: 1;
+          padding: 0;
+          transition: background 0.15s ease, color 0.15s ease;
+        }
+        .table-toolbar-drag {
+          cursor: grab;
+        }
+        .table-toolbar-drag:active {
+          cursor: grabbing;
+        }
+        .table-toolbar-button:hover {
+          background: hsl(var(--muted));
+          color: hsl(var(--foreground));
+        }
+        .table-toolbar-drag::before {
+          content: "⇕";
+        }
+        .table-toolbar-delete::before {
+          content: "✕";
         }
         .table-corner-handle {
           position: absolute;
-          width: 14px;
-          height: 14px;
-          bottom: 4px;
-          right: 4px;
+          width: 16px;
+          height: 16px;
+          bottom: 6px;
+          right: 6px;
           border-radius: 4px;
           background: hsl(var(--muted));
           border: 1px solid hsl(var(--border));
@@ -1055,14 +1405,11 @@ export function RichTextEditor({ content, onChange, placeholder = "Start writing
           display: flex;
           align-items: center;
           justify-content: center;
+          color: hsl(var(--muted-foreground));
+          font-size: 12px;
         }
         .table-corner-handle::after {
-          content: "";
-          width: 6px;
-          height: 6px;
-          border-right: 1px solid hsl(var(--primary));
-          border-bottom: 1px solid hsl(var(--primary));
-          transform: rotate(45deg);
+          content: "↘";
         }
         .rich-text-editor table {
           border-collapse: collapse;
