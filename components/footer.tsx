@@ -37,7 +37,7 @@ export default function Footer() {
             <OtaxLogo />
           </Link>
 
-          <nav className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground">
+          <nav className="hidden md:flex flex-wrap justify-center gap-8 text-sm text-muted-foreground">
             {navigation.map((section) => (
               <div key={section.title} className="space-y-3 min-w-[140px]">
                 <span className="font-medium text-foreground/80 uppercase tracking-wide block">
@@ -63,6 +63,28 @@ export default function Footer() {
           </p>
         </div>
       </div>
+      <nav className="flex md:hidden flex-wrap justify-center gap-8 text-sm text-muted-foreground mt-10 px-5">
+            {navigation.map((section) => (
+              section.title === "Legal" && (
+                <div key={section.title} className="space-y-3 min-w-[140px]">
+                <span className="font-medium text-foreground/80 uppercase tracking-wide block">
+                  {section.title}
+                </span>
+                <div className="flex flex-col gap-2">
+                  {section.links.map((link) => (
+                    <Link
+                      key={link.name}
+                      href={link.href}
+                      className="hover:text-primary transition-colors"
+                    >
+                      {link.name}
+                    </Link>
+                  ))}
+                </div>
+              </div>
+              )
+            ))}
+          </nav>
     </footer>
   )
 }
