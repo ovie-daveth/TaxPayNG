@@ -12,6 +12,7 @@ import { toast } from "sonner"
 
 const navItems = [
   { href: "/dashboard-creator", label: "Overview", icon: LayoutDashboard },
+  { href: "/dashboard-creator/tax-calculator", label: "Tax Calculator", icon: Calculator },
   { href: "/dashboard-creator/settings", label: "Settings", icon: Settings },
 ]
 

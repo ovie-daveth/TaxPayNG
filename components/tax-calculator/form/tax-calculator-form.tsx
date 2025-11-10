@@ -32,9 +32,13 @@ import {
   convertCurrency,
 } from "@/lib/utils/currency"
 
+type SupportedUserType = "freelancer" | "creator" | "business"
+
 interface TaxCalculatorFormProps {
   onCalculate: (result: any) => void
   onInputsSaved?: (inputs: any) => void
+  defaultUserType?: SupportedUserType
+  lockUserType?: boolean
 }
 
 interface IncomeSource {
@@ -44,6 +48,16 @@ interface IncomeSource {
   currency?: CurrencyCode // Currency for this income source
   description?: string
   allowanceType?: "transport" | "housing" | "other" // For allowance type breakdown
+}
+
+const getDefaultIncomeSources = (type: SupportedUserType): IncomeSource[] => {
+  if (type === "creator") {
+    return [{ id: "1", type: "sponsorship", amount: "", currency: "NGN" }]
+  }
+  if (type === "business") {
+    return [{ id: "1", type: "business_income", amount: "", currency: "NGN" }]
+  }
+  return [{ id: "1", type: "freelance", amount: "", currency: "NGN" }]
 }
 
 const INCOME_TYPES = {
@@ -149,15 +163,18 @@ const INCOME_TYPE_HELP: Record<string, string> = {
   other: "Any other income not covered above",
 }
 
-export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
-  const [userType, setUserType] = useState("freelancer")
+export function TaxCalculatorForm({
+  onCalculate,
+  onInputsSaved,
+  defaultUserType = "freelancer",
+  lockUserType = false,
+}: TaxCalculatorFormProps) {
+  const [userType, setUserType] = useState<SupportedUserType>(defaultUserType)
   const [showSMEModal, setShowSMEModal] = useState(false)
   const [calculationType, setCalculationType] = useState<string | null>(null) // "paye", "vat", null
   const [showExplanations, setShowExplanations] = useState(false) // Mobile-only toggle for explanations
   const [showRatesSheet, setShowRatesSheet] = useState(false) // Control sheet visibility
-  const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([
-    { id: "1", type: "freelance", amount: "", currency: "NGN" },
-  ])
+  const [incomeSources, setIncomeSources] = useState<IncomeSource[]>(() => getDefaultIncomeSources(defaultUserType))
   const [converting, setConverting] = useState(false)
   const [period, setPeriod] = useState<"monthly" | "quarterly" | "yearly">("yearly")
   const [rentPaid, setRentPaid] = useState("")
@@ -224,24 +241,24 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
   const [vatInputTax, setVatInputTax] = useState("")
 
   const handleUserTypeChange = (value: string) => {
+    if (lockUserType) {
+      return
+    }
     if (value === "business") {
       setShowSMEModal(true)
       setCalculationType(null)
     } else {
-      setUserType(value)
+      const nextType = (value as SupportedUserType)
+      setUserType(nextType)
       setCalculationType(null)
-      // Reset income sources based on user type
-      if (value === "freelancer") {
-        setIncomeSources([{ id: "1", type: "freelance", amount: "", currency: "NGN" }])
-      } else if (value === "creator") {
-        setIncomeSources([{ id: "1", type: "sponsorship", amount: "", currency: "NGN" }])
-      }
+      setIncomeSources(getDefaultIncomeSources(nextType))
     }
   }
 
   const handleSMEModalContinue = () => {
     setShowSMEModal(false)
     setUserType("business")
+    setIncomeSources(getDefaultIncomeSources("business"))
   }
 
   const handleCalculationTypeSelect = (type: string) => {
@@ -1044,8 +1061,18 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         {/* Show form only if calculation type is selected for business owners, or if not a business owner */}
         {(userType !== "business" || calculationType) && (
           <>
-        <div className={`grid ${userType === "business" && calculationType ? "sm:grid-cols-2 lg:grid-cols-3" : "sm:grid-cols-2"} gap-3 sm:gap-4`}>
-          <UserTypeSelector userType={userType} onUserTypeChange={handleUserTypeChange} />
+        <div
+          className={`grid ${
+            userType === "business" && calculationType
+              ? "sm:grid-cols-2 lg:grid-cols-3"
+              : lockUserType
+                ? "sm:grid-cols-1"
+                : "sm:grid-cols-2"
+          } gap-3 sm:gap-4`}
+        >
+          {!lockUserType && (
+            <UserTypeSelector userType={userType} onUserTypeChange={handleUserTypeChange} />
+          )}
           {userType === "business" && calculationType && (
             <TaxTypeSelector calculationType={calculationType} onCalculationTypeChange={handleCalculationTypeSelect} />
           )}
