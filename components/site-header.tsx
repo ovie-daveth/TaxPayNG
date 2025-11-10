@@ -18,12 +18,16 @@ interface CallToAction {
   label: string
   mobileLabel?: string
   showOnMobile?: boolean
+  variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link"
+  size?: "default" | "sm" | "lg" | "icon"
+  className?: string
 }
 
 interface SiteHeaderProps {
   navItems?: NavItem[]
   highlightHref?: string
   cta?: CallToAction
+  secondaryCta?: CallToAction
   wrapperClassName?: string
   containerClassName?: string
   logoHref?: string
@@ -47,6 +51,7 @@ export function SiteHeader({
   navItems = defaultNavItems,
   highlightHref,
   cta = defaultCta,
+  secondaryCta,
   wrapperClassName,
   containerClassName,
   logoHref,
@@ -93,8 +98,29 @@ export function SiteHeader({
             <ThemeToggle />
             {cta && (
               <Link href={cta.href}>
-                <Button size="sm" className="md:h-10 md:px-4 text-xs sm:text-sm md:text-base">
+                <Button
+                  size={cta.size ?? "sm"}
+                  variant={cta.variant ?? "default"}
+                  className={cn(
+                    "md:h-10 md:px-4 text-xs sm:text-sm md:text-base",
+                    cta.className
+                  )}
+                >
                   <span className="relative z-10">{cta.label}</span>
+                </Button>
+              </Link>
+            )}
+            {secondaryCta && (
+              <Link href={secondaryCta.href}>
+                <Button
+                  size={secondaryCta.size ?? "sm"}
+                  variant={secondaryCta.variant ?? "default"}
+                  className={cn(
+                    "md:h-10 md:px-4 text-xs sm:text-sm md:text-base",
+                    secondaryCta.className
+                  )}
+                >
+                  <span className="relative z-10">{secondaryCta.label}</span>
                 </Button>
               </Link>
             )}
@@ -104,8 +130,25 @@ export function SiteHeader({
             <ThemeToggle />
             {cta?.showOnMobile && (
               <Link href={cta.href}>
-                <Button size="sm" className="px-3">
+                <Button
+                  size={cta.size ?? "sm"}
+                  variant={cta.variant ?? "default"}
+                  className={cn("px-3", cta.className)}
+                >
                   <span className="relative z-10 text-xs">{cta.mobileLabel ?? cta.label}</span>
+                </Button>
+              </Link>
+            )}
+            {secondaryCta?.showOnMobile && (
+              <Link href={secondaryCta.href}>
+                <Button
+                  size={secondaryCta.size ?? "sm"}
+                  variant={secondaryCta.variant ?? "default"}
+                  className={cn("px-3", secondaryCta.className)}
+                >
+                  <span className="relative z-10 text-xs">
+                    {secondaryCta.mobileLabel ?? secondaryCta.label}
+                  </span>
                 </Button>
               </Link>
             )}
@@ -145,15 +188,45 @@ export function SiteHeader({
             )}
             {cta && !cta.showOnMobile && (
               <Link href={cta.href} className="block" onClick={handleNavClick}>
-                <Button className="w-full">
+                <Button
+                  size={cta.size ?? "default"}
+                  variant={cta.variant ?? "default"}
+                  className={cn("w-full", cta.className)}
+                >
                   {cta.label}
+                </Button>
+              </Link>
+            )}
+            {secondaryCta && !secondaryCta.showOnMobile && (
+              <Link href={secondaryCta.href} className="block" onClick={handleNavClick}>
+                <Button
+                  size={secondaryCta.size ?? "default"}
+                  variant={secondaryCta.variant ?? "default"}
+                  className={cn("w-full", secondaryCta.className)}
+                >
+                  {secondaryCta.label}
                 </Button>
               </Link>
             )}
             {cta && cta.showOnMobile && (
               <Link href={cta.href} className="block" onClick={handleNavClick}>
-                <Button className="w-full">
+                <Button
+                  size={cta.size ?? "default"}
+                  variant={cta.variant ?? "default"}
+                  className={cn("w-full", cta.className)}
+                >
                   {cta.label}
+                </Button>
+              </Link>
+            )}
+            {secondaryCta && secondaryCta.showOnMobile && (
+              <Link href={secondaryCta.href} className="block" onClick={handleNavClick}>
+                <Button
+                  size={secondaryCta.size ?? "default"}
+                  variant={secondaryCta.variant ?? "default"}
+                  className={cn("w-full", secondaryCta.className)}
+                >
+                  {secondaryCta.label}
                 </Button>
               </Link>
             )}

@@ -23,7 +23,7 @@ export default function AdminSignupPage() {
     firstName: '',
     lastName: '',
     phone: '',
-    businessType: 'individual' as 'freelancer' | 'sme' | 'individual'
+    businessType: 'individual' as 'freelancer' | 'creator' | 'sme' | 'individual'
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -200,7 +200,7 @@ export default function AdminSignupPage() {
               <Label htmlFor="businessType">Business Type</Label>
               <Select
                 value={formData.businessType}
-                onValueChange={(value: 'freelancer' | 'sme' | 'individual') => 
+                onValueChange={(value: 'freelancer' | 'creator' | 'sme' | 'individual') => 
                   setFormData(prev => ({ ...prev, businessType: value }))
                 }
                 disabled={isLoading}
@@ -211,6 +211,7 @@ export default function AdminSignupPage() {
                 <SelectContent>
                   <SelectItem value="individual">Individual</SelectItem>
                   <SelectItem value="freelancer">Freelancer</SelectItem>
+                  <SelectItem value="creator">Creator</SelectItem>
                   <SelectItem value="sme">SME</SelectItem>
                 </SelectContent>
               </Select>

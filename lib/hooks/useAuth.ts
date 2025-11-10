@@ -10,8 +10,10 @@ import {
   updateProfile,
   sendPasswordResetEmail
 } from 'firebase/auth'
+import { FirebaseError } from 'firebase/app'
 import { auth } from '@/firebase/firebase'
 import { userService } from '@/lib/services'
+import type { BusinessType } from '@/lib/types'
 
 interface AuthState {
   user: User | null
@@ -19,12 +21,34 @@ interface AuthState {
   error: string | null
 }
 
+const mapFirebaseAuthError = (code: string, fallback?: string) => {
+  switch (code) {
+    case 'auth/wrong-password':
+    case 'auth/invalid-credential':
+      return 'Incorrect password. Please try again.'
+    case 'auth/user-not-found':
+      return 'Email not found. Please create an account first.'
+    case 'auth/email-already-in-use':
+      return 'This email is already registered. Please log in instead.'
+    case 'auth/invalid-email':
+      return 'Please enter a valid email address.'
+    case 'auth/weak-password':
+      return 'Password must be at least 6 characters.'
+    case 'auth/too-many-requests':
+      return 'Too many attempts. Please try again later or reset your password.'
+    case 'auth/network-request-failed':
+      return 'Network error. Check your connection and try again.'
+    default:
+      return fallback || 'An authentication error occurred. Please try again.'
+  }
+}
+
 interface SignUpData {
   email: string
   password: string
   firstName: string
   lastName: string
-  businessType: 'freelancer' | 'sme' | 'individual'
+  businessType: BusinessType
 }
 
 interface SignInData {
@@ -99,8 +123,13 @@ export function useAuth() {
         return { success: false, error: errorMessage }
       }
       
-    } catch (error: any) {
-      const errorMessage = error.message || 'An error occurred during sign up'
+    } catch (error: unknown) {
+      let errorMessage = 'An error occurred during sign up'
+      if (error instanceof FirebaseError) {
+        errorMessage = mapFirebaseAuthError(error.code, error.message)
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = String((error as { message?: unknown }).message) || errorMessage
+      }
       setAuthState(prev => ({ ...prev, loading: false, error: errorMessage }))
       return { success: false, error: errorMessage }
     }
@@ -120,8 +149,13 @@ export function useAuth() {
       })
 
       return { success: true }
-    } catch (error: any) {
-      const errorMessage = error.message || 'An error occurred during sign in'
+    } catch (error: unknown) {
+      let errorMessage = 'An error occurred during sign in'
+      if (error instanceof FirebaseError) {
+        errorMessage = mapFirebaseAuthError(error.code, error.message)
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = String((error as { message?: unknown }).message) || errorMessage
+      }
       setAuthState(prev => ({ ...prev, loading: false, error: errorMessage }))
       return { success: false, error: errorMessage }
     }

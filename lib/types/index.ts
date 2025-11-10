@@ -1,3 +1,5 @@
+export type BusinessType = 'freelancer' | 'creator' | 'sme' | 'individual'
+
 // User Profile Types
 export interface UserProfile {
   id: string
@@ -13,7 +15,7 @@ export interface UserProfile {
     country: string
     postalCode: string
   }
-  businessType: 'freelancer' | 'sme' | 'individual'
+  businessType: BusinessType
   taxId?: string
   businessDocuments?: {
     cac?: string

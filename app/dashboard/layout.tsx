@@ -28,17 +28,36 @@ function LayoutContent({
   useEffect(() => {
     if (!profile) return
     
-    console.log("Dashboard layout - businessType:", profile.businessType, "current path:", window.location.pathname)
+    const currentPath = window.location.pathname
+    console.log("Dashboard layout - businessType:", profile.businessType, "current path:", currentPath)
     
-    // Redirect SMEs to their dashboard
-    if (profile.businessType === 'sme' && !window.location.pathname.startsWith('/dashboard-sme')) {
+    if (profile.businessType === 'sme' && !currentPath.startsWith('/dashboard-sme')) {
       console.log("Redirecting SME to /dashboard-sme")
       router.push('/dashboard-sme')
+      return
     }
-    // Redirect freelancers away from SME dashboard
-    if (profile.businessType === 'freelancer' && window.location.pathname.startsWith('/dashboard-sme')) {
+
+    if (profile.businessType === 'creator' && !currentPath.startsWith('/dashboard-creator')) {
+      console.log("Redirecting creator to /dashboard-creator")
+      router.push('/dashboard-creator')
+      return
+    }
+
+    if (profile.businessType === 'freelancer' && currentPath.startsWith('/dashboard-sme')) {
       console.log("Redirecting freelancer from /dashboard-sme to /dashboard")
       router.push('/dashboard')
+      return
+    }
+
+    if (profile.businessType === 'freelancer' && currentPath.startsWith('/dashboard-creator')) {
+      console.log("Redirecting freelancer from /dashboard-creator to /dashboard")
+      router.push('/dashboard')
+      return
+    }
+
+    if (profile.businessType === 'creator' && currentPath.startsWith('/dashboard-sme')) {
+      console.log("Redirecting creator from /dashboard-sme to /dashboard-creator")
+      router.push('/dashboard-creator')
     }
   }, [profile, router])
 

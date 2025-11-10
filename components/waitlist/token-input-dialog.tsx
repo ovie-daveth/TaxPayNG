@@ -12,9 +12,18 @@ interface TokenInputDialogProps {
   onOpenChange: (open: boolean) => void
   email: string
   onVerified: () => void
+  verifyEndpoint?: string
+  successMessage?: string
 }
 
-export function TokenInputDialog({ open, onOpenChange, email, onVerified }: TokenInputDialogProps) {
+export function TokenInputDialog({
+  open,
+  onOpenChange,
+  email,
+  onVerified,
+  verifyEndpoint,
+  successMessage,
+}: TokenInputDialogProps) {
   const [token, setToken] = useState("")
   const [verifying, setVerifying] = useState(false)
 
@@ -28,7 +37,8 @@ export function TokenInputDialog({ open, onOpenChange, email, onVerified }: Toke
 
     setVerifying(true)
     try {
-      const response = await fetch('/api/verify-waitlist-token', {
+      const endpoint = verifyEndpoint ?? '/api/verify-waitlist-token'
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -43,7 +53,7 @@ export function TokenInputDialog({ open, onOpenChange, email, onVerified }: Toke
         return
       }
 
-      toast.success("✅ Email verified! You're now on the waitlist!")
+      toast.success(successMessage ?? "✅ Email verified! You're now on the waitlist!")
       setToken("")
       onVerified()
       onOpenChange(false)

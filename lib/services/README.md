@@ -106,7 +106,7 @@ interface UserProfile {
   lastName: string
   phone?: string
   address?: Address
-  businessType: 'freelancer' | 'sme' | 'individual'
+455  businessType: 'freelancer' | 'creator' | 'sme' | 'individual'
   taxId?: string
   createdAt: string
   updatedAt: string
