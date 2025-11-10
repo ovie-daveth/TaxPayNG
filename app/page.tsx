@@ -154,7 +154,7 @@ export default function HomePage() {
           </div>
           
           <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight text-balance mb-4 sm:mb-6 px-2 animate-in fade-in slide-in-from-bottom duration-1000">
-            Don't Lose Sleep Over
+            Don't Sleep Over
             <span className="bg-gradient-to-r from-green-600 via-green-700 to-green-600 bg-clip-text text-transparent animate-gradient block sm:inline"> Tax Compliance</span>
           </h1>
           <p className="text-base sm:text-lg md:text-xl lg:text-2xl text-muted-foreground text-balance mb-4 sm:mb-6 max-w-3xl mx-auto leading-relaxed px-4 animate-in fade-in slide-in-from-bottom duration-1200">
