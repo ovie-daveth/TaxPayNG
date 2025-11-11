@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState, type ReactNode } from "react"
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -12,6 +12,7 @@ import { toast } from "sonner"
 import { AddTransactionDialog } from "@/components/transactions/add-transaction-dialog"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { faqData } from "@/app/faq/components/data"
+import { AuditSubscriptionsDialog } from "@/components/dashboard/audit-subscriptions-dialog"
 
 type DashboardBusinessType = "freelancer" | "creator"
 
@@ -44,6 +45,13 @@ const formatCurrency = (value: number) =>
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   })}`
+
+const formatDateLabel = (date: Date) =>
+  date.toLocaleDateString("en-NG", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  })
 
 const getQuarterStart = (date: Date) => {
   const quarter = Math.floor(date.getMonth() / 3)
@@ -115,6 +123,12 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
   const [transactionDialogOpen, setTransactionDialogOpen] = useState(false)
   const [transactionPreset, setTransactionPreset] = useState<{ type: Transaction["type"]; category?: string; description?: string } | null>(null)
   const [reliefDialogOpen, setReliefDialogOpen] = useState(false)
+  const [auditDialogOpen, setAuditDialogOpen] = useState(false)
+  const [auditLoading, setAuditLoading] = useState(false)
+  const [auditTransactions, setAuditTransactions] = useState<Transaction[]>([])
+  const [auditPeriodLabel, setAuditPeriodLabel] = useState("")
+  const [auditTotalSpend, setAuditTotalSpend] = useState(0)
+  const [auditGrossIncome, setAuditGrossIncome] = useState(0)
 
   const reliefFaq = faqData.individuals.find(
     (item) => item.category === "Tax Reliefs" && item.question === "What tax reliefs are available for individuals?"
@@ -218,6 +232,11 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
         currentIncomeTotal > 0 ? Math.round(((currentExpenseTotal / currentIncomeTotal) * 100 + Number.EPSILON) * 10) / 10 : 0
 
       const insightsDraft: Insight[] = []
+      const reserveTarget = Math.max(netCash * 0.3, reliefTotal)
+      const reliefCoversReserve = reliefTotal > netCash * 0.3
+      const reserveExplanation = reliefCoversReserve
+        ? "same amount as the reliefs you logged"
+        : "about 30% of what you kept this quarter"
 
       if (incomeGrowth !== null) {
         const growthPositive = incomeGrowth >= 0
@@ -237,7 +256,7 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
         insightsDraft.push({
           id: "first-quarter",
           title: "First quarter on record",
-          metric: formatCurrency(currentAvgMonthlyIncome),
+          metric: `${formatCurrency(currentAvgMonthlyIncome)} avg/month`,
           description: "Solid start! Track at least two quarters to unlock quarter-over-quarter trends.",
           tone: "info",
           action: "Keep booking income by tagging client projects",
@@ -255,10 +274,10 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
             ? `Spent ${formatCurrency(toolSpendTotal)} on platforms, apps, and subscriptions this quarter.`
             : "No tool-related expenses recorded this quarter. Track them to understand your production costs.",
           tone: toolSpendRatio >= (businessType === "creator" ? 18 : 15) ? "warning" : "info",
-          action: toolSpendTotal ? "Audit recurring subscriptions" : "Log your SaaS and editing tools",
+          action: toolSpendTotal ? "Audit recurring subscriptions" : "Log your tools and subscriptions",
           actionIntent: "expense",
           actionCategory: "Software",
-          actionDescription: toolSpendTotal ? "Subscription audit" : "New SaaS subscription",
+          actionDescription: toolSpendTotal ? "Subscription audit" : "New tool expense",
         })
       }
 
@@ -269,14 +288,18 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
           metric: netCash >= 0 ? `${formatCurrency(netCash)} retained` : `${formatCurrency(Math.abs(netCash))} overspent`,
           description:
             netCash >= 0
-              ? `Expenses consumed ${expenseRatio.toFixed(1)}% of income. Consider transferring ${formatCurrency(
-                  Math.max(netCash * 0.3, reliefTotal)
-                )} to your tax reserve.`
-              : `Expenses exceeded income this quarter. Trim discretionary costs or shift billing schedules to stay cashflow positive.`,
+              ? reliefCoversReserve
+                ? `You only held on to ${formatCurrency(netCash)}. Hey, you need to earn more to back your ${formatCurrency(
+                    reliefTotal
+                  )} relief—park that amount for tax.`
+                : `You kept ${formatCurrency(netCash)} after expenses. Save ${formatCurrency(
+                    reserveTarget
+                  )} for tax (about 30% of what you kept).`
+              : "You spent more than you earned this quarter. Cut big costs or nudge invoices so cash stays positive.",
           tone: netCash >= 0 ? "positive" : "warning",
-          action: netCash >= 0 ? "Automate your monthly tax transfer" : "Flag big-ticket expenses for review",
-          actionIntent: netCash >= 0 ? "relief" : "expense",
-          actionDescription: netCash >= 0 ? "Tax reserve transfer" : "Expense review",
+          action: netCash >= 0 ? undefined : "Flag big-ticket expenses for review",
+          actionIntent: netCash >= 0 ? undefined : "expense",
+          actionDescription: netCash >= 0 ? undefined : "Expense review",
         })
       } else {
         insightsDraft.push({
@@ -361,8 +384,66 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
     return result
   }
 
+  const loadToolAudit = useCallback(async () => {
+    if (useMockData) {
+      toast.info("Audit workspace is available after you connect your real data.")
+      return
+    }
+
+    const uid = user?.uid
+    if (!uid) {
+      toast.info("Sign in to prepare audit evidence.")
+      return
+    }
+
+    setAuditDialogOpen(true)
+    setAuditLoading(true)
+
+    try {
+      const now = new Date()
+      const quarterStart = getQuarterStart(now)
+      const transactions = await transactionService.getTransactionsForPeriod(
+        uid,
+        quarterStart.toISOString(),
+        now.toISOString()
+      )
+
+      const subscriptionTransactions = transactions.filter(
+        (txn) => txn.type === "expense" && isToolCategory(txn.category)
+      )
+
+      const incomeTotal = transactions
+        .filter((txn) => txn.type === "income")
+        .reduce((sum, txn) => sum + (txn.amount || 0), 0)
+
+      setAuditTransactions(subscriptionTransactions)
+      setAuditTotalSpend(
+        subscriptionTransactions.reduce((sum, txn) => sum + (txn.amount || 0), 0)
+      )
+      setAuditPeriodLabel(`${formatDateLabel(quarterStart)} – ${formatDateLabel(now)}`)
+      setAuditGrossIncome(incomeTotal)
+
+      if (subscriptionTransactions.length === 0) {
+        toast.info("No recurring subscription expenses logged this quarter yet. Add them to start an audit.")
+      }
+    } catch (error) {
+      console.error("Error preparing subscription audit:", error)
+      toast.error("Couldn't load your subscription audit data. Please try again.")
+      setAuditTransactions([])
+      setAuditTotalSpend(0)
+      setAuditGrossIncome(0)
+    } finally {
+      setAuditLoading(false)
+    }
+  }, [useMockData, user?.uid])
+
   const handleActionClick = (insight: Insight) => {
     if (!insight.actionIntent) return
+
+    if (insight.id === "tool-spend" && insight.action?.toLowerCase().includes("audit")) {
+      loadToolAudit()
+      return
+    }
 
     if (insight.actionIntent === "relief-info") {
       setReliefDialogOpen(true)
@@ -444,6 +525,34 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
         <ShieldCheck className="h-3.5 w-3.5 text-primary" />
         Insights combine your logged income, expenses, and tax reliefs to surface growth and compliance opportunities.
       </p>
+
+      <AuditSubscriptionsDialog
+        open={auditDialogOpen}
+        onOpenChange={(open) => {
+          setAuditDialogOpen(open)
+          if (!open) {
+            setAuditTransactions([])
+            setAuditLoading(false)
+            setAuditTotalSpend(0)
+            setAuditGrossIncome(0)
+            setAuditPeriodLabel("")
+          }
+        }}
+        transactions={auditTransactions}
+        isLoading={auditLoading}
+        totalSpend={auditTotalSpend}
+        periodLabel={auditPeriodLabel}
+        businessType={businessType}
+        grossIncome={auditGrossIncome}
+        onRequestNewExpense={() => {
+          setTransactionPreset({
+            type: "expense",
+            category: "Software",
+            description: "Software subscription",
+          })
+          setTransactionDialogOpen(true)
+        }}
+      />
 
       <AddTransactionDialog
         open={transactionDialogOpen}
