@@ -23,6 +23,7 @@ import { TokenInputDialog } from "@/components/waitlist/token-input-dialog"
 import OtaxLogo from "@/components/OtaxLogo"
 import { sendWaitlistVerification } from "@/lib/utils/emailVerification"
 import { TaxRatesInfo } from "@/components/tax-calculator/tax-rates-info"
+import { AnalyticsInsights } from "@/components/dashboard/analytics-insights"
 
 type NavItem = {
   href: string
@@ -136,6 +137,8 @@ export default function DemoPage() {
                 <UpcomingReminders />
               </div>
             </div>
+
+            <AnalyticsInsights businessType={businessType === "small-business" ? "freelancer" : businessType} useMockData />
           </div>
         )
       case "transactions":

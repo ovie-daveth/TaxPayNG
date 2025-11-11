@@ -136,6 +136,7 @@ export function TransactionsView({
                   <SelectItem value="all">All types</SelectItem>
                   <SelectItem value="income">Income</SelectItem>
                   <SelectItem value="expense">Expense</SelectItem>
+                  <SelectItem value="relief">Tax Relief</SelectItem>
                 </SelectContent>
               </Select>
             </div>

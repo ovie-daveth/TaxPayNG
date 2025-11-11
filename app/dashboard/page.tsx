@@ -7,6 +7,7 @@ import { RecentTransactions } from "@/components/dashboard/recent-transactions"
 import { TaxSummary } from "@/components/dashboard/tax-summary"
 import { UpcomingReminders } from "@/components/dashboard/upcoming-reminders"
 import { DashboardSkeleton } from "@/components/ui/skeletons"
+import { AnalyticsInsights } from "@/components/dashboard/analytics-insights"
 
 export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
@@ -37,9 +38,11 @@ export default function DashboardPage() {
             <IncomeExpenseChart />
           </div>
           <div>
-            <TaxSummary />
+            <TaxSummary businessType="freelancer" />
           </div>
         </div>
+
+        <AnalyticsInsights businessType="freelancer" />
 
         {/* Recent Activity */}
         <div className="grid md:grid-cols-3 gap-4 sm:gap-5 md:gap-6">

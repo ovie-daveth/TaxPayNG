@@ -8,6 +8,7 @@ import { TaxSummary } from "@/components/dashboard/tax-summary"
 import { UpcomingReminders } from "@/components/dashboard/upcoming-reminders"
 import { DashboardSkeleton } from "@/components/ui/skeletons"
 import { Card } from "@/components/ui/card"
+import { AnalyticsInsights } from "@/components/dashboard/analytics-insights"
 
 export default function CreatorDashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
@@ -45,9 +46,11 @@ export default function CreatorDashboardPage() {
             <IncomeExpenseChart />
           </div>
           <div>
-            <TaxSummary />
+            <TaxSummary businessType="creator" />
           </div>
         </div>
+
+        <AnalyticsInsights businessType="creator" />
 
         <div className="grid md:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
           <div className="md:col-span-2">

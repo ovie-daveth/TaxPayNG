@@ -44,6 +44,7 @@ interface StatDefinition {
 interface TransactionSummary {
   totalIncome: number
   totalExpenses: number
+  totalReliefs: number
   netIncome: number
   transactionCount: number
   categories: Record<string, { income: number; expenses: number; count: number }>
@@ -633,21 +634,21 @@ export function StatsCards({
                   <span>Tap for details</span>
                 </div>
               )}
-              <div className="flex items-start justify-between">
-                <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between">
+              <div className="flex-1 min-w-0">
                   <p className="text-xs sm:text-sm text-muted-foreground mb-1">{stat.label}</p>
-                  <p className="text-xl sm:text-2xl font-bold mb-1.5 sm:mb-2 truncate">{stat.value}</p>
+                <p className="text-xl sm:text-2xl font-bold mb-1.5 sm:mb-2 truncate">{stat.value}</p>
                   <p className={`text-xs font-medium ${stat.trend === "up" ? "text-primary" : "text-muted-foreground"}`}>
-                    {stat.change}
-                  </p>
-                </div>
+                  {stat.change}
+                </p>
+              </div>
                 <div
                   className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 ml-2 ${stat.color}`}
                 >
-                  <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
-                </div>
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
               </div>
-            </Card>
+            </div>
+          </Card>
 
             {showDropdown && (
               <div

@@ -34,10 +34,12 @@ export interface UserProfile {
 }
 
 // Transaction Types
+export type TransactionType = 'income' | 'expense' | 'relief'
+
 export interface Transaction {
   id: string
   userId: string
-  type: 'income' | 'expense'
+  type: TransactionType
   category: string
   amount: number
   description: string
@@ -54,7 +56,7 @@ export interface Transaction {
 }
 
 export interface TransactionFilters {
-  type?: 'income' | 'expense'
+  type?: TransactionType
   category?: string
   paymentMethod?: string
   startDate?: string

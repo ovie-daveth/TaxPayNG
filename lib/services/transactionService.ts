@@ -108,7 +108,7 @@ export class TransactionService extends BaseService {
     attachmentUrls: string[],
     transactionDescription: string,
     transactionDate: string,
-    transactionType: 'income' | 'expense'
+    transactionType: 'income' | 'expense' | 'relief'
   ): Promise<void> {
     try {
       for (let i = 0; i < attachmentUrls.length; i++) {
@@ -250,6 +250,7 @@ export class TransactionService extends BaseService {
   async getTransactionSummary(userId: string, startDate?: string, endDate?: string): Promise<{
     totalIncome: number
     totalExpenses: number
+    totalReliefs: number
     netIncome: number
     transactionCount: number
     categories: { [key: string]: { income: number; expenses: number; count: number } }
@@ -274,6 +275,7 @@ export class TransactionService extends BaseService {
       const summary = {
         totalIncome: 0,
         totalExpenses: 0,
+        totalReliefs: 0,
         netIncome: 0,
         transactionCount: filteredTransactions.length,
         categories: {} as { [key: string]: { income: number; expenses: number; count: number } }
@@ -282,8 +284,11 @@ export class TransactionService extends BaseService {
       filteredTransactions.forEach(transaction => {
         if (transaction.type === 'income') {
           summary.totalIncome += transaction.amount
-        } else {
+        } else if (transaction.type === 'expense') {
           summary.totalExpenses += transaction.amount
+        } else if (transaction.type === 'relief') {
+          summary.totalReliefs += transaction.amount
+          return
         }
 
         // Category breakdown
@@ -294,7 +299,7 @@ export class TransactionService extends BaseService {
         summary.categories[transaction.category].count++
         if (transaction.type === 'income') {
           summary.categories[transaction.category].income += transaction.amount
-        } else {
+        } else if (transaction.type === 'expense') {
           summary.categories[transaction.category].expenses += transaction.amount
         }
       })
@@ -304,6 +309,31 @@ export class TransactionService extends BaseService {
       return summary
     } catch (error) {
       console.error('Error getting transaction summary:', error)
+      throw error
+    }
+  }
+
+  async getTransactionsForPeriod(userId: string, startDate?: string, endDate?: string): Promise<Transaction[]> {
+    try {
+      const transactions = await this.getAll([
+        { field: 'userId', operator: '==', value: userId }
+      ])
+
+      if (!startDate && !endDate) {
+        return transactions
+      }
+
+      const start = startDate ? new Date(startDate) : null
+      const end = endDate ? new Date(endDate) : null
+
+      return transactions.filter((transaction) => {
+        const txnDate = new Date(transaction.date)
+        if (start && txnDate < start) return false
+        if (end && txnDate > end) return false
+        return true
+      })
+    } catch (error) {
+      console.error('Error getting transactions for period:', error)
       throw error
     }
   }
