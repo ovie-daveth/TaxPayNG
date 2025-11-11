@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Search, Mail, Phone } from "lucide-react"
+import { ArrowLeft, Search } from "lucide-react"
 import { AdminTableSkeleton } from "@/components/ui/skeletons"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useAdmin } from "@/lib/hooks/useAdmin"
@@ -82,6 +82,20 @@ export default function AdminWaitlistPage() {
     }
   }
 
+  const formatUserType = (userType?: string): string => {
+    const normalized = userType?.toString().toLowerCase()
+    switch (normalized) {
+      case "creator":
+        return "Creator"
+      case "sme":
+        return "SME"
+      case "freelancer":
+        return "Freelancer"
+      default:
+        return "Freelancer"
+    }
+  }
+
   const filteredWaitlist = waitlist.filter((w: any) => 
     w.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
     w.name?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -146,6 +160,8 @@ export default function AdminWaitlistPage() {
                     <th className="text-left p-4 font-semibold">Name</th>
                     <th className="text-left p-4 font-semibold">Email</th>
                     <th className="text-left p-4 font-semibold">Phone</th>
+                    <th className="text-left p-4 font-semibold">User Type</th>
+                    <th className="text-left p-4 font-semibold">Platform Expectations</th>
                     <th className="text-left p-4 font-semibold">Status</th>
                     <th className="text-left p-4 font-semibold">Signed Up</th>
                   </tr>
@@ -156,6 +172,12 @@ export default function AdminWaitlistPage() {
                       <td className="p-4">{w.name}</td>
                       <td className="p-4">{w.email}</td>
                       <td className="p-4">{w.phone || 'N/A'}</td>
+                      <td className="p-4">
+                        <Badge variant="outline">{formatUserType(w.userType)}</Badge>
+                      </td>
+                      <td className="p-4 text-sm text-muted-foreground max-w-[250px]">
+                        {w.platformExpectations?.trim() ? w.platformExpectations : '—'}
+                      </td>
                       <td className="p-4">
                         <Badge variant={w.status === 'notified' ? 'default' : 'secondary'}>
                           {w.status || 'pending'}
