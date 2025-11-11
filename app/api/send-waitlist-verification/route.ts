@@ -11,11 +11,11 @@ import { createTransporter } from '@/lib/utils/nodemailer'
  */
 export async function POST(request: NextRequest) {
   try {
-    const { email, name, phone } = await request.json()
+    const { email, name, phone, userType, platformExpectations } = await request.json()
 
-    if (!email || !name) {
+    if (!email || !name || !userType) {
       return NextResponse.json(
-        { error: 'Email and name are required' },
+        { error: 'Email, name, and user type are required' },
         { status: 400 }
       )
     }
@@ -25,6 +25,15 @@ export async function POST(request: NextRequest) {
     if (!emailRegex.test(email)) {
       return NextResponse.json(
         { error: 'Invalid email format' },
+        { status: 400 }
+      )
+    }
+
+    const normalizedUserType = userType.toString().toLowerCase().trim()
+    const allowedUserTypes = ['freelancer', 'creator', 'sme']
+    if (!allowedUserTypes.includes(normalizedUserType)) {
+      return NextResponse.json(
+        { error: 'Invalid user type selection' },
         { status: 400 }
       )
     }
@@ -52,6 +61,8 @@ export async function POST(request: NextRequest) {
       name: name.trim(),
       email: emailLower,
       phone: phone ? phone.replace(/\s/g, '') : '',
+      userType: normalizedUserType,
+      platformExpectations: platformExpectations?.toString().trim() || '',
       verificationToken,
       createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 minutes

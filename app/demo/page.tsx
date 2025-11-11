@@ -5,6 +5,9 @@ import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Calculator, ArrowRight, Loader2, Sparkles, LayoutDashboard, Receipt, Settings, Menu, X, ChevronLeft, ChevronRight, Building2, User, Users } from "lucide-react"
 import { toast } from "sonner"
@@ -47,7 +50,9 @@ export default function DemoPage() {
   const [waitlistData, setWaitlistData] = useState({
     name: "",
     email: "",
-    phone: ""
+    phone: "",
+    userType: "",
+    platformExpectations: ""
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
@@ -63,6 +68,12 @@ export default function DemoPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedType, setSelectedType] = useState<string>("all")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
+
+  const isSmeSelection = waitlistData.userType === "sme"
+  const waitlistNameLabel = isSmeSelection ? "Business Name" : "Full Name"
+  const waitlistEmailLabel = isSmeSelection ? "Business Email" : "Email Address"
+  const waitlistNamePlaceholder = isSmeSelection ? "Enter your business name" : "Jane Doe"
+  const waitlistEmailPlaceholder = isSmeSelection ? "business@example.com" : "you@example.com"
 
   const handleWaitlistSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -84,6 +95,12 @@ export default function DemoPage() {
         return
       }
 
+      if (!waitlistData.userType) {
+        toast.error("Please tell us whether you're a freelancer, creator, or SME")
+        setIsSubmitting(false)
+        return
+      }
+
       // Validate phone format only if provided (Nigerian phone numbers)
       if (waitlistData.phone && waitlistData.phone.trim() !== "") {
         const phoneRegex = /^(\+234|0)?[789][01]\d{8}$/
@@ -99,7 +116,9 @@ export default function DemoPage() {
       const verificationResult = await sendWaitlistVerification(
         waitlistData.email.trim(),
         waitlistData.name.trim(),
-        waitlistData.phone
+        waitlistData.phone.trim() || undefined,
+        waitlistData.userType,
+        waitlistData.platformExpectations.trim()
       )
       
       toast.dismiss(verificationToast)
@@ -483,33 +502,80 @@ export default function DemoPage() {
             </div>
           ) : (
             <form onSubmit={handleWaitlistSubmit} className="space-y-3 sm:space-y-4">
-              <div>
+              <div className="space-y-1">
+                <Label htmlFor="demo-waitlist-user-type" className="text-sm font-medium">
+                  I am a
+                </Label>
+                <Select
+                  value={waitlistData.userType}
+                  onValueChange={(value) => setWaitlistData(prev => ({ ...prev, userType: value }))}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger id="demo-waitlist-user-type" className="h-11 sm:h-12 text-sm sm:text-base">
+                    <SelectValue placeholder="Select an option" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="freelancer">Freelancer</SelectItem>
+                    <SelectItem value="creator">Creator</SelectItem>
+                    <SelectItem value="sme">SME</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="demo-waitlist-name" className="text-sm font-medium">
+                  {waitlistNameLabel}
+                </Label>
                 <Input
+                  id="demo-waitlist-name"
                   type="text"
-                  placeholder="Full Name"
+                  placeholder={waitlistNamePlaceholder}
                   value={waitlistData.name}
                   onChange={(e) => setWaitlistData(prev => ({ ...prev, name: e.target.value }))}
                   required
                   className="h-11 sm:h-12 text-sm sm:text-base"
+                  disabled={isSubmitting}
                 />
               </div>
-              <div>
+              <div className="space-y-1">
+                <Label htmlFor="demo-waitlist-email" className="text-sm font-medium">
+                  {waitlistEmailLabel}
+                </Label>
                 <Input
+                  id="demo-waitlist-email"
                   type="email"
-                  placeholder="Email Address"
+                  placeholder={waitlistEmailPlaceholder}
                   value={waitlistData.email}
                   onChange={(e) => setWaitlistData(prev => ({ ...prev, email: e.target.value }))}
                   required
                   className="h-11 sm:h-12 text-sm sm:text-base"
+                  disabled={isSubmitting}
                 />
               </div>
-              <div>
+              <div className="space-y-1">
+                <Label htmlFor="demo-waitlist-phone" className="text-sm font-medium">
+                  Phone Number <span className="text-xs text-muted-foreground">(optional)</span>
+                </Label>
                 <Input
+                  id="demo-waitlist-phone"
                   type="tel"
-                  placeholder="Phone Number (optional)"
+                  placeholder="0801 234 5678"
                   value={waitlistData.phone}
                   onChange={(e) => setWaitlistData(prev => ({ ...prev, phone: e.target.value }))}
                   className="h-11 sm:h-12 text-sm sm:text-base"
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="demo-waitlist-expectations" className="text-sm font-medium">
+                  What would you like to see on this platform? <span className="text-xs text-muted-foreground">(optional)</span>
+                </Label>
+                <Textarea
+                  id="demo-waitlist-expectations"
+                  placeholder="Share any features or experiences you'd love from OTax"
+                  value={waitlistData.platformExpectations}
+                  onChange={(e) => setWaitlistData(prev => ({ ...prev, platformExpectations: e.target.value }))}
+                  className="text-sm sm:text-base min-h-[96px]"
+                  disabled={isSubmitting}
                 />
               </div>
               <Button 
@@ -541,7 +607,7 @@ export default function DemoPage() {
         email={pendingEmail}
         onVerified={() => {
           setIsSubmitted(true)
-          setWaitlistData({ name: "", email: "", phone: "" })
+          setWaitlistData({ name: "", email: "", phone: "", userType: "", platformExpectations: "" })
           setShowTokenDialog(false)
         }}
       />
