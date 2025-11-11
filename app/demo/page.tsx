@@ -127,7 +127,7 @@ export default function DemoPage() {
       case "dashboard":
         return (
           <div className="space-y-4 sm:space-y-4 md:space-y-5 lg:space-y-6">
-            <StatsCards businessType={businessType} sidebarCollapsed={sidebarCollapsed} />
+            <StatsCards businessType={businessType} sidebarCollapsed={sidebarCollapsed} useMockData />
             <div className={`grid ${sidebarCollapsed ? 'md:grid-cols-2 lg:grid-cols-3' : 'md:grid-cols-1 lg:grid-cols-2 xl:grid-cols-3'} gap-4 sm:gap-4 md:gap-5 lg:gap-6`}>
               <div className={`${sidebarCollapsed ? 'lg:col-span-2' : 'xl:col-span-2 lg:col-span-1'}`}>
                 <RecentTransactions businessType={businessType} />

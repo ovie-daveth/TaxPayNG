@@ -5,6 +5,7 @@ import { StatsCards as DashboardStatsCards } from "@/components/dashboard/stats-
 interface StatsCardsProps {
   businessType: "freelancer" | "creator" | "small-business"
   sidebarCollapsed?: boolean
+  useMockData?: boolean
 }
 
 export function StatsCards(props: StatsCardsProps) {
