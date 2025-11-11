@@ -32,7 +32,7 @@ import {
   convertCurrency,
 } from "@/lib/utils/currency"
 
-type SupportedUserType = "freelancer" | "creator" | "business"
+type SupportedUserType = "freelancer" | "creator" | "business" | "employee"
 
 interface TaxCalculatorFormProps {
   onCalculate: (result: any) => void
@@ -56,6 +56,9 @@ const getDefaultIncomeSources = (type: SupportedUserType): IncomeSource[] => {
   }
   if (type === "business") {
     return [{ id: "1", type: "business_income", amount: "", currency: "NGN" }]
+  }
+  if (type === "employee") {
+    return [{ id: "1", type: "salary", amount: "", currency: "NGN" }]
   }
   return [{ id: "1", type: "freelance", amount: "", currency: "NGN" }]
 }
@@ -405,24 +408,24 @@ export function TaxCalculatorForm({
     const newId = Date.now().toString()
     const availableTypes = getAvailableIncomeTypes()
     const defaultType = availableTypes[0]?.value || "freelance"
-    // Default to USD for creators (they often receive income in foreign currency)
     const defaultCurrency = userType === "creator" ? "USD" : "NGN"
-    // Add new income source at the top of the list
-    setIncomeSources([
+
+    setIncomeSources((prev) => [
       { id: newId, type: defaultType, amount: "", currency: defaultCurrency },
-      ...incomeSources,
+      ...prev,
     ])
   }
 
   const removeIncomeSource = (id: string) => {
-    if (incomeSources.length > 1) {
-      setIncomeSources(incomeSources.filter((source) => source.id !== id))
-    }
+    setIncomeSources((prev) => {
+      if (prev.length <= 1) return prev
+      return prev.filter((source) => source.id !== id)
+    })
   }
 
   const updateIncomeSource = (id: string, field: keyof IncomeSource, value: string) => {
-    setIncomeSources(
-      incomeSources.map((source) =>
+    setIncomeSources((prev) =>
+      prev.map((source) =>
         source.id === id ? { ...source, [field]: value } : source
       )
     )

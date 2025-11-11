@@ -29,7 +29,7 @@ export default function DashboardPage() {
     <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5 md:py-6 max-w-7xl">
       <div className="space-y-4 sm:space-y-5 md:space-y-6">
         {/* Stats Overview */}
-        <StatsCards />
+        <StatsCards businessType="freelancer" />
 
         {/* Charts and Summary */}
         <div className="grid md:grid-cols-3 gap-4 sm:gap-5 md:gap-6">

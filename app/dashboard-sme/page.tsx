@@ -3,6 +3,7 @@
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { StatsCards } from "@/components/dashboard/stats-cards"
 import { Users, DollarSign, FileText, Calendar, TrendingUp, UserPlus } from "lucide-react"
 import Link from "next/link"
 
@@ -17,41 +18,6 @@ export default function SMEDashboardPage() {
     )
   }
 
-  const quickStats = [
-    {
-      label: "Total Employees",
-      value: "25",
-      change: "+2 this month",
-      trend: "up",
-      icon: Users,
-      color: "text-primary",
-    },
-    {
-      label: "Monthly Payroll",
-      value: "₦8,500,000",
-      change: "Current month",
-      trend: "neutral",
-      icon: DollarSign,
-      color: "text-chart-3",
-    },
-    {
-      label: "PAYE Tax",
-      value: "₦1,275,000",
-      change: "For January 2025",
-      trend: "up",
-      icon: FileText,
-      color: "text-accent",
-    },
-    {
-      label: "Due Date",
-      value: "Jan 31, 2025",
-      change: "5 days remaining",
-      trend: "up",
-      icon: Calendar,
-      color: "text-destructive",
-    },
-  ]
-
   const recentActivities = [
     { id: 1, type: "payroll", description: "January 2025 Payroll Processed", date: "2025-01-15", status: "completed" },
     { id: 2, type: "employee", description: "New employee added: John Doe", date: "2025-01-14", status: "completed" },
@@ -59,40 +25,18 @@ export default function SMEDashboardPage() {
   ]
 
   return (
-    <div className="container mx-auto px-4 py-8">
+    <div className="container mx-auto px-4 py-8 space-y-8">
       {/* Header */}
-      <div className="mb-8">
+      <div>
         <h1 className="text-3xl font-bold mb-2">Business Dashboard</h1>
         <p className="text-muted-foreground">Manage your employees, payroll, and business tax obligations</p>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {quickStats.map((stat) => {
-          const Icon = stat.icon
-          return (
-            <Card key={stat.label} className="p-6">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <p className="text-sm text-muted-foreground mb-1">{stat.label}</p>
-                  <p className="text-2xl font-bold mb-2">{stat.value}</p>
-                  <p
-                    className={`text-xs font-medium ${stat.trend === "up" ? "text-primary" : "text-muted-foreground"}`}
-                  >
-                    {stat.change}
-                  </p>
-                </div>
-                <div className={`w-10 h-10 rounded-lg bg-muted flex items-center justify-center ${stat.color}`}>
-                  <Icon className="w-5 h-5" />
-                </div>
-              </div>
-            </Card>
-          )
-        })}
-      </div>
+      {/* Interactive Stats */}
+      <StatsCards businessType="small-business" />
 
       {/* Main Content */}
-      <div className="grid lg:grid-cols-3 gap-6 mb-8">
+      <div className="grid lg:grid-cols-3 gap-6">
         {/* Quick Actions */}
         <Card className="p-6 lg:col-span-1">
           <h3 className="text-lg font-semibold mb-4">Quick Actions</h3>

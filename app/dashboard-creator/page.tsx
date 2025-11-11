@@ -38,7 +38,7 @@ export default function CreatorDashboardPage() {
       </Card>
 
       <div className="space-y-4 sm:space-y-5 md:space-y-6">
-        <StatsCards />
+        <StatsCards businessType="creator" />
 
         <div className="grid md:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
           <div className="md:col-span-2">
