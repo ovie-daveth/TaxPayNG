@@ -80,11 +80,13 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
     }
 
     let isMounted = true
-    const now = new Date()
-    const quarterInfo = getQuarterInfo(now)
 
     const fetchSummary = async () => {
       setLoading(true)
+
+      const now = new Date()
+      const quarterInfo = getQuarterInfo(now)
+
       try {
         const quarterSummary = await transactionService.getTransactionSummary(
           user.uid,
@@ -153,10 +155,17 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
       }
     }
 
+    const handleTransactionChanged = () => {
+      if (!isMounted) return
+      fetchSummary()
+    }
+
+    window.addEventListener("transactionChanged", handleTransactionChanged)
     fetchSummary()
 
     return () => {
       isMounted = false
+      window.removeEventListener("transactionChanged", handleTransactionChanged)
     }
   }, [businessType, mockSummary, useMockData, user])
 

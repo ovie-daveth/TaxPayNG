@@ -93,11 +93,11 @@ export function IncomeExpenseChart({ useMockData = false }: IncomeExpenseChartPr
     }
 
     let isMounted = true
-    const now = new Date()
-    const periodStart = new Date(now.getFullYear(), now.getMonth() - (MONTHS_TO_SHOW - 1), 1)
 
     const fetchData = async () => {
       setLoading(true)
+      const now = new Date()
+      const periodStart = new Date(now.getFullYear(), now.getMonth() - (MONTHS_TO_SHOW - 1), 1)
       try {
         const transactions = await transactionService.getTransactionsForPeriod(
           user.uid,
@@ -142,10 +142,17 @@ export function IncomeExpenseChart({ useMockData = false }: IncomeExpenseChartPr
       }
     }
 
+    const handleTransactionChanged = () => {
+      if (!isMounted) return
+      fetchData()
+    }
+
+    window.addEventListener("transactionChanged", handleTransactionChanged)
     fetchData()
 
     return () => {
       isMounted = false
+      window.removeEventListener("transactionChanged", handleTransactionChanged)
     }
   }, [useMockData, user?.uid])
 

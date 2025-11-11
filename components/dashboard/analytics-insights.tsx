@@ -355,10 +355,17 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
       }
     }
 
+    const handleTransactionChanged = () => {
+      if (!isMounted) return
+      fetchInsights()
+    }
+
+    window.addEventListener("transactionChanged", handleTransactionChanged)
     fetchInsights()
 
     return () => {
       isMounted = false
+      window.removeEventListener("transactionChanged", handleTransactionChanged)
     }
   }, [businessType, useMockData, user?.uid])
 

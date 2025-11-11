@@ -536,41 +536,53 @@ export function StatsCards({
     }
 
     let isMounted = true
-    setLoadingSummary(true)
 
-    const now = new Date()
-    const quarterInfo = getQuarterInfo(now)
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-    const nowIso = now.toISOString()
-    const quarterStartIso = quarterInfo.start.toISOString()
-    const monthStartIso = monthStart.toISOString()
-    const labels: PeriodLabels = {
-      quarterLabel: quarterInfo.label,
-      monthLabel: now.toLocaleString("en-US", { month: "long" }),
-      monthShortLabel: now.toLocaleString("en-US", { month: "short" }),
-      year: now.getFullYear(),
+    const fetchSummaryData = () => {
+      setLoadingSummary(true)
+
+      const now = new Date()
+      const quarterInfo = getQuarterInfo(now)
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+      const nowIso = now.toISOString()
+      const quarterStartIso = quarterInfo.start.toISOString()
+      const monthStartIso = monthStart.toISOString()
+      const labels: PeriodLabels = {
+        quarterLabel: quarterInfo.label,
+        monthLabel: now.toLocaleString("en-US", { month: "long" }),
+        monthShortLabel: now.toLocaleString("en-US", { month: "short" }),
+        year: now.getFullYear(),
+      }
+
+      Promise.all([
+        transactionService.getTransactionSummary(user.uid, quarterStartIso, nowIso),
+        transactionService.getTransactionSummary(user.uid, monthStartIso, nowIso),
+      ])
+        .then(([quarterSummary, monthSummary]) => {
+          if (!isMounted) return
+          setStats(buildStatsFromSummary(quarterSummary, monthSummary, businessType, formatCurrencyValue, labels))
+        })
+        .catch((error) => {
+          console.error("Error loading transaction summary:", error)
+          if (!isMounted) return
+          setStats(getMockStats(businessType, formatCurrencyValue))
+          toast.error("Unable to load your latest stats. Showing recent data instead.")
+        })
+        .finally(() => {
+          if (isMounted) setLoadingSummary(false)
+        })
     }
 
-    Promise.all([
-      transactionService.getTransactionSummary(user.uid, quarterStartIso, nowIso),
-      transactionService.getTransactionSummary(user.uid, monthStartIso, nowIso),
-    ])
-      .then(([quarterSummary, monthSummary]) => {
-        if (!isMounted) return
-        setStats(buildStatsFromSummary(quarterSummary, monthSummary, businessType, formatCurrencyValue, labels))
-      })
-      .catch((error) => {
-        console.error("Error loading transaction summary:", error)
-        if (!isMounted) return
-        setStats(getMockStats(businessType, formatCurrencyValue))
-        toast.error("Unable to load your latest stats. Showing recent data instead.")
-      })
-      .finally(() => {
-        if (isMounted) setLoadingSummary(false)
-      })
+    const handleTransactionChanged = () => {
+      if (!isMounted) return
+      fetchSummaryData()
+    }
+
+    window.addEventListener("transactionChanged", handleTransactionChanged)
+    fetchSummaryData()
 
     return () => {
       isMounted = false
+      window.removeEventListener("transactionChanged", handleTransactionChanged)
     }
   }, [user?.uid, businessType, useMockData])
 
