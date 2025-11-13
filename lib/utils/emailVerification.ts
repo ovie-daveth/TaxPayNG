@@ -13,14 +13,20 @@
  * @param phone - Optional phone number
  * @returns Promise with result including email
  */
-export async function sendWaitlistVerification(email: string, name: string, phone?: string): Promise<{ success: boolean; error?: string; email?: string }> {
+export async function sendWaitlistVerification(
+  email: string,
+  name: string,
+  phone?: string,
+  userType?: string,
+  platformExpectations?: string
+): Promise<{ success: boolean; error?: string; email?: string }> {
   try {
     const response = await fetch('/api/send-waitlist-verification', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ email, name, phone }),
+      body: JSON.stringify({ email, name, phone, userType, platformExpectations }),
     })
 
     if (!response.ok) {

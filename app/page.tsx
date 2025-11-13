@@ -4,11 +4,139 @@ import type React from "react"
 import { cloneElement, isValidElement } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { ArrowRight, BarChart3, Calculator, Bell, CheckCircle2, Sparkles, Shield, TrendingUp, Clock, Users, Award, DollarSign, ScanLine, FolderArchive, CreditCard, Layers, Receipt, FileCheck } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ArrowRight, BarChart3, Calculator, FileText, Bell, CheckCircle2, Loader2, Sparkles, Shield, TrendingUp, Clock, Users, Zap, Award, DollarSign, ScanLine, FolderArchive, CreditCard, Layers, Receipt, FileCheck, Smartphone, Building2 } from "lucide-react"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { toast } from "sonner"
+import { db } from "@/firebase/firebase"
+import { collection, addDoc, query, where, getDocs, setDoc, doc } from "firebase/firestore"
+import { useEffect } from "react"
 import Footer from "@/components/footer"
 import { SiteHeader } from "@/components/site-header"
 
 export default function HomePage() {
+  const { user, logout, loading } = useAuth()
+  const router = useRouter()
+
+  const [waitlistData, setWaitlistData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    userType: "",
+    platformExpectations: ""
+  })
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isSubmitted, setIsSubmitted] = useState(false)
+  const [showTokenDialog, setShowTokenDialog] = useState(false)
+  const [pendingEmail, setPendingEmail] = useState("")
+
+  const isSmeSelection = waitlistData.userType === "sme"
+  const waitlistNameLabel = isSmeSelection ? "Business Name" : "Full Name"
+  const waitlistEmailLabel = isSmeSelection ? "Business Email" : "Email Address"
+  const waitlistNamePlaceholder = isSmeSelection ? "Enter your business name" : "Enter your full name"
+  const waitlistEmailPlaceholder = isSmeSelection ? "business@example.com" : "you@example.com"
+
+  // Check for verification status in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const verified = params.get('verified')
+    const email = params.get('email')
+    
+    if (verified === 'true') {
+      toast.success(`✅ Email verified! ${email ? `Welcome ${email}` : 'You\'re now on the waitlist!'}`)
+      // Clean up URL
+      window.history.replaceState({}, '', window.location.pathname)
+    } else if (params.get('error')) {
+      const error = params.get('error')
+      let errorMessage = 'Verification failed'
+      if (error === 'invalid_token') errorMessage = 'Invalid verification link'
+      else if (error === 'token_expired') errorMessage = 'Verification link expired. Please sign up again.'
+      else if (error === 'not_found') errorMessage = 'Email not found in waitlist'
+      toast.error(errorMessage)
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+  }, [])
+
+  const handleLogout = async () => {
+    const result = await logout()
+    if (result.success) {
+      toast.success('Logged out successfully!')
+      router.push('/')
+    } else {
+      toast.error(result.error || 'Failed to log out')
+    }
+  }
+
+
+  const handleWaitlistSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+
+    try {
+      // Validate inputs (name and email are required, phone is optional)
+      if (!waitlistData.name || !waitlistData.email) {
+        toast.error("Please fill in your name and email")
+        setIsSubmitting(false)
+        return
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!emailRegex.test(waitlistData.email)) {
+        toast.error("Please enter a valid email address")
+        setIsSubmitting(false)
+        return
+      }
+
+      // Validate phone format only if provided (Nigerian phone numbers)
+      if (waitlistData.phone && waitlistData.phone.trim() !== "") {
+        const phoneRegex = /^(\+234|0)?[789][01]\d{8}$/
+        if (!phoneRegex.test(waitlistData.phone.replace(/\s/g, ""))) {
+          toast.error("Please enter a valid Nigerian phone number")
+          setIsSubmitting(false)
+          return
+        }
+      }
+
+      if (!waitlistData.userType) {
+        toast.error("Please tell us whether you're a freelancer, creator, or SME")
+        setIsSubmitting(false)
+        return
+      }
+
+      // Send verification token via email
+      const verificationToast = toast.loading("Sending verification code...")
+      const verificationResult = await sendWaitlistVerification(
+        waitlistData.email.trim(),
+        waitlistData.name.trim(),
+        waitlistData.phone,
+        waitlistData.userType,
+        waitlistData.platformExpectations.trim()
+      )
+      
+      toast.dismiss(verificationToast)
+
+      if (!verificationResult.success) {
+        toast.error(verificationResult.error || "Failed to send verification code")
+        setIsSubmitting(false)
+        return
+      }
+
+      // Show token input dialog
+      setPendingEmail(verificationResult.email || waitlistData.email.trim())
+      setShowTokenDialog(true)
+      setIsSubmitting(false)
+    } catch (error) {
+      console.error("Error submitting waitlist:", error)
+      toast.error("Oops! Something went wrong. Please try again.")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <SiteHeader
@@ -285,6 +413,160 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Waitlist Section */}
+      <section id="waitlist" className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 md:py-20 lg:py-24">
+        <div className="max-w-2xl mx-auto">
+          <div className="text-center mb-8 sm:mb-10 md:mb-12">
+            <div className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-1.5 sm:py-2 bg-green-100 dark:bg-green-900/30 border border-green-200 dark:border-green-800 rounded-full mb-4 sm:mb-6 duration-700 animate-blink-shimmer relative">
+              <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-green-600 dark:text-green-400" />
+              <span className="text-xs sm:text-sm font-medium text-green-700 dark:text-green-300">
+                Limited Early Access
+              </span>
+            </div>
+            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-3 sm:mb-4 px-4">
+              Join Our <span className="text-primary">Exclusive Waitlist</span>
+            </h2>
+            <p className="text-base sm:text-lg md:text-xl text-muted-foreground mb-3 sm:mb-4 px-4">
+              Affordable tax management for every freelancer, creator, and small business — early users enjoy exclusive launch discounts.
+            </p>
+            <p className="text-xs sm:text-sm text-muted-foreground px-4">
+              Get early access, lifetime discounts, and priority support
+            </p>
+          </div>
+
+          {isSubmitted ? (
+            <div className="bg-card border-2 border-green-200 dark:border-green-800 rounded-xl sm:rounded-2xl p-6 sm:p-8 text-center shadow-lg">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                <CheckCircle2 className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-green-600 dark:text-green-400" />
+              </div>
+              <h3 className="text-lg sm:text-xl font-bold mb-2">You're in!</h3>
+              <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">
+                Thank you for joining our waitlist. We'll notify you as soon as we launch!
+              </p>
+              <Button 
+                onClick={() => {
+                  setIsSubmitted(false)
+                  setWaitlistData({ name: "", email: "", phone: "", userType: "", platformExpectations: "" })
+                }}
+                variant="outline"
+                className="w-full sm:w-auto"
+              >
+                Join Another Email
+              </Button>
+            </div>
+          ) : (
+            <form onSubmit={handleWaitlistSubmit} className="space-y-4">
+              <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-xl">
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="waitlist-user-type" className="text-sm font-medium">
+                      I am a
+                    </Label>
+                    <Select
+                      value={waitlistData.userType}
+                      onValueChange={(value) => setWaitlistData(prev => ({ ...prev, userType: value }))}
+                      disabled={isSubmitting}
+                    >
+                      <SelectTrigger id="waitlist-user-type" className="h-11 sm:h-12 text-sm sm:text-base">
+                        <SelectValue placeholder="Select an option" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="freelancer">Freelancer</SelectItem>
+                        <SelectItem value="creator">Creator</SelectItem>
+                        <SelectItem value="sme">SME</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="waitlist-name" className="text-sm font-medium">
+                      {waitlistNameLabel}
+                    </Label>
+                    <Input
+                      type="text"
+                      name="name"
+                      id="waitlist-name"
+                      placeholder={waitlistNamePlaceholder}
+                      value={waitlistData.name}
+                      onChange={(e) => setWaitlistData(prev => ({ ...prev, name: e.target.value }))}
+                      required
+                      className="h-11 sm:h-12 text-sm sm:text-base"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="waitlist-email" className="text-sm font-medium">
+                      {waitlistEmailLabel}
+                    </Label>
+                    <Input
+                      type="email"
+                      name="email"
+                      id="waitlist-email"
+                      placeholder={waitlistEmailPlaceholder}
+                      value={waitlistData.email}
+                      onChange={(e) => setWaitlistData(prev => ({ ...prev, email: e.target.value }))}
+                      required
+                      className="h-11 sm:h-12 text-sm sm:text-base"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="waitlist-phone" className="text-sm font-medium">
+                      Phone Number <span className="text-xs text-muted-foreground">(Optional)</span>
+                    </Label>
+                    <Input
+                      type="tel"
+                      name="phone"
+                      id="waitlist-phone"
+                      placeholder="Phone Number"
+                      value={waitlistData.phone}
+                      onChange={(e) => setWaitlistData(prev => ({ ...prev, phone: e.target.value }))}
+                      className="h-11 sm:h-12 text-sm sm:text-base"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="waitlist-platform-expectations" className="text-sm font-medium">
+                      What would you like to see on this platform? <span className="text-xs text-muted-foreground">(Optional)</span>
+                    </Label>
+                    <Textarea
+                      id="waitlist-platform-expectations"
+                      name="platformExpectations"
+                      placeholder="Share any features or experiences you'd love from OTax"
+                      value={waitlistData.platformExpectations}
+                      onChange={(e) => setWaitlistData(prev => ({ ...prev, platformExpectations: e.target.value }))}
+                      className="min-h-[100px] text-sm sm:text-base"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground text-center -mt-1 sm:-mt-2 px-2">
+                    🔒 We respect your privacy. We'll never spam your email or phone number. 
+                    We'll only contact you when we launch or have important updates.
+                  </p>
+                  <Button 
+                    type="submit" 
+                    size="lg" 
+                    className="w-full h-11 sm:h-12 text-sm sm:text-base animate-button-shimmer relative"
+                    disabled={isSubmitting}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin relative z-10" />
+                        <span className="relative z-10">Joining Waitlist...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="relative z-10">Join Waitlist</span>
+                        <ArrowRight className="ml-2 w-4 h-4 relative z-10" />
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </form>
+          )}
+        </div>
+      </section>
+
       {/* CTA Section */}
       <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 md:py-20 lg:py-24">
         <div className="max-w-5xl mx-auto relative overflow-hidden">
@@ -321,6 +603,17 @@ export default function HomePage() {
       {/* Footer */}
       <Footer />
 
+      {/* Token Input Dialog */}
+      <TokenInputDialog
+        open={showTokenDialog}
+        onOpenChange={setShowTokenDialog}
+        email={pendingEmail}
+        onVerified={() => {
+          setIsSubmitted(true)
+          setWaitlistData({ name: "", email: "", phone: "", userType: "", platformExpectations: "" })
+          setShowTokenDialog(false)
+        }}
+      />
     </div>
   )
 }

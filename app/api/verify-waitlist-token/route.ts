@@ -78,6 +78,8 @@ export async function POST(request: NextRequest) {
       name: verificationData.name,
       email: emailLower,
       phone: verificationData.phone || '',
+      userType: verificationData.userType || '',
+      platformExpectations: verificationData.platformExpectations || '',
       createdAt: new Date().toISOString(),
       emailVerified: true,
       verifiedAt: new Date().toISOString(),
