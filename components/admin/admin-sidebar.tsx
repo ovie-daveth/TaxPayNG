@@ -25,6 +25,7 @@ import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { cn } from "@/lib/utils"
+import OtaxLogo from "../OtaxLogo"
 
 const navItems = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -81,11 +82,8 @@ export function AdminSidebar() {
           {/* Logo */}
           <div className="p-6 border-b border-border">
             <Link href="/admin/dashboard" className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                <LayoutDashboard className="w-5 h-5 text-primary-foreground" />
-              </div>
-              <div>
-                <h2 className="font-semibold text-lg">OTax Admin</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="font-semibold text-lg text-primary flex items-center gap-2"><OtaxLogo /> <span className="text-sm text-muted-foreground font-normal">Admin</span></h2>
               </div>
             </Link>
           </div>
