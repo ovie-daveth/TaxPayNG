@@ -155,10 +155,10 @@ export default function AdminDashboard() {
           ...doc.data()
         }))
 
+        // Fetch ALL transactions (no limit) for accurate income/expense calculations
         const allTransactionsSnapshot = await getDocs(query(
           collection(db, "transactions"),
-          orderBy("createdAt", "desc"),
-          limit(20)
+          orderBy("createdAt", "desc")
         ))
         const allTransactionsData = allTransactionsSnapshot.docs.map(doc => ({
           id: doc.id,

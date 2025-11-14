@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Sparkles, TrendingUp, Lightbulb, ShieldCheck, AlertTriangle } from "lucide-react"
+import { Sparkles, TrendingUp, Lightbulb, ShieldCheck, AlertTriangle, Info } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { transactionService } from "@/lib/services/transactionService"
 import type { Transaction } from "@/lib/types"
@@ -13,28 +13,35 @@ import { AddTransactionDialog } from "@/components/transactions/add-transaction-
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { faqData } from "@/app/faq/components/data"
 import { AuditSubscriptionsDialog } from "@/components/dashboard/audit-subscriptions-dialog"
+import { calculateTaxRecommendation, type CalculationDetailsType, type PeriodType } from "./utils/tax-calculation"
+import { TaxCalculationDialog } from "./components/tax-calculation-dialog"
 
 type DashboardBusinessType = "freelancer" | "creator"
 
 interface AnalyticsInsightsProps {
   businessType?: DashboardBusinessType
   useMockData?: boolean
+  periodType?: PeriodType
+  selectedYear?: number
+  selectedQuarter?: number
 }
 
 type InsightTone = "positive" | "warning" | "info"
 
 type InsightActionIntent = "income" | "expense" | "relief" | "relief-info"
 
+
 interface Insight {
   id: string
   title: string
   metric: string
-  description: string
+  description: string | ReactNode
   tone: InsightTone
   action?: string
   actionIntent?: InsightActionIntent
   actionCategory?: string
   actionDescription?: string
+  calculationDetails?: CalculationDetailsType
 }
 
 const TOOL_KEYWORDS = ["software", "tool", "subscription", "saas", "platform", "app", "license", "hosting"]
@@ -53,15 +60,46 @@ const formatDateLabel = (date: Date) =>
     year: "numeric",
   })
 
-const getQuarterStart = (date: Date) => {
-  const quarter = Math.floor(date.getMonth() / 3)
-  return new Date(date.getFullYear(), quarter * 3, 1)
+const getYearStart = (date: Date, year?: number) => {
+  const y = year ?? date.getFullYear()
+  return new Date(y, 0, 1)
 }
 
-const subtractMonths = (date: Date, months: number) => {
-  const result = new Date(date)
-  result.setMonth(result.getMonth() - months)
-  return result
+const getYearEnd = (date: Date, year?: number) => {
+  const y = year ?? date.getFullYear()
+  return new Date(y, 11, 31, 23, 59, 59, 999)
+}
+
+const getQuarterInfo = (date: Date, quarter?: number, year?: number) => {
+  const q = quarter ?? Math.floor(date.getMonth() / 3) + 1
+  const y = year ?? date.getFullYear()
+  const start = new Date(y, (q - 1) * 3, 1)
+  const end = new Date(y, q * 3, 0, 23, 59, 59, 999)
+  return { quarter: q, start, end }
+}
+
+const getPreviousYearStart = (date: Date, year?: number) => {
+  const y = year ?? date.getFullYear()
+  return new Date(y - 1, 0, 1)
+}
+
+const getPreviousYearEnd = (date: Date, year?: number) => {
+  const y = year ?? date.getFullYear()
+  return new Date(y - 1, 11, 31, 23, 59, 59, 999)
+}
+
+const getPreviousQuarterInfo = (date: Date, quarter?: number, year?: number) => {
+  const q = quarter ?? Math.floor(date.getMonth() / 3) + 1
+  const y = year ?? date.getFullYear()
+  let prevQuarter = q - 1
+  let prevYear = y
+  if (prevQuarter < 1) {
+    prevQuarter = 4
+    prevYear = y - 1
+  }
+  const start = new Date(prevYear, (prevQuarter - 1) * 3, 1)
+  const end = new Date(prevYear, prevQuarter * 3, 0, 23, 59, 59, 999)
+  return { quarter: prevQuarter, start, end }
 }
 
 const isToolCategory = (category?: string) => {
@@ -116,8 +154,22 @@ const toneStyles: Record<InsightTone, { badge: string; icon: ReactNode }> = {
   },
 }
 
-export function AnalyticsInsights({ businessType = "freelancer", useMockData = false }: AnalyticsInsightsProps) {
+export function AnalyticsInsights({ 
+  businessType = "freelancer", 
+  useMockData = false,
+  periodType = "year",
+  selectedYear,
+  selectedQuarter
+}: AnalyticsInsightsProps) {
   const { user } = useAuth()
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentQuarter = Math.floor(now.getMonth() / 3) + 1
+
+  // Use props if provided, otherwise use defaults
+  const effectiveYear = selectedYear ?? currentYear
+  const effectiveQuarter = selectedQuarter ?? currentQuarter
+
   const [insights, setInsights] = useState<Insight[]>([])
   const [loading, setLoading] = useState<boolean>(!useMockData)
   const [transactionDialogOpen, setTransactionDialogOpen] = useState(false)
@@ -129,6 +181,8 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
   const [auditPeriodLabel, setAuditPeriodLabel] = useState("")
   const [auditTotalSpend, setAuditTotalSpend] = useState(0)
   const [auditGrossIncome, setAuditGrossIncome] = useState(0)
+  const [calculationDialogOpen, setCalculationDialogOpen] = useState(false)
+  const [calculationDetails, setCalculationDetails] = useState<CalculationDetailsType | null>(null)
 
   const reliefFaq = faqData.individuals.find(
     (item) => item.category === "Tax Reliefs" && item.question === "What tax reliefs are available for individuals?"
@@ -187,37 +241,64 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
     let isMounted = true
 
     const now = new Date()
-    const currentQuarterStart = getQuarterStart(now)
-    const previousQuarterStart = subtractMonths(currentQuarterStart, 3)
-    const lookbackStart = subtractMonths(currentQuarterStart, MONTHS_TO_ANALYZE - 3)
+    
+    // Get period info based on selection
+    let currentPeriodStart: Date
+    let currentPeriodEnd: Date
+    let previousPeriodStart: Date
+    let previousPeriodEnd: Date
+    let monthsInPeriod: number
 
-    const buildInsights = (transactions: Transaction[]) => {
-      const currentQuarterTransactions = transactions.filter((txn) => {
+    if (periodType === "year") {
+      currentPeriodStart = getYearStart(now, effectiveYear)
+      currentPeriodEnd = getYearEnd(now, effectiveYear) > now ? now : getYearEnd(now, effectiveYear)
+      previousPeriodStart = getPreviousYearStart(now, effectiveYear)
+      previousPeriodEnd = getPreviousYearEnd(now, effectiveYear)
+      monthsInPeriod = 12
+    } else {
+      const quarterDate = new Date(effectiveYear, (effectiveQuarter - 1) * 3, 1)
+      const quarterInfo = getQuarterInfo(quarterDate, effectiveQuarter, effectiveYear)
+      currentPeriodStart = quarterInfo.start
+      currentPeriodEnd = quarterInfo.end > now ? now : quarterInfo.end
+      const prevQuarterInfo = getPreviousQuarterInfo(quarterDate, effectiveQuarter, effectiveYear)
+      previousPeriodStart = prevQuarterInfo.start
+      previousPeriodEnd = prevQuarterInfo.end
+      monthsInPeriod = 3
+    }
+
+    const buildInsights = (
+      transactions: Transaction[],
+      yearToDateTransactions: Transaction[],
+      periodType: PeriodType,
+      effectiveYear: number,
+      effectiveQuarter: number
+    ) => {
+      const currentPeriodTransactions = transactions.filter((txn) => {
         const txnDate = new Date(txn.date)
-        return txnDate >= currentQuarterStart
+        return txnDate >= currentPeriodStart && txnDate <= currentPeriodEnd
       })
 
-      const previousQuarterTransactions = transactions.filter((txn) => {
+      const previousPeriodTransactions = transactions.filter((txn) => {
         const txnDate = new Date(txn.date)
-        return txnDate >= previousQuarterStart && txnDate < currentQuarterStart
+        return txnDate >= previousPeriodStart && txnDate <= previousPeriodEnd
       })
 
       const sumAmount = (txns: Transaction[], predicate: (txn: Transaction) => boolean) =>
         txns.reduce((total, txn) => (predicate(txn) ? total + Number(txn.amount || 0) : total), 0)
 
-      const currentIncomeTotal = sumAmount(currentQuarterTransactions, (txn) => txn.type === "income")
-      const previousIncomeTotal = sumAmount(previousQuarterTransactions, (txn) => txn.type === "income")
+      const currentIncomeTotal = sumAmount(currentPeriodTransactions, (txn) => txn.type === "income")
+      const previousIncomeTotal = sumAmount(previousPeriodTransactions, (txn) => txn.type === "income")
 
-      const currentAvgMonthlyIncome = currentIncomeTotal / 3
-      const previousAvgMonthlyIncome = previousIncomeTotal / 3
+      const currentAvgMonthlyIncome = currentIncomeTotal / monthsInPeriod
+      const previousAvgMonthlyIncome = previousIncomeTotal / monthsInPeriod
 
-      const currentExpenseTotal = sumAmount(currentQuarterTransactions, (txn) => txn.type === "expense")
+      const currentExpenseTotal = sumAmount(currentPeriodTransactions, (txn) => txn.type === "expense")
       const toolSpendTotal = sumAmount(
-        currentQuarterTransactions,
+        currentPeriodTransactions,
         (txn) => txn.type === "expense" && isToolCategory(txn.category)
       )
 
-      const reliefTotal = sumAmount(currentQuarterTransactions, (txn) => txn.type === "relief")
+      const reliefTotal = sumAmount(currentPeriodTransactions, (txn) => txn.type === "relief")
 
       const incomeGrowth =
         previousAvgMonthlyIncome > 0
@@ -232,20 +313,39 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
         currentIncomeTotal > 0 ? Math.round(((currentExpenseTotal / currentIncomeTotal) * 100 + Number.EPSILON) * 10) / 10 : 0
 
       const insightsDraft: Insight[] = []
-      const reserveTarget = Math.max(netCash * 0.3, reliefTotal)
-      const reliefCoversReserve = reliefTotal > netCash * 0.3
-      const reserveExplanation = reliefCoversReserve
-        ? "same amount as the reliefs you logged"
-        : "about 30% of what you kept this quarter"
+      
+      // Calculate intelligent tax recommendation based on projected annual income
+      const sumAmountHelper = (txns: Transaction[], predicate: (txn: Transaction) => boolean) =>
+        txns.reduce((total, txn) => (predicate(txn) ? total + Number(txn.amount || 0) : total), 0)
+      
+      const ytdIncome = sumAmountHelper(yearToDateTransactions, (txn) => txn.type === "income")
+      const ytdExpenses = sumAmountHelper(yearToDateTransactions, (txn) => txn.type === "expense")
+      const ytdReliefs = sumAmountHelper(yearToDateTransactions, (txn) => txn.type === "relief")
+      
+      const { taxAdvice, reserveTarget, isLowEarner, calculationDetails } = calculateTaxRecommendation({
+        currentIncomeTotal,
+        currentExpenseTotal,
+        reliefTotal,
+        ytdIncome,
+        ytdExpenses,
+        ytdReliefs,
+        yearToDateTransactions,
+        periodType,
+        effectiveYear,
+        effectiveQuarter,
+      })
+      const reliefCoversReserve = reliefTotal > reserveTarget
+      const periodLabel = periodType === "year" ? "year" : "quarter"
 
       if (incomeGrowth !== null) {
         const growthPositive = incomeGrowth >= 0
+        const comparisonLabel = periodType === "year" ? "last year" : "last quarter"
         insightsDraft.push({
           id: "income-growth",
           title: "Income momentum",
-          metric: `${growthPositive ? "▲" : "▼"} ${Math.abs(incomeGrowth).toFixed(1)}% vs last quarter`,
+          metric: `${growthPositive ? "▲" : "▼"} ${Math.abs(incomeGrowth).toFixed(1)}% vs ${comparisonLabel}`,
           description: growthPositive
-            ? `Average monthly earnings rose to ${formatCurrency(currentAvgMonthlyIncome)} this quarter.`
+            ? `Average monthly earnings rose to ${formatCurrency(currentAvgMonthlyIncome)} this ${periodLabel}.`
             : `Average monthly earnings slipped to ${formatCurrency(currentAvgMonthlyIncome)}. Revisit pricing or pipeline.`,
           tone: growthPositive ? "positive" : "warning",
           action: growthPositive ? "Lock in the winning retainers" : "Schedule a client acquisition sprint",
@@ -253,11 +353,12 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
           actionDescription: "Client project income",
         })
       } else if (currentIncomeTotal > 0) {
+        const trendLabel = periodType === "year" ? "two years" : "two quarters"
         insightsDraft.push({
-          id: "first-quarter",
-          title: "First quarter on record",
+          id: `first-${periodLabel}`,
+          title: `First ${periodLabel} on record`,
           metric: `${formatCurrency(currentAvgMonthlyIncome)} avg/month`,
-          description: "Solid start! Track at least two quarters to unlock quarter-over-quarter trends.",
+          description: `Solid start! Track at least ${trendLabel} to unlock ${periodLabel}-over-${periodLabel} trends.`,
           tone: "info",
           action: "Keep booking income by tagging client projects",
           actionIntent: "income",
@@ -271,8 +372,8 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
           title: "Tooling costs",
           metric: `${toolSpendRatio.toFixed(1)}% of income`,
           description: toolSpendTotal
-            ? `Spent ${formatCurrency(toolSpendTotal)} on platforms, apps, and subscriptions this quarter.`
-            : "No tool-related expenses recorded this quarter. Track them to understand your production costs.",
+            ? `Spent ${formatCurrency(toolSpendTotal)} on platforms, apps, and subscriptions this ${periodLabel}.`
+            : `No tool-related expenses recorded this ${periodLabel}. Track them to understand your production costs.`,
           tone: toolSpendRatio >= (businessType === "creator" ? 18 : 15) ? "warning" : "info",
           action: toolSpendTotal ? "Audit recurring subscriptions" : "Log your tools and subscriptions",
           actionIntent: "expense",
@@ -282,24 +383,39 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
       }
 
       if (currentIncomeTotal > 0) {
+        const runwayLabel = periodType === "year" ? "Annual runway" : "Quarterly runway"
+        
+        // Build intelligent description based on tax situation
+        let description: string | ReactNode
+        if (netCash < 0) {
+          description = `You spent more than you earned this ${periodLabel}. Cut big costs or nudge invoices so cash stays positive.`
+        } else if (isLowEarner && reserveTarget === 0) {
+          // Tax-free threshold
+          description = `You kept ${formatCurrency(netCash)} after expenses. ${taxAdvice} No tax reserve needed, but keep tracking your income.`
+        } else if (isLowEarner) {
+          // Low tax bracket
+          const reserveForPeriod = periodType === "year" ? reserveTarget : reserveTarget / 4
+          description = `You kept ${formatCurrency(netCash)} after expenses. ${taxAdvice} Set aside ${formatCurrency(reserveForPeriod)} for tax this ${periodLabel}.`
+        } else if (reliefCoversReserve) {
+          // Reliefs cover tax
+          description = `You kept ${formatCurrency(netCash)} after expenses. Your reliefs (${formatCurrency(reliefTotal)}) may cover most of your tax liability. ${taxAdvice}`
+        } else {
+          // Standard case
+          const reserveForPeriod = periodType === "year" ? reserveTarget : reserveTarget / 4
+          const reservePercentage = netCash > 0 ? ((reserveForPeriod / netCash) * 100).toFixed(0) : "0"
+          description = `You kept ${formatCurrency(netCash)} after expenses. ${taxAdvice} Set aside ${formatCurrency(reserveForPeriod)} for tax this ${periodLabel} (${reservePercentage}% of what you kept).`
+        }
+        
         insightsDraft.push({
           id: "profitability",
-          title: "Quarterly runway",
+          title: runwayLabel,
           metric: netCash >= 0 ? `${formatCurrency(netCash)} retained` : `${formatCurrency(Math.abs(netCash))} overspent`,
-          description:
-            netCash >= 0
-              ? reliefCoversReserve
-                ? `You only held on to ${formatCurrency(netCash)}. Hey, you need to earn more to back your ${formatCurrency(
-                    reliefTotal
-                  )} relief—park that amount for tax.`
-                : `You kept ${formatCurrency(netCash)} after expenses. Save ${formatCurrency(
-                    reserveTarget
-                  )} for tax (about 30% of what you kept).`
-              : "You spent more than you earned this quarter. Cut big costs or nudge invoices so cash stays positive.",
+          description,
           tone: netCash >= 0 ? "positive" : "warning",
           action: netCash >= 0 ? undefined : "Flag big-ticket expenses for review",
           actionIntent: netCash >= 0 ? undefined : "expense",
           actionDescription: netCash >= 0 ? undefined : "Expense review",
+          calculationDetails: netCash >= 0 ? calculationDetails : undefined,
         })
       } else {
         insightsDraft.push({
@@ -332,15 +448,59 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
     const fetchInsights = async () => {
       setLoading(true)
       try {
-        const transactions = await transactionService.getTransactionsForPeriod(
-          user.uid,
-          lookbackStart.toISOString(),
-          now.toISOString()
-        )
+        // Get period info based on selection
+        let currentPeriodStart: Date
+        let currentPeriodEnd: Date
+        let previousPeriodStart: Date
+        let previousPeriodEnd: Date
+        let yearStart: Date
+        let yearEnd: Date
+
+        if (periodType === "year") {
+          currentPeriodStart = getYearStart(now, effectiveYear)
+          currentPeriodEnd = getYearEnd(now, effectiveYear) > now ? now : getYearEnd(now, effectiveYear)
+          previousPeriodStart = getPreviousYearStart(now, effectiveYear)
+          previousPeriodEnd = getPreviousYearEnd(now, effectiveYear)
+          yearStart = currentPeriodStart
+          yearEnd = currentPeriodEnd
+        } else {
+          const quarterDate = new Date(effectiveYear, (effectiveQuarter - 1) * 3, 1)
+          const quarterInfo = getQuarterInfo(quarterDate, effectiveQuarter, effectiveYear)
+          currentPeriodStart = quarterInfo.start
+          currentPeriodEnd = quarterInfo.end > now ? now : quarterInfo.end
+          const prevQuarterInfo = getPreviousQuarterInfo(quarterDate, effectiveQuarter, effectiveYear)
+          previousPeriodStart = prevQuarterInfo.start
+          previousPeriodEnd = prevQuarterInfo.end
+          yearStart = getYearStart(now, effectiveYear)
+          yearEnd = getYearEnd(now, effectiveYear) > now ? now : getYearEnd(now, effectiveYear)
+        }
+        
+        // Fetch transactions for current period, previous period, and full year (for accurate projections)
+        const [currentPeriodTransactions, previousPeriodTransactions, yearToDateTransactions] = await Promise.all([
+          transactionService.getTransactionsForPeriod(
+            user.uid,
+            currentPeriodStart.toISOString(),
+            currentPeriodEnd.toISOString()
+          ),
+          transactionService.getTransactionsForPeriod(
+            user.uid,
+            previousPeriodStart.toISOString(),
+            previousPeriodEnd.toISOString()
+          ),
+          // Fetch all transactions from the start of the year to now for accurate projections
+          transactionService.getTransactionsForPeriod(
+            user.uid,
+            yearStart.toISOString(),
+            yearEnd.toISOString()
+          )
+        ])
+        
+        // Combine for analysis
+        const transactions = [...currentPeriodTransactions, ...previousPeriodTransactions]
 
         if (!isMounted) return
 
-        const computedInsights = buildInsights(transactions)
+        const computedInsights = buildInsights(transactions, yearToDateTransactions, periodType, effectiveYear, effectiveQuarter)
         setInsights(computedInsights)
       } catch (error) {
         console.error("Error loading analytics insights:", error)
@@ -367,7 +527,7 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
       isMounted = false
       window.removeEventListener("transactionChanged", handleTransactionChanged)
     }
-  }, [businessType, useMockData, user?.uid])
+  }, [businessType, useMockData, user?.uid, periodType, effectiveYear, effectiveQuarter])
 
   const headerText = useMemo(() => {
     if (loading) return "Crunching numbers..."
@@ -408,11 +568,25 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
 
     try {
       const now = new Date()
-      const quarterStart = getQuarterStart(now)
+      
+      // Get period info based on selection
+      let periodStart: Date
+      let periodEnd: Date
+      
+      if (periodType === "year") {
+        periodStart = getYearStart(now, effectiveYear)
+        periodEnd = getYearEnd(now, effectiveYear) > now ? now : getYearEnd(now, effectiveYear)
+      } else {
+        const quarterDate = new Date(effectiveYear, (effectiveQuarter - 1) * 3, 1)
+        const quarterInfo = getQuarterInfo(quarterDate, effectiveQuarter, effectiveYear)
+        periodStart = quarterInfo.start
+        periodEnd = quarterInfo.end > now ? now : quarterInfo.end
+      }
+      
       const transactions = await transactionService.getTransactionsForPeriod(
         uid,
-        quarterStart.toISOString(),
-        now.toISOString()
+        periodStart.toISOString(),
+        periodEnd.toISOString()
       )
 
       const subscriptionTransactions = transactions.filter(
@@ -427,11 +601,12 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
       setAuditTotalSpend(
         subscriptionTransactions.reduce((sum, txn) => sum + (txn.amount || 0), 0)
       )
-      setAuditPeriodLabel(`${formatDateLabel(quarterStart)} – ${formatDateLabel(now)}`)
+      setAuditPeriodLabel(`${formatDateLabel(periodStart)} – ${formatDateLabel(periodEnd)}`)
       setAuditGrossIncome(incomeTotal)
 
       if (subscriptionTransactions.length === 0) {
-        toast.info("No recurring subscription expenses logged this quarter yet. Add them to start an audit.")
+        const periodLabel = periodType === "year" ? "year" : "quarter"
+        toast.info(`No recurring subscription expenses logged this ${periodLabel} yet. Add them to start an audit.`)
       }
     } catch (error) {
       console.error("Error preparing subscription audit:", error)
@@ -442,7 +617,7 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
     } finally {
       setAuditLoading(false)
     }
-  }, [useMockData, user?.uid])
+  }, [useMockData, user?.uid, periodType, effectiveYear, effectiveQuarter])
 
   const handleActionClick = (insight: Insight) => {
     if (!insight.actionIntent) return
@@ -486,7 +661,7 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
           <p className="text-xs sm:text-sm text-muted-foreground mt-1">{headerText}</p>
         </div>
         <Badge variant="outline" className="text-xs sm:text-sm">
-          Quarter view
+          {periodType === "year" ? "Year view" : `Q${effectiveQuarter} ${effectiveYear}`}
         </Badge>
       </div>
 
@@ -503,7 +678,7 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
           : insights.map((insight) => {
               const tone = toneStyles[insight.tone]
               return (
-                <div key={insight.id} className="border border-border rounded-xl p-4 space-y-3">
+                <div key={insight.id} className="border border-border rounded-xl p-4 space-y-3 relative">
                   <div className="flex items-center justify-between">
                     <Badge variant="secondary" className={`gap-2 ${tone.badge}`}>
                       {tone.icon}
@@ -511,7 +686,7 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
                     </Badge>
                     <span className="text-sm font-semibold">{insight.metric}</span>
                   </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground">{insight.description}</p>
+                  <div className="text-xs sm:text-sm text-muted-foreground">{insight.description}</div>
                   {insight.action && (
                     <Button
                       variant="link"
@@ -521,6 +696,20 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
                     >
                       <Lightbulb className="h-3.5 w-3.5 mr-1 text-primary" />
                       {insight.action}
+                    </Button>
+                  )}
+                  {insight.calculationDetails && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="absolute bottom-2 right-2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                      onClick={() => {
+                        setCalculationDetails(insight.calculationDetails || null)
+                        setCalculationDialogOpen(true)
+                      }}
+                      title="View calculation breakdown"
+                    >
+                      <Info className="h-3.5 w-3.5" />
                     </Button>
                   )}
                 </div>
@@ -600,11 +789,17 @@ export function AnalyticsInsights({ businessType = "freelancer", useMockData = f
               <p>We’re updating our relief knowledge. Check back soon.</p>
             )}
             <p className="text-xs text-muted-foreground">
-              Tip: Log each relief as a “Tax Relief” transaction so your tax summary stays accurate before filing.
+              Tip: Log each relief as a "Tax Relief" transaction so your tax summary stays accurate before filing.
             </p>
           </div>
         </DialogContent>
       </Dialog>
+
+      <TaxCalculationDialog
+        open={calculationDialogOpen}
+        onOpenChange={setCalculationDialogOpen}
+        calculationDetails={calculationDetails}
+      />
     </Card>
   )
 }

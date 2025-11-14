@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { cloneElement, isValidElement } from "react"
+import { cloneElement, isValidElement, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -16,6 +16,9 @@ import { collection, addDoc, query, where, getDocs, setDoc, doc } from "firebase
 import { useEffect } from "react"
 import Footer from "@/components/footer"
 import { SiteHeader } from "@/components/site-header"
+import { useRouter } from "next/navigation"
+import { sendWaitlistVerification } from "@/lib/utils/emailVerification"
+import { TokenInputDialog } from "@/components/waitlist/token-input-dialog"
 
 export default function HomePage() {
   const { user, logout, loading } = useAuth()

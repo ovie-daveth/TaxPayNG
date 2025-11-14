@@ -106,9 +106,9 @@ export function DashboardHeader() {
                 variant="outline" 
                 size="sm"
                 onClick={() => console.log("Export transactions")}
-                className="text-xs sm:text-sm"
+                className="h-9 sm:h-10 text-xs sm:text-sm px-3"
               >
-                <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-2" />
+                <Download className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Export</span>
               </Button>
             )}
@@ -129,9 +129,9 @@ export function DashboardHeader() {
               <Button 
                 onClick={pageInfo.buttonAction}
                 size="sm"
-                className="text-xs sm:text-sm whitespace-nowrap px-2 sm:px-3"
+                className="h-9 sm:h-10 text-xs sm:text-sm whitespace-nowrap px-3"
               >
-                <ButtonIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-1.5 md:mr-2" />
+                <ButtonIcon className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">{pageInfo.buttonText}</span>
                 <span className="sm:hidden">{pageInfo.buttonText.split(' ')[0]}</span>
               </Button>
