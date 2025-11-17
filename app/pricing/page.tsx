@@ -5,6 +5,9 @@ import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
@@ -25,11 +28,19 @@ export default function PricingPage() {
     name: "",
     email: "",
     phone: "",
+    userType: "",
+    platformExpectations: ""
   })
   const [isSubmittingWaitlist, setIsSubmittingWaitlist] = useState(false)
   const [isWaitlistSubmitted, setIsWaitlistSubmitted] = useState(false)
   const [showTokenDialog, setShowTokenDialog] = useState(false)
   const [pendingEmail, setPendingEmail] = useState("")
+
+  const isSmeSelection = waitlistForm.userType === "sme"
+  const waitlistNameLabel = isSmeSelection ? "Business Name" : "Full Name"
+  const waitlistEmailLabel = isSmeSelection ? "Business Email" : "Email Address"
+  const waitlistNamePlaceholder = isSmeSelection ? "Enter your business name" : "Jane Doe"
+  const waitlistEmailPlaceholder = isSmeSelection ? "business@example.com" : "you@example.com"
 
   const handleOpenWaitlist = (plan: string) => {
     setSelectedPlan(plan)
@@ -41,7 +52,7 @@ export default function PricingPage() {
     if (!open) {
       setIsWaitlistSubmitted(false)
       setIsSubmittingWaitlist(false)
-      setWaitlistForm({ name: "", email: "", phone: "" })
+      setWaitlistForm({ name: "", email: "", phone: "", userType: "", platformExpectations: "" })
       setSelectedPlan(null)
     }
   }
@@ -53,6 +64,12 @@ export default function PricingPage() {
     try {
       if (!waitlistForm.name || !waitlistForm.email) {
         toast.error("Please provide your name and email")
+        setIsSubmittingWaitlist(false)
+        return
+      }
+
+      if (!waitlistForm.userType) {
+        toast.error("Please tell us whether you're a freelancer, creator, or SME")
         setIsSubmittingWaitlist(false)
         return
       }
@@ -77,7 +94,9 @@ export default function PricingPage() {
       const verificationResult = await sendWaitlistVerification(
         waitlistForm.email.trim(),
         waitlistForm.name.trim(),
-        waitlistForm.phone.trim() || undefined
+        waitlistForm.phone.trim() || undefined,
+        waitlistForm.userType,
+        waitlistForm.platformExpectations.trim()
       )
       toast.dismiss(toastId)
 
@@ -101,6 +120,7 @@ export default function PricingPage() {
   const handleVerified = () => {
     setIsWaitlistSubmitted(true)
     setPendingEmail("")
+    setWaitlistForm({ name: "", email: "", phone: "", userType: "", platformExpectations: "" })
   }
 
   return (
@@ -742,12 +762,31 @@ export default function PricingPage() {
           ) : (
             <form onSubmit={handleWaitlistSubmit} className="space-y-4 mt-4">
               <div className="space-y-1">
-                <label htmlFor="waitlist-name" className="text-sm font-medium">
-                  Full Name
-                </label>
+                <Label htmlFor="waitlist-user-type" className="text-sm font-medium">
+                  I am a
+                </Label>
+                <Select
+                  value={waitlistForm.userType}
+                  onValueChange={(value) => setWaitlistForm((prev) => ({ ...prev, userType: value }))}
+                  disabled={isSubmittingWaitlist}
+                >
+                  <SelectTrigger id="waitlist-user-type">
+                    <SelectValue placeholder="Select an option" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="freelancer">Freelancer</SelectItem>
+                    <SelectItem value="creator">Creator</SelectItem>
+                    <SelectItem value="sme">SME</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="waitlist-name" className="text-sm font-medium">
+                  {waitlistNameLabel}
+                </Label>
                 <Input
                   id="waitlist-name"
-                  placeholder="Jane Doe"
+                  placeholder={waitlistNamePlaceholder}
                   value={waitlistForm.name}
                   onChange={(e) => setWaitlistForm((prev) => ({ ...prev, name: e.target.value }))}
                   required
@@ -755,13 +794,13 @@ export default function PricingPage() {
                 />
               </div>
               <div className="space-y-1">
-                <label htmlFor="waitlist-email" className="text-sm font-medium">
-                  Email Address
-                </label>
+                <Label htmlFor="waitlist-email" className="text-sm font-medium">
+                  {waitlistEmailLabel}
+                </Label>
                 <Input
                   id="waitlist-email"
                   type="email"
-                  placeholder="you@example.com"
+                  placeholder={waitlistEmailPlaceholder}
                   value={waitlistForm.email}
                   onChange={(e) => setWaitlistForm((prev) => ({ ...prev, email: e.target.value }))}
                   required
@@ -769,15 +808,28 @@ export default function PricingPage() {
                 />
               </div>
               <div className="space-y-1">
-                <label htmlFor="waitlist-phone" className="text-sm font-medium">
+                <Label htmlFor="waitlist-phone" className="text-sm font-medium">
                   Phone Number <span className="text-xs text-muted-foreground">(optional)</span>
-                </label>
+                </Label>
                 <Input
                   id="waitlist-phone"
                   placeholder="0801 234 5678"
                   value={waitlistForm.phone}
                   onChange={(e) => setWaitlistForm((prev) => ({ ...prev, phone: e.target.value }))}
                   disabled={isSubmittingWaitlist}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label htmlFor="waitlist-platform-expectations" className="text-sm font-medium">
+                  What would you like to see on this platform? <span className="text-xs text-muted-foreground">(optional)</span>
+                </Label>
+                <Textarea
+                  id="waitlist-platform-expectations"
+                  placeholder="Share any features or experiences you'd love from OTax"
+                  value={waitlistForm.platformExpectations}
+                  onChange={(e) => setWaitlistForm((prev) => ({ ...prev, platformExpectations: e.target.value }))}
+                  disabled={isSubmittingWaitlist}
+                  className="min-h-[100px]"
                 />
               </div>
               <Button type="submit" className="w-full" disabled={isSubmittingWaitlist}>

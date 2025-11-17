@@ -6,6 +6,9 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowRight, BarChart3, Calculator, FileText, Bell, CheckCircle2, Loader2, Sparkles, Shield, TrendingUp, Clock, Users, Zap, Award, DollarSign, ScanLine, FolderArchive, CreditCard, Layers, Receipt, FileCheck, Smartphone, Building2 } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { toast } from "sonner"
@@ -24,12 +27,20 @@ export default function HomePage() {
   const [waitlistData, setWaitlistData] = useState({
     name: "",
     email: "",
-    phone: ""
+    phone: "",
+    userType: "",
+    platformExpectations: ""
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSubmitted, setIsSubmitted] = useState(false)
   const [showTokenDialog, setShowTokenDialog] = useState(false)
   const [pendingEmail, setPendingEmail] = useState("")
+
+  const isSmeSelection = waitlistData.userType === "sme"
+  const waitlistNameLabel = isSmeSelection ? "Business Name" : "Full Name"
+  const waitlistEmailLabel = isSmeSelection ? "Business Email" : "Email Address"
+  const waitlistNamePlaceholder = isSmeSelection ? "Enter your business name" : "Enter your full name"
+  const waitlistEmailPlaceholder = isSmeSelection ? "business@example.com" : "you@example.com"
 
   // Check for verification status in URL
   useEffect(() => {
@@ -93,12 +104,20 @@ export default function HomePage() {
         }
       }
 
+      if (!waitlistData.userType) {
+        toast.error("Please tell us whether you're a freelancer, creator, or SME")
+        setIsSubmitting(false)
+        return
+      }
+
       // Send verification token via email
       const verificationToast = toast.loading("Sending verification code...")
       const verificationResult = await sendWaitlistVerification(
         waitlistData.email.trim(),
         waitlistData.name.trim(),
-        waitlistData.phone
+        waitlistData.phone,
+        waitlistData.userType,
+        waitlistData.platformExpectations.trim()
       )
       
       toast.dismiss(verificationToast)
@@ -421,7 +440,10 @@ export default function HomePage() {
                 Thank you for joining our waitlist. We'll notify you as soon as we launch!
               </p>
               <Button 
-                onClick={() => setIsSubmitted(false)}
+                onClick={() => {
+                  setIsSubmitted(false)
+                  setWaitlistData({ name: "", email: "", phone: "", userType: "", platformExpectations: "" })
+                }}
                 variant="outline"
                 className="w-full sm:w-auto"
               >
@@ -431,12 +453,35 @@ export default function HomePage() {
           ) : (
             <form onSubmit={handleWaitlistSubmit} className="space-y-4">
               <div className="bg-card border border-border rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-xl">
-                <div className="space-y-3 sm:space-y-4">
-                  <div>
+                <div className="space-y-4">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="waitlist-user-type" className="text-sm font-medium">
+                      I am a
+                    </Label>
+                    <Select
+                      value={waitlistData.userType}
+                      onValueChange={(value) => setWaitlistData(prev => ({ ...prev, userType: value }))}
+                      disabled={isSubmitting}
+                    >
+                      <SelectTrigger id="waitlist-user-type" className="h-11 sm:h-12 text-sm sm:text-base">
+                        <SelectValue placeholder="Select an option" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="freelancer">Freelancer</SelectItem>
+                        <SelectItem value="creator">Creator</SelectItem>
+                        <SelectItem value="sme">SME</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="waitlist-name" className="text-sm font-medium">
+                      {waitlistNameLabel}
+                    </Label>
                     <Input
                       type="text"
                       name="name"
-                      placeholder="Full Name"
+                      id="waitlist-name"
+                      placeholder={waitlistNamePlaceholder}
                       value={waitlistData.name}
                       onChange={(e) => setWaitlistData(prev => ({ ...prev, name: e.target.value }))}
                       required
@@ -444,11 +489,15 @@ export default function HomePage() {
                       disabled={isSubmitting}
                     />
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="waitlist-email" className="text-sm font-medium">
+                      {waitlistEmailLabel}
+                    </Label>
                     <Input
                       type="email"
                       name="email"
-                      placeholder="Email Address"
+                      id="waitlist-email"
+                      placeholder={waitlistEmailPlaceholder}
                       value={waitlistData.email}
                       onChange={(e) => setWaitlistData(prev => ({ ...prev, email: e.target.value }))}
                       required
@@ -456,14 +505,32 @@ export default function HomePage() {
                       disabled={isSubmitting}
                     />
                   </div>
-                  <div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="waitlist-phone" className="text-sm font-medium">
+                      Phone Number <span className="text-xs text-muted-foreground">(Optional)</span>
+                    </Label>
                     <Input
                       type="tel"
                       name="phone"
-                      placeholder="Phone Number (Optional)"
+                      id="waitlist-phone"
+                      placeholder="Phone Number"
                       value={waitlistData.phone}
                       onChange={(e) => setWaitlistData(prev => ({ ...prev, phone: e.target.value }))}
                       className="h-11 sm:h-12 text-sm sm:text-base"
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="waitlist-platform-expectations" className="text-sm font-medium">
+                      What would you like to see on this platform? <span className="text-xs text-muted-foreground">(Optional)</span>
+                    </Label>
+                    <Textarea
+                      id="waitlist-platform-expectations"
+                      name="platformExpectations"
+                      placeholder="Share any features or experiences you'd love from OTax"
+                      value={waitlistData.platformExpectations}
+                      onChange={(e) => setWaitlistData(prev => ({ ...prev, platformExpectations: e.target.value }))}
+                      className="min-h-[100px] text-sm sm:text-base"
                       disabled={isSubmitting}
                     />
                   </div>
@@ -539,7 +606,7 @@ export default function HomePage() {
         email={pendingEmail}
         onVerified={() => {
           setIsSubmitted(true)
-          setWaitlistData({ name: "", email: "", phone: "" })
+          setWaitlistData({ name: "", email: "", phone: "", userType: "", platformExpectations: "" })
           setShowTokenDialog(false)
         }}
       />
