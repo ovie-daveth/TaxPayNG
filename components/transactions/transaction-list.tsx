@@ -274,12 +274,12 @@ export function TransactionList({
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleEdit(transaction)}>
+                      <DropdownMenuItem className="cursor-pointer" onClick={() => handleEdit(transaction)}>
                         <Pencil className="w-4 h-4 mr-2" />
                         Edit
                       </DropdownMenuItem>
                       <DropdownMenuItem 
-                        className="text-destructive"
+                        className="text-destructive cursor-pointer"
                         onClick={() => handleDeleteClick(transaction.id)}
                       >
                         <Trash2 className="w-4 h-4 mr-2" />
@@ -334,12 +334,12 @@ export function TransactionList({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleEdit(transaction)}>
+                  <DropdownMenuItem className="cursor-pointer" onClick={() => handleEdit(transaction)}>
                     <Pencil className="w-4 h-4 mr-2" />
                     Edit
                   </DropdownMenuItem>
                   <DropdownMenuItem 
-                    className="text-destructive"
+                    className="text-destructive cursor-pointer"
                     onClick={() => handleDeleteClick(transaction.id)}
                   >
                     <Trash2 className="w-4 h-4 mr-2" />

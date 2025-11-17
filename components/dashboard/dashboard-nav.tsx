@@ -9,6 +9,7 @@ import { useState } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { toast } from "sonner"
+import OtaxLogo from "../OtaxLogo"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -49,11 +50,8 @@ export function DashboardNav() {
             "flex items-center gap-2 transition-all duration-300",
             sidebarCollapsed && "justify-center"
           )}>
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-              <Calculator className="w-5 h-5 text-primary-foreground" />
-            </div>
             {!sidebarCollapsed && (
-              <span className="font-semibold text-lg whitespace-nowrap">OTax</span>
+             <OtaxLogo />
             )}
           </Link>
           <Button
