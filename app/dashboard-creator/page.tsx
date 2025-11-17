@@ -8,7 +8,7 @@ import { TaxSummary } from "@/components/dashboard/tax-summary"
 import { UpcomingReminders } from "@/components/dashboard/upcoming-reminders"
 import { DashboardSkeleton } from "@/components/ui/skeletons"
 import { Card } from "@/components/ui/card"
-import { AnalyticsInsights } from "@/components/dashboard/analytics-insights"
+import { AnalyticsInsights } from "@/components/dashboard/insights/analytics-insights"
 
 export default function CreatorDashboardPage() {
   const [isLoading, setIsLoading] = useState(true)

@@ -9,6 +9,9 @@ import { toast } from "sonner"
 
 interface IncomeExpenseChartProps {
   useMockData?: boolean
+  periodType?: PeriodType
+  selectedYear?: number
+  selectedQuarter?: number
 }
 
 interface ChartPoint {
@@ -19,23 +22,54 @@ interface ChartPoint {
   expenses: number
 }
 
-const MONTHS_TO_SHOW = 6
+type PeriodType = "quarter" | "year"
+
+const getQuarterInfo = (date: Date, quarter?: number) => {
+  const q = quarter ?? Math.floor(date.getMonth() / 3) + 1
+  const start = new Date(date.getFullYear(), (q - 1) * 3, 1)
+  const end = new Date(date.getFullYear(), q * 3, 0, 23, 59, 59, 999)
+  const label = `Q${q} ${start.getFullYear()}`
+  return { quarter: q, start, end, label }
+}
+
+const getYearInfo = (date: Date, year?: number) => {
+  const y = year ?? date.getFullYear()
+  const start = new Date(y, 0, 1)
+  const end = new Date(y, 11, 31, 23, 59, 59, 999)
+  const label = `${y}`
+  return { year: y, start, end, label }
+}
+
+const getAllQuartersForYear = (year: number) => {
+  return [
+    { value: 1, label: `Q1 ${year}`, start: new Date(year, 0, 1), end: new Date(year, 2, 31, 23, 59, 59, 999) },
+    { value: 2, label: `Q2 ${year}`, start: new Date(year, 3, 1), end: new Date(year, 5, 30, 23, 59, 59, 999) },
+    { value: 3, label: `Q3 ${year}`, start: new Date(year, 6, 1), end: new Date(year, 8, 30, 23, 59, 59, 999) },
+    { value: 4, label: `Q4 ${year}`, start: new Date(year, 9, 1), end: new Date(year, 11, 31, 23, 59, 59, 999) },
+  ]
+}
 
 const formatCurrency = (value: number) =>
   `₦${value.toLocaleString("en-NG", { maximumFractionDigits: 0 })}`
 
-const buildEmptyChartData = (endDate: Date): ChartPoint[] => {
-  return Array.from({ length: MONTHS_TO_SHOW }).map((_, index) => {
-    const monthDate = new Date(endDate.getFullYear(), endDate.getMonth() - (MONTHS_TO_SHOW - 1 - index), 1)
-    const key = `${monthDate.getFullYear()}-${monthDate.getMonth()}`
-    return {
+const buildEmptyChartDataForPeriod = (startDate: Date, endDate: Date): ChartPoint[] => {
+  const points: ChartPoint[] = []
+  const current = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
+  const end = new Date(endDate.getFullYear(), endDate.getMonth(), 1)
+
+  while (current <= end) {
+    const key = `${current.getFullYear()}-${current.getMonth()}`
+    points.push({
       key,
-      month: monthDate.toLocaleString("en-US", { month: "short" }),
-      year: monthDate.getFullYear(),
+      month: current.toLocaleString("en-US", { month: "short" }),
+      year: current.getFullYear(),
       income: 0,
       expenses: 0,
-    }
-  })
+    })
+    current.setMonth(current.getMonth() + 1)
+  }
+
+  return points
 }
 
 const mockData: ChartPoint[] = [
@@ -74,9 +108,25 @@ const CustomTooltip = ({ active, payload }: any) => {
   return null
 }
 
-export function IncomeExpenseChart({ useMockData = false }: IncomeExpenseChartProps) {
+export function IncomeExpenseChart({ 
+  useMockData = false,
+  periodType = "quarter",
+  selectedYear,
+  selectedQuarter
+}: IncomeExpenseChartProps) {
   const { user } = useAuth()
-  const [chartData, setChartData] = useState<ChartPoint[]>(() => buildEmptyChartData(new Date()))
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentQuarter = Math.floor(now.getMonth() / 3) + 1
+
+  // Use props if provided, otherwise use defaults
+  const effectiveYear = selectedYear ?? currentYear
+  const effectiveQuarter = selectedQuarter ?? currentQuarter
+
+  const [chartData, setChartData] = useState<ChartPoint[]>(() => {
+    const periodInfo = getQuarterInfo(now, effectiveQuarter)
+    return buildEmptyChartDataForPeriod(periodInfo.start, periodInfo.end > now ? now : periodInfo.end)
+  })
   const [loading, setLoading] = useState<boolean>(!useMockData)
 
   useEffect(() => {
@@ -87,25 +137,40 @@ export function IncomeExpenseChart({ useMockData = false }: IncomeExpenseChartPr
     }
 
     if (!user) {
-      setChartData(buildEmptyChartData(new Date()))
+      const periodInfo = periodType === "year" 
+        ? getYearInfo(now, effectiveYear)
+        : getQuarterInfo(now, effectiveQuarter)
+      setChartData(buildEmptyChartDataForPeriod(periodInfo.start, periodInfo.end > now ? now : periodInfo.end))
       setLoading(false)
       return
     }
 
     let isMounted = true
-    const now = new Date()
-    const periodStart = new Date(now.getFullYear(), now.getMonth() - (MONTHS_TO_SHOW - 1), 1)
 
     const fetchData = async () => {
       setLoading(true)
+      const now = new Date()
+      
+      // Get period info based on selection
+      let periodInfo: { start: Date; end: Date; label: string }
+      if (periodType === "year") {
+        periodInfo = getYearInfo(now, effectiveYear)
+      } else {
+        const quarterDate = new Date(effectiveYear, (effectiveQuarter - 1) * 3, 1)
+        periodInfo = getQuarterInfo(quarterDate, effectiveQuarter)
+      }
+
+      const periodStart = periodInfo.start
+      const periodEnd = periodInfo.end > now ? now : periodInfo.end
+
       try {
         const transactions = await transactionService.getTransactionsForPeriod(
           user.uid,
           periodStart.toISOString(),
-          now.toISOString()
+          periodEnd.toISOString()
         )
 
-        const buckets = buildEmptyChartData(now).reduce<Record<string, ChartPoint>>((acc, point) => {
+        const buckets = buildEmptyChartDataForPeriod(periodStart, periodEnd).reduce<Record<string, ChartPoint>>((acc, point) => {
           acc[point.key] = { ...point }
           return acc
         }, {})
@@ -129,7 +194,7 @@ export function IncomeExpenseChart({ useMockData = false }: IncomeExpenseChartPr
         const aggregated = Object.values(buckets)
         const hasData = aggregated.some((point) => point.income > 0 || point.expenses > 0)
 
-        setChartData(hasData ? aggregated : buildEmptyChartData(now))
+        setChartData(hasData ? aggregated : buildEmptyChartDataForPeriod(periodStart, periodEnd))
       } catch (error) {
         console.error("Error loading income vs expenses chart:", error)
         if (!isMounted) return
@@ -142,19 +207,28 @@ export function IncomeExpenseChart({ useMockData = false }: IncomeExpenseChartPr
       }
     }
 
+    const handleTransactionChanged = () => {
+      if (!isMounted) return
+      fetchData()
+    }
+
+    window.addEventListener("transactionChanged", handleTransactionChanged)
     fetchData()
 
     return () => {
       isMounted = false
+      window.removeEventListener("transactionChanged", handleTransactionChanged)
     }
-  }, [useMockData, user?.uid])
+  }, [useMockData, user?.uid, periodType, effectiveYear, effectiveQuarter])
 
   const chartDescription = useMemo(() => {
-    const latest = chartData[chartData.length - 1]
-    if (!latest) return "Monthly comparison"
-
-    return `Last ${MONTHS_TO_SHOW} months • Updated ${latest.month} ${latest.year}`
-  }, [chartData])
+    if (periodType === "year") {
+      return `${effectiveYear} (Full Year)`
+    } else {
+      const quarterInfo = getQuarterInfo(now, effectiveQuarter)
+      return quarterInfo.label
+    }
+  }, [periodType, effectiveYear, effectiveQuarter, now])
 
   return (
     <Card className="p-4 sm:p-5 md:p-6">

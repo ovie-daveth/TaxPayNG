@@ -9,6 +9,7 @@ import { calculateNigerianTax } from "@/lib/tax-calculator"
 import { transactionService } from "@/lib/services/transactionService"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { toast } from "sonner"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 type DashboardBusinessType = "freelancer" | "creator" | "small-business"
 
@@ -29,15 +30,16 @@ const formatCurrency = (amount: number) =>
     .format(amount)
     .replace("NGN", "₦")
 
-const getQuarterInfo = (date: Date) => {
-  const quarter = Math.floor(date.getMonth() / 3) + 1
-  const start = new Date(date.getFullYear(), (quarter - 1) * 3, 1)
-  const label = `Q${quarter} ${start.getFullYear()}`
-  return { quarter, start, label }
+const getYearInfo = (date: Date, year?: number) => {
+  const y = year ?? date.getFullYear()
+  const start = new Date(y, 0, 1)
+  const end = new Date(y, 11, 31, 23, 59, 59, 999)
+  const label = `${y}`
+  return { year: y, start, end, label }
 }
 
 interface SummaryState {
-  quarterLabel: string
+  yearLabel: string
   taxableIncome: number
   totalReliefs: number
   manualReliefs: number
@@ -49,18 +51,21 @@ interface SummaryState {
 
 export function TaxSummary({ businessType = "freelancer", useMockData = false }: TaxSummaryProps) {
   const { user } = useAuth()
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const [selectedYear, setSelectedYear] = useState<number>(currentYear)
   const [loading, setLoading] = useState(true)
   const [summary, setSummary] = useState<SummaryState | null>(null)
 
   const mockSummary = useMemo<SummaryState>(
     () => ({
-      quarterLabel: "Q1 2025",
+      yearLabel: "2025",
       taxableIncome: 1_560_000,
       totalReliefs: 200_000,
       manualReliefs: 200_000,
       deductions: 50_000,
       taxPayable: 234_000,
-      monthlySetAside: 234_000 / 3,
+      monthlySetAside: 234_000 / 12,
       isSmallBusinessExempt: false,
     }),
     []
@@ -80,21 +85,26 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
     }
 
     let isMounted = true
-    const now = new Date()
-    const quarterInfo = getQuarterInfo(now)
 
     const fetchSummary = async () => {
       setLoading(true)
+
+      const now = new Date()
+      const yearInfo = getYearInfo(now, selectedYear)
+      const yearStartIso = yearInfo.start.toISOString()
+      const yearEndIso = yearInfo.end > now ? now.toISOString() : yearInfo.end.toISOString()
+
       try {
-        const quarterSummary = await transactionService.getTransactionSummary(
+        // Fetch full year data for tax calculation
+        const yearSummary = await transactionService.getTransactionSummary(
           user.uid,
-          quarterInfo.start.toISOString(),
-          now.toISOString()
+          yearStartIso,
+          yearEndIso
         )
 
-        const totalIncome = quarterSummary?.totalIncome ?? 0
-        const totalExpenses = quarterSummary?.totalExpenses ?? 0
-        const manualReliefs = quarterSummary?.totalReliefs ?? 0
+        const totalIncome = yearSummary?.totalIncome ?? 0
+        const totalExpenses = yearSummary?.totalExpenses ?? 0
+        const manualReliefs = yearSummary?.totalReliefs ?? 0
 
         const taxCalculation =
           businessType === "small-business" && totalIncome <= SMALL_BUSINESS_TURNOVER_THRESHOLD
@@ -131,7 +141,7 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
         if (!isMounted) return
 
         setSummary({
-          quarterLabel: quarterInfo.label,
+          yearLabel: yearInfo.label,
           taxableIncome: calculatedTaxableIncome,
           totalReliefs: calculatedReliefs,
           manualReliefs,
@@ -153,21 +163,45 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
       }
     }
 
+    const handleTransactionChanged = () => {
+      if (!isMounted) return
+      fetchSummary()
+    }
+
+    window.addEventListener("transactionChanged", handleTransactionChanged)
     fetchSummary()
 
     return () => {
       isMounted = false
+      window.removeEventListener("transactionChanged", handleTransactionChanged)
     }
-  }, [businessType, mockSummary, useMockData, user])
+  }, [businessType, mockSummary, useMockData, user, selectedYear])
 
   const displaySummary = summary ?? mockSummary
+
+  // Generate year options (current year and previous 2 years)
+  const yearOptions = Array.from({ length: 3 }, (_, i) => currentYear - i)
 
   return (
     <Card className="p-4 sm:p-5 md:p-6">
       <div className="mb-4 sm:mb-5 md:mb-6">
-        <h3 className="text-base sm:text-lg font-semibold">Tax Summary</h3>
-        <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-          {loading ? "Loading..." : displaySummary.quarterLabel}
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-base sm:text-lg font-semibold">Tax Summary</h3>
+          <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(parseInt(value))}>
+            <SelectTrigger className="w-[100px] h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {yearOptions.map((year) => (
+                <SelectItem key={year} value={year.toString()}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <p className="text-xs sm:text-sm text-muted-foreground">
+          {loading ? "Loading..." : `${displaySummary.yearLabel} (Full Year)`}
         </p>
       </div>
 
@@ -193,7 +227,7 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
             </span>
           </div>
           <div className="flex items-center justify-between py-2.5 sm:py-3 border-b border-border">
-            <span className="text-xs sm:text-sm text-muted-foreground">Deductions</span>
+            <span className="text-xs sm:text-sm text-muted-foreground">Work Expenses</span>
             <span className="font-semibold text-xs sm:text-sm text-primary">
               -{formatCurrency(Math.abs(displaySummary.deductions))}
             </span>

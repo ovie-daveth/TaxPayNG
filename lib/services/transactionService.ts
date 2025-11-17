@@ -263,14 +263,33 @@ export class TransactionService extends BaseService {
 
       const start = startDate ? new Date(startDate) : null
       const end = endDate ? new Date(endDate) : null
+      const filteredTransactions = transactions
+        .map((transaction) => {
+          const coercedAmount =
+            typeof transaction.amount === 'number'
+              ? transaction.amount
+              : Number(String(transaction.amount).replace(/[\u20A6,]/g, '').trim()) || 0
 
-      const filteredTransactions = transactions.filter((transaction) => {
-        if (!start && !end) return true
-        const txnDate = new Date(transaction.date)
-        if (start && txnDate < start) return false
-        if (end && txnDate > end) return false
-        return true
-      })
+          const dateString = transaction.date || transaction.createdAt
+          const txnDate = dateString ? new Date(dateString) : null
+
+          return {
+            ...transaction,
+            amount: coercedAmount,
+            category: transaction.category || 'uncategorized',
+            txnDate,
+          }
+        })
+        .filter((transaction) => {
+          if (!transaction.txnDate || Number.isNaN(transaction.txnDate.getTime())) {
+            return false
+          }
+
+          if (!start && !end) return true
+          if (start && transaction.txnDate < start) return false
+          if (end && transaction.txnDate > end) return false
+          return true
+        })
 
       const summary = {
         totalIncome: 0,
@@ -281,7 +300,7 @@ export class TransactionService extends BaseService {
         categories: {} as { [key: string]: { income: number; expenses: number; count: number } }
       }
 
-      filteredTransactions.forEach(transaction => {
+      filteredTransactions.forEach((transaction) => {
         if (transaction.type === 'income') {
           summary.totalIncome += transaction.amount
         } else if (transaction.type === 'expense') {
@@ -290,17 +309,17 @@ export class TransactionService extends BaseService {
           summary.totalReliefs += transaction.amount
           return
         }
-
         // Category breakdown
-        if (!summary.categories[transaction.category]) {
-          summary.categories[transaction.category] = { income: 0, expenses: 0, count: 0 }
+        const categoryKey = transaction.category || 'uncategorized'
+        if (!summary.categories[categoryKey]) {
+          summary.categories[categoryKey] = { income: 0, expenses: 0, count: 0 }
         }
-        
-        summary.categories[transaction.category].count++
+
+        summary.categories[categoryKey].count++
         if (transaction.type === 'income') {
-          summary.categories[transaction.category].income += transaction.amount
+          summary.categories[categoryKey].income += transaction.amount
         } else if (transaction.type === 'expense') {
-          summary.categories[transaction.category].expenses += transaction.amount
+          summary.categories[categoryKey].expenses += transaction.amount
         }
       })
 
@@ -320,18 +339,44 @@ export class TransactionService extends BaseService {
       ])
 
       if (!startDate && !endDate) {
-        return transactions
+        return transactions.map((transaction) => ({
+          ...transaction,
+          amount:
+            typeof transaction.amount === 'number'
+              ? transaction.amount
+              : Number(String(transaction.amount).replace(/[\u20A6,]/g, '').trim()) || 0,
+          category: transaction.category || 'uncategorized',
+        }))
       }
 
       const start = startDate ? new Date(startDate) : null
       const end = endDate ? new Date(endDate) : null
 
-      return transactions.filter((transaction) => {
-        const txnDate = new Date(transaction.date)
-        if (start && txnDate < start) return false
-        if (end && txnDate > end) return false
-        return true
-      })
+      return transactions
+        .map((transaction) => {
+          const coercedAmount =
+            typeof transaction.amount === 'number'
+              ? transaction.amount
+              : Number(String(transaction.amount).replace(/[\u20A6,]/g, '').trim()) || 0
+          const dateString = transaction.date || transaction.createdAt
+          const txnDate = dateString ? new Date(dateString) : null
+          return {
+            ...transaction,
+            amount: coercedAmount,
+            category: transaction.category || 'uncategorized',
+            txnDate,
+          }
+        })
+        .filter((transaction) => {
+          if (!transaction.txnDate || Number.isNaN(transaction.txnDate.getTime())) {
+            return false
+          }
+
+          if (start && transaction.txnDate < start) return false
+          if (end && transaction.txnDate > end) return false
+          return true
+        })
+        .map(({ txnDate, ...rest }) => rest)
     } catch (error) {
       console.error('Error getting transactions for period:', error)
       throw error
