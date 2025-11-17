@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card } from "@/components/ui/card"
 import { FileText, ExternalLink, CheckCircle, Upload, Building2, Loader2 } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { userService, documentService } from "@/lib/services"
@@ -27,8 +28,10 @@ export default function VerifyTINPage() {
     taxCertificate?: File
     businessLicense?: File
   }>({})
+  const [popupBlocked, setPopupBlocked] = useState(false)
   const [uploadingDocuments, setUploadingDocuments] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<{[key: string]: boolean}>({})
+  const [showPopupInstructions, setShowPopupInstructions] = useState(false)
 
   useEffect(() => {
     console.log("Verify TIN page mounted - user:", user ? "logged in" : "not logged in")
@@ -66,8 +69,45 @@ export default function VerifyTINPage() {
   }
 
   const handleGetTIN = () => {
-    // Open FIRS portal in new tab
-    window.open("https://tinverification.jtb.gov.ng/", "_blank")
+    const portalUrl = "https://tinverification.jtb.gov.ng/"
+    const viewportWidth = window.innerWidth || 1024
+    const viewportHeight = window.innerHeight || 768
+
+    const popupWidth = Math.min(1024, Math.floor(viewportWidth * 0.9))
+    const popupHeight = Math.min(768, Math.floor(viewportHeight * 0.9))
+
+    const dualScreenLeft = window.screenLeft !== undefined ? window.screenLeft : window.screenX
+    const dualScreenTop = window.screenTop !== undefined ? window.screenTop : window.screenY
+    const outerWidth = window.outerWidth || viewportWidth
+    const outerHeight = window.outerHeight || viewportHeight
+
+    const left = Math.max(0, Math.floor(dualScreenLeft + (outerWidth - popupWidth) / 2))
+    const top = Math.max(0, Math.floor(dualScreenTop + (outerHeight - popupHeight) / 2))
+
+    const features = [
+      "noopener",
+      "noreferrer",
+      `width=${popupWidth}`,
+      `height=${popupHeight}`,
+      `left=${left}`,
+      `top=${top}`,
+      "scrollbars=yes",
+      "resizable=yes",
+    ].join(",")
+
+    const popup = window.open(
+      portalUrl,
+      "tinVerificationPortal",
+      features
+    )
+
+    if (!popup || popup.closed || typeof popup.closed === "undefined") {
+      setPopupBlocked(true)
+      toast.info("Please allow pop-ups for OTax to open the TIN portal.")
+    } else {
+      setPopupBlocked(false)
+      popup.focus()
+    }
   }
 
   const handleVerifyTIN = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -400,6 +440,21 @@ export default function VerifyTINPage() {
                     <ExternalLink className="w-4 h-4 mr-2" />
                     Get TIN from FIRS Portal
                   </Button>
+                  <p className="text-xs text-muted-foreground mt-3 md:hidden">
+                    Having trouble on mobile? Allow pop-ups for OTax so the FIRS portal can open in a new window.
+                  </p>
+                  {(popupBlocked) && (
+                    <p className="text-xs text-destructive mt-2">
+                      Pop-up blocked. Please enable pop-ups for OTax and try again.{" "}
+                      <button
+                        type="button"
+                        onClick={() => setShowPopupInstructions(true)}
+                        className="underline underline-offset-2 text-destructive"
+                      >
+                        Learn how
+                      </button>
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -424,6 +479,62 @@ export default function VerifyTINPage() {
           )}
         </Card>
       </div>
+      {/* Popup Instructions Modal */}
+      <Dialog open={showPopupInstructions} onOpenChange={setShowPopupInstructions}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>How to Allow Pop-ups for OTax</DialogTitle>
+            <DialogDescription>
+              Enable pop-ups so we can open the official TIN portal in a new window.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm text-muted-foreground">
+            <div>
+              <h4 className="font-semibold text-foreground mb-1">Chrome / Edge (Desktop)</h4>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Click the blocked popup icon in the address bar.</li>
+                <li>Select <span className="font-medium text-foreground">“Always allow pop-ups and redirects”</span> for <span className="font-medium text-foreground">otax.ng</span>.</li>
+                <li>Click <span className="font-medium text-foreground">Done</span>, then press the button again.</li>
+              </ol>
+            </div>
+            <div>
+              <h4 className="font-semibold text-foreground mb-1">Safari (iPhone / iPad)</h4>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Open <span className="font-medium text-foreground">Settings</span> &gt; <span className="font-medium text-foreground">Safari</span>.</li>
+                <li>Turn off <span className="font-medium text-foreground">Block Pop-ups</span>.</li>
+                <li>Return to OTax and try again.</li>
+              </ol>
+            </div>
+            <div>
+              <h4 className="font-semibold text-foreground mb-1">Android (Chrome)</h4>
+              <ol className="list-decimal list-inside space-y-1">
+                <li>Tap the 3-dot menu &gt; <span className="font-medium text-foreground">Settings</span>.</li>
+                <li>Tap <span className="font-medium text-foreground">Site settings</span> &gt; <span className="font-medium text-foreground">Pop-ups and redirects</span>.</li>
+                <li>Allow pop-ups, then try again.</li>
+              </ol>
+            </div>
+            <div className="border border-border rounded-lg p-3 bg-muted/40">
+              <p>
+                Need more help? You can manually visit{" "}
+                <a
+                  href="https://tinverification.jtb.gov.ng/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary underline underline-offset-2"
+                >
+                  tinverification.jtb.gov.ng
+                </a>{" "}
+                in a new tab.
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end">
+            <Button type="button" onClick={() => setShowPopupInstructions(false)}>
+              Got it
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

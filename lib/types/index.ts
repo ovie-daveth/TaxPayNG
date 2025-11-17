@@ -1,3 +1,5 @@
+export type BusinessType = 'freelancer' | 'creator' | 'sme' | 'individual'
+
 // User Profile Types
 export interface UserProfile {
   id: string
@@ -13,7 +15,7 @@ export interface UserProfile {
     country: string
     postalCode: string
   }
-  businessType: 'freelancer' | 'sme' | 'individual'
+  businessType: BusinessType
   taxId?: string
   businessDocuments?: {
     cac?: string
@@ -32,10 +34,12 @@ export interface UserProfile {
 }
 
 // Transaction Types
+export type TransactionType = 'income' | 'expense' | 'relief'
+
 export interface Transaction {
   id: string
   userId: string
-  type: 'income' | 'expense'
+  type: TransactionType
   category: string
   amount: number
   description: string
@@ -52,7 +56,7 @@ export interface Transaction {
 }
 
 export interface TransactionFilters {
-  type?: 'income' | 'expense'
+  type?: TransactionType
   category?: string
   paymentMethod?: string
   startDate?: string

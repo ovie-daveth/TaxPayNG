@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Calculator } from "lucide-react"
+import { Calculator, Eye, EyeOff } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
@@ -22,22 +22,32 @@ export default function LoginPage() {
     email: '',
     password: ''
   })
-
-  // Redirect to waitlist during pre-launch
-  useEffect(() => {
-    router.push('/#waitlist')
-  }, [router])
+  const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
     if (!loading && !profileLoading && user && profile) {
       // Check if user needs to verify TIN or upload documents
       if (!profile.taxId) {
         router.push("/verify-tin")
-      } else if (profile.businessType === 'sme' && !profile.businessDocuments) {
-        router.push("/verify-tin")
-      } else {
-        router.push("/dashboard")
+        return
       }
+
+      if (profile.businessType === 'sme' && !profile.businessDocuments) {
+        router.push("/verify-tin")
+        return
+      }
+
+      if (profile.businessType === 'creator') {
+        router.push("/dashboard-creator")
+        return
+      }
+
+      if (profile.businessType === 'sme') {
+        router.push("/dashboard-sme")
+        return
+      }
+
+      router.push("/dashboard")
     }
   }, [user, loading, profile, profileLoading, router])
 
@@ -100,14 +110,25 @@ export default function LoginPage() {
                   Forgot password?
                 </Link>
               </div>
-              <Input 
-                id="password" 
-                type="password" 
-                placeholder="••••••••" 
-                value={formData.password}
-                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                required 
-              />
+              <div className="relative group">
+                <Input 
+                  id="password" 
+                  type={showPassword ? "text" : "password"} 
+                  placeholder="••••••••" 
+                  value={formData.password}
+                  onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                  required 
+                  className="pr-12 transition-all group-hover:border-primary/60 group-hover:shadow-[0_0_12px_rgba(34,197,94,0.25)]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(prev => !prev)}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-primary transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
 
             <Button type="submit" className="w-full" size="lg" disabled={isLoading}>

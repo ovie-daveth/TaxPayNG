@@ -9,10 +9,22 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Calculator } from "lucide-react"
-import { useState, useEffect } from "react"
+import { Calculator, Eye, EyeOff } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { toast } from "sonner"
+import { TokenInputDialog } from "@/components/waitlist/token-input-dialog"
+import { sendSignupVerification } from "@/lib/utils/emailVerification"
+
+type SignupBusinessType = '' | 'freelancer' | 'creator' | 'sme' | 'large_corporation'
+type AllowedBusinessType = Extract<SignupBusinessType, 'freelancer' | 'creator' | 'sme'>
+type SignupPayload = {
+  email: string
+  password: string
+  firstName: string
+  lastName: string
+  businessType: AllowedBusinessType
+}
 
 export default function SignupPage() {
   const router = useRouter()
@@ -20,19 +32,25 @@ export default function SignupPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [showComingSoonModal, setShowComingSoonModal] = useState(false)
   const [signupSuccess, setSignupSuccess] = useState(false)
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    fullName: string
+    email: string
+    businessType: SignupBusinessType
+    password: string
+    confirmPassword: string
+  }>({
     fullName: '',
     email: '',
     businessType: '',
     password: '',
     confirmPassword: ''
   })
-
-  // Redirect to waitlist during pre-launch
-  useEffect(() => {
-    router.push('/#waitlist')
-  }, [router])
-
+  const [showVerificationDialog, setShowVerificationDialog] = useState(false)
+  const [pendingEmail, setPendingEmail] = useState("")
+  const [verifiedEmail, setVerifiedEmail] = useState<string | null>(null)
+  const pendingSignupDataRef = useRef<SignupPayload | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   // Redirect to login after successful signup (no auto-login)
   useEffect(() => {
     if (signupSuccess && !loading && !user) {
@@ -40,6 +58,43 @@ export default function SignupPage() {
       router.push("/login")
     }
   }, [signupSuccess, loading, user, router])
+
+  const isSME = formData.businessType === 'sme'
+  const isCreator = formData.businessType === 'creator'
+  const businessNameLabel = isSME ? 'Company Name' : isCreator ? 'Creator or Brand Name' : 'Full Name'
+  const businessNamePlaceholder = isSME
+    ? 'Acme Corporation Ltd'
+    : isCreator
+      ? 'Jane Creator Studios'
+      : 'John Doe'
+
+  const completeSignup = async (payload: SignupPayload) => {
+    try {
+      setIsLoading(true)
+      const result = await signUp({
+        email: payload.email,
+        password: payload.password,
+        firstName: payload.firstName,
+        lastName: payload.lastName,
+        businessType: payload.businessType,
+      })
+
+      console.log("result now", result)
+
+      if (result?.success) {
+        toast.success('Account created successfully! Please log in to continue.')
+        setVerifiedEmail(payload.email.toLowerCase())
+        setSignupSuccess(true)
+      } else {
+        toast.error(result?.error || 'Failed to create account')
+      }
+    } catch (error) {
+      console.error("Signup completion error:", error)
+      toast.error('Failed to create account')
+    } finally {
+      setIsLoading(false)
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -56,29 +111,93 @@ export default function SignupPage() {
       return
     }
 
-    setIsLoading(true)
+    // Validate supported business type
+    if (!['freelancer', 'creator', 'sme'].includes(formData.businessType)) {
+      toast.error('Please select a supported business type')
+      return
+    }
 
     // Split full name into first and last name
-    const nameParts = formData.fullName.trim().split(' ')
+    const trimmedFullName = formData.fullName.trim()
+    const nameParts = trimmedFullName.split(/\s+/)
     const firstName = nameParts[0] || ''
     const lastName = nameParts.slice(1).join(' ') || ''
 
-    const result = await signUp({
-      email: formData.email,
+    const businessType = formData.businessType as AllowedBusinessType
+    const trimmedEmail = formData.email.trim().toLowerCase()
+
+    if (trimmedEmail !== formData.email) {
+      setFormData(prev => ({ ...prev, email: trimmedEmail }))
+    }
+
+    const payload: SignupPayload = {
+      email: trimmedEmail,
       password: formData.password,
       firstName,
       lastName,
-      businessType: formData.businessType as 'freelancer' | 'sme'
-    })
-
-    setIsLoading(false)
-    console.log("result now", result)
-    if (result?.success) {
-      toast.success('Account created successfully! Please log in to continue.')
-      setSignupSuccess(true)
-    } else {
-      toast.error(result?.error || 'Failed to create account')
+      businessType,
     }
+
+    // If email already verified in this session for the same address, proceed directly
+    if (verifiedEmail && verifiedEmail === trimmedEmail) {
+      pendingSignupDataRef.current = null
+      await completeSignup(payload)
+      return
+    }
+
+    setIsLoading(true)
+    const verificationToast = toast.loading("Sending verification code...")
+
+    try {
+      const verificationResult = await sendSignupVerification(
+        trimmedEmail,
+        trimmedFullName || firstName || 'there',
+        businessType
+      )
+
+      toast.dismiss(verificationToast)
+
+      if (!verificationResult.success) {
+        toast.error(verificationResult.error || 'Failed to send verification email')
+        return
+      }
+
+      pendingSignupDataRef.current = payload
+
+      if (verificationResult.alreadyVerified) {
+        const verified = (verificationResult.email ?? trimmedEmail).toLowerCase()
+        setVerifiedEmail(verified)
+        toast.success('Email already verified. Completing signup...')
+        pendingSignupDataRef.current = null
+        await completeSignup(payload)
+        return
+      }
+
+      const emailForDialog = (verificationResult.email ?? trimmedEmail).toLowerCase()
+      setPendingEmail(emailForDialog)
+      setShowVerificationDialog(true)
+      toast.success('Verification code sent! Please check your email.')
+    } catch (error) {
+      toast.dismiss(verificationToast)
+      console.error('Error sending signup verification:', error)
+      toast.error('Failed to send verification email. Please try again.')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleTokenVerified = async () => {
+    const payload = pendingSignupDataRef.current
+
+    if (!payload) {
+      toast.error('Verification session expired. Please try again.')
+      return
+    }
+
+    pendingSignupDataRef.current = null
+    setVerifiedEmail(payload.email.toLowerCase())
+    setPendingEmail('')
+    await completeSignup(payload)
   }
 
   return (
@@ -112,9 +231,9 @@ export default function SignupPage() {
                     setShowComingSoonModal(true)
                     // Revert to small business
                     setFormData(prev => ({ ...prev, businessType: 'sme' }))
-                  } else {
-                    setFormData(prev => ({ ...prev, businessType: value }))
+                    return
                   }
+                  setFormData(prev => ({ ...prev, businessType: value as AllowedBusinessType }))
                 }}
               >
                 <SelectTrigger id="businessType">
@@ -122,6 +241,7 @@ export default function SignupPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="freelancer">Freelancer</SelectItem>
+                  <SelectItem value="creator">Creator / Influencer</SelectItem>
                   <SelectItem value="sme">Small Business</SelectItem>
                   <SelectItem value="large_corporation">Large Corporation</SelectItem>
                 </SelectContent>
@@ -130,12 +250,12 @@ export default function SignupPage() {
 
             <div className="space-y-2">
               <Label htmlFor="fullName">
-                {formData.businessType === 'sme' ? 'Company Name' : 'Full Name'}
+                {businessNameLabel}
               </Label>
               <Input 
                 id="fullName" 
                 type="text" 
-                placeholder={formData.businessType === 'sme' ? 'Acme Corporation Ltd' : 'John Doe'} 
+                placeholder={businessNamePlaceholder} 
                 value={formData.fullName}
                 onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
                 required 
@@ -156,26 +276,48 @@ export default function SignupPage() {
 
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input 
-                id="password" 
-                type="password" 
-                placeholder="••••••••" 
-                value={formData.password}
-                onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
-                required 
-              />
+              <div className="relative group">
+                <Input 
+                  id="password" 
+                  type={showPassword ? "text" : "password"} 
+                  placeholder="••••••••" 
+                  value={formData.password}
+                  onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                  required 
+                  className="pr-12 transition-all group-hover:border-primary/60 group-hover:shadow-[0_0_12px_rgba(34,197,94,0.25)]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(prev => !prev)}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-primary transition-colors"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input 
-                id="confirmPassword" 
-                type="password" 
-                placeholder="••••••••" 
-                value={formData.confirmPassword}
-                onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                required 
-              />
+              <div className="relative group">
+                <Input 
+                  id="confirmPassword" 
+                  type={showConfirmPassword ? "text" : "password"} 
+                  placeholder="••••••••" 
+                  value={formData.confirmPassword}
+                  onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                  required 
+                  className="pr-12 transition-all group-hover:border-primary/60 group-hover:shadow-[0_0_12px_rgba(34,197,94,0.25)]"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(prev => !prev)}
+                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-primary transition-colors"
+                  aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                >
+                  {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
             </div>
 
             <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
@@ -195,6 +337,15 @@ export default function SignupPage() {
           By continuing, you agree to our Terms of Service and Privacy Policy
         </p>
       </div>
+
+    <TokenInputDialog
+      open={showVerificationDialog}
+      onOpenChange={setShowVerificationDialog}
+      email={pendingEmail || formData.email.trim()}
+      verifyEndpoint="/api/verify-signup-token"
+      successMessage="Email verified! Completing your signup..."
+      onVerified={handleTokenVerified}
+    />
 
       {/* Coming Soon Modal */}
       <Dialog open={showComingSoonModal} onOpenChange={setShowComingSoonModal}>

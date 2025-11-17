@@ -20,16 +20,22 @@ interface AddTransactionDialogProps {
   onOpenChange: (open: boolean) => void
   onSubmit: (data: Omit<Transaction, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => Promise<any>
   transaction?: Transaction | null
+  defaultType?: Transaction['type']
+  defaultCategory?: string
+  defaultDescription?: string
 }
 
 export function AddTransactionDialog({ 
   open, 
   onOpenChange, 
   onSubmit, 
-  transaction 
+  transaction,
+  defaultType,
+  defaultCategory,
+  defaultDescription
 }: AddTransactionDialogProps) {
   const [formData, setFormData] = useState({
-    type: 'income' as 'income' | 'expense',
+    type: 'income' as Transaction['type'],
     description: '',
     amount: '',
     date: new Date().toISOString().split('T')[0],
@@ -95,11 +101,11 @@ export function AddTransactionDialog({
       setUploadedImages([])
     } else {
       setFormData({
-        type: 'income',
-        description: '',
+        type: defaultType ?? 'income',
+        description: defaultDescription ?? '',
         amount: '',
         date: new Date().toISOString().split('T')[0],
-        category: '',
+        category: defaultCategory ?? '',
         paymentMethod: 'Bank Transfer',
         notes: '',
         taxDeductible: false,
@@ -109,7 +115,7 @@ export function AddTransactionDialog({
       setSelectedFiles([])
       setUploadedImages([])
     }
-  }, [transaction, open])
+  }, [transaction, open, defaultType, defaultCategory, defaultDescription])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -185,7 +191,7 @@ export function AddTransactionDialog({
               <Label htmlFor="type">Transaction Type</Label>
               <Select 
                 value={formData.type} 
-                onValueChange={(value) => setFormData(prev => ({ ...prev, type: value as 'income' | 'expense' }))}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, type: value as Transaction['type'] }))}
               >
                 <SelectTrigger id="type">
                   <SelectValue placeholder="Select type" />
@@ -193,6 +199,7 @@ export function AddTransactionDialog({
                 <SelectContent>
                   <SelectItem value="income">Income</SelectItem>
                   <SelectItem value="expense">Expense</SelectItem>
+                  <SelectItem value="relief">Tax Relief</SelectItem>
                 </SelectContent>
               </Select>
             </div>

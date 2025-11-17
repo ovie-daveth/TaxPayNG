@@ -116,28 +116,27 @@ export function IncomeSourcesSection({
                     Amount ({getPeriodLabel()})
                   </Label>
                   <div className="flex gap-2">
-                    <Input
-                      id={`income-amount-${source.id}`}
-                      type="text"
-                      inputMode="decimal"
-                      placeholder="0.00"
-                      value={source.currency === "NGN" ? formatCurrencyInput(source.amount) : source.amount}
-                      onChange={(e) => {
-                        const value = e.target.value
-                        if (source.currency === "NGN") {
+                    <div className="relative flex-1">
+                      <span className="absolute inset-y-0 left-3 flex items-center text-muted-foreground text-xs sm:text-sm pointer-events-none">
+                        {(SUPPORTED_CURRENCIES.find((c) => c.code === source.currency)?.symbol) || "₦"}
+                      </span>
+                      <Input
+                        id={`income-amount-${source.id}`}
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={formatCurrencyInput(source.amount)}
+                        onChange={(e) => {
+                          const value = e.target.value
                           const { isValid, rawValue } = handleCurrencyInputChange(value)
                           if (isValid) {
                             onUpdateIncomeSource(source.id, "amount", rawValue)
                           }
-                        } else {
-                          if (value === "" || /^\d*\.?\d*$/.test(value)) {
-                            onUpdateIncomeSource(source.id, "amount", value)
-                          }
-                        }
-                      }}
-                      required
-                      className="flex-1 h-9 sm:h-10 text-xs sm:text-sm"
-                    />
+                        }}
+                        required
+                        className="h-9 sm:h-10 text-xs sm:text-sm pl-8"
+                      />
+                    </div>
                     <Select
                       value={source.currency || "NGN"}
                       onValueChange={(value: CurrencyCode) =>

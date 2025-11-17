@@ -75,6 +75,7 @@ export default function SettingsPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="freelancer">Freelancer / Self-Employed</SelectItem>
+                  <SelectItem value="creator">Creator / Influencer</SelectItem>
                       <SelectItem value="sme">Small & Medium Enterprise</SelectItem>
                       <SelectItem value="individual">Individual</SelectItem>
                     </SelectContent>

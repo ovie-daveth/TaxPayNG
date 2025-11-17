@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from './useAuth'
 import { userService } from '@/lib/services'
-import { UserProfile } from '@/lib/types'
+import type { UserProfile, BusinessType } from '@/lib/types'
 
 export function useUserProfile() {
   const { user } = useAuth()
@@ -52,8 +52,9 @@ export function useUserProfile() {
     loading,
     error,
     refetchProfile,
-    businessType: profile?.businessType || 'freelancer',
+    businessType: (profile?.businessType ?? 'freelancer') as BusinessType,
     isFreelancer: profile?.businessType === 'freelancer',
+    isCreator: profile?.businessType === 'creator',
     isSME: profile?.businessType === 'sme',
   }
 }

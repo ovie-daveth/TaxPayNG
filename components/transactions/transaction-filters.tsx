@@ -18,7 +18,7 @@ export function TransactionFilters({ filters, onFiltersChange }: TransactionFilt
   const handleTypeChange = (value: string) => {
     onFiltersChange({
       ...filters,
-      type: value === 'all' ? undefined : value as 'income' | 'expense'
+      type: value === 'all' ? undefined : (value as TransactionFiltersType['type'])
     })
   }
 
@@ -90,6 +90,7 @@ export function TransactionFilters({ filters, onFiltersChange }: TransactionFilt
               <SelectItem value="all">All types</SelectItem>
               <SelectItem value="income">Income</SelectItem>
               <SelectItem value="expense">Expense</SelectItem>
+              <SelectItem value="relief">Tax Relief</SelectItem>
             </SelectContent>
           </Select>
         </div>
