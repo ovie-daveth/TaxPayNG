@@ -11,14 +11,34 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch"
 import { Separator } from "@/components/ui/separator"
 import { SettingsSkeleton } from "@/components/ui/skeletons"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { userService } from "@/lib/services"
+import { toast } from "sonner"
+import { Progress } from "@/components/ui/progress"
+import { Badge } from "@/components/ui/badge"
 
 export default function SettingsPage() {
+  const { user } = useAuth()
+  const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
   const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
+  const [subscriptionData, setSubscriptionData] = useState({
+    isSubscribe: false,
+    subscriptionType: null as string | null,
+  })
 
   useEffect(() => {
-    const timer = setTimeout(() => setIsLoading(false), 500)
-    return () => clearTimeout(timer)
-  }, [])
+    if (!profileLoading && profile) {
+      setSubscriptionData({
+        isSubscribe: profile.isSubscribe ?? false,
+        subscriptionType: profile.subscriptionType || null,
+      })
+      setIsLoading(false)
+    } else if (!profileLoading) {
+      setIsLoading(false)
+    }
+  }, [profile, profileLoading])
   if (isLoading) {
     return (
           <main className="container mx-auto px-4 py-6 max-w-4xl">
@@ -124,6 +144,128 @@ export default function SettingsPage() {
                   </div>
                   <Switch defaultChecked />
                 </div>
+              </div>
+            </Card>
+
+            {/* Subscription Settings */}
+            <Card className="p-6">
+              <h2 className="text-lg font-semibold mb-4">Subscription & Limits</h2>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Subscription Status</Label>
+                    <p className="text-sm text-muted-foreground">Manage your subscription plan</p>
+                  </div>
+                  <Badge variant={subscriptionData.isSubscribe ? "default" : "secondary"}>
+                    {subscriptionData.isSubscribe ? "Subscribed" : "Not Subscribed"}
+                  </Badge>
+                </div>
+                <Separator />
+                <div className="space-y-2">
+                  <Label htmlFor="subscription-type">Subscription Type</Label>
+                  <Select 
+                    value={subscriptionData.subscriptionType || "none"} 
+                    onValueChange={(value) => setSubscriptionData(prev => ({ ...prev, subscriptionType: value === "none" ? null : value }))}
+                    disabled={isSaving}
+                  >
+                    <SelectTrigger id="subscription-type">
+                      <SelectValue placeholder="Select subscription type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">No Subscription</SelectItem>
+                      <SelectItem value="PRO">PRO - Freelancers</SelectItem>
+                      <SelectItem value="GOLD">GOLD - Creators</SelectItem>
+                      <SelectItem value="PLATINUM">PLATINUM - Advanced Creators</SelectItem>
+                      <SelectItem value="Small Business">Small Business</SelectItem>
+                      <SelectItem value="Big Business">Big Business</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>Is Subscribed</Label>
+                    <p className="text-sm text-muted-foreground">Toggle subscription status</p>
+                  </div>
+                  <Switch 
+                    checked={subscriptionData.isSubscribe} 
+                    onCheckedChange={(checked) => setSubscriptionData(prev => ({ ...prev, isSubscribe: checked }))}
+                    disabled={isSaving}
+                  />
+                </div>
+                <Separator />
+                
+                {/* Transaction Count */}
+                {profile && (
+                  <>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Monthly Transactions</Label>
+                        <span className="text-sm font-medium">
+                          {profile.transactionCount || 0} / {userService.getTransactionLimit(profile.subscriptionType || null) === Infinity ? '∞' : userService.getTransactionLimit(profile.subscriptionType || null)}
+                        </span>
+                      </div>
+                      {userService.getTransactionLimit(profile.subscriptionType || null) !== Infinity && (
+                        <Progress 
+                          value={((profile.transactionCount || 0) / userService.getTransactionLimit(profile.subscriptionType || null)) * 100} 
+                          className="h-2"
+                        />
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        Resets on the 1st of each month
+                      </p>
+                    </div>
+                    <Separator />
+                    
+                    {/* Storage Usage */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Storage Usage</Label>
+                        <span className="text-sm font-medium">
+                          {((profile.storageUsed || 0) / (1024 * 1024)).toFixed(2)} MB / {((profile.storageLimit || 500 * 1024 * 1024) / (1024 * 1024)).toFixed(0)} MB
+                        </span>
+                      </div>
+                      <Progress 
+                        value={((profile.storageUsed || 0) / (profile.storageLimit || 500 * 1024 * 1024)) * 100} 
+                        className="h-2"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {((profile.storageLimit || 500 * 1024 * 1024) - (profile.storageUsed || 0)) / (1024 * 1024) > 0 
+                          ? `${(((profile.storageLimit || 500 * 1024 * 1024) - (profile.storageUsed || 0)) / (1024 * 1024)).toFixed(2)} MB remaining`
+                          : 'Storage limit reached'}
+                      </p>
+                    </div>
+                  </>
+                )}
+                
+                <Button 
+                  onClick={async () => {
+                    if (!user?.uid) {
+                      toast.error("User not authenticated")
+                      return
+                    }
+                    setIsSaving(true)
+                    try {
+                      const result = await userService.upsertProfile(user.uid, {
+                        isSubscribe: subscriptionData.isSubscribe,
+                        subscriptionType: subscriptionData.subscriptionType as any,
+                      })
+                      if (result.success) {
+                        toast.success("Subscription updated successfully")
+                        await refetchProfile()
+                      } else {
+                        toast.error(result.error || "Failed to update subscription")
+                      }
+                    } catch (error) {
+                      toast.error("Failed to update subscription")
+                      console.error(error)
+                    } finally {
+                      setIsSaving(false)
+                    }
+                  }}
+                  disabled={isSaving}
+                >
+                  {isSaving ? "Saving..." : "Save Subscription Changes"}
+                </Button>
               </div>
             </Card>
 

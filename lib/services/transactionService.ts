@@ -1,6 +1,7 @@
 import { BaseService } from './base'
 import { Transaction, TransactionFilters, ApiResponse, PaginatedResponse, Document } from '@/lib/types'
 import { documentService } from './documentService'
+import { userService } from './userService'
 
 export class TransactionService extends BaseService {
   constructor() {
@@ -97,6 +98,34 @@ export class TransactionService extends BaseService {
   // Create a new transaction
   async createTransaction(userId: string, transactionData: Omit<Transaction, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<Transaction>> {
     try {
+      // Check transaction limit
+      const profile = await userService.getProfile(userId)
+      if (profile) {
+        const transactionLimit = userService.getTransactionLimit(profile.subscriptionType || null)
+        
+        // Reset count if new month
+        await userService.resetTransactionCountIfNeeded(userId, profile)
+        const currentProfile = await userService.getProfile(userId)
+        
+        if (currentProfile && transactionLimit !== Infinity) {
+          const currentCount = currentProfile.transactionCount || 0
+          if (currentCount >= transactionLimit) {
+            return {
+              success: false,
+              error: `Transaction limit reached. You have used ${currentCount} of ${transactionLimit} transactions this month. Please upgrade your plan to add more transactions.`
+            }
+          }
+          
+          // Check if adding this transaction would exceed limit
+          if (currentCount + 1 > transactionLimit) {
+            return {
+              success: false,
+              error: `This transaction would exceed your monthly limit of ${transactionLimit} transactions. You have ${currentCount} transactions remaining.`
+            }
+          }
+        }
+      }
+
       const newTransaction = {
         ...transactionData,
         userId,
@@ -106,6 +135,9 @@ export class TransactionService extends BaseService {
 
       const transactionId = await this.create(newTransaction)
       const createdTransaction = await this.getById(transactionId)
+
+      // Increment transaction count
+      await userService.incrementTransactionCount(userId)
 
       // If transaction has attachments, create corresponding documents
       if (transactionData.attachments && transactionData.attachments.length > 0) {

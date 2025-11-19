@@ -2,6 +2,7 @@ import { BaseService } from './base'
 import { Document, UploadDocumentData, DocumentFilters, ApiResponse, PaginatedResponse } from '@/lib/types'
 import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage'
 import { storage } from '@/firebase/firebase'
+import { userService } from './userService'
 
 export class DocumentService extends BaseService {
   constructor() {
@@ -91,6 +92,25 @@ export class DocumentService extends BaseService {
   async uploadDocument(userId: string, uploadData: UploadDocumentData): Promise<ApiResponse<Document>> {
     try {
       const file = uploadData.file
+      
+      // Check storage limit
+      const profile = await userService.getProfile(userId)
+      if (profile) {
+        const storageLimit = profile.storageLimit || 500 * 1024 * 1024 // Default 500MB
+        const currentStorageUsed = profile.storageUsed || 0
+        
+        if (currentStorageUsed + file.size > storageLimit) {
+          const remainingBytes = storageLimit - currentStorageUsed
+          const remainingMB = (remainingBytes / (1024 * 1024)).toFixed(2)
+          const limitMB = (storageLimit / (1024 * 1024)).toFixed(2)
+          
+          return {
+            success: false,
+            error: `Storage limit exceeded. You have ${remainingMB}MB remaining of ${limitMB}MB total storage. Please delete some documents or upgrade your plan.`
+          }
+        }
+      }
+      
       let downloadURL: string
       let thumbnailURL: string | undefined
       
@@ -144,6 +164,9 @@ export class DocumentService extends BaseService {
 
       const documentId = await this.create(documentData)
       const createdDocument = await this.getById(documentId)
+
+      // Update storage used
+      await userService.updateStorageUsed(userId, file.size)
 
       return {
         success: true,
@@ -200,6 +223,8 @@ export class DocumentService extends BaseService {
         }
       }
 
+      const documentSize = existingDocument.size || 0
+
       // Delete file from Firebase Storage
       try {
         const fileRef = ref(storage, existingDocument.url)
@@ -211,6 +236,11 @@ export class DocumentService extends BaseService {
 
       // Delete document record from Firestore
       await this.delete(documentId)
+
+      // Reduce storage used
+      if (documentSize > 0) {
+        await userService.updateStorageUsed(userId, -documentSize)
+      }
 
       return {
         success: true,

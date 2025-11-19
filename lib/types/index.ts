@@ -1,5 +1,8 @@
 export type BusinessType = 'freelancer' | 'creator' | 'sme' | 'individual'
 
+// Subscription Types
+export type SubscriptionType = 'PRO' | 'GOLD' | 'PLATINUM' | 'Small Business' | 'Big Business' | null
+
 // User Profile Types
 export interface UserProfile {
   id: string
@@ -31,6 +34,13 @@ export interface UserProfile {
     notifications: boolean
     theme: 'light' | 'dark' | 'system'
   }
+  // Subscription fields
+  isSubscribe?: boolean
+  subscriptionType?: SubscriptionType
+  transactionCount?: number // Current month's transaction count
+  transactionCountResetDate?: string // Date when transaction count was last reset
+  storageLimit?: number // Storage limit in bytes (e.g., 500MB = 500 * 1024 * 1024)
+  storageUsed?: number // Current storage used in bytes
 }
 
 // Transaction Types
