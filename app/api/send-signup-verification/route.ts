@@ -66,8 +66,14 @@ export async function POST(request: NextRequest) {
     const emailSent = await sendSignupVerificationEmail(emailLower, trimmedName, verificationToken)
 
     if (!emailSent) {
+      // Check if we're in development mode - if so, the code was logged to console
+      const isDevelopment = process.env.NODE_ENV === 'development'
+      const errorMessage = isDevelopment
+        ? 'Email sending failed, but verification code has been logged to the server console. Check your terminal for the code.'
+        : 'Failed to send verification email. Please check your SMTP configuration and try again.'
+      
       return NextResponse.json(
-        { error: 'Failed to send verification email. Please try again.' },
+        { error: errorMessage },
         { status: 500 }
       )
     }
@@ -91,11 +97,15 @@ async function sendSignupVerificationEmail(email: string, name: string, token: s
     const transporter = createTransporter()
 
     if (!transporter) {
+      // SMTP not configured - log to console for development
       console.log(`\n📧 Signup Verification Email for ${email}`)
       console.log(`Hi ${name},`)
       console.log(`Your verification code is: ${token}`)
       console.log(`This code expires in 15 minutes.\n`)
       console.warn('⚠️ SMTP not configured. Please configure SMTP settings to send actual emails.')
+      console.warn('   Add SMTP_HOST, SMTP_PORT, SMTP_USER, and SMTP_PASS to your .env.local file.')
+      console.warn('   See NODEMAILER_SETUP.md for instructions.\n')
+      // Return true to allow development flow to continue
       return true
     }
 
@@ -180,25 +190,65 @@ If you didn't start this signup, you can safely ignore this email.
 Visit our website: ${appUrl}
     `.trim()
 
-    const info = await transporter.sendMail({
-      from: `"OTax" <${fromEmail}>`,
-      to: email,
-      subject: 'Verify Your Email - OTax Signup',
-      text: textTemplate,
-      html: htmlTemplate,
-    })
+    try {
+      const info = await transporter.sendMail({
+        from: `"OTax" <${fromEmail}>`,
+        to: email,
+        subject: 'Verify Your Email - OTax Signup',
+        text: textTemplate,
+        html: htmlTemplate,
+      })
 
-    console.log('✅ Signup verification email sent successfully:', info.messageId)
-    return true
+      console.log('✅ Signup verification email sent successfully:', info.messageId)
+      return true
+    } catch (sendError: any) {
+      // Log detailed error information
+      console.error('❌ Signup email sending error:', sendError)
+      console.error('Error details:', {
+        message: sendError.message,
+        code: sendError.code,
+        command: sendError.command,
+        response: sendError.response,
+        responseCode: sendError.responseCode,
+      })
+
+      // Common error messages
+      if (sendError.code === 'EAUTH') {
+        console.error('❌ Authentication failed. Check your SMTP_USER and SMTP_PASS credentials.')
+      } else if (sendError.code === 'ECONNECTION') {
+        console.error('❌ Connection failed. Check your SMTP_HOST and SMTP_PORT settings.')
+      } else if (sendError.code === 'ETIMEDOUT') {
+        console.error('❌ Connection timeout. Check your network and SMTP settings.')
+      }
+
+      // Fallback: log to console for development
+      console.log(`\n📧 Signup Verification Email for ${email} (Fallback - Email service failed)`)
+      console.log(`Hi ${name},`)
+      console.log(`Your verification code is: ${token}`)
+      console.log(`This code expires in 15 minutes.\n`)
+      console.warn('⚠️ Email sending failed. Check your SMTP configuration in .env.local')
+      console.warn('   See NODEMAILER_SETUP.md for setup instructions.\n')
+
+      // In development, allow flow to continue even if email fails
+      // In production, you might want to return false here
+      const isDevelopment = process.env.NODE_ENV === 'development'
+      if (isDevelopment) {
+        console.warn('⚠️ Development mode: Allowing signup to continue despite email failure.')
+        return true
+      }
+
+      return false
+    }
   } catch (error: any) {
-    console.error('❌ Signup email sending error:', error)
-
-    console.log(`\n📧 Signup Verification Email for ${email} (Fallback - Email service failed)`)
+    console.error('❌ Unexpected error in sendSignupVerificationEmail:', error)
+    console.log(`\n📧 Signup Verification Email for ${email} (Fallback - Unexpected error)`)
     console.log(`Hi ${name},`)
     console.log(`Your verification code is: ${token}`)
     console.log(`This code expires in 15 minutes.\n`)
 
-    return false
+    // In development, allow flow to continue
+    const isDevelopment = process.env.NODE_ENV === 'development'
+    return isDevelopment
   }
 }
 

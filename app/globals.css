@@ -464,6 +464,25 @@
     }
   }
 
+  /* Transaction row highlight animation */
+  @keyframes highlightFade {
+    0% {
+      background-color: hsl(var(--primary) / 0.3);
+      border-color: hsl(var(--primary) / 0.8);
+      box-shadow: 0 0 0 0 hsl(var(--primary) / 0.4);
+    }
+    50% {
+      background-color: hsl(var(--primary) / 0.2);
+      border-color: hsl(var(--primary) / 0.6);
+      box-shadow: 0 4px 12px hsl(var(--primary) / 0.2);
+    }
+    100% {
+      background-color: transparent;
+      border-color: hsl(var(--border));
+      box-shadow: none;
+    }
+  }
+
   
   /* Article Content Styling */
   .article-content {
