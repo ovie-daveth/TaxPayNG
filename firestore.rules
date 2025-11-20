@@ -112,7 +112,16 @@ service cloud.firestore {
       // Users can read their own invoices
       // For admin access, we allow authenticated users (admin checks done at app level)
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      
+      // Allow create if:
+      // 1. User is creating their own invoice (userId matches auth.uid), OR
+      // 2. User is sending an invoice to another user (senderUserId matches auth.uid for incoming invoices)
+      allow create: if isAuthenticated() && (
+        request.resource.data.userId == request.auth.uid ||
+        (request.resource.data.invoiceType == 'incoming' && 
+         request.resource.data.senderUserId == request.auth.uid)
+      );
+      
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
     }

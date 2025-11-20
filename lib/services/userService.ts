@@ -372,6 +372,20 @@ export class UserService extends BaseService {
       }
     }
   }
+
+  // Find user by email (for sending invoices)
+  async findUserByEmail(email: string): Promise<UserProfile | null> {
+    try {
+      const profiles = await this.getAll([
+        { field: 'email', operator: '==', value: email.toLowerCase() }
+      ])
+      
+      return profiles.length > 0 ? profiles[0] : null
+    } catch (error) {
+      console.error('Error finding user by email:', error)
+      return null
+    }
+  }
 }
 
 // Export a singleton instance

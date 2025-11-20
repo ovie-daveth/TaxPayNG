@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { invoiceService } from "@/lib/services"
-import { Invoice, InvoiceStatus } from "@/lib/types"
+import { Invoice, InvoiceStatus, InvoiceType } from "@/lib/types"
 import { toast } from "sonner"
 import { AddInvoiceDialog } from "@/components/invoices/add-invoice-dialog"
 import { ViewInvoiceDialog } from "@/components/invoices/view-invoice-dialog"
@@ -24,6 +24,7 @@ export default function InvoicesPage() {
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | "all">("all")
+  const [typeFilter, setTypeFilter] = useState<InvoiceType | "all">("all")
   const [currentPage, setCurrentPage] = useState(1)
   const [pagination, setPagination] = useState({
     page: 1,
@@ -43,6 +44,9 @@ export default function InvoicesPage() {
       if (statusFilter !== "all") {
         filters.status = statusFilter
       }
+      if (typeFilter !== "all") {
+        filters.invoiceType = typeFilter
+      }
       if (searchTerm) {
         filters.search = searchTerm
       }
@@ -60,7 +64,7 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     loadInvoices()
-  }, [user, currentPage, statusFilter, searchTerm])
+  }, [user, currentPage, statusFilter, typeFilter, searchTerm])
 
   // Listen for create invoice event from header
   useEffect(() => {
@@ -71,7 +75,7 @@ export default function InvoicesPage() {
     return () => window.removeEventListener('createInvoice', handleCreateInvoice)
   }, [])
 
-  const getStatusBadge = (status: InvoiceStatus) => {
+  const getStatusBadge = (status: InvoiceStatus, invoiceType?: InvoiceType) => {
     const variants: Record<InvoiceStatus, { variant: "default" | "secondary" | "destructive" | "outline", icon: any }> = {
       draft: { variant: "secondary", icon: FileText },
       sent: { variant: "outline", icon: Send },
@@ -81,10 +85,17 @@ export default function InvoicesPage() {
     }
     const config = variants[status]
     const Icon = config.icon
+    
+    // For incoming invoices with "sent" status, show "Received" instead
+    let statusLabel = status.charAt(0).toUpperCase() + status.slice(1)
+    if (status === 'sent' && invoiceType === 'incoming') {
+      statusLabel = 'Received'
+    }
+    
     return (
       <Badge variant={config.variant} className="flex items-center gap-1">
         <Icon className="w-3 h-3" />
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+        {statusLabel}
       </Badge>
     )
   }
@@ -163,6 +174,16 @@ export default function InvoicesPage() {
               className="pl-10"
             />
           </div>
+          <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as "all" | "outgoing" | "incoming")}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Filter by type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="outgoing">Outgoing (You send)</SelectItem>
+              <SelectItem value="incoming">Incoming (You receive)</SelectItem>
+            </SelectContent>
+          </Select>
           <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as InvoiceStatus | "all")}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Filter by status" />
@@ -202,14 +223,30 @@ export default function InvoicesPage() {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-4 mb-2">
-                    <h3 className="text-lg font-semibold">{invoice.invoiceNumber}</h3>
-                    {getStatusBadge(invoice.status)}
+                    <h3 className="text-lg font-semibold">
+                      {invoice.invoiceType === 'incoming' ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
+                    </h3>
+                    <Badge variant="outline" className="text-xs">
+                      {invoice.invoiceType === 'incoming' ? 'Incoming' : 'Outgoing'}
+                    </Badge>
+                    {getStatusBadge(invoice.status, invoice.invoiceType)}
                   </div>
                   <div className="grid md:grid-cols-3 gap-4 text-sm text-muted-foreground">
                     <div>
-                      <p className="font-medium text-foreground mb-1">Client</p>
-                      <p>{invoice.client.name}</p>
-                      {invoice.client.email && <p className="text-xs">{invoice.client.email}</p>}
+                      <p className="font-medium text-foreground mb-1">
+                        {invoice.invoiceType === 'incoming' ? 'From' : 'Client'}
+                      </p>
+                      {invoice.invoiceType === 'incoming' ? (
+                        <>
+                          <p>{invoice.supplier?.name || 'Unknown'}</p>
+                          {invoice.supplier?.email && <p className="text-xs">{invoice.supplier.email}</p>}
+                        </>
+                      ) : (
+                        <>
+                          <p>{invoice.client.name}</p>
+                          {invoice.client.email && <p className="text-xs">{invoice.client.email}</p>}
+                        </>
+                      )}
                     </div>
                     <div>
                       <p className="font-medium text-foreground mb-1">Dates</p>

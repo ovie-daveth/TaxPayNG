@@ -2,25 +2,30 @@ import { BaseService } from './base'
 import { Invoice, InvoiceFilters, InvoiceItem, ApiResponse, PaginatedResponse, SavedClient } from '@/lib/types'
 
 export class InvoiceService extends BaseService {
+  private sendingInvoices: Set<string> = new Set() // Track invoices being sent to prevent duplicates
+
   constructor() {
     super('invoices')
   }
 
-  // Generate invoice number (format: INV-YYYY-NNN)
-  private async generateInvoiceNumber(userId: string): Promise<string> {
+  // Generate invoice number (format: INV-YYYY-NNN or BILL-YYYY-NNN)
+  private async generateInvoiceNumber(userId: string, invoiceType: 'outgoing' | 'incoming' = 'outgoing'): Promise<string> {
     try {
       const year = new Date().getFullYear()
-      const prefix = `INV-${year}-`
+      const prefix = invoiceType === 'incoming' ? `BILL-${year}-` : `INV-${year}-`
       
       // Get all invoices for this user this year
       const invoices = await this.getAll([
         { field: 'userId', operator: '==', value: userId }
       ])
       
-      // Filter invoices from this year
+      // Filter invoices from this year with matching type
       const yearInvoices = invoices.filter(inv => {
         const invDate = inv.issueDate ? new Date(inv.issueDate) : new Date(inv.createdAt)
-        return invDate.getFullYear() === year && inv.invoiceNumber?.startsWith(prefix)
+        const invType = inv.invoiceType || 'outgoing'
+        return invDate.getFullYear() === year && 
+               inv.invoiceNumber?.startsWith(prefix) &&
+               invType === invoiceType
       })
       
       // Find the highest number
@@ -40,7 +45,8 @@ export class InvoiceService extends BaseService {
       // Fallback to timestamp-based number
       const year = new Date().getFullYear()
       const timestamp = Date.now().toString().slice(-6)
-      return `INV-${year}-${timestamp}`
+      const prefix = invoiceType === 'incoming' ? 'BILL' : 'INV'
+      return `${prefix}-${year}-${timestamp}`
     }
   }
 
@@ -72,7 +78,7 @@ export class InvoiceService extends BaseService {
     }
   }
 
-  // Get all invoices for a user
+  // Get all invoices for a user (both created and received)
   async getUserInvoices(
     userId: string,
     filters?: InvoiceFilters,
@@ -80,16 +86,41 @@ export class InvoiceService extends BaseService {
     pageSize: number = 20
   ): Promise<PaginatedResponse<Invoice>> {
     try {
-      // Always fetch all invoices for the user (only filter by userId in database)
-      const allInvoices = await this.getAll([
-        { field: 'userId', operator: '==', value: userId }
+      // Fetch invoices created by user AND invoices received by user
+      const [createdInvoices, receivedInvoices] = await Promise.all([
+        this.getAll([{ field: 'userId', operator: '==', value: userId }]),
+        this.getAll([{ field: 'recipientUserId', operator: '==', value: userId }])
       ])
+      
+      // Combine both lists and deduplicate by invoice ID
+      // An invoice can appear in both lists if it has both userId and recipientUserId set to the same user
+      const invoiceMap = new Map<string, Invoice>()
+      
+      // Add created invoices
+      createdInvoices.forEach(inv => {
+        if (inv.id) {
+          invoiceMap.set(inv.id, inv)
+        }
+      })
+      
+      // Add received invoices (will overwrite duplicates with same ID)
+      receivedInvoices.forEach(inv => {
+        if (inv.id) {
+          invoiceMap.set(inv.id, inv)
+        }
+      })
+      
+      // Convert map back to array
+      const allInvoices = Array.from(invoiceMap.values())
 
       // Apply all filters client-side
       let filtered = allInvoices
 
       if (filters?.status) {
         filtered = filtered.filter(inv => inv.status === filters.status)
+      }
+      if (filters?.invoiceType) {
+        filtered = filtered.filter(inv => (inv.invoiceType || 'outgoing') === filters.invoiceType)
       }
       if (filters?.clientId) {
         filtered = filtered.filter(inv => inv.client.id === filters.clientId)
@@ -166,7 +197,7 @@ export class InvoiceService extends BaseService {
   async createInvoice(userId: string, invoiceData: Omit<Invoice, 'id' | 'userId' | 'invoiceNumber' | 'subtotal' | 'taxAmount' | 'total' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<Invoice>> {
     try {
       // Generate invoice number
-      const invoiceNumber = await this.generateInvoiceNumber(userId)
+      const invoiceNumber = await this.generateInvoiceNumber(userId, invoiceData.invoiceType || 'outgoing')
       
       // Calculate totals
       const totals = this.calculateTotals(invoiceData.items, invoiceData.discount)
@@ -398,6 +429,254 @@ export class InvoiceService extends BaseService {
     } catch (error) {
       console.error('Error getting invoice stats:', error)
       throw error
+    }
+  }
+
+  // Send invoice to another OTax user
+  // async sendInvoiceToUser(
+  //   invoiceId: string,
+  //   senderUserId: string,
+  //   recipientEmail: string
+  // ): Promise<ApiResponse<Invoice>> {
+  //   try {
+  //     // Find recipient user by email
+  //     const { userService } = await import('./userService')
+  //     const recipient = await userService.findUserByEmail(recipientEmail)
+      
+  //     if (!recipient) {
+  //       return {
+  //         success: false,
+  //         error: 'User not found. Please make sure the recipient is registered on OTax.'
+  //       }
+  //     }
+
+  //     // Get the invoice
+  //     const invoice = await this.getById(invoiceId)
+  //     if (!invoice || invoice.userId !== senderUserId) {
+  //       return {
+  //         success: false,
+  //         error: 'Invoice not found or unauthorized'
+  //       }
+  //     }
+
+  //     // Check if invoice was already sent to this user
+  //     // Get all incoming invoices for this recipient
+  //     const allRecipientInvoices = await this.getAll([
+  //       { field: 'userId', operator: '==', value: recipient.userId },
+  //       { field: 'invoiceType', operator: '==', value: 'incoming' }
+  //     ])
+      
+  //     // Check if any existing invoice matches this one
+  //     // Match by: senderUserId matches AND recipientEmail matches
+  //     // Also check if the invoice was created recently (within last 5 minutes) to prevent race conditions
+  //     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+  //     const duplicate = allRecipientInvoices.find(inv => {
+  //       const isFromSameSender = inv.senderUserId === senderUserId
+  //       const isSameEmail = inv.recipientEmail?.toLowerCase() === recipientEmail.toLowerCase()
+  //       const isRecent = inv.createdAt && inv.createdAt > fiveMinutesAgo
+  //       const hasSameInvoiceNumber = inv.invoiceNumber === invoice.invoiceNumber
+        
+  //       // Match if: same sender AND (same email OR same invoice number OR created recently)
+  //       return isFromSameSender && (isSameEmail || hasSameInvoiceNumber || (isRecent && isSameEmail))
+  //     })
+      
+  //     if (duplicate) {
+  //       return {
+  //         success: false,
+  //         error: 'This invoice has already been sent to this user'
+  //       }
+  //     }
+
+  //     // Generate a new invoice number for the incoming invoice (so it's unique for the recipient)
+  //     const recipientInvoiceNumber = await this.generateInvoiceNumber(recipient.userId, 'incoming')
+
+  //     // Create a copy of the invoice for the recipient (incoming invoice)
+  //     const incomingInvoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'> = {
+  //       ...invoice,
+  //       userId: recipient.userId, // Recipient owns this copy
+  //       invoiceNumber: recipientInvoiceNumber, // Generate new number for recipient
+  //       invoiceType: 'incoming' as const,
+  //       senderUserId: senderUserId,
+  //       recipientUserId: recipient.userId,
+  //       recipientEmail: recipientEmail,
+  //       status: 'sent' as const,
+  //       receivedAt: new Date().toISOString(),
+  //       sentAt: new Date().toISOString()
+  //     }
+
+  //     // Create the incoming invoice for recipient
+  //     const newInvoiceId = await this.create({
+  //       ...incomingInvoiceData,
+  //       createdAt: new Date().toISOString(),
+  //       updatedAt: new Date().toISOString()
+  //     })
+      
+  //     // Update original invoice to mark as sent
+  //     await this.update(invoiceId, {
+  //       recipientUserId: recipient.userId,
+  //       recipientEmail: recipientEmail,
+  //       status: 'sent',
+  //       sentAt: new Date().toISOString(),
+  //       updatedAt: new Date().toISOString()
+  //     })
+
+  //     const sentInvoice = await this.getById(invoiceId)
+  //     return {
+  //       success: true,
+  //       data: sentInvoice,
+  //       message: `Invoice sent successfully to ${recipientEmail}`
+  //     }
+  //   } catch (error) {
+  //     console.error('Error sending invoice to user:', error)
+  //     return {
+  //       success: false,
+  //       error: error instanceof Error ? error.message : 'Unknown error occurred'
+  //     }
+  //   }
+  // }
+
+  async sendInvoiceToUser(
+    invoiceId: string,
+    senderUserId: string,
+    recipientEmail: string
+  ): Promise<ApiResponse<Invoice>> {
+    // Create a unique key for this send operation
+    const sendKey = `${invoiceId}-${recipientEmail.toLowerCase()}`
+    
+    // Check if this invoice is already being sent to this recipient
+    if (this.sendingInvoices.has(sendKey)) {
+      return {
+        success: false,
+        error: 'Invoice is already being sent to this user. Please wait...'
+      }
+    }
+
+    try {
+      // Mark as sending
+      this.sendingInvoices.add(sendKey)
+
+      // Get the invoice first
+      const invoice = await this.getById(invoiceId)
+      if (!invoice || invoice.userId !== senderUserId) {
+        this.sendingInvoices.delete(sendKey)
+        return {
+          success: false,
+          error: 'Invoice not found or unauthorized'
+        }
+      }
+
+      // Check if this invoice was already sent
+      if (invoice.recipientUserId && invoice.recipientEmail) {
+        // Invoice was already sent, check if it's to the same recipient
+        if (invoice.recipientEmail.toLowerCase() === recipientEmail.toLowerCase()) {
+          this.sendingInvoices.delete(sendKey)
+          return {
+            success: false,
+            error: 'This invoice has already been sent to this user'
+          }
+        }
+      }
+
+      // Find recipient user by email
+      const { userService } = await import('./userService')
+      const recipient = await userService.findUserByEmail(recipientEmail)
+      
+      if (!recipient) {
+        return {
+          success: false,
+          error: 'User not found. Please make sure the recipient is registered on OTax.'
+        }
+      }
+
+      // Check if a copy already exists for the recipient
+      // Get all incoming invoices for this recipient
+      const allRecipientInvoices = await this.getAll([
+        { field: 'userId', operator: '==', value: recipient.userId },
+        { field: 'invoiceType', operator: '==', value: 'incoming' }
+      ])
+      
+      // Check if any invoice matches this one
+      // Match by: senderUserId AND (senderInvoiceNumber OR recipientEmail OR recent creation)
+      const now = Date.now()
+      const fiveMinutesAgo = now - (5 * 60 * 1000)
+      
+      const duplicate = allRecipientInvoices.find(inv => {
+        const isFromSameSender = inv.senderUserId === senderUserId
+        if (!isFromSameSender) return false
+        
+        // Check multiple criteria for duplicate detection
+        const hasSameSenderInvoiceNumber = inv.senderInvoiceNumber === invoice.invoiceNumber
+        const hasSameEmail = inv.recipientEmail?.toLowerCase() === recipientEmail.toLowerCase()
+        
+        // Check if invoice was created recently (within 5 minutes) - catches race conditions
+        const isRecent = inv.createdAt && new Date(inv.createdAt).getTime() > fiveMinutesAgo
+        
+        // Match if: same sender AND (same sender invoice number OR same email OR recent creation with same email)
+        return hasSameSenderInvoiceNumber || hasSameEmail || (isRecent && hasSameEmail)
+      })
+      
+      if (duplicate) {
+        this.sendingInvoices.delete(sendKey)
+        return {
+          success: false,
+          error: 'This invoice has already been sent to this user'
+        }
+      }
+
+      // Generate a new invoice number for the incoming invoice
+      const recipientInvoiceNumber = await this.generateInvoiceNumber(recipient.userId, 'incoming')
+
+      // Create a copy of the invoice for the recipient (incoming invoice)
+      const incomingInvoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'> = {
+        ...invoice,
+        userId: recipient.userId, // Recipient owns this copy
+        invoiceNumber: recipientInvoiceNumber, // Generate new number for recipient
+        invoiceType: 'incoming' as const,
+        senderUserId: senderUserId,
+        senderInvoiceNumber: invoice.invoiceNumber, // Store original invoice number for duplicate detection
+        recipientUserId: recipient.userId,
+        recipientEmail: recipientEmail,
+        status: 'sent' as const,
+        receivedAt: new Date().toISOString(),
+        sentAt: new Date().toISOString()
+      }
+
+      // Create the incoming invoice for recipient
+      const newInvoiceId = await this.create({
+        ...incomingInvoiceData,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      })
+      
+      // Update original invoice to mark as sent (only if not already sent)
+      if (!invoice.sentAt || !invoice.recipientUserId) {
+        await this.update(invoiceId, {
+          recipientUserId: recipient.userId,
+          recipientEmail: recipientEmail,
+          status: 'sent',
+          sentAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString()
+        })
+      }
+
+      const sentInvoice = await this.getById(invoiceId)
+      
+      // Remove from sending set
+      this.sendingInvoices.delete(sendKey)
+      
+      return {
+        success: true,
+        data: sentInvoice,
+        message: `Invoice sent successfully to ${recipientEmail}`
+      }
+    } catch (error) {
+      console.error('Error sending invoice to user:', error)
+      // Remove from sending set on error
+      this.sendingInvoices.delete(sendKey)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      }
     }
   }
 }

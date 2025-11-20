@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Download, Printer, ExternalLink } from "lucide-react"
-import { Invoice } from "@/lib/types"
+import { Invoice, InvoiceType } from "@/lib/types"
 import { getCurrencySymbol } from "@/lib/utils/currency"
 import { format } from "date-fns"
 import { toast } from "sonner"
@@ -38,7 +38,12 @@ export function ViewInvoiceDialog({
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto hide-scrollbar">
         <DialogHeader>
           <div className="flex items-center justify-between">
-            <DialogTitle>Invoice {invoice.invoiceNumber}</DialogTitle>
+            <DialogTitle>
+              {invoice.invoiceType === 'incoming' ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
+              {invoice.invoiceType === 'incoming' && (
+                <span className="ml-2 text-sm font-normal text-muted-foreground">(You owe supplier)</span>
+              )}
+            </DialogTitle>
             <div className="flex gap-2">
               <Button variant="outline" size="sm" onClick={handlePrint}>
                 <Printer className="w-4 h-4 mr-2" />
@@ -56,78 +61,160 @@ export function ViewInvoiceDialog({
           {/* Invoice Header */}
           <div className="flex justify-between items-start border-b pb-4">
             <div>
-              <h2 className="text-2xl font-bold mb-2">INVOICE</h2>
-              <p className="text-sm text-muted-foreground">Invoice #{invoice.invoiceNumber}</p>
+              <h2 className="text-2xl font-bold mb-2">
+                {invoice.invoiceType === 'incoming' ? 'BILL' : 'INVOICE'}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {invoice.invoiceType === 'incoming' ? 'Bill' : 'Invoice'} #{invoice.invoiceNumber}
+              </p>
             </div>
             <Badge variant={invoice.status === 'paid' ? 'default' : invoice.status === 'overdue' ? 'destructive' : 'secondary'}>
-              {invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
+              {invoice.status === 'sent' && invoice.invoiceType === 'incoming' 
+                ? 'Received' 
+                : invoice.status.charAt(0).toUpperCase() + invoice.status.slice(1)}
             </Badge>
           </div>
 
           {/* Supplier and Client Info */}
           <div className="grid md:grid-cols-2 gap-6">
-            <div>
-              <h3 className="font-semibold mb-2">From (You):</h3>
-              <p className="text-xs text-muted-foreground mb-2">Your business information</p>
-              {invoice.supplier?.businessName && (
-                <p className="font-medium">{invoice.supplier.businessName}</p>
-              )}
-              <p>{invoice.supplier?.name || "Not provided"}</p>
-              {invoice.supplier?.address && (
-                <div className="text-sm text-muted-foreground mt-1">
-                  {invoice.supplier.address.street && <p>{invoice.supplier.address.street}</p>}
-                  {(invoice.supplier.address.city || invoice.supplier.address.state) && (
-                    <p>
-                      {invoice.supplier.address.city}
-                      {invoice.supplier.address.city && invoice.supplier.address.state && ", "}
-                      {invoice.supplier.address.state}
-                    </p>
+            {invoice.invoiceType === 'outgoing' ? (
+              <>
+                <div>
+                  <h3 className="font-semibold mb-2">From (You):</h3>
+                  <p className="text-xs text-muted-foreground mb-2">Your business information</p>
+                  {invoice.supplier?.businessName && (
+                    <p className="font-medium">{invoice.supplier.businessName}</p>
                   )}
-                  {invoice.supplier.address.postalCode && <p>{invoice.supplier.address.postalCode}</p>}
-                  {invoice.supplier.address.country && <p>{invoice.supplier.address.country}</p>}
+                  <p>{invoice.supplier?.name || "Not provided"}</p>
+                  {invoice.supplier?.address && (
+                    <div className="text-sm text-muted-foreground mt-1">
+                      {invoice.supplier.address.street && <p>{invoice.supplier.address.street}</p>}
+                      {(invoice.supplier.address.city || invoice.supplier.address.state) && (
+                        <p>
+                          {invoice.supplier.address.city}
+                          {invoice.supplier.address.city && invoice.supplier.address.state && ", "}
+                          {invoice.supplier.address.state}
+                        </p>
+                      )}
+                      {invoice.supplier.address.postalCode && <p>{invoice.supplier.address.postalCode}</p>}
+                      {invoice.supplier.address.country && <p>{invoice.supplier.address.country}</p>}
+                    </div>
+                  )}
+                  {invoice.supplier?.email && (
+                    <p className="text-sm text-muted-foreground mt-1">{invoice.supplier.email}</p>
+                  )}
+                  {invoice.supplier?.phone && (
+                    <p className="text-sm text-muted-foreground">{invoice.supplier.phone}</p>
+                  )}
+                  {invoice.supplier?.taxId && (
+                    <p className="text-sm text-muted-foreground mt-1">TIN: {invoice.supplier.taxId}</p>
+                  )}
                 </div>
-              )}
-              {invoice.supplier?.email && (
-                <p className="text-sm text-muted-foreground mt-1">{invoice.supplier.email}</p>
-              )}
-              {invoice.supplier?.phone && (
-                <p className="text-sm text-muted-foreground">{invoice.supplier.phone}</p>
-              )}
-              {invoice.supplier?.taxId && (
-                <p className="text-sm text-muted-foreground mt-1">TIN: {invoice.supplier.taxId}</p>
-              )}
-            </div>
 
             <div>
-              <h3 className="font-semibold mb-2">Bill To:</h3>
-              {invoice.client.businessName && (
-                <p className="font-medium">{invoice.client.businessName}</p>
-              )}
-              <p>{invoice.client.name}</p>
-              {invoice.client.address && (
-                <div className="text-sm text-muted-foreground mt-1">
-                  {invoice.client.address.street && <p>{invoice.client.address.street}</p>}
-                  {(invoice.client.address.city || invoice.client.address.state) && (
-                    <p>
-                      {invoice.client.address.city}
-                      {invoice.client.address.city && invoice.client.address.state && ", "}
-                      {invoice.client.address.state}
-                    </p>
+              <h3 className="font-semibold mb-2">
+                Bill To:
+              </h3>
+              <p className="text-xs text-muted-foreground mb-2">
+                Client who will pay this invoice
+              </p>
+                  <p className="text-xs text-muted-foreground mb-2">Client information</p>
+                  {invoice.client.businessName && (
+                    <p className="font-medium">{invoice.client.businessName}</p>
                   )}
-                  {invoice.client.address.postalCode && <p>{invoice.client.address.postalCode}</p>}
-                  {invoice.client.address.country && <p>{invoice.client.address.country}</p>}
+                  <p>{invoice.client.name}</p>
+                  {invoice.client.address && (
+                    <div className="text-sm text-muted-foreground mt-1">
+                      {invoice.client.address.street && <p>{invoice.client.address.street}</p>}
+                      {(invoice.client.address.city || invoice.client.address.state) && (
+                        <p>
+                          {invoice.client.address.city}
+                          {invoice.client.address.city && invoice.client.address.state && ", "}
+                          {invoice.client.address.state}
+                        </p>
+                      )}
+                      {invoice.client.address.postalCode && <p>{invoice.client.address.postalCode}</p>}
+                      {invoice.client.address.country && <p>{invoice.client.address.country}</p>}
+                    </div>
+                  )}
+                  {invoice.client.email && (
+                    <p className="text-sm text-muted-foreground mt-1">{invoice.client.email}</p>
+                  )}
+                  {invoice.client.phone && (
+                    <p className="text-sm text-muted-foreground">{invoice.client.phone}</p>
+                  )}
+                  {invoice.client.taxId && (
+                    <p className="text-sm text-muted-foreground mt-1">TIN: {invoice.client.taxId}</p>
+                  )}
                 </div>
-              )}
-              {invoice.client.email && (
-                <p className="text-sm text-muted-foreground mt-1">{invoice.client.email}</p>
-              )}
-              {invoice.client.phone && (
-                <p className="text-sm text-muted-foreground">{invoice.client.phone}</p>
-              )}
-              {invoice.client.taxId && (
-                <p className="text-sm text-muted-foreground mt-1">TIN: {invoice.client.taxId}</p>
-              )}
-            </div>
+              </>
+            ) : (
+              <>
+                <div>
+                  <h3 className="font-semibold mb-2">From (Supplier):</h3>
+                  <p className="text-xs text-muted-foreground mb-2">Supplier who sent you this bill</p>
+                  {invoice.client.businessName && (
+                    <p className="font-medium">{invoice.client.businessName}</p>
+                  )}
+                  <p>{invoice.client.name}</p>
+                  {invoice.client.address && (
+                    <div className="text-sm text-muted-foreground mt-1">
+                      {invoice.client.address.street && <p>{invoice.client.address.street}</p>}
+                      {(invoice.client.address.city || invoice.client.address.state) && (
+                        <p>
+                          {invoice.client.address.city}
+                          {invoice.client.address.city && invoice.client.address.state && ", "}
+                          {invoice.client.address.state}
+                        </p>
+                      )}
+                      {invoice.client.address.postalCode && <p>{invoice.client.address.postalCode}</p>}
+                      {invoice.client.address.country && <p>{invoice.client.address.country}</p>}
+                    </div>
+                  )}
+                  {invoice.client.email && (
+                    <p className="text-sm text-muted-foreground mt-1">{invoice.client.email}</p>
+                  )}
+                  {invoice.client.phone && (
+                    <p className="text-sm text-muted-foreground">{invoice.client.phone}</p>
+                  )}
+                  {invoice.client.taxId && (
+                    <p className="text-sm text-muted-foreground mt-1">TIN: {invoice.client.taxId}</p>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="font-semibold mb-2">Bill To (You):</h3>
+                  <p className="text-xs text-muted-foreground mb-2">Your business information</p>
+                  {invoice.supplier?.businessName && (
+                    <p className="font-medium">{invoice.supplier.businessName}</p>
+                  )}
+                  <p>{invoice.supplier?.name || "Not provided"}</p>
+                  {invoice.supplier?.address && (
+                    <div className="text-sm text-muted-foreground mt-1">
+                      {invoice.supplier.address.street && <p>{invoice.supplier.address.street}</p>}
+                      {(invoice.supplier.address.city || invoice.supplier.address.state) && (
+                        <p>
+                          {invoice.supplier.address.city}
+                          {invoice.supplier.address.city && invoice.supplier.address.state && ", "}
+                          {invoice.supplier.address.state}
+                        </p>
+                      )}
+                      {invoice.supplier.address.postalCode && <p>{invoice.supplier.address.postalCode}</p>}
+                      {invoice.supplier.address.country && <p>{invoice.supplier.address.country}</p>}
+                    </div>
+                  )}
+                  {invoice.supplier?.email && (
+                    <p className="text-sm text-muted-foreground mt-1">{invoice.supplier.email}</p>
+                  )}
+                  {invoice.supplier?.phone && (
+                    <p className="text-sm text-muted-foreground">{invoice.supplier.phone}</p>
+                  )}
+                  {invoice.supplier?.taxId && (
+                    <p className="text-sm text-muted-foreground mt-1">TIN: {invoice.supplier.taxId}</p>
+                  )}
+                </div>
+              </>
+            )}
           </div>
 
           {/* Invoice Details */}

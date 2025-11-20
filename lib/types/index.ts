@@ -237,6 +237,7 @@ export interface PaginatedResponse<T> {
 // Invoice Types
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
 export type InvoiceTemplateType = 'standard' | 'detailed' | 'minimal' | 'professional'
+export type InvoiceType = 'outgoing' | 'incoming' // outgoing = sales invoice (client owes you), incoming = purchase invoice/bill (you owe supplier)
 
 export interface InvoiceItem {
   id: string
@@ -280,16 +281,25 @@ export interface InvoiceSupplier {
 
 export interface Invoice {
   id: string
-  userId: string
+  userId: string // Owner of the invoice (who created it)
   invoiceNumber: string // Auto-generated (e.g., INV-2024-001)
+  invoiceType: InvoiceType // 'outgoing' = you send to clients, 'incoming' = received from another OTax user
   status: InvoiceStatus
   template: InvoiceTemplateType
   
-  // Supplier/Business information (from user profile)
+  // Supplier/Business information (from user profile for outgoing, or supplier info for incoming)
   supplier: InvoiceSupplier
   
-  // Client information
+  // Client information (for outgoing) or Your information (for incoming from OTax user)
   client: InvoiceClient
+  
+  // For invoices sent to/received from other OTax users
+  recipientUserId?: string // OTax user ID who received this invoice (if sent to another OTax user)
+  senderUserId?: string // OTax user ID who sent this invoice (if received from another OTax user)
+  senderInvoiceNumber?: string // Original invoice number from sender (for duplicate detection)
+  recipientEmail?: string // Email of recipient (if not an OTax user)
+  sentAt?: string // When invoice was sent
+  receivedAt?: string // When invoice was received (for incoming)
   
   // Invoice details
   issueDate: string
@@ -329,6 +339,7 @@ export interface Invoice {
 
 export interface InvoiceFilters {
   status?: InvoiceStatus
+  invoiceType?: InvoiceType
   clientId?: string
   startDate?: string
   endDate?: string

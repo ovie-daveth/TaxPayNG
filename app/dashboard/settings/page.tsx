@@ -45,8 +45,8 @@ export default function SettingsPage() {
   if (isLoading) {
     return (
       <main className="h-screen flex items-center justify-center">
-        <SettingsSkeleton />
-      </main>
+            <SettingsSkeleton />
+          </main>
     )
   }
 
@@ -97,33 +97,33 @@ export default function SettingsPage() {
                       Update your personal information and contact details
                     </p>
                   </div>
-                  <div className="space-y-6">
+          <div className="space-y-6">
                     <div className="grid md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="full-name">Full Name</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="full-name">Full Name</Label>
                         <Input id="full-name" defaultValue={profile ? `${profile.firstName} ${profile.lastName}` : ""} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="email">Email</Label>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
                         <Input id="email" type="email" defaultValue={profile?.email || ""} disabled />
                         <p className="text-xs text-muted-foreground">Email cannot be changed</p>
-                      </div>
-                    </div>
+                  </div>
+                </div>
                     <div className="grid md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="phone">Phone Number</Label>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone Number</Label>
                         <Input id="phone" defaultValue={profile?.phone || ""} />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="tin">Tax Identification Number</Label>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="tin">Tax Identification Number</Label>
                         <Input id="tin" defaultValue={profile?.taxId || ""} />
-                      </div>
-                    </div>
+                  </div>
+                </div>
                     <div className="flex justify-end">
                       <Button size="lg">Save Changes</Button>
                     </div>
-                  </div>
-                </Card>
+              </div>
+            </Card>
               </TabsContent>
 
               {/* Business Tab - Only show if not freelancer */}
@@ -137,33 +137,33 @@ export default function SettingsPage() {
                       </p>
                     </div>
                     <div className="space-y-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="business-name">Business Name</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="business-name">Business Name</Label>
                         <Input id="business-name" placeholder="Enter your business name" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="business-type">Business Type</Label>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="business-type">Business Type</Label>
                         <Select defaultValue={profile?.businessType || "freelancer"}>
-                          <SelectTrigger id="business-type">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="freelancer">Freelancer / Self-Employed</SelectItem>
-                            <SelectItem value="creator">Creator / Influencer</SelectItem>
-                            <SelectItem value="sme">Small & Medium Enterprise</SelectItem>
-                            <SelectItem value="individual">Individual</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="business-address">Business Address</Label>
+                    <SelectTrigger id="business-type">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="freelancer">Freelancer / Self-Employed</SelectItem>
+                  <SelectItem value="creator">Creator / Influencer</SelectItem>
+                      <SelectItem value="sme">Small & Medium Enterprise</SelectItem>
+                      <SelectItem value="individual">Individual</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="business-address">Business Address</Label>
                         <Input id="business-address" placeholder="Enter your business address" />
                       </div>
                       <div className="flex justify-end">
                         <Button size="lg">Save Changes</Button>
-                      </div>
-                    </div>
-                  </Card>
+                </div>
+              </div>
+            </Card>
                 </TabsContent>
               )}
 
@@ -245,7 +245,7 @@ export default function SettingsPage() {
                         
                         {/* Storage Usage */}
                         <div className="space-y-3">
-                          <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between">
                             <Label className="text-base">Storage Usage</Label>
                             <span className="text-sm font-semibold">
                               {((profile.storageUsed || 0) / (1024 * 1024)).toFixed(2)} MB / {((profile.storageLimit || 500 * 1024 * 1024) / (1024 * 1024)).toFixed(0)} MB
@@ -311,41 +311,41 @@ export default function SettingsPage() {
                   </div>
                   <div className="space-y-6">
                     <div className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="space-y-0.5">
+                  <div className="space-y-0.5">
                         <Label className="text-base">Email Notifications</Label>
-                        <p className="text-sm text-muted-foreground">Receive email alerts for reminders and deadlines</p>
-                      </div>
-                      <Switch defaultChecked />
-                    </div>
-                    <Separator />
+                    <p className="text-sm text-muted-foreground">Receive email alerts for reminders and deadlines</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+                <Separator />
                     <div className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="space-y-0.5">
+                  <div className="space-y-0.5">
                         <Label className="text-base">Tax Deadline Reminders</Label>
-                        <p className="text-sm text-muted-foreground">Get notified about upcoming tax deadlines</p>
-                      </div>
-                      <Switch defaultChecked />
-                    </div>
-                    <Separator />
+                    <p className="text-sm text-muted-foreground">Get notified about upcoming tax deadlines</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
+                <Separator />
                     <div className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="space-y-0.5">
+                  <div className="space-y-0.5">
                         <Label className="text-base">Transaction Alerts</Label>
-                        <p className="text-sm text-muted-foreground">Notifications for new transactions</p>
-                      </div>
-                      <Switch />
-                    </div>
-                    <Separator />
+                    <p className="text-sm text-muted-foreground">Notifications for new transactions</p>
+                  </div>
+                  <Switch />
+                </div>
+                <Separator />
                     <div className="flex items-center justify-between p-4 border rounded-lg">
-                      <div className="space-y-0.5">
+                  <div className="space-y-0.5">
                         <Label className="text-base">Weekly Summary</Label>
-                        <p className="text-sm text-muted-foreground">Receive weekly financial summary reports</p>
-                      </div>
-                      <Switch defaultChecked />
-                    </div>
+                    <p className="text-sm text-muted-foreground">Receive weekly financial summary reports</p>
+                  </div>
+                  <Switch defaultChecked />
+                </div>
                     <div className="flex justify-end pt-4">
                       <Button size="lg">Save Preferences</Button>
                     </div>
-                  </div>
-                </Card>
+              </div>
+            </Card>
               </TabsContent>
 
               {/* Security Tab */}
@@ -358,28 +358,28 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   <div className="space-y-6 max-w-2xl">
-                    <div className="space-y-2">
-                      <Label htmlFor="current-password">Current Password</Label>
+                <div className="space-y-2">
+                  <Label htmlFor="current-password">Current Password</Label>
                       <Input id="current-password" type="password" placeholder="Enter your current password" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="new-password">New Password</Label>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="new-password">New Password</Label>
                       <Input id="new-password" type="password" placeholder="Enter your new password" />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="confirm-password">Confirm New Password</Label>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="confirm-password">Confirm New Password</Label>
                       <Input id="confirm-password" type="password" placeholder="Confirm your new password" />
                     </div>
                     <div className="flex justify-end pt-4">
                       <Button size="lg">Update Password</Button>
-                    </div>
-                  </div>
-                </Card>
+                </div>
+              </div>
+            </Card>
               </TabsContent>
             </div>
           </Tabs>
-        </div>
-      </main>
-    </div>
+          </div>
+        </main>
+      </div>
   )
 }
