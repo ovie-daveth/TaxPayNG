@@ -233,3 +233,140 @@ export interface PaginatedResponse<T> {
     hasPrev: boolean
   }
 }
+
+// Invoice Types
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
+export type InvoiceTemplateType = 'standard' | 'detailed' | 'minimal' | 'professional'
+
+export interface InvoiceItem {
+  id: string
+  description: string
+  quantity: number
+  unitPrice: number
+  tax?: number // Tax percentage (e.g., 7.5 for 7.5%)
+  amount: number // quantity * unitPrice * (1 + tax/100)
+}
+
+export interface InvoiceClient {
+  id?: string // If saved client, use ID
+  name: string
+  email?: string
+  phone?: string
+  address?: {
+    street?: string
+    city?: string
+    state?: string
+    country?: string
+    postalCode?: string
+  }
+  taxId?: string
+  businessName?: string // Customer's business name (if applicable)
+}
+
+export interface InvoiceSupplier {
+  businessName?: string
+  name: string // Contact person name (firstName + lastName from profile)
+  email: string
+  phone?: string
+  address?: {
+    street?: string
+    city?: string
+    state?: string
+    country?: string
+    postalCode?: string
+  }
+  taxId?: string // TIN from user profile
+}
+
+export interface Invoice {
+  id: string
+  userId: string
+  invoiceNumber: string // Auto-generated (e.g., INV-2024-001)
+  status: InvoiceStatus
+  template: InvoiceTemplateType
+  
+  // Supplier/Business information (from user profile)
+  supplier: InvoiceSupplier
+  
+  // Client information
+  client: InvoiceClient
+  
+  // Invoice details
+  issueDate: string
+  dueDate: string
+  currency: string
+  
+  // Items
+  items: InvoiceItem[]
+  
+  // Totals
+  subtotal: number
+  taxAmount: number
+  discount?: number
+  total: number
+  
+  // Additional information
+  notes?: string
+  terms?: string
+  paymentTerms?: string // e.g., "Net 30", "Due on receipt"
+  paymentInstructions?: string // Payment instructions or payment link
+  
+  // Tracking
+  sentAt?: string
+  paidAt?: string
+  paymentMethod?: string
+  paymentReference?: string
+  
+  // Linked transaction (if invoice was paid and recorded)
+  linkedTransactionId?: string
+  
+  // Attachments
+  pdfUrl?: string
+  
+  createdAt: string
+  updatedAt: string
+}
+
+export interface InvoiceFilters {
+  status?: InvoiceStatus
+  clientId?: string
+  startDate?: string
+  endDate?: string
+  dateRange?: {
+    start: string
+    end: string
+  }
+  amountRange?: {
+    min: number
+    max: number
+  }
+  search?: string
+}
+
+export interface InvoiceTemplate {
+  id: string
+  name: string
+  type: InvoiceTemplateType
+  description: string
+  preview?: string
+  isDefault?: boolean
+}
+
+export interface SavedClient {
+  id: string
+  userId: string
+  name: string
+  email?: string
+  phone?: string
+  address?: {
+    street?: string
+    city?: string
+    state?: string
+    country?: string
+    postalCode?: string
+  }
+  taxId?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}

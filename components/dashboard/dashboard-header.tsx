@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Plus, FileText, Calculator, Bell, Settings, Receipt, Download } from "lucide-react"
+import { Plus, FileText, Calculator, Bell, Settings, Receipt, Download, FileCheck } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { UploadDocumentDialog } from "../documents/upload-document-dialog"
 import { useState } from "react"
@@ -44,6 +44,18 @@ export function DashboardHeader() {
           buttonIcon: Plus,
           buttonAction: () => setIsAddDialogOpen(true),
           showExportButton: true
+        }
+      case "/dashboard/invoices":
+        return {
+          title: "Invoices",
+          subtitle: "Create, manage, and track your invoices",
+          buttonText: "Create Invoice",
+          buttonIcon: Plus,
+          buttonAction: () => {
+            // Trigger invoice creation - will be handled by the invoices page
+            const event = new CustomEvent('createInvoice')
+            window.dispatchEvent(event)
+          }
         }
       case "/dashboard/tax-calculator":
         return {
