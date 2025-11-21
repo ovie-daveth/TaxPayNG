@@ -78,7 +78,8 @@ export class InvoiceService extends BaseService {
     }
   }
 
-  // Get all invoices for a user (both created and received)
+  // Get all invoices for a user
+  // Returns invoices where user is the sender (userId) OR recipient (recipientUserId)
   async getUserInvoices(
     userId: string,
     filters?: InvoiceFilters,
@@ -86,31 +87,21 @@ export class InvoiceService extends BaseService {
     pageSize: number = 20
   ): Promise<PaginatedResponse<Invoice>> {
     try {
-      // Fetch invoices created by user AND invoices received by user
-      const [createdInvoices, receivedInvoices] = await Promise.all([
+      // Fetch invoices where user is sender OR recipient
+      const [sentInvoices, receivedInvoices] = await Promise.all([
         this.getAll([{ field: 'userId', operator: '==', value: userId }]),
         this.getAll([{ field: 'recipientUserId', operator: '==', value: userId }])
       ])
       
-      // Combine both lists and deduplicate by invoice ID
-      // An invoice can appear in both lists if it has both userId and recipientUserId set to the same user
+      // Combine and deduplicate by invoice ID
       const invoiceMap = new Map<string, Invoice>()
-      
-      // Add created invoices
-      createdInvoices.forEach(inv => {
-        if (inv.id) {
-          invoiceMap.set(inv.id, inv)
-        }
+      sentInvoices.forEach(inv => {
+        if (inv.id) invoiceMap.set(inv.id, inv)
       })
-      
-      // Add received invoices (will overwrite duplicates with same ID)
       receivedInvoices.forEach(inv => {
-        if (inv.id) {
-          invoiceMap.set(inv.id, inv)
-        }
+        if (inv.id) invoiceMap.set(inv.id, inv)
       })
       
-      // Convert map back to array
       const allInvoices = Array.from(invoiceMap.values())
 
       // Apply all filters client-side
@@ -217,6 +208,9 @@ export class InvoiceService extends BaseService {
         userId,
         invoiceNumber,
         status,
+        // Set default payment statuses
+        clientPaymentStatus: 'pending' as const,
+        supplierPaymentStatus: 'pending' as const,
         subtotal: totals.subtotal,
         taxAmount: totals.taxAmount,
         total: totals.total,
@@ -246,12 +240,9 @@ export class InvoiceService extends BaseService {
     try {
       // Verify ownership
       const existingInvoice = await this.getById(invoiceId)
-      if (existingInvoice.userId !== userId) {
-        return {
-          success: false,
-          error: 'Unauthorized: You can only update your own invoices'
-        }
-      }
+      
+      // No authorization check needed - if user can view the invoice, they can update it
+      // The view dialog already ensures invoice.userId === profile.userId
 
       // Recalculate totals if items changed
       if (updateData.items) {
@@ -275,8 +266,17 @@ export class InvoiceService extends BaseService {
         }
       }
 
+      // Remove undefined values from updateData before sending to Firestore
+      const cleanedUpdateData: any = {}
+      for (const key in updateData) {
+        const value = updateData[key as keyof Invoice]
+        if (value !== undefined) {
+          cleanedUpdateData[key] = value
+        }
+      }
+
       await this.update(invoiceId, {
-        ...updateData,
+        ...cleanedUpdateData,
         updatedAt: new Date().toISOString()
       })
 
@@ -346,25 +346,351 @@ export class InvoiceService extends BaseService {
     }
   }
 
-  // Mark invoice as paid
-  async markAsPaid(invoiceId: string, userId: string, paymentMethod?: string, paymentReference?: string): Promise<ApiResponse<Invoice>> {
+  // Mark invoice as paid and create corresponding transaction
+  // async markAsPaid(
+  //   invoiceId: string, 
+  //   userId: string, 
+  //   paymentMethod?: string, 
+  //   paymentReference?: string,
+  //   receiptUrl?: string
+  // ): Promise<ApiResponse<Invoice>> {
+  //   try {
+  //     const invoice = await this.getById(invoiceId)
+  //     if (!invoice) {
+  //       return {
+  //         success: false,
+  //         error: 'Invoice not found'
+  //       }
+  //     }
+      
+  //     // Authorization logic:
+  //     // - For incoming invoices: The recipient (who received the bill) can mark it as paid
+  //     //   When incoming invoice is created, userId is set to recipient.userId, so recipient owns it
+  //     // - For outgoing invoices: The sender (who created the invoice) can confirm payment received
+  //     //   For outgoing invoices, userId is the sender, so sender owns it
+      
+  //     // Check if user is the owner of the invoice
+  //     // For incoming: userId = recipient.userId (recipient owns it)
+  //     // For outgoing: userId = sender.userId (sender owns it)
+  //     // Authorization: 
+  //     // - For incoming invoices: userId is set to recipient.userId when invoice is created
+  //     //   So invoice.userId should match the recipient's userId
+  //     // - For outgoing invoices: userId is the sender, so sender owns it
+  //     // Also check recipientUserId as fallback for incoming invoices
+  //     const isOwner = invoice.userId === userId
+  //     console.log("User ID:", userId)
+  //     console.log("Invoice Recipient User ID:", invoice.recipientUserId)
+  //     const isRecipient = invoice.invoiceType === 'incoming' && (invoice.recipientUserId === userId || invoice.client.id === userId)
+      
+  //     if (!isOwner && !isRecipient) {
+  //       console.error('Authorization failed in markAsPaid:', {
+  //         invoiceId: invoice.id,
+  //         invoiceUserId: invoice.userId,
+  //         requestUserId: userId,
+  //         invoiceType: invoice.invoiceType,
+  //         recipientUserId: invoice.recipientUserId,
+  //         isOwner,
+  //         isRecipient
+  //       })
+  //       return {
+  //         success: false,
+  //         error: 'Unauthorized: You can only mark your own invoices as paid'
+  //       }
+  //     }
+
+  //     // Check if invoice is already paid and has a linked transaction
+  //     if (invoice.status === 'paid' && invoice.linkedTransactionId) {
+  //       // Just update payment details if needed
+  //       return await this.updateInvoice(invoiceId, userId, {
+  //         paidAt: invoice.paidAt || new Date().toISOString(),
+  //         paymentMethod: paymentMethod || invoice.paymentMethod,
+  //         paymentReference: paymentReference || invoice.paymentReference,
+  //         receiptUrl: receiptUrl || invoice.receiptUrl
+  //       })
+  //     }
+
+  //     // Update invoice to paid status
+  //     const updateData: Partial<Invoice> = {
+  //       status: 'paid',
+  //       paidAt: new Date().toISOString(),
+  //       paymentMethod,
+  //       paymentReference,
+  //       receiptUrl
+  //     }
+
+  //     // Create corresponding transaction
+  //     try {
+  //       const { transactionService } = await import('./transactionService')
+        
+  //       // Determine transaction type based on invoice type
+  //       // Outgoing invoice (you sent) = income (money coming in)
+  //       // Incoming invoice (you received) = expense (money going out)
+  //       const transactionType: 'income' | 'expense' = invoice.invoiceType === 'outgoing' ? 'income' : 'expense'
+        
+  //       // Create transaction description from invoice
+  //       const description = `${invoice.invoiceType === 'outgoing' ? 'Invoice payment received' : 'Bill payment made'}: ${invoice.invoiceNumber}`
+        
+  //       // Create transaction
+  //       const transactionData = {
+  //         type: transactionType,
+  //         category: invoice.invoiceType === 'outgoing' ? 'sales' : 'purchases',
+  //         amount: invoice.total,
+  //         description,
+  //         date: new Date().toISOString().split('T')[0], // Use today's date
+  //         paymentMethod: paymentMethod || 'other',
+  //         taxDeductible: invoice.invoiceType === 'incoming', // Incoming invoices (bills) are tax deductible
+  //         notes: `Invoice: ${invoice.invoiceNumber}\nClient: ${invoice.client.name}\nItems: ${invoice.items.map((item: InvoiceItem) => item.description).join(', ')}`,
+  //         receiptUrl: receiptUrl,
+  //         attachments: receiptUrl ? [receiptUrl] : undefined
+  //       }
+
+  //       const transactionResult = await transactionService.createTransaction(userId, transactionData)
+        
+  //       if (transactionResult.success && transactionResult.data) {
+  //         updateData.linkedTransactionId = transactionResult.data.id
+  //       } else {
+  //         console.error('Failed to create transaction for invoice:', transactionResult.error)
+  //         // Continue with invoice update even if transaction creation fails
+  //       }
+  //     } catch (error) {
+  //       console.error('Error creating transaction for invoice:', error)
+  //       // Continue with invoice update even if transaction creation fails
+  //     }
+
+  //     const result = await this.updateInvoice(invoiceId, userId, updateData)
+  //     return result
+  //   } catch (error) {
+  //     console.error('Error marking invoice as paid:', error)
+  //     return {
+  //       success: false,
+  //       error: error instanceof Error ? error.message : 'Unknown error occurred'
+  //     }
+  //   }
+  // }
+
+  // Mark invoice as paid (for recipients/clients)
+  // Client updates paymentStatus to 'paid' and uploads receipt
+  async markAsPaid(
+    invoiceId: string,
+    userId: string,
+    paymentMethod?: string,
+    paymentReference?: string,
+    receiptUrl?: string,
+    taxDeductible?: boolean
+  ): Promise<ApiResponse<Invoice>> {
     try {
       const invoice = await this.getById(invoiceId)
+      if (!invoice) {
+        return {
+          success: false,
+          error: 'Invoice not found'
+        }
+      }
+      
+      // Verify user is the recipient (client) or the client themselves
+      const isRecipient = invoice.recipientUserId === userId
+      const isClient = invoice.client?.id === userId
+      
+      if (!isRecipient && !isClient) {
+        return {
+          success: false,
+          error: 'Unauthorized: Only the client can mark this invoice as paid'
+        }
+      }
+      
+      // Check if already paid
+      if (invoice.clientPaymentStatus === 'paid' && invoice.linkedTransactionId) {
+        // Just update payment details if needed
+        const updateData: Partial<Invoice> = {
+          clientPaidAt: invoice.clientPaidAt || new Date().toISOString()
+        }
+        
+        if (paymentMethod || invoice.clientPaymentMethod) {
+          updateData.clientPaymentMethod = paymentMethod || invoice.clientPaymentMethod
+        }
+        if (paymentReference || invoice.clientPaymentReference) {
+          updateData.clientPaymentReference = paymentReference || invoice.clientPaymentReference
+        }
+        if (receiptUrl || invoice.clientReceiptUrl) {
+          updateData.clientReceiptUrl = receiptUrl || invoice.clientReceiptUrl
+        }
+        
+        return await this.updateInvoice(invoiceId, userId, updateData)
+      }
+
+      // Update invoice payment status (client marks as paid)
+      const updateData: Partial<Invoice> = {
+        clientPaymentStatus: 'paid',
+        clientPaidAt: new Date().toISOString()
+      }
+      
+      if (paymentMethod) {
+        updateData.clientPaymentMethod = paymentMethod
+      }
+      if (paymentReference) {
+        updateData.clientPaymentReference = paymentReference
+      }
+      if (receiptUrl) {
+        updateData.clientReceiptUrl = receiptUrl
+      }
+
+      // Create corresponding expense transaction (incoming invoice = bill payment = expense)
+      try {
+        const { transactionService } = await import('./transactionService')
+        
+        const description = `Bill payment made: ${invoice.invoiceNumber}`
+        
+        const transactionData: any = {
+          type: 'expense' as const,
+          category: 'purchases',
+          amount: invoice.total,
+          description,
+          date: new Date().toISOString().split('T')[0],
+          paymentMethod: paymentMethod || 'other',
+          taxDeductible: taxDeductible !== undefined ? taxDeductible : true, // Default to true if not specified
+          notes: `Invoice: ${invoice.invoiceNumber}\nSupplier: ${invoice.supplier?.name || 'Unknown'}${invoice.items && invoice.items.length > 0 ? `\nItems: ${invoice.items.map((item: InvoiceItem) => item.description).join(', ')}` : ''}`
+        }
+        
+        // Only include receiptUrl and attachments if they have values
+        if (receiptUrl) {
+          transactionData.receiptUrl = receiptUrl
+          transactionData.attachments = [receiptUrl]
+        }
+
+        const transactionResult = await transactionService.createTransaction(userId, transactionData)
+        
+        if (transactionResult.success && transactionResult.data) {
+          updateData.linkedTransactionId = transactionResult.data.id
+        } else {
+          console.error('Failed to create transaction for invoice:', transactionResult.error)
+        }
+      } catch (error) {
+        console.error('Error creating transaction for invoice:', error)
+      }
+
+      const result = await this.updateInvoice(invoiceId, userId, updateData)
+      return result
+    } catch (error) {
+      console.error('Error marking invoice as paid:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      }
+    }
+  }
+
+  // Confirm payment received (for outgoing invoices only - sender confirms payment was received)
+  async confirmPaymentReceived(
+    invoiceId: string,
+    userId: string,
+    paymentMethod?: string,
+    paymentReference?: string
+  ): Promise<ApiResponse<Invoice>> {
+    try {
+      const invoice = await this.getById(invoiceId)
+      if (!invoice) {
+        return {
+          success: false,
+          error: 'Invoice not found'
+        }
+      }
+      
+      // Only allow confirming payment for outgoing invoices
+      if (invoice.invoiceType !== 'outgoing') {
+        return {
+          success: false,
+          error: 'This function is only for outgoing invoices. Use markAsPaid for incoming invoices.'
+        }
+      }
+      
+      // Authorization: For outgoing invoices, userId is set to sender.userId when created
+      // So invoice.userId should match the sender's userId
       if (invoice.userId !== userId) {
         return {
           success: false,
-          error: 'Unauthorized'
+          error: 'Unauthorized: You can only confirm payment for your own outgoing invoices'
         }
       }
 
-      return await this.updateInvoice(invoiceId, userId, {
-        status: 'paid',
-        paidAt: new Date().toISOString(),
-        paymentMethod,
-        paymentReference
-      })
+      // Check if already confirmed
+      if (invoice.supplierPaymentStatus === 'paid' && invoice.linkedTransactionId) {
+        // Just update confirmation details if needed
+        const updateData: Partial<Invoice> = {
+          supplierPaidAt: invoice.supplierPaidAt || new Date().toISOString()
+        }
+        
+        if (paymentMethod || invoice.supplierPaymentMethod) {
+          updateData.supplierPaymentMethod = paymentMethod || invoice.supplierPaymentMethod
+        }
+        if (paymentReference || invoice.supplierPaymentReference) {
+          updateData.supplierPaymentReference = paymentReference || invoice.supplierPaymentReference
+        }
+        
+        return await this.updateInvoice(invoiceId, userId, updateData)
+      }
+
+      // Only create transaction if client has marked as paid
+      if (invoice.clientPaymentStatus !== 'paid') {
+        return {
+          success: false,
+          error: 'Client must mark the invoice as paid first before you can confirm payment received'
+        }
+      }
+
+      // Update invoice - supplier confirms payment received
+      const updateData: Partial<Invoice> = {
+        supplierPaymentStatus: 'paid',
+        supplierPaidAt: new Date().toISOString()
+      }
+      
+      if (paymentMethod) {
+        updateData.supplierPaymentMethod = paymentMethod
+      }
+      if (paymentReference) {
+        updateData.supplierPaymentReference = paymentReference
+      }
+
+      // Create corresponding income transaction (issuer confirms payment = income)
+      try {
+        const { transactionService } = await import('./transactionService')
+        
+        const description = `Invoice payment received: ${invoice.invoiceNumber}`
+        
+        // Use client's receipt URL if available
+        const clientReceiptUrl = invoice.clientReceiptUrl
+        
+        const transactionData: any = {
+          type: 'income' as const,
+          category: 'sales',
+          amount: invoice.total,
+          description,
+          date: new Date().toISOString().split('T')[0],
+          paymentMethod: paymentMethod || invoice.paymentMethod || 'other',
+          taxDeductible: false, // Sales invoices are not tax deductible
+          notes: `Invoice: ${invoice.invoiceNumber}\nClient: ${invoice.client.name}${invoice.items && invoice.items.length > 0 ? `\nItems: ${invoice.items.map((item: InvoiceItem) => item.description).join(', ')}` : ''}`
+        }
+        
+        // Only include receiptUrl and attachments if they have values
+        if (clientReceiptUrl) {
+          transactionData.receiptUrl = clientReceiptUrl
+          transactionData.attachments = [clientReceiptUrl]
+        }
+
+        const transactionResult = await transactionService.createTransaction(userId, transactionData)
+        
+        if (transactionResult.success && transactionResult.data) {
+          updateData.linkedTransactionId = transactionResult.data.id
+        } else {
+          console.error('Failed to create transaction for invoice:', transactionResult.error)
+        }
+      } catch (error) {
+        console.error('Error creating transaction for invoice:', error)
+      }
+
+      const result = await this.updateInvoice(invoiceId, userId, updateData)
+      return result
     } catch (error) {
-      console.error('Error marking invoice as paid:', error)
+      console.error('Error confirming payment received:', error)
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'
@@ -413,7 +739,9 @@ export class InvoiceService extends BaseService {
 
       filtered.forEach(inv => {
         stats.totalAmount += inv.total
-        if (inv.status === 'paid') {
+        // Check payment status: paid if both paymentStatus is 'paid' and isConfirmed is true
+        const isFullyPaid = inv.paymentStatus === 'paid' && inv.isConfirmed === true
+        if (isFullyPaid) {
           stats.paid++
           stats.paidAmount += inv.total
         } else if (inv.status === 'sent' || inv.status === 'draft') {
@@ -431,109 +759,6 @@ export class InvoiceService extends BaseService {
       throw error
     }
   }
-
-  // Send invoice to another OTax user
-  // async sendInvoiceToUser(
-  //   invoiceId: string,
-  //   senderUserId: string,
-  //   recipientEmail: string
-  // ): Promise<ApiResponse<Invoice>> {
-  //   try {
-  //     // Find recipient user by email
-  //     const { userService } = await import('./userService')
-  //     const recipient = await userService.findUserByEmail(recipientEmail)
-      
-  //     if (!recipient) {
-  //       return {
-  //         success: false,
-  //         error: 'User not found. Please make sure the recipient is registered on OTax.'
-  //       }
-  //     }
-
-  //     // Get the invoice
-  //     const invoice = await this.getById(invoiceId)
-  //     if (!invoice || invoice.userId !== senderUserId) {
-  //       return {
-  //         success: false,
-  //         error: 'Invoice not found or unauthorized'
-  //       }
-  //     }
-
-  //     // Check if invoice was already sent to this user
-  //     // Get all incoming invoices for this recipient
-  //     const allRecipientInvoices = await this.getAll([
-  //       { field: 'userId', operator: '==', value: recipient.userId },
-  //       { field: 'invoiceType', operator: '==', value: 'incoming' }
-  //     ])
-      
-  //     // Check if any existing invoice matches this one
-  //     // Match by: senderUserId matches AND recipientEmail matches
-  //     // Also check if the invoice was created recently (within last 5 minutes) to prevent race conditions
-  //     const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
-  //     const duplicate = allRecipientInvoices.find(inv => {
-  //       const isFromSameSender = inv.senderUserId === senderUserId
-  //       const isSameEmail = inv.recipientEmail?.toLowerCase() === recipientEmail.toLowerCase()
-  //       const isRecent = inv.createdAt && inv.createdAt > fiveMinutesAgo
-  //       const hasSameInvoiceNumber = inv.invoiceNumber === invoice.invoiceNumber
-        
-  //       // Match if: same sender AND (same email OR same invoice number OR created recently)
-  //       return isFromSameSender && (isSameEmail || hasSameInvoiceNumber || (isRecent && isSameEmail))
-  //     })
-      
-  //     if (duplicate) {
-  //       return {
-  //         success: false,
-  //         error: 'This invoice has already been sent to this user'
-  //       }
-  //     }
-
-  //     // Generate a new invoice number for the incoming invoice (so it's unique for the recipient)
-  //     const recipientInvoiceNumber = await this.generateInvoiceNumber(recipient.userId, 'incoming')
-
-  //     // Create a copy of the invoice for the recipient (incoming invoice)
-  //     const incomingInvoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'> = {
-  //       ...invoice,
-  //       userId: recipient.userId, // Recipient owns this copy
-  //       invoiceNumber: recipientInvoiceNumber, // Generate new number for recipient
-  //       invoiceType: 'incoming' as const,
-  //       senderUserId: senderUserId,
-  //       recipientUserId: recipient.userId,
-  //       recipientEmail: recipientEmail,
-  //       status: 'sent' as const,
-  //       receivedAt: new Date().toISOString(),
-  //       sentAt: new Date().toISOString()
-  //     }
-
-  //     // Create the incoming invoice for recipient
-  //     const newInvoiceId = await this.create({
-  //       ...incomingInvoiceData,
-  //       createdAt: new Date().toISOString(),
-  //       updatedAt: new Date().toISOString()
-  //     })
-      
-  //     // Update original invoice to mark as sent
-  //     await this.update(invoiceId, {
-  //       recipientUserId: recipient.userId,
-  //       recipientEmail: recipientEmail,
-  //       status: 'sent',
-  //       sentAt: new Date().toISOString(),
-  //       updatedAt: new Date().toISOString()
-  //     })
-
-  //     const sentInvoice = await this.getById(invoiceId)
-  //     return {
-  //       success: true,
-  //       data: sentInvoice,
-  //       message: `Invoice sent successfully to ${recipientEmail}`
-  //     }
-  //   } catch (error) {
-  //     console.error('Error sending invoice to user:', error)
-  //     return {
-  //       success: false,
-  //       error: error instanceof Error ? error.message : 'Unknown error occurred'
-  //     }
-  //   }
-  // }
 
   async sendInvoiceToUser(
     invoiceId: string,
@@ -588,34 +813,8 @@ export class InvoiceService extends BaseService {
         }
       }
 
-      // Check if a copy already exists for the recipient
-      // Get all incoming invoices for this recipient
-      const allRecipientInvoices = await this.getAll([
-        { field: 'userId', operator: '==', value: recipient.userId },
-        { field: 'invoiceType', operator: '==', value: 'incoming' }
-      ])
-      
-      // Check if any invoice matches this one
-      // Match by: senderUserId AND (senderInvoiceNumber OR recipientEmail OR recent creation)
-      const now = Date.now()
-      const fiveMinutesAgo = now - (5 * 60 * 1000)
-      
-      const duplicate = allRecipientInvoices.find(inv => {
-        const isFromSameSender = inv.senderUserId === senderUserId
-        if (!isFromSameSender) return false
-        
-        // Check multiple criteria for duplicate detection
-        const hasSameSenderInvoiceNumber = inv.senderInvoiceNumber === invoice.invoiceNumber
-        const hasSameEmail = inv.recipientEmail?.toLowerCase() === recipientEmail.toLowerCase()
-        
-        // Check if invoice was created recently (within 5 minutes) - catches race conditions
-        const isRecent = inv.createdAt && new Date(inv.createdAt).getTime() > fiveMinutesAgo
-        
-        // Match if: same sender AND (same sender invoice number OR same email OR recent creation with same email)
-        return hasSameSenderInvoiceNumber || hasSameEmail || (isRecent && hasSameEmail)
-      })
-      
-      if (duplicate) {
+      // Check if invoice was already sent to this recipient (single invoice approach)
+      if (invoice.recipientUserId === recipient.userId) {
         this.sendingInvoices.delete(sendKey)
         return {
           success: false,
@@ -623,50 +822,27 @@ export class InvoiceService extends BaseService {
         }
       }
 
-      // Generate a new invoice number for the incoming invoice
-      const recipientInvoiceNumber = await this.generateInvoiceNumber(recipient.userId, 'incoming')
-
-      // Create a copy of the invoice for the recipient (incoming invoice)
-      const incomingInvoiceData: Omit<Invoice, 'id' | 'createdAt' | 'updatedAt'> = {
-        ...invoice,
-        userId: recipient.userId, // Recipient owns this copy
-        invoiceNumber: recipientInvoiceNumber, // Generate new number for recipient
-        invoiceType: 'incoming' as const,
-        senderUserId: senderUserId,
-        senderInvoiceNumber: invoice.invoiceNumber, // Store original invoice number for duplicate detection
+      // Update invoice to add recipient information (single invoice approach)
+      // No copy is created - both sender and recipient reference the same invoice
+      const updateData: Partial<Invoice> = {
         recipientUserId: recipient.userId,
         recipientEmail: recipientEmail,
+        sentAt: new Date().toISOString(),
         status: 'sent' as const,
-        receivedAt: new Date().toISOString(),
-        sentAt: new Date().toISOString()
-      }
-
-      // Create the incoming invoice for recipient
-      const newInvoiceId = await this.create({
-        ...incomingInvoiceData,
-        createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
-      })
-      
-      // Update original invoice to mark as sent (only if not already sent)
-      if (!invoice.sentAt || !invoice.recipientUserId) {
-        await this.update(invoiceId, {
-          recipientUserId: recipient.userId,
-          recipientEmail: recipientEmail,
-          status: 'sent',
-          sentAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        })
       }
-
-      const sentInvoice = await this.getById(invoiceId)
       
-      // Remove from sending set
+      // Update the invoice
+      await this.update(invoiceId, updateData)
+      
+      // Get updated invoice
+      const updatedInvoice = await this.getById(invoiceId)
+      
       this.sendingInvoices.delete(sendKey)
       
       return {
         success: true,
-        data: sentInvoice,
+        data: updatedInvoice!,
         message: `Invoice sent successfully to ${recipientEmail}`
       }
     } catch (error) {

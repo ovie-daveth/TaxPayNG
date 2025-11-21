@@ -1197,11 +1197,11 @@ export function AddInvoiceDialog({
           <div className="space-y-2 border-t pt-4">
             <div className="flex justify-between text-sm">
               <span>Subtotal:</span>
-              <span>{getCurrencySymbol(formData.currency)} {totals.subtotal.toFixed(2)}</span>
+              <span>{getCurrencySymbol(formData.currency)} {totals.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             <div className="flex justify-between text-sm">
               <span>Tax:</span>
-              <span>{getCurrencySymbol(formData.currency)} {totals.taxAmount.toFixed(2)}</span>
+              <span>{getCurrencySymbol(formData.currency)} {totals.taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             {formData.discount > 0 && (
               <div className="flex justify-between text-sm">
@@ -1211,7 +1211,7 @@ export function AddInvoiceDialog({
             )}
             <div className="flex justify-between text-lg font-semibold border-t pt-2">
               <span>Total:</span>
-              <span>{getCurrencySymbol(formData.currency)} {totals.total.toFixed(2)}</span>
+              <span>{getCurrencySymbol(formData.currency)} {totals.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
           </div>
 

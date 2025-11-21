@@ -8,6 +8,7 @@ import { TaxSummary } from "@/components/dashboard/tax-summary"
 import { UpcomingReminders } from "@/components/dashboard/upcoming-reminders"
 import { DashboardSkeleton } from "@/components/ui/skeletons"
 import { AnalyticsInsights } from "@/components/dashboard/insights/analytics-insights"
+import { IncompleteInvoices } from "@/components/dashboard/incomplete-invoices"
 
 type PeriodType = "quarter" | "year"
 
@@ -77,8 +78,9 @@ export default function DashboardPage() {
           <div className="md:col-span-2">
             <RecentTransactions />
           </div>
-          <div>
+          <div className="space-y-4 sm:space-y-5 md:space-y-6">
             <UpcomingReminders />
+            <IncompleteInvoices />
           </div>
         </div>
       </div>

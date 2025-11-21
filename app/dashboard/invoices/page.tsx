@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/hooks/useAuth"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Search, Filter, Download, FileText, Eye, Edit, Trash2, Send, CheckCircle2, Clock, AlertCircle } from "lucide-react"
@@ -17,6 +18,7 @@ import { format } from "date-fns"
 
 export default function InvoicesPage() {
   const { user } = useAuth()
+  const { profile } = useUserProfile()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -36,7 +38,7 @@ export default function InvoicesPage() {
   })
 
   const loadInvoices = async () => {
-    if (!user?.uid) return
+    if (!profile?.userId) return
     
     try {
       setLoading(true)
@@ -51,7 +53,7 @@ export default function InvoicesPage() {
         filters.search = searchTerm
       }
       
-      const result = await invoiceService.getUserInvoices(user.uid, filters, currentPage, 20)
+      const result = await invoiceService.getUserInvoices(profile.userId, filters, currentPage, 20)
       setInvoices(result.data)
       setPagination(result.pagination)
     } catch (error) {
@@ -64,7 +66,7 @@ export default function InvoicesPage() {
 
   useEffect(() => {
     loadInvoices()
-  }, [user, currentPage, statusFilter, typeFilter, searchTerm])
+  }, [profile?.userId, currentPage, statusFilter, typeFilter, searchTerm])
 
   // Listen for create invoice event from header
   useEffect(() => {
@@ -101,11 +103,11 @@ export default function InvoicesPage() {
   }
 
   const handleDelete = async (invoiceId: string) => {
-    if (!user?.uid) return
+    if (!profile?.userId) return
     if (!confirm("Are you sure you want to delete this invoice?")) return
 
     try {
-      const result = await invoiceService.deleteInvoice(invoiceId, user.uid)
+      const result = await invoiceService.deleteInvoice(invoiceId, profile.userId)
       if (result.success) {
         toast.success("Invoice deleted successfully")
         loadInvoices()
@@ -118,9 +120,9 @@ export default function InvoicesPage() {
   }
 
   const handleMarkAsSent = async (invoiceId: string) => {
-    if (!user?.uid) return
+    if (!profile?.userId) return
     try {
-      const result = await invoiceService.markAsSent(invoiceId, user.uid)
+      const result = await invoiceService.markAsSent(invoiceId, profile.userId)
       if (result.success) {
         toast.success("Invoice marked as sent")
         loadInvoices()
@@ -133,17 +135,12 @@ export default function InvoicesPage() {
   }
 
   const handleMarkAsPaid = async (invoiceId: string) => {
-    if (!user?.uid) return
-    try {
-      const result = await invoiceService.markAsPaid(invoiceId, user.uid)
-      if (result.success) {
-        toast.success("Invoice marked as paid")
-        loadInvoices()
-      } else {
-        toast.error(result.error || "Failed to update invoice")
-      }
-    } catch (error) {
-      toast.error("Failed to update invoice")
+    // This is now handled in the ViewInvoiceDialog with receipt upload
+    // Keeping this for backward compatibility but it will open the view dialog
+    const invoice = invoices.find(inv => inv.id === invoiceId)
+    if (invoice) {
+      setSelectedInvoice(invoice)
+      setIsViewDialogOpen(true)
     }
   }
 
@@ -158,7 +155,7 @@ export default function InvoicesPage() {
       </div>
     )
   }
-
+console.log("invoices", invoices)
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       <div className="mb-8">
@@ -224,28 +221,43 @@ export default function InvoicesPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-4 mb-2">
                     <h3 className="text-lg font-semibold">
-                      {invoice.invoiceType === 'incoming' ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
+                      {invoice.recipientUserId !== profile?.userId ? 'Invoice' : 'Bill'} {invoice.invoiceNumber}
                     </h3>
-                    <Badge variant="outline" className="text-xs">
-                      {invoice.invoiceType === 'incoming' ? 'Incoming' : 'Outgoing'}
-                    </Badge>
-                    {getStatusBadge(invoice.status, invoice.invoiceType)}
+                   {
+                    invoice.status === "sent" &&   <Badge variant="outline" className="text-xs">
+                    {invoice.recipientUserId !== profile?.userId ? 'Outgoing' : 'Incoming'}
+                  </Badge>
+                  }
+                  {
+                    invoice.recipientUserId === profile?.userId ? (
+                      <Badge variant="outline" className={`text-xs capitalize ${invoice.clientPaymentStatus === 'paid' ? 'bg-green-800 text-white' : 'bg-red-800 text-white'}`}>
+                        {invoice.clientPaymentStatus || 'Pending'}
+                      </Badge>
+                    )
+                  : (
+                    <Badge variant="outline" className={`text-xs capitalize ${invoice.supplierPaymentStatus === 'paid' ? 'bg-green-800 text-white' : 'bg-red-800 text-white'}`}>
+                        {invoice.supplierPaymentStatus || 'Pending'}
+                      </Badge>
+                  )
+                  } 
+                  
                   </div>
                   <div className="grid md:grid-cols-3 gap-4 text-sm text-muted-foreground">
                     <div>
                       <p className="font-medium text-foreground mb-1">
-                        {invoice.invoiceType === 'incoming' ? 'From' : 'Client'}
+                        {invoice.recipientUserId !== profile?.userId ? 'Client' : 'From'}
                       </p>
-                      {invoice.invoiceType === 'incoming' ? (
+                      {invoice.recipientUserId !== profile?.userId ? (
+                         <>
+                         <p>{invoice.client.name}</p>
+                         {invoice.client.email && <p className="text-xs">{invoice.client.email}</p>}
+                       </>
+                      ) : (
                         <>
                           <p>{invoice.supplier?.name || 'Unknown'}</p>
                           {invoice.supplier?.email && <p className="text-xs">{invoice.supplier.email}</p>}
                         </>
-                      ) : (
-                        <>
-                          <p>{invoice.client.name}</p>
-                          {invoice.client.email && <p className="text-xs">{invoice.client.email}</p>}
-                        </>
+                       
                       )}
                     </div>
                     <div>
@@ -323,6 +335,7 @@ export default function InvoicesPage() {
         open={isViewDialogOpen}
         onOpenChange={setIsViewDialogOpen}
         invoice={selectedInvoice}
+        onInvoiceUpdated={loadInvoices}
       />
     </div>
   )

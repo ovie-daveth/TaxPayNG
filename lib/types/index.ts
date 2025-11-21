@@ -244,6 +244,7 @@ export interface InvoiceItem {
   description: string
   quantity: number
   unitPrice: number
+  currency?: string // Currency code for this item (if different from invoice currency)
   tax?: number // Tax percentage (e.g., 7.5 for 7.5%)
   amount: number // quantity * unitPrice * (1 + tax/100)
 }
@@ -321,11 +322,19 @@ export interface Invoice {
   paymentTerms?: string // e.g., "Net 30", "Due on receipt"
   paymentInstructions?: string // Payment instructions or payment link
   
-  // Tracking
-  sentAt?: string
-  paidAt?: string
-  paymentMethod?: string
-  paymentReference?: string
+  // Payment tracking - separate statuses for client and supplier
+  // Client payment status - updated by client when they pay
+  clientPaymentStatus?: 'pending' | 'paid' // Client marks as paid (default: 'pending')
+  clientPaidAt?: string // When client marked as paid
+  clientPaymentMethod?: string // Payment method used by client
+  clientPaymentReference?: string // Payment reference from client
+  clientReceiptUrl?: string // Receipt uploaded by client
+  
+  // Supplier payment status - updated by supplier when they confirm payment received
+  supplierPaymentStatus?: 'pending' | 'paid' // Supplier confirms payment received (default: 'pending')
+  supplierPaidAt?: string // When supplier confirmed payment
+  supplierPaymentMethod?: string // Payment method confirmed by supplier
+  supplierPaymentReference?: string // Payment reference confirmed by supplier
   
   // Linked transaction (if invoice was paid and recorded)
   linkedTransactionId?: string
