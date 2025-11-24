@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAdminAuth, getAdminDb } from "@/lib/firebase-admin"
 import { createTransporter } from "@/lib/utils/nodemailer"
-import { buildWaitlistEmail, WAITLIST_EMAIL_TEMPLATES, type WaitlistTemplateKey } from "@/lib/emails/waitlist-templates"
+import { buildWaitlistEmail, WAITLIST_EMAIL_TEMPLATES, WAITLIST_SITE_LINK, type WaitlistTemplateKey } from "@/lib/emails/waitlist-templates"
 
 const auth = getAdminAuth()
 const adminDb = getAdminDb()
@@ -76,22 +76,38 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { waitlistId, recipientEmail, recipientName, templateKey } = body as {
+    const { 
+      waitlistId, 
+      recipientEmail, 
+      recipientName, 
+      templateKey,
+      customSubject,
+      customBody,
+      isCustomEmail
+    } = body as {
       waitlistId?: string
       recipientEmail?: string
       recipientName?: string
       templateKey?: WaitlistTemplateKey
+      customSubject?: string
+      customBody?: string
+      isCustomEmail?: boolean
     }
 
-    if (!recipientEmail || !templateKey) {
+    if (!recipientEmail) {
       return NextResponse.json(
-        { error: "Recipient email and template key are required" },
+        { error: "Recipient email is required" },
         { status: 400 }
       )
     }
 
-    if (!WAITLIST_EMAIL_TEMPLATES[templateKey]) {
-      return NextResponse.json({ error: "Invalid template key" }, { status: 400 })
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(recipientEmail)) {
+      return NextResponse.json(
+        { error: "Invalid email format" },
+        { status: 400 }
+      )
     }
 
     const transporter = createTransporter()
@@ -102,10 +118,39 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { subject, body: emailBody } = buildWaitlistEmail(templateKey, {
-      name: recipientName,
-      email: recipientEmail
-    })
+    let subject: string
+    let emailBody: string
+
+    if (isCustomEmail && customSubject && customBody) {
+      // Use custom email
+      subject = customSubject.trim()
+      emailBody = customBody.trim()
+      
+      // Replace placeholders in custom email if present
+      const displayName = recipientName?.trim() || "there"
+      emailBody = emailBody
+        .replace(/\{\{name\}\}/g, displayName)
+        .replace(/\{\{siteLink\}\}/g, WAITLIST_SITE_LINK)
+    } else {
+      // Use template
+      if (!templateKey) {
+        return NextResponse.json(
+          { error: "Template key is required when not using custom email" },
+          { status: 400 }
+        )
+      }
+
+      if (!WAITLIST_EMAIL_TEMPLATES[templateKey]) {
+        return NextResponse.json({ error: "Invalid template key" }, { status: 400 })
+      }
+
+      const built = buildWaitlistEmail(templateKey, {
+        name: recipientName,
+        email: recipientEmail
+      })
+      subject = built.subject
+      emailBody = built.body
+    }
 
     const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER || "noreply@otax.com"
 
