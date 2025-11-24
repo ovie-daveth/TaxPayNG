@@ -167,16 +167,24 @@ export async function POST(request: NextRequest) {
     if (waitlistId) {
       const waitlistRef = adminDb.collection("waitlist").doc(waitlistId)
       const now = new Date().toISOString()
-      await waitlistRef.set(
-        {
-          notified: true,
-          status: templateKey,
-          lastNotifiedAt: now,
-          lastNotificationTemplate: templateKey,
-          updatedAt: now
-        },
-        { merge: true }
-      )
+      
+      // Build update object - only include defined values
+      const updateData: any = {
+        notified: true,
+        lastNotifiedAt: now,
+        updatedAt: now
+      }
+
+      // Only set status and template if using a template (not custom)
+      if (templateKey && !isCustomEmail) {
+        updateData.status = templateKey
+        updateData.lastNotificationTemplate = templateKey
+      } else if (isCustomEmail) {
+        // For custom emails, use manualNotification status
+        updateData.status = "manualNotification"
+      }
+
+      await waitlistRef.set(updateData, { merge: true })
 
       const snapshot = await waitlistRef.get()
       if (snapshot.exists) {
