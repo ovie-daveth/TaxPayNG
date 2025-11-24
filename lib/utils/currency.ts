@@ -119,10 +119,12 @@ export function getCurrencySymbol(code: CurrencyCode): string {
  */
 export function formatCurrencyAmount(amount: number, currency: CurrencyCode): string {
   const symbol = getCurrencySymbol(currency)
-  return `${symbol}${amount.toLocaleString("en-NG", {
+  // Use toLocaleString with proper locale to ensure commas are added
+  const formatted = amount.toLocaleString("en-US", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  })}`
+  })
+  return `${symbol}${formatted}`
 }
 
 /**

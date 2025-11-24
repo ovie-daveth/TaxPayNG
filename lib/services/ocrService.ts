@@ -170,10 +170,22 @@ class OCRService {
       // Perform OCR on the image
       console.log('Starting OCR...')
       const { data: { text, confidence } } = await this.worker.recognize(imageFile)
-      console.log('OCR completed. Raw text:', text)
+      console.log('OCR completed')
       
-      // Parse the extracted text
-      const receiptData = this.parseReceiptText(text, confidence)
+      // Normalize common OCR mistakes
+      let normalizedText = text
+        .replace(/[#＃]/g, '₦') // Replace # with ₦
+        .replace(/\bN\s+(\d)/g, '₦$1') // N 200.00 → ₦200.00
+        .replace(/(\d)\s+00\b/g, '$1.00') // Fix "200 00" → "200.00"
+        .replace(/[oO](?=\d)/g, '0') // Fix O/o misread as 0
+        .replace(/[Il|](?=\d{2}\.)/g, '1') // Fix I/l/| misread as 1
+      
+      console.log('Normalized text (first 500 chars):', normalizedText.substring(0, 500))
+      
+      // Parse the extracted text (use normalized text)
+      const receiptData = this.parseReceiptText(normalizedText, confidence)
+      // Store original raw text
+      receiptData.rawText = text
       
       return receiptData
     } catch (error) {
@@ -188,6 +200,12 @@ class OCRService {
   private parseReceiptText(text: string, confidence: number): ReceiptData {
     const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0)
     
+    // Log raw text for debugging
+    console.log('=== RAW OCR TEXT ===')
+    console.log(text)
+    console.log('=== END RAW TEXT ===')
+    console.log('Lines extracted:', lines)
+    
     // Initialize default values
     const receiptData: ReceiptData = {
       amount: '',
@@ -199,27 +217,36 @@ class OCRService {
       rawText: text
     }
 
-    // FIXED: Enhanced amount extraction with better patterns for Nigerian receipts
+    // FIXED: Enhanced amount extraction with better patterns for Nigerian receipts (especially OPay)
     const amountPatterns = [
-      // Pattern 1: Naira symbol with amount (₦200.00)
-      /[₦]\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/g,
+      // Pattern 0: Look for lines that start with currency symbol (common in OPay receipts)
+      /^[₦#N]\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/gm,
+      // Pattern 1: Naira symbol with amount (₦200.00) - most common in OPay
+      /[₦#]\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/g,
       // Pattern 2: Amount with Naira symbol after (200.00₦)
-      /(\d+(?:,\d{3})*(?:\.\d{2})?)\s*[₦]/g,
+      /(\d+(?:,\d{3})*(?:\.\d{2})?)\s*[₦#]/g,
       // Pattern 3: NGN/N prefix (NGN 200.00 or N 200.00)
-      /(?:NGN|N)\s+(\d+(?:,\d{3})*(?:\.\d{2})?)/gi,
-      // Pattern 4: Standalone amount with 2 decimals (200.00) - very common
-      /\b(\d+(?:,\d{3})*\.\d{2})\b/g,
-      // Pattern 5: Amount near keywords
-      /(?:amount|total|sum|paid|transaction)\s*[:=]?\s*[₦N]?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/gi,
-      // Pattern 6: Just digits with decimals at start of line
-      /^[\s]*(\d+\.\d{2})\b/gm,
+      /\b(?:NGN|N)\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/gi,
+      // Pattern 4: Standalone amount with 2 decimals on its own line or after whitespace
+      // FIXED: More specific for prominent amounts like "200.00" displayed large
+      /(?:^|\n|\s)(\d{1,3}(?:,\d{3})*\.\d{2})(?:\s|\n|$)/gm,
+      // Pattern 5: Amount near keywords (especially "Successful" in OPay receipts)
+      /(?:amount|total|sum|paid|transaction|successful)\s*[:=]?\s*[₦#N]?\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/gi,
+      // Pattern 6: Large prominent numbers (like 200.00 or 50,000.00) - common in receipts
+      /\b(\d{1,3}(?:,\d{3})*\.\d{2})\b/g,
+      // Pattern 7: Simple decimal numbers with exactly 2 decimals
+      /\b(\d+\.\d{2})\b/g,
+      // Pattern 8: Amount after "₦" or "#" without space (OCR might read as one token)
+      /[₦#](\d+(?:,\d{3})*(?:\.\d{2})?)/g,
     ]
 
-    let bestMatch: { amount: string; value: number; score: number; context: string } | null = null
-    const allMatches: Array<{ amount: string; value: number; score: number; context: string }> = []
+    let bestMatch: { amount: string; value: number; score: number; context: string; pattern: number } | null = null
+    const allMatches: Array<{ amount: string; value: number; score: number; context: string; pattern: number }> = []
 
-    for (const pattern of amountPatterns) {
+    for (let patternIndex = 0; patternIndex < amountPatterns.length; patternIndex++) {
+      const pattern = amountPatterns[patternIndex]
       const matches = [...text.matchAll(pattern)]
+      
       for (const match of matches) {
         if (match[1]) {
           const amountStr = match[1].replace(/,/g, '')
@@ -227,61 +254,82 @@ class OCRService {
           
           // Get context around the match
           const matchIndex = match.index || 0
-          const contextStart = Math.max(0, matchIndex - 60)
-          const contextEnd = Math.min(text.length, matchIndex + match[0].length + 60)
-          const context = text.substring(contextStart, contextEnd).toLowerCase()
+          const contextStart = Math.max(0, matchIndex - 80)
+          const contextEnd = Math.min(text.length, matchIndex + match[0].length + 80)
+          const context = text.substring(contextStart, contextEnd)
+          const contextLower = context.toLowerCase()
           
-          console.log(`Found potential amount: ${amountStr}, context: "${context.substring(0, 100)}"`)
+          console.log(`Pattern ${patternIndex}: Found "${amountStr}" (${amountValue}) | Full match: "${match[0]}" | Context: "${context.substring(0, 120).replace(/\n/g, ' ')}"`)
           
-          // FIXED: Better filtering for account numbers
+          // Check if this looks like an account number or reference
           const isAccountNumber = 
-            /account\s*(?:number|no\.?|#)?\s*[:=]?\s*\d{10,}/.test(context) ||
-            /\d{10,}/.test(match[1]) || // Long numbers are likely account numbers
-            /\*{4,}/.test(match[0]) || // Masked numbers
-            context.includes('session') ||
-            context.includes('transaction no') ||
-            context.includes('reference') ||
-            context.includes('814') || // OPay account patterns
-            context.includes('310') // First Bank account patterns
+            /account\s*(?:number|no\.?|#)?\s*[:=]?\s*\d{10,}/.test(contextLower) ||
+            /\d{10,}/.test(match[1]) || // Numbers with 10+ digits
+            /\*{4,}/.test(match[0]) || // Masked numbers like 814****675
+            /session\s*id/i.test(contextLower) ||
+            /transaction\s*no/i.test(contextLower) ||
+            /reference/i.test(contextLower)
           
-          // FIXED: Accept reasonable transaction amounts (from 0.01 to 10M)
-          const isValidAmount = amountValue >= 0.01 && amountValue <= 10000000
+          // Check if it's a partial account number (3-4 digits near account context)
+          // FIXED: Don't reject amounts that are legitimate transaction amounts
+          const isPartialAccount = 
+            (amountValue >= 100 && amountValue < 1000) && 
+            (/814|310|675|616/g.test(match[1])) &&
+            /account|sender|recipient|opay|bank/i.test(contextLower) &&
+            !/transaction|amount|successful|receipt/i.test(contextLower) // Don't reject if near transaction keywords
           
-          if (!isAccountNumber && isValidAmount) {
-            // Scoring system
+          // Valid transaction amounts
+          const isValidAmount = amountValue >= 0.01 && amountValue <= 100000000
+          
+          if (!isAccountNumber && !isPartialAccount && isValidAmount) {
             let score = 0
             
-            // Has exactly 2 decimal places (currency format) - HIGHEST PRIORITY
-            if (amountStr.match(/^\d+\.\d{2}$/)) score += 150
+            // HIGHEST PRIORITY: Has exactly 2 decimal places
+            if (amountStr.match(/^\d+\.\d{2}$/)) score += 200
             
-            // Reasonable transaction amount (1-100000)
-            if (amountValue >= 1 && amountValue <= 100000) score += 60
+            // Reasonable transaction amount
+            if (amountValue >= 1 && amountValue <= 1000000) score += 70
+            if (amountValue >= 100 && amountValue <= 100000) score += 20 // Sweet spot
             
-            // Very small amounts get lower priority
-            if (amountValue < 10) score -= 20
+            // FIXED: Don't penalize small amounts if they have currency symbol or are in prominent position
+            if (amountValue < 10) {
+              // Only penalize if it's NOT near currency symbol or transaction keywords
+              if (!/[₦#]/.test(match[0]) && !/transaction|amount|successful|receipt/i.test(contextLower)) {
+                score -= 30
+              }
+            }
             
-            // Near transaction keywords
-            if (/amount|total|paid|transaction|successful|transfer/i.test(context)) score += 50
+            // Near transaction keywords (especially "Successful" in OPay receipts)
+            if (/successful/i.test(contextLower)) score += 80 // High priority for OPay receipts
+            if (/transaction|receipt|amount|total|paid|transfer/i.test(contextLower)) score += 60
             
-            // Has currency symbol
-            if (/[₦N]/.test(match[0])) score += 40
+            // Has currency symbol (₦ or #)
+            if (/[₦#]/.test(match[0])) score += 50
             
-            // NOT near account/reference keywords - IMPORTANT
-            if (!/account|session|reference|transaction\s*no|sender|recipient|id/i.test(context)) score += 30
+            // NOT near account/reference keywords
+            if (!/account|session|reference|transaction\s*no|sender|recipient|id/i.test(contextLower)) score += 40
             
-            // Prefer amounts at the beginning of text (usually prominent on receipts)
+            // Position-based scoring (earlier = more likely to be transaction amount)
             const relativePosition = matchIndex / text.length
-            if (relativePosition < 0.2) score += 25 // First 20% of text
-            else if (relativePosition < 0.4) score += 15 // First 40% of text
+            if (relativePosition < 0.15) score += 40 // First 15%
+            else if (relativePosition < 0.30) score += 25 // First 30%
+            else if (relativePosition < 0.50) score += 10 // First 50%
             
-            // Exact match "₦200.00" or "200.00" at prominent position
-            if (amountValue === 200 && amountStr === '200.00' && relativePosition < 0.3) score += 50
+            // On its own line (common for prominent amounts)
+            const lineBreakBefore = text.substring(Math.max(0, matchIndex - 5), matchIndex).includes('\n')
+            const lineBreakAfter = text.substring(matchIndex + match[0].length, Math.min(text.length, matchIndex + match[0].length + 5)).includes('\n')
+            if (lineBreakBefore || lineBreakAfter) score += 30
+            
+            // Bonus for early patterns (more specific)
+            if (patternIndex === 0) score += 30 // Line starting with currency
+            if (patternIndex === 1) score += 20 // Currency symbol before
             
             const matchData = {
               amount: amountStr,
               value: amountValue,
               score,
-              context: context.substring(0, 100)
+              context: context.substring(0, 100).replace(/\n/g, ' '),
+              pattern: patternIndex
             }
             
             allMatches.push(matchData)
@@ -289,19 +337,26 @@ class OCRService {
             if (!bestMatch || score > bestMatch.score) {
               bestMatch = matchData
             }
+          } else {
+            if (isAccountNumber) console.log(`  ↳ REJECTED: Looks like account number`)
+            if (isPartialAccount) console.log(`  ↳ REJECTED: Partial account number`)
+            if (!isValidAmount) console.log(`  ↳ REJECTED: Invalid amount range`)
           }
         }
       }
     }
 
     // Log all matches for debugging
-    console.log('All amount matches found:', allMatches)
+    console.log('\n=== ALL AMOUNT MATCHES ===')
+    console.table(allMatches.sort((a, b) => b.score - a.score))
+    console.log('=== END MATCHES ===\n')
     
     if (bestMatch) {
       receiptData.amount = bestMatch.amount
-      console.log('✓ Extracted amount:', bestMatch.amount, '| Score:', bestMatch.score)
+      console.log(`✓ SELECTED AMOUNT: ${bestMatch.amount} (Score: ${bestMatch.score}, Pattern: ${bestMatch.pattern})`)
     } else {
-      console.log('✗ No valid amount found in text')
+      console.log('✗ NO VALID AMOUNT FOUND')
+      console.log('Tip: Check if OCR is correctly reading the currency symbol and decimal points')
     }
 
     // FIXED: Enhanced date extraction for various formats
@@ -384,23 +439,62 @@ class OCRService {
       }
     }
 
-    // FIXED: Enhanced remark/description extraction
+    // FIXED: Enhanced remark/description extraction for OPay and other Nigerian receipts
     const remarkPatterns = [
-      /(?:remark|narration|description|memo|purpose)[:\s]*([^\n]+)/i,
+      // Pattern 0: "Remark:" or "Remark :" followed by text
+      /(?:remark|narration|description|memo|purpose)\s*:?\s*([^\n]+?)(?:\n|transaction|session|$)/i,
+      // Pattern 1: Look for "Remark" on its own line, then capture next line
+      /remark\s*:?\s*\n\s*([^\n]+?)(?:\n|transaction|session|$)/i,
+      // Pattern 2: Common OPay format - "Remark" followed by text on same or next line
+      /remark\s*:?\s*([a-z][^\n]{2,100}?)(?:\n|transaction|session|id|no|$)/i,
     ]
 
     for (const pattern of remarkPatterns) {
       const match = text.match(pattern)
       if (match && match[1]) {
         let remark = match[1].trim()
-        // Clean up remark
+        // Clean up remark - remove transaction numbers, session IDs, etc.
         remark = remark.replace(/\d{10,}/g, '').replace(/\s+/g, ' ').trim()
         remark = remark.replace(/transaction\s*no\.?.*$/i, '').trim()
-        if (remark.length > 2 && remark.length < 200) {
+        remark = remark.replace(/session\s*id.*$/i, '').trim()
+        // Remove common trailing patterns
+        remark = remark.replace(/\s*[:\-]\s*$/, '').trim()
+        
+        if (remark.length > 2 && remark.length < 200 && !/^\d+$/.test(remark)) {
           receiptData.notes = remark
           receiptData.description = remark // FIXED: Also set as description
-          console.log('Extracted remark/description:', remark)
+          console.log('✓ Extracted remark/description:', remark)
           break
+        }
+      }
+    }
+    
+    // Fallback: Look for common remark patterns without explicit "Remark:" label
+    // This helps with receipts where OCR might miss the label
+    if (!receiptData.notes) {
+      // Look for short text phrases (2-5 words) that appear between transaction details
+      const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0)
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].toLowerCase()
+        // Check if this line looks like a remark (short, no numbers, common words)
+        if (
+          line.length > 5 && 
+          line.length < 50 &&
+          !/\d{4,}/.test(line) && // No long numbers
+          !/transaction|session|account|bank|opay|successful|date|time/i.test(line) && // Not a label
+          /^[a-z\s]+$/.test(line.replace(/[^a-z\s]/g, '')) && // Mostly letters
+          line.split(/\s+/).length >= 2 && // At least 2 words
+          line.split(/\s+/).length <= 8 // At most 8 words
+        ) {
+          // Check if previous line mentions "remark" or similar
+          const prevLine = i > 0 ? lines[i - 1].toLowerCase() : ''
+          if (/remark|narration|description|memo|purpose/i.test(prevLine) || 
+              (prevLine.length < 10 && /remark|narration/i.test(prevLine))) {
+            receiptData.notes = lines[i]
+            receiptData.description = lines[i]
+            console.log('✓ Extracted remark/description (fallback):', lines[i])
+            break
+          }
         }
       }
     }

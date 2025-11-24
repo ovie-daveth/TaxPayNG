@@ -1,5 +1,8 @@
 export type BusinessType = 'freelancer' | 'creator' | 'sme' | 'individual'
 
+// Subscription Types
+export type SubscriptionType = 'PRO' | 'GOLD' | 'PLATINUM' | 'Small Business' | 'Big Business' | null
+
 // User Profile Types
 export interface UserProfile {
   id: string
@@ -31,6 +34,13 @@ export interface UserProfile {
     notifications: boolean
     theme: 'light' | 'dark' | 'system'
   }
+  // Subscription fields
+  isSubscribe?: boolean
+  subscriptionType?: SubscriptionType
+  transactionCount?: number // Current month's transaction count
+  transactionCountResetDate?: string // Date when transaction count was last reset
+  storageLimit?: number // Storage limit in bytes (e.g., 500MB = 500 * 1024 * 1024)
+  storageUsed?: number // Current storage used in bytes
 }
 
 // Transaction Types
@@ -222,4 +232,161 @@ export interface PaginatedResponse<T> {
     hasNext: boolean
     hasPrev: boolean
   }
+}
+
+// Invoice Types
+export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled'
+export type InvoiceTemplateType = 'standard' | 'detailed' | 'minimal' | 'professional'
+export type InvoiceType = 'outgoing' | 'incoming' // outgoing = sales invoice (client owes you), incoming = purchase invoice/bill (you owe supplier)
+
+export interface InvoiceItem {
+  id: string
+  description: string
+  quantity: number
+  unitPrice: number
+  currency?: string // Currency code for this item (if different from invoice currency)
+  tax?: number // Tax percentage (e.g., 7.5 for 7.5%)
+  amount: number // quantity * unitPrice * (1 + tax/100)
+}
+
+export interface InvoiceClient {
+  id?: string // If saved client, use ID
+  name: string
+  email?: string
+  phone?: string
+  address?: {
+    street?: string
+    city?: string
+    state?: string
+    country?: string
+    postalCode?: string
+  }
+  taxId?: string
+  businessName?: string // Customer's business name (if applicable)
+}
+
+export interface InvoiceSupplier {
+  businessName?: string
+  name: string // Contact person name (firstName + lastName from profile)
+  email: string
+  phone?: string
+  address?: {
+    street?: string
+    city?: string
+    state?: string
+    country?: string
+    postalCode?: string
+  }
+  taxId?: string // TIN from user profile
+}
+
+export interface Invoice {
+  id: string
+  userId: string // Owner of the invoice (who created it)
+  invoiceNumber: string // Auto-generated (e.g., INV-2024-001)
+  invoiceType: InvoiceType // 'outgoing' = you send to clients, 'incoming' = received from another OTax user
+  status: InvoiceStatus
+  template: InvoiceTemplateType
+  
+  // Supplier/Business information (from user profile for outgoing, or supplier info for incoming)
+  supplier: InvoiceSupplier
+  
+  // Client information (for outgoing) or Your information (for incoming from OTax user)
+  client: InvoiceClient
+  
+  // For invoices sent to/received from other OTax users
+  recipientUserId?: string // OTax user ID who received this invoice (if sent to another OTax user)
+  senderUserId?: string // OTax user ID who sent this invoice (if received from another OTax user)
+  senderInvoiceNumber?: string // Original invoice number from sender (for duplicate detection)
+  recipientEmail?: string // Email of recipient (if not an OTax user)
+  sentAt?: string // When invoice was sent
+  receivedAt?: string // When invoice was received (for incoming)
+  
+  // Invoice details
+  issueDate: string
+  dueDate: string
+  currency: string
+  
+  // Items
+  items: InvoiceItem[]
+  
+  // Totals
+  subtotal: number
+  taxAmount: number
+  discount?: number
+  total: number
+  
+  // Additional information
+  notes?: string
+  terms?: string
+  paymentTerms?: string // e.g., "Net 30", "Due on receipt"
+  paymentInstructions?: string // Payment instructions or payment link
+  
+  // Payment tracking - separate statuses for client and supplier
+  // Client payment status - updated by client when they pay
+  clientPaymentStatus?: 'pending' | 'paid' // Client marks as paid (default: 'pending')
+  clientPaidAt?: string // When client marked as paid
+  clientPaymentMethod?: string // Payment method used by client
+  clientPaymentReference?: string // Payment reference from client
+  clientReceiptUrl?: string // Receipt uploaded by client
+  
+  // Supplier payment status - updated by supplier when they confirm payment received
+  supplierPaymentStatus?: 'pending' | 'paid' // Supplier confirms payment received (default: 'pending')
+  supplierPaidAt?: string // When supplier confirmed payment
+  supplierPaymentMethod?: string // Payment method confirmed by supplier
+  supplierPaymentReference?: string // Payment reference confirmed by supplier
+  
+  // Linked transaction (if invoice was paid and recorded)
+  linkedTransactionId?: string
+  
+  // Attachments
+  pdfUrl?: string
+  
+  createdAt: string
+  updatedAt: string
+}
+
+export interface InvoiceFilters {
+  status?: InvoiceStatus
+  invoiceType?: InvoiceType
+  clientId?: string
+  startDate?: string
+  endDate?: string
+  dateRange?: {
+    start: string
+    end: string
+  }
+  amountRange?: {
+    min: number
+    max: number
+  }
+  search?: string
+}
+
+export interface InvoiceTemplate {
+  id: string
+  name: string
+  type: InvoiceTemplateType
+  description: string
+  preview?: string
+  isDefault?: boolean
+}
+
+export interface SavedClient {
+  id: string
+  userId: string
+  name: string
+  email?: string
+  phone?: string
+  address?: {
+    street?: string
+    city?: string
+    state?: string
+    country?: string
+    postalCode?: string
+  }
+  taxId?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
 }

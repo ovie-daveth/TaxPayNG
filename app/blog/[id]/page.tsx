@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Calendar, Clock, User, Share2, BookOpen, Tag, Edit } from "lucide-react"
+import { ArrowLeft, Calendar, Clock, User, Share2, BookOpen, Tag, Edit, Heart, Eye, Loader2 } from "lucide-react"
 import { BlogDetailSkeleton } from "@/components/ui/skeletons"
 import Footer from "@/components/footer"
 import { Badge } from "@/components/ui/badge"
@@ -16,6 +16,7 @@ import { useAuth } from "@/lib/hooks/useAuth"
 import { useEditor } from "@/lib/hooks/useEditor"
 import { useAdmin } from "@/lib/hooks/useAdmin"
 import { SiteHeader } from "@/components/site-header"
+import { toast } from "sonner"
 
 interface BlogPost {
   id: string
@@ -30,6 +31,9 @@ interface BlogPost {
   featuredImage?: string
   status?: string
   isPublished?: boolean
+  views?: number
+  likeCount?: number
+  likedBy?: string[]
 }
 
 export default function BlogDetailPage() {
@@ -42,6 +46,11 @@ export default function BlogDetailPage() {
   const [post, setPost] = useState<BlogPost | null>(null)
   const [relatedPosts, setRelatedPosts] = useState<BlogPost[]>([])
   const [loading, setLoading] = useState(true)
+  const [views, setViews] = useState(0)
+  const [likeCount, setLikeCount] = useState(0)
+  const [isLiked, setIsLiked] = useState(false)
+  const [liking, setLiking] = useState(false)
+  const [viewTracked, setViewTracked] = useState(false)
 
   // Fetch blog post from Firestore
   useEffect(() => {
@@ -63,6 +72,15 @@ export default function BlogDetailPage() {
           }
           
           setPost(postData)
+          setViews(postData.views || 0)
+          setLikeCount(postData.likeCount || 0)
+          setIsLiked(user ? (postData.likedBy || []).includes(user.uid) : false)
+
+          // Track view (only once per page load)
+          if (!viewTracked && postData.isPublished) {
+            trackView(postId)
+            setViewTracked(true)
+          }
 
           // Fetch related posts - only show published posts
           if (postData.category) {
@@ -92,7 +110,68 @@ export default function BlogDetailPage() {
     }
 
     fetchPost()
-  }, [postId, isAdmin, isEditor])
+  }, [postId, isAdmin, isEditor, user, viewTracked])
+
+  // Track view function
+  const trackView = async (blogId: string) => {
+    try {
+      await fetch("/api/blog/track-view", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ blogId }),
+      })
+    } catch (error) {
+      console.error("Error tracking view:", error)
+    }
+  }
+
+  // Handle like toggle
+  const handleLike = async () => {
+    if (!user) {
+      toast.error("Please sign in to like posts")
+      return
+    }
+
+    if (liking) return
+
+    setLiking(true)
+    try {
+      const response = await fetch("/api/blog/toggle-like", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          blogId: postId,
+          userId: user.uid,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        setIsLiked(data.liked)
+        setLikeCount(data.likeCount)
+        // Update post state
+        setPost((prev) => prev ? {
+          ...prev,
+          likeCount: data.likeCount,
+          likedBy: data.liked 
+            ? [...(prev.likedBy || []), user.uid]
+            : (prev.likedBy || []).filter(id => id !== user.uid)
+        } : null)
+      } else {
+        toast.error(data.error || "Failed to update like")
+      }
+    } catch (error) {
+      console.error("Error toggling like:", error)
+      toast.error("Failed to update like")
+    } finally {
+      setLiking(false)
+    }
+  }
 
   if (loading) {
     return <BlogDetailSkeleton />
@@ -124,8 +203,12 @@ export default function BlogDetailPage() {
       }
     } else {
       // Fallback: copy to clipboard
-      navigator.clipboard.writeText(window.location.href)
-      alert('Link copied to clipboard!')
+      try {
+        await navigator.clipboard.writeText(window.location.href)
+        toast.success('Link copied to clipboard!')
+      } catch (err) {
+        toast.error('Failed to copy link')
+      }
     }
   }
 
@@ -152,7 +235,40 @@ export default function BlogDetailPage() {
 
       {/* Article Content */}
       <article className="container mx-auto px-4 pt-12 pb-16 md:pt-20 md:pb-24">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-6xl mx-auto flex gap-8">
+          {/* Sticky Sidebar */}
+          <aside className="hidden lg:block flex-shrink-0 w-16">
+            <div className="sticky top-1/2 -translate-y-1/2 flex flex-col items-center gap-6">
+              <button
+                onClick={handleLike}
+                disabled={liking}
+                className="flex flex-col items-center gap-1 hover:opacity-70 transition-opacity disabled:opacity-50"
+              >
+                {liking ? (
+                  <Loader2 className="w-6 h-6 text-muted-foreground animate-spin" />
+                ) : (
+                  <Heart className={`w-6 h-6 ${isLiked ? "fill-current text-primary" : "text-muted-foreground"}`} />
+                )}
+                <span className="text-xs font-medium text-muted-foreground">{likeCount}</span>
+              </button>
+              
+              <div className="flex flex-col items-center gap-1">
+                <Eye className="w-6 h-6 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">{views.toLocaleString()}</span>
+              </div>
+              
+              <button
+                onClick={handleShare}
+                className="flex flex-col items-center gap-1 hover:opacity-70 transition-opacity cursor-pointer"
+              >
+                <Share2 className="w-6 h-6 text-muted-foreground" />
+                <span className="text-xs font-medium text-muted-foreground">Share</span>
+              </button>
+            </div>
+          </aside>
+
+          {/* Main Content */}
+          <div className="flex-1 max-w-4xl">
           {/* Back Button */}
           {isEditor ? (
             <Link href="/editor/dashboard">
@@ -193,14 +309,35 @@ export default function BlogDetailPage() {
                 <Clock className="w-4 h-4" />
                 <span>{post.readTime}</span>
               </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleShare}
-              >
-                <Share2 className="w-4 h-4 mr-2" />
-                Share
-              </Button>
+              {/* Mobile: Show views, likes, share */}
+              <div className="flex items-center gap-3 lg:hidden">
+                <div className="flex items-center gap-2">
+                  <Eye className="w-4 h-4" />
+                  <span>{views.toLocaleString()}</span>
+                </div>
+                <Button
+                  variant={isLiked ? "default" : "outline"}
+                  size="sm"
+                  onClick={handleLike}
+                  disabled={liking}
+                  className="gap-2"
+                >
+                  {liking ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Heart className={`w-4 h-4 ${isLiked ? "fill-current" : ""}`} />
+                  )}
+                  <span>{likeCount}</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleShare}
+                >
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Share
+                </Button>
+              </div>
               {/* Edit Button - Show for admins or editors who own the post */}
               {(isAdmin || (isEditor && post.authorId === user?.uid)) && (
                 <Link href={`/blog/${postId}/edit`}>
@@ -331,6 +468,7 @@ export default function BlogDetailPage() {
                 </Button>
               </Link>
             )}
+          </div>
           </div>
         </div>
       </article>

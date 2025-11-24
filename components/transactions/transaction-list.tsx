@@ -38,9 +38,33 @@ export function TransactionList({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [highlightedTransactionId, setHighlightedTransactionId] = useState<string | null>(null)
 
   const { user } = useAuth()
   const { createTransaction } = useTransactions(user?.uid || null)
+
+  // Listen for newly created transactions to highlight them
+  useEffect(() => {
+    const handleTransactionChanged = (event: CustomEvent) => {
+      const { action, transactionId } = event.detail || {}
+      
+      // Only highlight newly created transactions
+      if (action === 'created' && transactionId) {
+        setHighlightedTransactionId(transactionId)
+        
+        // Remove highlight after 3 seconds
+        setTimeout(() => {
+          setHighlightedTransactionId(null)
+        }, 3000)
+      }
+    }
+
+    window.addEventListener('transactionChanged', handleTransactionChanged as EventListener)
+    
+    return () => {
+      window.removeEventListener('transactionChanged', handleTransactionChanged as EventListener)
+    }
+  }, [])
 
   console.log("Transactions:", transactions)
   
@@ -212,8 +236,20 @@ export function TransactionList({
             </tr>
           </thead>
           <tbody>
-            {transactions.map((transaction) => (
-              <tr key={`${transaction.id}-${transaction.updatedAt || transaction.createdAt}`} className="border-b border-border last:border-0 hover:bg-muted/30">
+            {transactions.map((transaction) => {
+              const isHighlighted = highlightedTransactionId === transaction.id
+              return (
+              <tr 
+                key={`${transaction.id}-${transaction.updatedAt || transaction.createdAt}`} 
+                className={`border-b border-border last:border-0 hover:bg-muted/30 transition-all duration-500 ${
+                  isHighlighted 
+                    ? 'bg-primary/15 border-l-4 border-primary shadow-lg' 
+                    : ''
+                }`}
+                style={isHighlighted ? {
+                  animation: 'highlightFade 3s ease-out forwards'
+                } : undefined}
+              >
                 <td className="py-4 px-4 text-sm">{formatDate(transaction.date)}</td>
                 <td className="py-4 px-4">
                   <div className="flex items-center gap-2">
@@ -289,15 +325,28 @@ export function TransactionList({
                   </DropdownMenu>
                 </td>
               </tr>
-            ))}
+              )
+            })}
           </tbody>
         </table>
       </div>
 
       {/* Mobile View */}
       <div className="md:hidden divide-y divide-border">
-        {transactions.map((transaction) => (
-          <div key={`mobile-${transaction.id}-${transaction.updatedAt || transaction.createdAt}`} className="p-4">
+        {transactions.map((transaction) => {
+          const isHighlighted = highlightedTransactionId === transaction.id
+          return (
+          <div 
+            key={`mobile-${transaction.id}-${transaction.updatedAt || transaction.createdAt}`} 
+            className={`p-4 transition-all duration-500 ${
+              isHighlighted 
+                ? 'bg-primary/15 border-l-4 border-primary shadow-lg' 
+                : ''
+            }`}
+            style={isHighlighted ? {
+              animation: 'highlightFade 3s ease-out'
+            } : undefined}
+          >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
                 <div
@@ -364,7 +413,8 @@ export function TransactionList({
               </span>
             </div>
           </div>
-        ))} 
+          )
+        })} 
       </div>
 
       {/* Add Transaction Dialog */}

@@ -107,21 +107,40 @@ service cloud.firestore {
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
     }
     
+    // Invoices Collection
+    match /invoices/{invoiceId} {
+      // Users can read their own invoices
+      // For admin access, we allow authenticated users (admin checks done at app level)
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
+      
+      // Allow create if:
+      // 1. User is creating their own invoice (userId matches auth.uid), OR
+      // 2. User is sending an invoice to another user (senderUserId matches auth.uid for incoming invoices)
+      allow create: if isAuthenticated() && (
+        request.resource.data.userId == request.auth.uid ||
+        (request.resource.data.invoiceType == 'incoming' && 
+         request.resource.data.senderUserId == request.auth.uid)
+      );
+      
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
+    }
+    
     // Waitlist Verifications Collection (temporary, server-side only)
     // Stores verification tokens before adding to waitlist
     match /waitlistVerifications/{emailId} {
       // Helper function to validate verification entry structure
       function isValidVerificationEntry() {
-        let hasRequiredFields = request.resource.data.keys().hasAll(['name', 'email', 'verificationToken', 'createdAt', 'expiresAt', 'attempts'])
-        let nameValid = request.resource.data.name is string && request.resource.data.name.size() > 0
-        let emailValid = request.resource.data.email is string && request.resource.data.email.size() > 0
-        let tokenValid = request.resource.data.verificationToken is string && request.resource.data.verificationToken.size() == 6
-        let datesValid = request.resource.data.createdAt is string && request.resource.data.expiresAt is string
-        let attemptsValid = request.resource.data.attempts is int && request.resource.data.attempts >= 0 && request.resource.data.attempts <= 10
-        let phoneValid = !('phone' in request.resource.data) || request.resource.data.phone == null || request.resource.data.phone is string
-        let emailMatchesId = request.resource.data.email == emailId
+        let hasRequiredFields = request.resource.data.keys().hasAll(['name', 'email', 'verificationToken', 'createdAt', 'expiresAt', 'attempts']);
+        let nameValid = request.resource.data.name is string && request.resource.data.name.size() > 0;
+        let emailValid = request.resource.data.email is string && request.resource.data.email.size() > 0;
+        let tokenValid = request.resource.data.verificationToken is string && request.resource.data.verificationToken.size() == 6;
+        let datesValid = request.resource.data.createdAt is string && request.resource.data.expiresAt is string;
+        let attemptsValid = request.resource.data.attempts is int && request.resource.data.attempts >= 0 && request.resource.data.attempts <= 10;
+        let phoneValid = !('phone' in request.resource.data) || request.resource.data.phone == null || request.resource.data.phone is string;
+        let emailMatchesId = request.resource.data.email == emailId;
         
-        return hasRequiredFields && nameValid && emailValid && tokenValid && datesValid && attemptsValid && phoneValid && emailMatchesId
+        return hasRequiredFields && nameValid && emailValid && tokenValid && datesValid && attemptsValid && phoneValid && emailMatchesId;
       }
       
       // Helper function to validate update (can only increment attempts, not modify token)

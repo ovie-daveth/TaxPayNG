@@ -1,6 +1,7 @@
 import { BaseService } from './base'
 import { Transaction, TransactionFilters, ApiResponse, PaginatedResponse, Document } from '@/lib/types'
 import { documentService } from './documentService'
+import { userService } from './userService'
 
 export class TransactionService extends BaseService {
   constructor() {
@@ -8,6 +9,7 @@ export class TransactionService extends BaseService {
   }
 
   // Get all transactions for a user
+  // All filtering is done client-side to avoid Firestore composite index requirements
   async getUserTransactions(
     userId: string, 
     filters?: TransactionFilters,
@@ -15,38 +17,69 @@ export class TransactionService extends BaseService {
     pageSize: number = 20
   ): Promise<PaginatedResponse<Transaction>> {
     try {
-      const queryFilters = [{ field: 'userId', operator: '==', value: userId }]
+      // Always fetch all transactions for the user (only filter by userId in database)
+      const allTransactions = await this.getAll([
+        { field: 'userId', operator: '==', value: userId }
+      ])
       
-      // Add additional filters
-      if (filters) {
-        if (filters.type) {
-          queryFilters.push({ field: 'type', operator: '==', value: filters.type })
-        }
-        if (filters.category) {
-          queryFilters.push({ field: 'category', operator: '==', value: filters.category })
-        }
-        if (filters.dateRange) {
-          queryFilters.push({ field: 'date', operator: '>=', value: filters.dateRange.start })
-          queryFilters.push({ field: 'date', operator: '<=', value: filters.dateRange.end })
-        }
-        if (filters.amountRange) {
-          queryFilters.push({ field: 'amount', operator: '>=', value: filters.amountRange.min.toString() })
-          queryFilters.push({ field: 'amount', operator: '<=', value: filters.amountRange.max.toString() })
+      // Convert startDate/endDate to dateRange if needed
+      let dateRange = filters?.dateRange
+      if (!dateRange && (filters?.startDate || filters?.endDate)) {
+        dateRange = {
+          start: filters.startDate || new Date(0).toISOString().split('T')[0],
+          end: filters.endDate || new Date().toISOString().split('T')[0]
         }
       }
-
-      const { data, total } = await this.getPaginated(
-        page,
-        pageSize,
-        queryFilters,
-        'date',
-        'desc'
-      )
-
+      
+      // Apply all filters client-side
+      let filtered = allTransactions
+      
+      if (filters?.type) {
+        filtered = filtered.filter(t => t.type === filters.type)
+      }
+      if (filters?.category) {
+        filtered = filtered.filter(t => t.category === filters.category)
+      }
+      if (filters?.paymentMethod) {
+        filtered = filtered.filter(t => t.paymentMethod === filters.paymentMethod)
+      }
+      if (dateRange) {
+        const start = dateRange.start ? new Date(dateRange.start) : null
+        const end = dateRange.end ? new Date(dateRange.end) : null
+        filtered = filtered.filter(t => {
+          const txnDate = t.date ? new Date(t.date) : null
+          if (!txnDate || isNaN(txnDate.getTime())) return false
+          if (start && txnDate < start) return false
+          if (end && txnDate > end) return false
+          return true
+        })
+      }
+      if (filters?.amountRange) {
+        filtered = filtered.filter(t => {
+          const amount = typeof t.amount === 'number' ? t.amount : Number(String(t.amount).replace(/[\u20A6,]/g, '').trim()) || 0
+          if (filters.amountRange!.min !== undefined && amount < filters.amountRange!.min) return false
+          if (filters.amountRange!.max !== undefined && amount > filters.amountRange!.max) return false
+          return true
+        })
+      }
+      
+      // Sort by date descending
+      filtered.sort((a, b) => {
+        const dateA = a.date ? new Date(a.date).getTime() : 0
+        const dateB = b.date ? new Date(b.date).getTime() : 0
+        return dateB - dateA
+      })
+      
+      // Apply pagination
+      const total = filtered.length
+      const startIndex = (page - 1) * pageSize
+      const endIndex = startIndex + pageSize
+      const paginatedData = filtered.slice(startIndex, endIndex)
+      
       const totalPages = Math.ceil(total / pageSize)
-
+      
       return {
-        data,
+        data: paginatedData,
         pagination: {
           page,
           limit: pageSize,
@@ -65,6 +98,34 @@ export class TransactionService extends BaseService {
   // Create a new transaction
   async createTransaction(userId: string, transactionData: Omit<Transaction, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<Transaction>> {
     try {
+      // Check transaction limit
+      const profile = await userService.getProfile(userId)
+      if (profile) {
+        const transactionLimit = userService.getTransactionLimit(profile.subscriptionType || null)
+        
+        // Reset count if new month
+        await userService.resetTransactionCountIfNeeded(userId, profile)
+        const currentProfile = await userService.getProfile(userId)
+        
+        if (currentProfile && transactionLimit !== Infinity) {
+          const currentCount = currentProfile.transactionCount || 0
+          if (currentCount >= transactionLimit) {
+            return {
+              success: false,
+              error: `Transaction limit reached. You have used ${currentCount} of ${transactionLimit} transactions this month. Please upgrade your plan to add more transactions.`
+            }
+          }
+          
+          // Check if adding this transaction would exceed limit
+          if (currentCount + 1 > transactionLimit) {
+            return {
+              success: false,
+              error: `This transaction would exceed your monthly limit of ${transactionLimit} transactions. You have ${currentCount} transactions remaining.`
+            }
+          }
+        }
+      }
+
       const newTransaction = {
         ...transactionData,
         userId,
@@ -74,6 +135,9 @@ export class TransactionService extends BaseService {
 
       const transactionId = await this.create(newTransaction)
       const createdTransaction = await this.getById(transactionId)
+
+      // Increment transaction count
+      await userService.incrementTransactionCount(userId)
 
       // If transaction has attachments, create corresponding documents
       if (transactionData.attachments && transactionData.attachments.length > 0) {

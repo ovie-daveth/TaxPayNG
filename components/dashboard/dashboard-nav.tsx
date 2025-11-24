@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Calculator, LayoutDashboard, Receipt, FileText, Bell, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, IdCardIcon } from "lucide-react"
+import { Calculator, LayoutDashboard, Receipt, FileText, Bell, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, IdCardIcon, FileCheck } from "lucide-react"
 import { useState } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { useAuth } from "@/lib/hooks/useAuth"
@@ -14,6 +14,7 @@ import OtaxLogo from "../OtaxLogo"
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard/transactions", label: "Transactions", icon: Receipt },
+  { href: "/dashboard/invoices", label: "Invoices", icon: FileCheck },
   { href: "/dashboard/tax-calculator", label: "Tax Calculator", icon: Calculator },
   { href: "/dashboard/payment", label: "Payment", icon: IdCardIcon },
   { href: "/dashboard/documents", label: "Documents", icon: FileText },

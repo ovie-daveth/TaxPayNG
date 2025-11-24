@@ -15,7 +15,8 @@ import {
   Plus,
   Edit,
   Calendar,
-  LogOut
+  LogOut,
+  Heart
 } from "lucide-react"
 import { EditorDashboardSkeleton } from "@/components/ui/skeletons"
 import { useAuth } from "@/lib/hooks/useAuth"
@@ -38,6 +39,7 @@ export default function EditorDashboard() {
     publishedPosts: 0,
     draftPosts: 0,
     totalViews: 0,
+    totalLikes: 0,
     averageViews: 0
   })
 
@@ -105,6 +107,7 @@ export default function EditorDashboard() {
         const published = userPosts.filter((p: any) => p.status === 'published')
         const drafts = userPosts.filter((p: any) => p.status === 'draft')
         const totalViews = userPosts.reduce((sum: number, p: any) => sum + (p.views || 0), 0)
+        const totalLikes = userPosts.reduce((sum: number, p: any) => sum + (p.likeCount || 0), 0)
         const avgViews = published.length > 0 ? Math.round(totalViews / published.length) : 0
 
         setStats({
@@ -112,6 +115,7 @@ export default function EditorDashboard() {
           publishedPosts: published.length,
           draftPosts: drafts.length,
           totalViews,
+          totalLikes,
           averageViews: avgViews
         })
       } catch (error) {
@@ -224,6 +228,19 @@ export default function EditorDashboard() {
               <p className="text-xs text-muted-foreground mt-1">Per post</p>
             </CardContent>
           </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                <Heart className="w-4 h-4" />
+                Total Likes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalLikes.toLocaleString()}</div>
+              <p className="text-xs text-muted-foreground mt-1">All posts</p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Posts List */}
@@ -280,6 +297,10 @@ export default function EditorDashboard() {
                           <div className="flex items-center gap-1">
                             <Eye className="w-4 h-4" />
                             {post.views || 0} views
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Heart className="w-4 h-4" />
+                            {post.likeCount || 0} likes
                           </div>
                           <div className="flex items-center gap-1">
                             <FileText className="w-4 h-4" />
