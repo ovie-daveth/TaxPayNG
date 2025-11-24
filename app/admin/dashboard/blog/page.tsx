@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Plus, Search, Edit, Trash2 } from "lucide-react"
+import { ArrowLeft, Plus, Search, Edit, Trash2, Heart, Eye } from "lucide-react"
 import { AdminTableSkeleton } from "@/components/ui/skeletons"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useAdmin } from "@/lib/hooks/useAdmin"
@@ -18,6 +18,7 @@ import { db } from "@/firebase/firebase"
 import { collection, getDocs, query, orderBy, deleteDoc, doc } from "firebase/firestore"
 import { format } from "date-fns"
 import { Timestamp } from "firebase/firestore"
+import { BlogAnalytics } from "@/components/blog/blog-analytics"
 
 export default function AdminBlogPage() {
   const router = useRouter()
@@ -26,6 +27,12 @@ export default function AdminBlogPage() {
   const [posts, setPosts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [analytics, setAnalytics] = useState({
+    totalViews: 0,
+    totalLikes: 0,
+    totalPosts: 0,
+    averageViews: 0
+  })
 
   useEffect(() => {
     if (!authLoading && !adminLoading) {
@@ -50,6 +57,19 @@ export default function AdminBlogPage() {
           ...doc.data()
         }))
         setPosts(postsData)
+
+        // Calculate analytics
+        const publishedPosts = postsData.filter((p: any) => p.isPublished && p.status === 'published')
+        const totalViews = publishedPosts.reduce((sum: number, p: any) => sum + (p.views || 0), 0)
+        const totalLikes = publishedPosts.reduce((sum: number, p: any) => sum + (p.likeCount || 0), 0)
+        const avgViews = publishedPosts.length > 0 ? Math.round(totalViews / publishedPosts.length) : 0
+
+        setAnalytics({
+          totalViews,
+          totalLikes,
+          totalPosts: publishedPosts.length,
+          averageViews: avgViews
+        })
       } catch (error) {
         console.error("Error fetching posts:", error)
         toast.error("Failed to load blog posts")
@@ -143,6 +163,26 @@ export default function AdminBlogPage() {
           <p className="text-muted-foreground">Manage all blog posts</p>
         </div>
 
+        {/* Analytics */}
+        <div className="mb-8">
+          <BlogAnalytics
+            totalViews={analytics.totalViews}
+            totalLikes={analytics.totalLikes}
+            totalPosts={analytics.totalPosts}
+            averageViews={analytics.averageViews}
+            topPosts={posts
+              .filter((p: any) => p.isPublished && p.status === 'published')
+              .sort((a: any, b: any) => (b.views || 0) - (a.views || 0))
+              .slice(0, 5)
+              .map((p: any) => ({
+                id: p.id,
+                title: p.title,
+                views: p.views || 0,
+                likeCount: p.likeCount || 0
+              }))}
+          />
+        </div>
+
         <div className="mb-6">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -174,7 +214,15 @@ export default function AdminBlogPage() {
                       <span>•</span>
                       <span>{formatDate(post.publishedAt)}</span>
                       <span>•</span>
-                      <span>{post.views || 0} views</span>
+                      <span className="flex items-center gap-1">
+                        <Eye className="w-3 h-3" />
+                        {post.views || 0} views
+                      </span>
+                      <span>•</span>
+                      <span className="flex items-center gap-1">
+                        <Heart className="w-3 h-3" />
+                        {post.likeCount || 0} likes
+                      </span>
                     </div>
                   </div>
                   <div className="flex gap-2 ml-4">
