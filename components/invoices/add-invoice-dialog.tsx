@@ -447,157 +447,61 @@ export function AddInvoiceDialog({
   }
 
   const calculateTotals = () => {
-    // Calculate subtotal using converted amounts
-    const subtotal = formData.items.reduce((sum, item) => {
-      // If unit price is 0, skip this item
-      if (item.unitPrice === 0) return sum
-      
-      const itemCurrency = itemCurrencies[item.id] || formData.currency
-      const basePrice = itemCurrency !== formData.currency 
-        ? (itemConvertedAmounts[item.id] || item.unitPrice)
-        : item.unitPrice
-      return sum + (item.quantity * basePrice)
-    }, 0)
+    // Calculate subtotal WITHOUT tax (sum of quantity * converted unit price)
+    let subtotalWithoutTax = 0
+    let totalTaxAmount = 0
     
-    // Calculate tax using converted amounts
-    const taxAmount = formData.items.reduce((sum, item) => {
+    formData.items.forEach(item => {
       // If unit price is 0, skip this item
-      if (item.unitPrice === 0) return sum
+      if (item.unitPrice === 0) return
       
+      // Get the converted price in base currency
       const itemCurrency = itemCurrencies[item.id] || formData.currency
       const basePrice = itemCurrency !== formData.currency 
         ? (itemConvertedAmounts[item.id] || item.unitPrice)
         : item.unitPrice
+      
+      // Debug logging
+      console.log(`Item: ${item.description}`, {
+        itemCurrency,
+        baseCurrency: formData.currency,
+        originalPrice: item.unitPrice,
+        convertedPrice: basePrice,
+        quantity: item.quantity,
+        tax: item.tax
+      })
+      
+      // Calculate item subtotal (quantity × converted unit price)
       const itemSubtotal = item.quantity * basePrice
-      return sum + (item.tax ? itemSubtotal * (item.tax / 100) : 0)
-    }, 0)
+      subtotalWithoutTax += itemSubtotal
+      
+      // Calculate tax for this item
+      const itemTaxAmount = item.tax ? itemSubtotal * (item.tax / 100) : 0
+      totalTaxAmount += itemTaxAmount
+    })
     
-    const discountAmount = formData.discount ? subtotal * (formData.discount / 100) : 0
-    const total = subtotal + taxAmount - discountAmount
-    return { subtotal, taxAmount, total }
+    // Subtotal is the sum of all items (without tax)
+    const subtotal = subtotalWithoutTax
+    
+    // Total before discount = subtotal + tax
+    const totalBeforeDiscount = subtotal + totalTaxAmount
+    
+    // Discount is applied to the total before discount
+    const discountAmount = formData.discount ? totalBeforeDiscount * (formData.discount / 100) : 0
+    
+    // Final total
+    const total = totalBeforeDiscount - discountAmount
+    
+    console.log('Totals:', { subtotal, totalTaxAmount, totalBeforeDiscount, discountAmount, total })
+    
+    return { 
+      subtotal: subtotal, 
+      taxAmount: totalTaxAmount, 
+      total: total 
+    }
   }
 
-  // const handleSubmit = async () => {
-  //   if (!user?.uid) {
-  //     toast.error("User not authenticated")
-  //     return
-  //   }
-
-  //   // Validation
-  //   if (!formData.supplier?.name?.trim()) {
-  //     toast.error("Please enter your business/contact name")
-  //     return
-  //   }
-
-  //   if (!formData.supplier?.email?.trim()) {
-  //     toast.error("Please enter your email")
-  //     return
-  //   }
-
-  //   if (!formData.client.name.trim()) {
-  //     toast.error("Please enter client name")
-  //     return
-  //   }
-
-  //   if (formData.items.length === 0 || formData.items.some(item => !item.description.trim() || item.unitPrice <= 0)) {
-  //     toast.error("Please add at least one valid item")
-  //     return
-  //   }
-
-  //   setIsSubmitting(true)
-  //   try {
-  //     // Helper function to remove undefined values from objects
-  //     const removeUndefined = (obj: any): any => {
-  //       if (obj === null || obj === undefined) return obj
-  //       if (Array.isArray(obj)) return obj.map(removeUndefined)
-  //       if (typeof obj !== 'object') return obj
-        
-  //       const cleaned: any = {}
-  //       for (const key in obj) {
-  //         if (obj[key] !== undefined) {
-  //           cleaned[key] = removeUndefined(obj[key])
-  //         }
-  //       }
-  //       return cleaned
-  //     }
-
-  //     // Clean client and supplier objects
-  //     const cleanedClient = removeUndefined(formData.client)
-  //     const cleanedSupplier = removeUndefined(
-  //       formData.invoiceType === 'outgoing' ? (formData.supplier || getInitialSupplier()) : getInitialSupplier()
-  //     )
-
-  //     // Recalculate all item amounts before saving to ensure they're correct
-  //     const itemsWithCalculatedAmounts = formData.items.map(item => {
-  //       const itemCurrency = itemCurrencies[item.id] || formData.currency
-  //       const basePrice = itemCurrency !== formData.currency 
-  //         ? (itemConvertedAmounts[item.id] || item.unitPrice)
-  //         : item.unitPrice
-  //       const subtotal = item.quantity * basePrice
-  //       const taxAmount = item.tax ? subtotal * (item.tax / 100) : 0
-  //       return {
-  //         ...item,
-  //         amount: subtotal + taxAmount
-  //       }
-  //     })
-
-  //     const invoiceData = {
-  //       invoiceType: formData.invoiceType,
-  //       template: formData.template,
-  //       supplier: cleanedSupplier,
-  //       client: cleanedClient,
-  //       issueDate: formData.issueDate,
-  //       dueDate: formData.dueDate,
-  //       currency: formData.currency,
-  //       items: itemsWithCalculatedAmounts,
-  //       discount: formData.discount || undefined,
-  //       notes: formData.notes || undefined,
-  //       terms: formData.terms || undefined,
-  //       paymentTerms: formData.paymentTerms,
-  //       paymentInstructions: formData.paymentInstructions || undefined,
-  //       status: 'draft' as const
-  //     }
-
-  //     // Remove undefined top-level fields
-  //     const cleanedInvoiceData = removeUndefined(invoiceData)
-
-  //     let result
-  //     if (invoice) {
-  //       result = await invoiceService.updateInvoice(invoice.id, user.uid, cleanedInvoiceData)
-  //     } else {
-  //       result = await invoiceService.createInvoice(user.uid, cleanedInvoiceData)
-  //     }
-
-  //     if (result.success) {
-  //       toast.success(invoice ? "Invoice updated successfully" : "Invoice created successfully")
-        
-  //       // If sending to OTax user, send the invoice
-  //       if (formData.sendToOtaxUser && formData.recipientEmail && result.data) {
-  //         const sendResult = await invoiceService.sendInvoiceToUser(
-  //           result.data.id,
-  //           user.uid,
-  //           formData.recipientEmail
-  //         )
-          
-  //         if (sendResult.success) {
-  //           toast.success(`Invoice sent to ${formData.recipientEmail}`)
-  //         } else {
-  //           toast.error(sendResult.error || "Failed to send invoice")
-  //         }
-  //       }
-        
-  //       onOpenChange(false)
-  //       onSuccess?.()
-  //     } else {
-  //       toast.error(result.error || "Failed to save invoice")
-  //     }
-  //   } catch (error) {
-  //     console.error("Error saving invoice:", error)
-  //     toast.error("Failed to save invoice")
-  //   } finally {
-  //     setIsSubmitting(false)
-  //   }
-  // }
+  const totals = calculateTotals()
 
   const handleSubmit = async () => {
     if (!user?.uid) {
@@ -654,17 +558,13 @@ export function AddInvoiceDialog({
         formData.invoiceType === 'outgoing' ? (formData.supplier || getInitialSupplier()) : getInitialSupplier()
       )
   
-      // Recalculate all item amounts before saving to ensure they're correct
+      // Use items as-is (amounts are already calculated during input via updateItem)
+      // Just ensure currency is saved if different from invoice currency
       const itemsWithCalculatedAmounts = formData.items.map(item => {
         const itemCurrency = itemCurrencies[item.id] || formData.currency
-        const basePrice = itemCurrency !== formData.currency 
-          ? (itemConvertedAmounts[item.id] || item.unitPrice)
-          : item.unitPrice
-        const subtotal = item.quantity * basePrice
-        const taxAmount = item.tax ? subtotal * (item.tax / 100) : 0
         return {
           ...item,
-          amount: subtotal + taxAmount
+          currency: itemCurrency !== formData.currency ? itemCurrency : undefined
         }
       })
   
@@ -682,23 +582,32 @@ export function AddInvoiceDialog({
         terms: formData.terms || undefined,
         paymentTerms: formData.paymentTerms,
         paymentInstructions: formData.paymentInstructions || undefined,
-        status: 'draft' as const
+        status: 'draft' as const,
+        subtotal: totals.subtotal,
+        taxAmount: totals.taxAmount,
+        total: totals.total
       }
+      
+      console.log('Invoice data:', invoiceData)
   
       // Remove undefined top-level fields
       const cleanedInvoiceData = removeUndefined(invoiceData)
+
+      console.log('Cleaned invoice data:', cleanedInvoiceData)
   
       let result
       if (invoice) {
-        result = await invoiceService.updateInvoice(invoice.id, user.uid, cleanedInvoiceData)
+         result = await invoiceService.updateInvoice(invoice.id, user.uid, cleanedInvoiceData)
+        console.log('Updating invoice:', invoice)
       } else {
-        result = await invoiceService.createInvoice(user.uid, cleanedInvoiceData)
+         result = await invoiceService.createInvoice(user.uid, cleanedInvoiceData)
+        console.log('Creating invoice:', cleanedInvoiceData)
       }
   
       if (result.success) {
         toast.success(invoice ? "Invoice updated successfully" : "Invoice created successfully")
         
-        // If sending to OTax user, send the invoice
+        //If sending to OTax user, send the invoice
         if (formData.sendToOtaxUser && formData.recipientEmail && result.data) {
           setIsSendingToUser(true) // Prevent duplicate sends
           try {
@@ -733,8 +642,7 @@ export function AddInvoiceDialog({
       setIsSubmitting(false)
     }
   }
-
-  const totals = calculateTotals()
+  
 
   // Prevent form submission on Enter key for all inputs
   const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {

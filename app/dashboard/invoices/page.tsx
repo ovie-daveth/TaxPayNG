@@ -9,6 +9,7 @@ import { Plus, Search, Filter, Download, FileText, Eye, Edit, Trash2, Send, Chec
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { invoiceService } from "@/lib/services"
 import { Invoice, InvoiceStatus, InvoiceType } from "@/lib/types"
 import { toast } from "sonner"
@@ -274,34 +275,57 @@ console.log("invoices", invoices)
                   </div>
                 </div>
                 <div className="flex gap-2 ml-4">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => {
-                      setSelectedInvoice(invoice)
-                      setIsViewDialogOpen(true)
-                    }}
-                  >
-                    <Eye className="w-4 h-4" />
-                  </Button>
-                  {invoice.status === "draft" && (
-                    <>
-                      <Button variant="outline" size="sm" onClick={() => handleMarkAsSent(invoice.id)}>
-                        <Send className="w-4 h-4" />
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setSelectedInvoice(invoice)
+                          setIsViewDialogOpen(true)
+                        }}
+                      >
+                        <Eye className="w-4 h-4" />
                       </Button>
-                      <Button variant="outline" size="sm">
-                        <Edit className="w-4 h-4" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>View Invoice</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  {invoice.status === "draft" && invoice.userId === profile?.userId && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="sm" onClick={() => handleMarkAsSent(invoice.id)}>
+                          <Send className="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Mark as Sent</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
+                  {/* {invoice.status === "sent" && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button variant="outline" size="sm" onClick={() => handleMarkAsPaid(invoice.id)}>
+                          <CheckCircle2 className="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Mark as Paid</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )} */}
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" size="sm" onClick={() => handleDelete(invoice.id)}>
+                        <Trash2 className="w-4 h-4" />
                       </Button>
-                    </>
-                  )}
-                  {invoice.status === "sent" && (
-                    <Button variant="outline" size="sm" onClick={() => handleMarkAsPaid(invoice.id)}>
-                      <CheckCircle2 className="w-4 h-4" />
-                    </Button>
-                  )}
-                  <Button variant="outline" size="sm" onClick={() => handleDelete(invoice.id)}>
-                    <Trash2 className="w-4 h-4" />
-                  </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Delete Invoice</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               </div>
             </Card>
@@ -327,8 +351,14 @@ console.log("invoices", invoices)
 
       <AddInvoiceDialog
         open={isAddDialogOpen}
-        onOpenChange={setIsAddDialogOpen}
+        onOpenChange={(open) => {
+          setIsAddDialogOpen(open)
+          if (!open) {
+            setSelectedInvoice(null) // Clear selected invoice when dialog closes
+          }
+        }}
         onSuccess={loadInvoices}
+        invoice={selectedInvoice}
       />
 
       <ViewInvoiceDialog
@@ -336,6 +366,11 @@ console.log("invoices", invoices)
         onOpenChange={setIsViewDialogOpen}
         invoice={selectedInvoice}
         onInvoiceUpdated={loadInvoices}
+        onEdit={(invoice) => {
+          setSelectedInvoice(invoice)
+          setIsViewDialogOpen(false)
+          setIsAddDialogOpen(true)
+        }}
       />
     </div>
   )

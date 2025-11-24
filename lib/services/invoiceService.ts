@@ -185,13 +185,15 @@ export class InvoiceService extends BaseService {
   }
 
   // Create a new invoice
-  async createInvoice(userId: string, invoiceData: Omit<Invoice, 'id' | 'userId' | 'invoiceNumber' | 'subtotal' | 'taxAmount' | 'total' | 'createdAt' | 'updatedAt'>): Promise<ApiResponse<Invoice>> {
+  async createInvoice(userId: string, invoiceData: Omit<Invoice, 'id' | 'userId' | 'invoiceNumber' | 'subtotal' | 'taxAmount' | 'total' | 'createdAt' | 'updatedAt'>) {
     try {
       // Generate invoice number
       const invoiceNumber = await this.generateInvoiceNumber(userId, invoiceData.invoiceType || 'outgoing')
       
+      console.log('Invoice number:', invoiceNumber)
+      console.log('Invoice data:', invoiceData)
       // Calculate totals
-      const totals = this.calculateTotals(invoiceData.items, invoiceData.discount)
+     // const totals = this.calculateTotals(invoiceData.items, invoiceData.discount)
       
       // Check if invoice is overdue
       let status = invoiceData.status || 'draft'
@@ -211,9 +213,6 @@ export class InvoiceService extends BaseService {
         // Set default payment statuses
         clientPaymentStatus: 'pending' as const,
         supplierPaymentStatus: 'pending' as const,
-        subtotal: totals.subtotal,
-        taxAmount: totals.taxAmount,
-        total: totals.total,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
@@ -243,19 +242,6 @@ export class InvoiceService extends BaseService {
       
       // No authorization check needed - if user can view the invoice, they can update it
       // The view dialog already ensures invoice.userId === profile.userId
-
-      // Recalculate totals if items changed
-      if (updateData.items) {
-        const totals = this.calculateTotals(updateData.items, updateData.discount ?? existingInvoice.discount)
-        updateData.subtotal = totals.subtotal
-        updateData.taxAmount = totals.taxAmount
-        updateData.total = totals.total
-      } else if (updateData.discount !== undefined) {
-        const totals = this.calculateTotals(existingInvoice.items, updateData.discount)
-        updateData.subtotal = totals.subtotal
-        updateData.taxAmount = totals.taxAmount
-        updateData.total = totals.total
-      }
 
       // Check if invoice should be marked as overdue
       if (updateData.status === 'sent' || (existingInvoice.status === 'sent' && !updateData.status)) {
