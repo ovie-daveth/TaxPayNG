@@ -34,12 +34,17 @@ export default function AdminWaitlistPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [emailDialogOpen, setEmailDialogOpen] = useState(false)
   const [selectedRecipient, setSelectedRecipient] = useState<any | null>(null)
-  const [selectedTemplate, setSelectedTemplate] = useState<WaitlistTemplateKey>("launchPreview")
+  const [selectedTemplate, setSelectedTemplate] = useState<WaitlistTemplateKey | "custom">("launchPreview")
   const [emailPreview, setEmailPreview] = useState<{ subject: string; body: string }>({ subject: "", body: "" })
+  const [editableSubject, setEditableSubject] = useState("")
+  const [editableBody, setEditableBody] = useState("")
   const [sendingEmail, setSendingEmail] = useState(false)
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false)
-  const [bulkTemplate, setBulkTemplate] = useState<WaitlistTemplateKey>("launchPreview")
+  const [bulkTemplate, setBulkTemplate] = useState<WaitlistTemplateKey | "custom">("launchPreview")
+  const [bulkEditableSubject, setBulkEditableSubject] = useState("")
+  const [bulkEditableBody, setBulkEditableBody] = useState("")
   const [bulkSending, setBulkSending] = useState(false)
+  const [bulkUserTypeFilter, setBulkUserTypeFilter] = useState<"all" | "sme" | "freelancer" | "creator">("all")
   const [markingId, setMarkingId] = useState<string | null>(null)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [pendingAction, setPendingAction] = useState<null | { type: "sendEmail" | "markNotified"; payload: any }>(null)
@@ -140,28 +145,43 @@ export default function AdminWaitlistPage() {
   )
 
   useEffect(() => {
-    if (selectedRecipient) {
-      setEmailPreview(buildWaitlistEmail(selectedTemplate, selectedRecipient))
+    if (selectedRecipient && selectedTemplate !== "custom") {
+      const preview = buildWaitlistEmail(selectedTemplate as WaitlistTemplateKey, selectedRecipient)
+      setEmailPreview(preview)
+      setEditableSubject(preview.subject)
+      setEditableBody(preview.body)
+    } else if (selectedTemplate === "custom") {
+      setEditableSubject("")
+      setEditableBody("")
     }
   }, [selectedRecipient, selectedTemplate])
 
   const openEmailDialogWithRecipient = (recipient: any) => {
     setSelectedRecipient(recipient)
     setSelectedTemplate("launchPreview")
-    setEmailPreview(buildWaitlistEmail("launchPreview", recipient))
+    const preview = buildWaitlistEmail("launchPreview", recipient)
+    setEmailPreview(preview)
+    setEditableSubject(preview.subject)
+    setEditableBody(preview.body)
     setEmailDialogOpen(true)
   }
 
-  const handleTemplateChange = (value: WaitlistTemplateKey) => {
+  const handleTemplateChange = (value: WaitlistTemplateKey | "custom") => {
     setSelectedTemplate(value)
-    if (selectedRecipient) {
-      setEmailPreview(buildWaitlistEmail(value, selectedRecipient))
+    if (selectedRecipient && value !== "custom") {
+      const preview = buildWaitlistEmail(value as WaitlistTemplateKey, selectedRecipient)
+      setEmailPreview(preview)
+      setEditableSubject(preview.subject)
+      setEditableBody(preview.body)
+    } else if (value === "custom") {
+      setEditableSubject("")
+      setEditableBody("")
     }
   }
 
   const handleCopyBody = async () => {
     try {
-      await navigator.clipboard.writeText(emailPreview.body)
+      await navigator.clipboard.writeText(editableBody)
       toast.success("Email content copied to clipboard")
     } catch (error) {
       toast.error("Failed to copy email content")
@@ -169,7 +189,20 @@ export default function AdminWaitlistPage() {
   }
 
   const handleSendEmail = async () => {
-    if (!selectedRecipient || !user || sendingEmail) return
+    if (!user || sendingEmail || !selectedRecipient) return
+
+    const recipientEmail = selectedRecipient.email || ""
+    const recipientName = selectedRecipient.name || ""
+
+    if (!recipientEmail) {
+      toast.error("Recipient email is required")
+      return
+    }
+
+    if (!editableSubject.trim() || !editableBody.trim()) {
+      toast.error("Please fill in both subject and body")
+      return
+    }
 
     setSendingEmail(true)
 
@@ -177,6 +210,7 @@ export default function AdminWaitlistPage() {
       const currentUser = auth.currentUser
       const token = currentUser ? await currentUser.getIdToken() : undefined
 
+      const isCustom = selectedTemplate === "custom"
       const response = await fetch("/api/admin/send-waitlist-email", {
         method: "POST",
         headers: {
@@ -185,9 +219,12 @@ export default function AdminWaitlistPage() {
         },
         body: JSON.stringify({
           waitlistId: selectedRecipient.id,
-          recipientEmail: selectedRecipient.email,
-          recipientName: selectedRecipient.name,
-          templateKey: selectedTemplate,
+          recipientEmail,
+          recipientName,
+          templateKey: isCustom ? undefined : (selectedTemplate as WaitlistTemplateKey),
+          customSubject: editableSubject.trim(),
+          customBody: editableBody.trim(),
+          isCustomEmail: isCustom,
         })
       })
 
@@ -200,6 +237,9 @@ export default function AdminWaitlistPage() {
       toast.success(data.message || "Email sent successfully")
       setEmailDialogOpen(false)
       setSelectedRecipient(null)
+      setSelectedTemplate("launchPreview")
+      setEditableSubject("")
+      setEditableBody("")
 
       if (data.updatedWaitlist) {
         setWaitlist((prev) => prev.map((entry) => entry.id === data.updatedWaitlist.id ? data.updatedWaitlist : entry))
@@ -258,47 +298,93 @@ export default function AdminWaitlistPage() {
   const handleBulkSend = async () => {
     if (bulkSending || waitlist.length === 0) return
 
+    if (!bulkEditableSubject.trim() || !bulkEditableBody.trim()) {
+      toast.error("Please fill in both subject and body")
+      return
+    }
+
     try {
       setBulkSending(true)
 
       const currentUser = auth.currentUser
       const token = currentUser ? await currentUser.getIdToken() : undefined
 
-      const response = await fetch("/api/admin/send-waitlist-bulk-emails", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          waitlistIds: waitlist.map((entry) => entry.id),
-          templateKey: bulkTemplate
+      // Filter waitlist by user type
+      let filteredWaitlist = waitlist
+      if (bulkUserTypeFilter !== "all") {
+        filteredWaitlist = waitlist.filter((entry: any) => {
+          const userType = entry.userType?.toString().toLowerCase().trim()
+          return userType === bulkUserTypeFilter
         })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to send bulk emails")
       }
 
-      const successes = data.results?.filter((item: any) => item.success).length ?? 0
-      const failures = data.results?.length ? data.results.length - successes : 0
+      if (filteredWaitlist.length === 0) {
+        toast.error(`No ${bulkUserTypeFilter === "all" ? "" : bulkUserTypeFilter} users found to send emails to`)
+        setBulkSending(false)
+        return
+      }
+
+      // Send emails one by one
+      const results: Array<{ id: string; email?: string; success: boolean; error?: string }> = []
+      
+      for (const entry of filteredWaitlist) {
+        if (!entry.email) {
+          results.push({ id: entry.id, success: false, error: "Email missing" })
+          continue
+        }
+
+        try {
+          const isCustom = bulkTemplate === "custom"
+          const response = await fetch("/api/admin/send-waitlist-email", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {})
+            },
+            body: JSON.stringify({
+              waitlistId: entry.id,
+              recipientEmail: entry.email,
+              recipientName: entry.name,
+              templateKey: isCustom ? undefined : (bulkTemplate as WaitlistTemplateKey),
+              customSubject: bulkEditableSubject.trim(),
+              customBody: bulkEditableBody.trim(),
+              isCustomEmail: isCustom,
+            })
+          })
+
+          const data = await response.json()
+
+          if (response.ok) {
+            results.push({ id: entry.id, email: entry.email, success: true })
+          } else {
+            results.push({ id: entry.id, email: entry.email, success: false, error: data.error || "Failed to send" })
+          }
+        } catch (error: any) {
+          results.push({ id: entry.id, email: entry.email, success: false, error: error.message || "Failed to send" })
+        }
+      }
+
+      const successes = results.filter((item) => item.success).length
+      const failures = results.length - successes
 
       toast.success(`Bulk email complete: ${successes} sent${failures ? `, ${failures} failed` : ""}`)
       setBulkDialogOpen(false)
+      setBulkTemplate("launchPreview")
+      setBulkEditableSubject("")
+      setBulkEditableBody("")
+      setBulkUserTypeFilter("all")
 
       if (successes > 0) {
         setWaitlist((prev) =>
           prev.map((entry) => {
-            const result = data.results?.find((item: any) => item.id === entry.id)
+            const result = results.find((item: any) => item.id === entry.id)
             if (!result || !result.success) return entry
             return {
               ...entry,
               notified: true,
-              status: bulkTemplate,
+              status: bulkTemplate === "custom" ? "manualNotification" : (bulkTemplate as WaitlistTemplateKey),
               lastNotifiedAt: new Date().toISOString(),
-              lastNotificationTemplate: bulkTemplate
+              lastNotificationTemplate: bulkTemplate === "custom" ? undefined : (bulkTemplate as WaitlistTemplateKey)
             }
           })
         )
@@ -347,7 +433,23 @@ export default function AdminWaitlistPage() {
             <p className="text-muted-foreground">Manage waitlist signups</p>
           </div>
           <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={() => setBulkDialogOpen(true)}>
+           
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setBulkTemplate("launchPreview")
+                setBulkUserTypeFilter("all")
+                if (waitlist.length > 0 && waitlist[0].email) {
+                  const preview = buildWaitlistEmail("launchPreview", waitlist[0])
+                  setBulkEditableSubject(preview.subject)
+                  setBulkEditableBody(preview.body)
+                } else {
+                  setBulkEditableSubject("")
+                  setBulkEditableBody("")
+                }
+                setBulkDialogOpen(true)
+              }}
+            >
               Send Bulk Email
             </Button>
             <Badge variant="outline">{waitlist.length} signups</Badge>
@@ -447,18 +549,24 @@ export default function AdminWaitlistPage() {
       </div>
 
       <Dialog open={emailDialogOpen} onOpenChange={setEmailDialogOpen}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Send Waitlist Email</DialogTitle>
+            <DialogTitle>Send Email</DialogTitle>
             <DialogDescription>
-              {selectedRecipient ? `Send an update to ${selectedRecipient.name || selectedRecipient.email}.` : ""}
+              {selectedRecipient 
+                ? `Send an email to ${selectedRecipient.name || selectedRecipient.email}` 
+                : "Send an email to a waitlist member"}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
+            {/* Template Selection */}
             <div>
               <Label htmlFor="email-template">Email Template</Label>
-              <Select value={selectedTemplate} onValueChange={(value: WaitlistTemplateKey) => handleTemplateChange(value)}>
+              <Select 
+                value={selectedTemplate} 
+                onValueChange={(value: WaitlistTemplateKey | "custom") => handleTemplateChange(value)}
+              >
                 <SelectTrigger id="email-template" className="mt-1">
                   <SelectValue placeholder="Select template" />
                 </SelectTrigger>
@@ -468,29 +576,36 @@ export default function AdminWaitlistPage() {
                       {template.label}
                     </SelectItem>
                   ))}
+                  <SelectItem value="custom">Custom Template</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
+            {/* Subject - Always Editable */}
             <div>
-              <Label htmlFor="email-subject">Subject</Label>
-              <Input id="email-subject" value={emailPreview.subject} readOnly className="mt-1" />
+              <Label htmlFor="email-subject">Subject *</Label>
+              <Input
+                id="email-subject"
+                value={editableSubject}
+                onChange={(e) => setEditableSubject(e.target.value)}
+                placeholder="Enter email subject"
+                className="mt-1"
+              />
             </div>
 
+            {/* Body - Always Editable */}
             <div>
-              <Label htmlFor="email-body">Email Preview</Label>
+              <Label htmlFor="email-body">Email Body *</Label>
               <Textarea
                 id="email-body"
-                value={emailPreview.body}
-                readOnly
+                value={editableBody}
+                onChange={(e) => setEditableBody(e.target.value)}
+                placeholder="Enter your email content here..."
                 rows={12}
-                className="mt-1 font-mono text-sm"
+                className="mt-1"
               />
               <p className="text-xs text-muted-foreground mt-2">
-                This email will include the link to our site:{" "}
-                <a href={WAITLIST_SITE_LINK} target="_blank" rel="noreferrer" className="underline">
-                  {WAITLIST_SITE_LINK}
-                </a>
+                You can use placeholders: {"{{name}}"} for recipient name, {"{{siteLink}}"} for site URL
               </p>
             </div>
           </div>
@@ -581,18 +696,62 @@ export default function AdminWaitlistPage() {
       </Dialog>
 
       <Dialog open={bulkDialogOpen} onOpenChange={setBulkDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Send Bulk Waitlist Email</DialogTitle>
+            <DialogTitle>Send Bulk Email</DialogTitle>
             <DialogDescription>
-              Choose a template and notify all waitlist members in one go. This will send individual emails to each person.
+              Send an email to all waitlist members at once. This will send individual emails to each person.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 mt-4">
+            {/* User Type Filter */}
+            <div>
+              <Label htmlFor="bulk-user-type">Send To</Label>
+              <Select 
+                value={bulkUserTypeFilter} 
+                onValueChange={(value: "all" | "sme" | "freelancer" | "creator") => {
+                  setBulkUserTypeFilter(value)
+                }}
+              >
+                <SelectTrigger id="bulk-user-type" className="mt-1">
+                  <SelectValue placeholder="Select user type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Users</SelectItem>
+                  <SelectItem value="sme">SMEs Only</SelectItem>
+                  <SelectItem value="freelancer">Freelancers Only</SelectItem>
+                  <SelectItem value="creator">Creators Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Template Selection */}
             <div>
               <Label htmlFor="bulk-template">Email Template</Label>
-              <Select value={bulkTemplate} onValueChange={(value: WaitlistTemplateKey) => setBulkTemplate(value)}>
+              <Select 
+                value={bulkTemplate} 
+                onValueChange={(value: WaitlistTemplateKey | "custom") => {
+                  setBulkTemplate(value)
+                  if (value !== "custom") {
+                    // Load template preview for first recipient (if available)
+                    const filtered = bulkUserTypeFilter === "all" 
+                      ? waitlist 
+                      : waitlist.filter((entry: any) => {
+                          const userType = entry.userType?.toString().toLowerCase().trim()
+                          return userType === bulkUserTypeFilter
+                        })
+                    if (filtered.length > 0 && filtered[0].email) {
+                      const preview = buildWaitlistEmail(value as WaitlistTemplateKey, filtered[0])
+                      setBulkEditableSubject(preview.subject)
+                      setBulkEditableBody(preview.body)
+                    }
+                  } else {
+                    setBulkEditableSubject("")
+                    setBulkEditableBody("")
+                  }
+                }}
+              >
                 <SelectTrigger id="bulk-template" className="mt-1">
                   <SelectValue placeholder="Select template" />
                 </SelectTrigger>
@@ -602,15 +761,64 @@ export default function AdminWaitlistPage() {
                       {template.label}
                     </SelectItem>
                   ))}
+                  <SelectItem value="custom">Custom Template</SelectItem>
                 </SelectContent>
               </Select>
+            </div>
+
+            {/* Subject - Always Editable */}
+            <div>
+              <Label htmlFor="bulk-subject">Subject *</Label>
+              <Input
+                id="bulk-subject"
+                value={bulkEditableSubject}
+                onChange={(e) => setBulkEditableSubject(e.target.value)}
+                placeholder="Enter email subject"
+                className="mt-1"
+              />
+            </div>
+
+            {/* Body - Always Editable */}
+            <div>
+              <Label htmlFor="bulk-body">Email Body *</Label>
+              <Textarea
+                id="bulk-body"
+                value={bulkEditableBody}
+                onChange={(e) => setBulkEditableBody(e.target.value)}
+                placeholder="Enter your email content here..."
+                rows={10}
+                className="mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                You can use placeholders: {"{{name}}"} for recipient name, {"{{siteLink}}"} for site URL
+              </p>
             </div>
 
             <div className="rounded-lg border border-dashed border-muted-foreground/40 p-4 text-sm text-muted-foreground">
               <p className="font-medium text-foreground mb-1">
                 Recipients
               </p>
-              <p>All {waitlist.length} waitlist members with valid emails will receive this message.</p>
+              {(() => {
+                const filtered = bulkUserTypeFilter === "all" 
+                  ? waitlist 
+                  : waitlist.filter((entry: any) => {
+                      const userType = entry.userType?.toString().toLowerCase().trim()
+                      return userType === bulkUserTypeFilter
+                    })
+                const count = filtered.length
+                const typeLabel = bulkUserTypeFilter === "all" 
+                  ? "all waitlist members" 
+                  : bulkUserTypeFilter === "sme" 
+                    ? "SMEs" 
+                    : bulkUserTypeFilter === "freelancer" 
+                      ? "Freelancers" 
+                      : "Creators"
+                return (
+                  <p>
+                    {count} {typeLabel} {count === 1 ? "has" : "have"} valid {count === 1 ? "email" : "emails"} and will receive this message.
+                  </p>
+                )
+              })()}
             </div>
           </div>
 
@@ -618,7 +826,19 @@ export default function AdminWaitlistPage() {
             <Button variant="ghost" onClick={() => setBulkDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleBulkSend} className="flex items-center gap-2" disabled={bulkSending || waitlist.length === 0}>
+            <Button 
+              onClick={handleBulkSend} 
+              className="flex items-center gap-2" 
+              disabled={bulkSending || (() => {
+                const filtered = bulkUserTypeFilter === "all" 
+                  ? waitlist 
+                  : waitlist.filter((entry: any) => {
+                      const userType = entry.userType?.toString().toLowerCase().trim()
+                      return userType === bulkUserTypeFilter
+                    })
+                return filtered.length === 0
+              })()}
+            >
               {bulkSending ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
