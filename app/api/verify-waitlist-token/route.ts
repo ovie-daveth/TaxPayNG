@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminDb } from '@/lib/firebase-admin'
+import { sendWhatsAppCommunityEmail } from '@/lib/emails/whatsapp-community-email'
 
 /**
  * Verify waitlist token and add to waitlist
@@ -89,6 +90,14 @@ export async function POST(request: NextRequest) {
 
     // Delete pending verification
     await adminDb.collection('waitlistVerifications').doc(emailLower).delete()
+
+    // Send WhatsApp community invitation email (don't block on failure)
+    try {
+      await sendWhatsAppCommunityEmail(emailLower, verificationData.name || '')
+    } catch (emailError) {
+      console.error('Failed to send WhatsApp community email (non-blocking):', emailError)
+      // Continue - email failure shouldn't block waitlist signup
+    }
 
     return NextResponse.json({
       success: true,
