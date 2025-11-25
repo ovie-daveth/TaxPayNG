@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowRight, BarChart3, Calculator, FileText, Bell, CheckCircle2, Loader2, Sparkles, Shield, TrendingUp, Clock, Users, Zap, Award, DollarSign, ScanLine, FolderArchive, CreditCard, Layers, Receipt, FileCheck, Smartphone, Building2 } from "lucide-react"
+import { ArrowRight, BarChart3, Calculator, FileText, Bell, CheckCircle2, Loader2, Sparkles, Shield, TrendingUp, Clock, Users, Zap, Award, DollarSign, ScanLine, FolderArchive, CreditCard, Layers, Receipt, FileCheck, Smartphone, Building2, MessageCircle } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { toast } from "sonner"
 import { db } from "@/firebase/firebase"
@@ -439,16 +439,32 @@ export default function HomePage() {
               <p className="text-sm sm:text-base text-muted-foreground mb-4 sm:mb-6">
                 Thank you for joining our waitlist. We'll notify you as soon as we launch!
               </p>
-              <Button 
-                onClick={() => {
-                  setIsSubmitted(false)
-                  setWaitlistData({ name: "", email: "", phone: "", userType: "", platformExpectations: "" })
-                }}
-                variant="outline"
-                className="w-full sm:w-auto"
-              >
-                Join Another Email
-              </Button>
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-3">
+                <Button 
+                  onClick={() => {
+                    setIsSubmitted(false)
+                    setWaitlistData({ name: "", email: "", phone: "", userType: "", platformExpectations: "" })
+                  }}
+                  variant="outline"
+                  className="w-full sm:w-auto"
+                >
+                  Join Another Email
+                </Button>
+                <Button 
+                  asChild
+                  className="w-full sm:w-auto bg-[#25D366] hover:bg-[#20BA5A] text-white"
+                >
+                  <a 
+                    href="https://chat.whatsapp.com/LLwCZWyuu1qEFUFZvnZQZY" 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    Join WhatsApp Community
+                  </a>
+                </Button>
+              </div>
             </div>
           ) : (
             <form onSubmit={handleWaitlistSubmit} className="space-y-4">

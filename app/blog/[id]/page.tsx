@@ -263,7 +263,7 @@ export default function BlogDetailPage() {
               >
                 <Share2 className="w-6 h-6 text-muted-foreground" />
                 <span className="text-xs font-medium text-muted-foreground">Share</span>
-              </button>
+              </button>  
             </div>
           </aside>
 

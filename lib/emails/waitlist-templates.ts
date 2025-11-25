@@ -1,6 +1,7 @@
 export type WaitlistTemplateKey = "launchPreview" | "importantUpdate" | "weAreLive"
 
 export const WAITLIST_SITE_LINK = "https://www.otaxng.com"
+export const WHATSAPP_COMMUNITY_LINK = "https://chat.whatsapp.com/LLwCZWyuu1qEFUFZvnZQZY"
 
 export interface WaitlistRecipient {
   name?: string
