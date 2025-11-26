@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Search, Filter, Download, FileText, Eye, Edit, Trash2, Send, CheckCircle2, Clock, AlertCircle } from "lucide-react"
+import { Plus, Search, Filter, Download, FileText, Eye, Edit, Trash2, Send, CheckCircle2, Clock, AlertCircle, LayoutGrid, Table2 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -29,6 +29,7 @@ export default function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | "all">("all")
   const [typeFilter, setTypeFilter] = useState<InvoiceType | "all">("all")
   const [currentPage, setCurrentPage] = useState(1)
+  const [viewMode, setViewMode] = useState<"card" | "table">("card")
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -160,10 +161,8 @@ console.log("invoices", invoices)
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       <div className="mb-8">
-     
-
-        <div className="flex gap-4 items-center">
-          <div className="flex-1 relative">
+        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-4">
+          <div className="flex-1 relative w-full sm:w-auto">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <Input
               placeholder="Search invoices by number, client name, or email..."
@@ -172,29 +171,49 @@ console.log("invoices", invoices)
               className="pl-10"
             />
           </div>
-          <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as "all" | "outgoing" | "incoming")}>
-            <SelectTrigger className="w-[200px]">
-              <SelectValue placeholder="Filter by type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="outgoing">Outgoing (You send)</SelectItem>
-              <SelectItem value="incoming">Incoming (You receive)</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as InvoiceStatus | "all")}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="sent">Sent</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="overdue">Overdue</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex gap-2 items-center w-full sm:w-auto">
+            <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as "all" | "outgoing" | "incoming")}>
+              <SelectTrigger className="w-full sm:w-[200px]">
+                <SelectValue placeholder="Filter by type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="outgoing">Outgoing (You send)</SelectItem>
+                <SelectItem value="incoming">Incoming (You receive)</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as InvoiceStatus | "all")}>
+              <SelectTrigger className="w-full sm:w-[180px]">
+                <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Status</SelectItem>
+                <SelectItem value="draft">Draft</SelectItem>
+                <SelectItem value="sent">Sent</SelectItem>
+                <SelectItem value="paid">Paid</SelectItem>
+                <SelectItem value="overdue">Overdue</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex border rounded-md">
+              <Button
+                variant={viewMode === "card" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("card")}
+                className="rounded-r-none"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </Button>
+              <Button
+                variant={viewMode === "table" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setViewMode("table")}
+                className="rounded-l-none"
+              >
+                <Table2 className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -214,123 +233,279 @@ console.log("invoices", invoices)
             </Button>
           )}
         </Card>
-      ) : (
+      ) : viewMode === "card" ? (
         <div className="space-y-4">
-          {invoices.map((invoice) => (
-            <Card key={invoice.id} className="p-6 hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between">
-                <div className="flex-1">
-                  <div className="flex items-center gap-4 mb-2">
-                    <h3 className="text-lg font-semibold">
-                      {invoice.recipientUserId !== profile?.userId ? 'Invoice' : 'Bill'} {invoice.invoiceNumber}
-                    </h3>
-                   {
-                    invoice.status === "sent" &&   <Badge variant="outline" className="text-xs">
-                    {invoice.recipientUserId !== profile?.userId ? 'Outgoing' : 'Incoming'}
-                  </Badge>
-                  }
-                  {
-                    invoice.recipientUserId === profile?.userId ? (
-                      <Badge variant="outline" className={`text-xs capitalize ${invoice.clientPaymentStatus === 'paid' ? 'bg-green-800 text-white' : 'bg-red-800 text-white'}`}>
-                        {invoice.clientPaymentStatus || 'Pending'}
-                      </Badge>
-                    )
-                  : (
-                    <Badge variant="outline" className={`text-xs capitalize ${invoice.supplierPaymentStatus === 'paid' ? 'bg-green-800 text-white' : 'bg-red-800 text-white'}`}>
-                        {invoice.supplierPaymentStatus || 'Pending'}
-                      </Badge>
-                  )
-                  } 
-                  
-                  </div>
-                  <div className="grid md:grid-cols-3 gap-4 text-sm text-muted-foreground">
-                    <div>
-                      <p className="font-medium text-foreground mb-1">
-                        {invoice.recipientUserId !== profile?.userId ? 'Client' : 'From'}
-                      </p>
-                      {invoice.recipientUserId !== profile?.userId ? (
-                         <>
-                         <p>{invoice.client.name}</p>
-                         {invoice.client.email && <p className="text-xs">{invoice.client.email}</p>}
-                       </>
-                      ) : (
-                        <>
-                          <p>{invoice.supplier?.name || 'Unknown'}</p>
-                          {invoice.supplier?.email && <p className="text-xs">{invoice.supplier.email}</p>}
-                        </>
-                       
+          {invoices.map((invoice) => {
+            const isIncoming = invoice.recipientUserId === profile?.userId
+            const paymentStatus = isIncoming 
+              ? (invoice.clientPaymentStatus || 'Pending')
+              : (invoice.supplierPaymentStatus || 'Pending')
+            
+            return (
+              <Card key={invoice.id} className="p-6 hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1 min-w-0">
+                    {/* Header with document type, ID, and badges */}
+                    <div className="flex items-center gap-3 mb-4 flex-wrap">
+                      <h3 className="text-lg font-semibold">
+                        {isIncoming ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
+                      </h3>
+                      {invoice.status === "sent" && (
+                        <Badge variant="outline" className="text-xs">
+                          {isIncoming ? 'Incoming' : 'Outgoing'}
+                        </Badge>
                       )}
+                      <Badge 
+                        variant="outline" 
+                        className={`text-xs capitalize ${
+                          paymentStatus === 'paid' 
+                            ? 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20' 
+                            : 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20'
+                        }`}
+                      >
+                        {paymentStatus}
+                      </Badge>
                     </div>
-                    <div>
-                      <p className="font-medium text-foreground mb-1">Dates</p>
-                      <p>Issue: {format(new Date(invoice.issueDate), "MMM dd, yyyy")}</p>
-                      <p>Due: {format(new Date(invoice.dueDate), "MMM dd, yyyy")}</p>
-                    </div>
-                    <div>
-                      <p className="font-medium text-foreground mb-1">Amount</p>
-                      <p className="text-lg font-semibold text-foreground">
-                        {invoice.currency} {invoice.total.toLocaleString()}
-                      </p>
+                    
+                    {/* Content grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {/* Client/From */}
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
+                          {isIncoming ? 'From' : 'Client'}
+                        </p>
+                        <p className="text-sm font-medium text-foreground">
+                          {isIncoming 
+                            ? (invoice.supplier?.name || 'Unknown')
+                            : invoice.client.name
+                          }
+                        </p>
+                        {(isIncoming ? invoice.supplier?.email : invoice.client.email) && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {isIncoming ? invoice.supplier?.email : invoice.client.email}
+                          </p>
+                        )}
+                      </div>
+                      
+                      {/* Dates */}
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
+                          Dates
+                        </p>
+                        <p className="text-sm text-foreground">
+                          Issue: <span className="font-medium">{format(new Date(invoice.issueDate), "MMM dd, yyyy")}</span>
+                        </p>
+                        <p className="text-sm text-foreground">
+                          Due: <span className="font-medium">{format(new Date(invoice.dueDate), "MMM dd, yyyy")}</span>
+                        </p>
+                      </div>
+                      
+                      {/* Amount */}
+                      <div>
+                        <p className="text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
+                          Amount
+                        </p>
+                        <p className="text-xl font-semibold text-foreground">
+                          {invoice.currency} {invoice.total.toLocaleString()}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex gap-2 ml-4">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
-                          setSelectedInvoice(invoice)
-                          setIsViewDialogOpen(true)
-                        }}
-                      >
-                        <Eye className="w-4 h-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>View Invoice</p>
-                    </TooltipContent>
-                  </Tooltip>
-                  {invoice.status === "draft" && invoice.userId === profile?.userId && (
+                  
+                  {/* Action buttons */}
+                  <div className="flex gap-2 flex-shrink-0">
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="outline" size="sm" onClick={() => handleMarkAsSent(invoice.id)}>
-                          <Send className="w-4 h-4" />
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={() => {
+                            setSelectedInvoice(invoice)
+                            setIsViewDialogOpen(true)
+                          }}
+                        >
+                          <Eye className="w-4 h-4" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Mark as Sent</p>
+                        <p>View Invoice</p>
                       </TooltipContent>
                     </Tooltip>
-                  )}
-                  {/* {invoice.status === "sent" && (
+                    {invoice.status === "draft" && invoice.userId === profile?.userId && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button 
+                            variant="outline" 
+                            size="icon"
+                            className="h-9 w-9"
+                            onClick={() => handleMarkAsSent(invoice.id)}
+                          >
+                            <Send className="w-4 h-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Mark as Sent</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button variant="outline" size="sm" onClick={() => handleMarkAsPaid(invoice.id)}>
-                          <CheckCircle2 className="w-4 h-4" />
+                        <Button 
+                          variant="outline" 
+                          size="icon"
+                          className="h-9 w-9"
+                          onClick={() => handleDelete(invoice.id)}
+                        >
+                          <Trash2 className="w-4 h-4" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>
-                        <p>Mark as Paid</p>
+                        <p>Delete Invoice</p>
                       </TooltipContent>
                     </Tooltip>
-                  )} */}
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button variant="outline" size="sm" onClick={() => handleDelete(invoice.id)}>
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Delete Invoice</p>
-                    </TooltipContent>
-                  </Tooltip>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            )
+          })}
         </div>
+      ) : (
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-muted/50 border-b border-border">
+                <tr>
+                  <th className="text-left p-4 text-sm font-semibold">Document</th>
+                  <th className="text-left p-4 text-sm font-semibold">Type</th>
+                  <th className="text-left p-4 text-sm font-semibold">{typeFilter === "incoming" ? "From" : typeFilter === "outgoing" ? "Client" : "Client/From"}</th>
+                  <th className="text-left p-4 text-sm font-semibold">Issue Date</th>
+                  <th className="text-left p-4 text-sm font-semibold">Due Date</th>
+                  <th className="text-left p-4 text-sm font-semibold">Status</th>
+                  <th className="text-right p-4 text-sm font-semibold">Amount</th>
+                  <th className="text-center p-4 text-sm font-semibold">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoices.map((invoice) => {
+                  const isIncoming = invoice.recipientUserId === profile?.userId
+                  const paymentStatus = isIncoming 
+                    ? (invoice.clientPaymentStatus || 'Pending')
+                    : (invoice.supplierPaymentStatus || 'Pending')
+                  
+                  return (
+                    <tr key={invoice.id} className="border-b border-border hover:bg-muted/30 transition-colors">
+                      <td className="p-4">
+                        <div className="font-semibold">
+                          {isIncoming ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
+                        </div>
+                      </td>
+                      <td className="p-4">
+                        {invoice.status === "sent" && (
+                          <Badge variant="outline" className="text-xs">
+                            {isIncoming ? 'Incoming' : 'Outgoing'}
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="p-4">
+                        <div>
+                          <p className="text-sm font-medium">
+                            {isIncoming 
+                              ? (invoice.supplier?.name || 'Unknown')
+                              : invoice.client.name
+                            }
+                          </p>
+                          {(isIncoming ? invoice.supplier?.email : invoice.client.email) && (
+                            <p className="text-xs text-muted-foreground">
+                              {isIncoming ? invoice.supplier?.email : invoice.client.email}
+                            </p>
+                          )}
+                        </div>
+                      </td>
+                      <td className="p-4 text-sm">
+                        {format(new Date(invoice.issueDate), "MMM dd, yyyy")}
+                      </td>
+                      <td className="p-4 text-sm">
+                        {format(new Date(invoice.dueDate), "MMM dd, yyyy")}
+                      </td>
+                      <td className="p-4">
+                        <Badge 
+                          variant="outline" 
+                          className={`text-xs capitalize ${
+                            paymentStatus === 'paid' 
+                              ? 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20' 
+                              : 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20'
+                          }`}
+                        >
+                          {paymentStatus}
+                        </Badge>
+                      </td>
+                      <td className="p-4 text-right">
+                        <span className="font-semibold">
+                          {invoice.currency} {invoice.total.toLocaleString()}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex items-center justify-center gap-2">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => {
+                                  setSelectedInvoice(invoice)
+                                  setIsViewDialogOpen(true)
+                                }}
+                              >
+                                <Eye className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>View Invoice</p>
+                            </TooltipContent>
+                          </Tooltip>
+                          {invoice.status === "draft" && invoice.userId === profile?.userId && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => handleMarkAsSent(invoice.id)}
+                                >
+                                  <Send className="w-4 h-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Mark as Sent</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button 
+                                variant="ghost" 
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                onClick={() => handleDelete(invoice.id)}
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Delete Invoice</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
 
       {pagination.totalPages > 1 && (

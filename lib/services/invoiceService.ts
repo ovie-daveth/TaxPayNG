@@ -50,30 +50,68 @@ export class InvoiceService extends BaseService {
     }
   }
 
-  // Calculate invoice totals
-  private calculateTotals(items: InvoiceItem[], discount?: number): {
+  // Calculate invoice totals with VAT and WHT support
+  // VAT is only applied to items marked as vatable
+  private calculateTotals(
+    items: InvoiceItem[], 
+    discount?: number,
+    vatRate?: number,
+    whtApplicable?: boolean,
+    whtRate?: number
+  ): {
     subtotal: number
-    taxAmount: number
+    vatAmount: number
+    taxAmount: number // Legacy field, equals vatAmount
+    invoiceTotal: number
+    whtAmount?: number
     total: number
   } {
     let subtotal = 0
-    let taxAmount = 0
+    let vatableSubtotal = 0 // Subtotal of vatable items only
     
+    // Calculate subtotal and vatable subtotal
     items.forEach(item => {
       const itemSubtotal = item.quantity * item.unitPrice
       subtotal += itemSubtotal
       
-      if (item.tax) {
-        taxAmount += itemSubtotal * (item.tax / 100)
+      // Only include in vatable subtotal if item is marked as vatable
+      if (item.vatable) {
+        vatableSubtotal += itemSubtotal
       }
     })
     
+    // Apply discount to subtotal (if any)
     const discountAmount = discount ? subtotal * (discount / 100) : 0
-    const total = subtotal + taxAmount - discountAmount
+    const subtotalAfterDiscount = subtotal - discountAmount
+    
+    // Apply discount proportionally to vatable subtotal
+    const vatableDiscountAmount = vatableSubtotal > 0 && subtotal > 0 
+      ? (vatableSubtotal / subtotal) * discountAmount 
+      : 0
+    const vatableSubtotalAfterDiscount = vatableSubtotal - vatableDiscountAmount
+    
+    // Calculate VAT (7.5% default in Nigeria) only on vatable items after discount
+    const effectiveVatRate = vatRate !== undefined ? vatRate : 7.5
+    const vatAmount = vatableSubtotalAfterDiscount * (effectiveVatRate / 100)
+    
+    // Invoice Total = Subtotal (after discount) + VAT (on vatable items only)
+    const invoiceTotal = subtotalAfterDiscount + vatAmount
+    
+    // Calculate WHT (if applicable) on Invoice Total
+    let whtAmount: number | undefined = undefined
+    if (whtApplicable && whtRate !== undefined && whtRate > 0) {
+      whtAmount = invoiceTotal * (whtRate / 100)
+    }
+    
+    // Final Total = Invoice Total - WHT
+    const total = invoiceTotal - (whtAmount || 0)
     
     return {
       subtotal: Math.round(subtotal * 100) / 100,
-      taxAmount: Math.round(taxAmount * 100) / 100,
+      vatAmount: Math.round(vatAmount * 100) / 100,
+      taxAmount: Math.round(vatAmount * 100) / 100, // Legacy field
+      invoiceTotal: Math.round(invoiceTotal * 100) / 100,
+      whtAmount: whtAmount !== undefined ? Math.round(whtAmount * 100) / 100 : undefined,
       total: Math.round(total * 100) / 100
     }
   }

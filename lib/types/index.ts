@@ -245,8 +245,8 @@ export interface InvoiceItem {
   quantity: number
   unitPrice: number
   currency?: string // Currency code for this item (if different from invoice currency)
-  tax?: number // Tax percentage (e.g., 7.5 for 7.5%)
-  amount: number // quantity * unitPrice * (1 + tax/100)
+  vatable?: boolean // Whether this item is subject to VAT (default: false)
+  amount: number // quantity * unitPrice (converted to invoice currency if needed)
 }
 
 export interface InvoiceClient {
@@ -278,6 +278,7 @@ export interface InvoiceSupplier {
     postalCode?: string
   }
   taxId?: string // TIN from user profile
+  vatRegistrationNumber?: string // VAT registration number for VAT-registered businesses
 }
 
 export interface Invoice {
@@ -312,9 +313,28 @@ export interface Invoice {
   
   // Totals
   subtotal: number
-  taxAmount: number
+  
+  // VAT (Value Added Tax) - 7.5% in Nigeria
+  vatRate?: number // Default: 7.5%
+  vatAmount: number // Calculated: subtotal * vatRate / 100
+  
+  // Legacy tax field (deprecated - use vatAmount)
+  taxAmount: number // Kept for backward compatibility, should equal vatAmount
+  
   discount?: number
-  total: number
+  
+  // Invoice Total (Subtotal + VAT)
+  invoiceTotal: number // Subtotal + VAT - Discount
+  
+  // Withholding Tax (WHT) - optional
+  whtApplicable?: boolean // Whether WHT applies to this invoice
+  whtRate?: number // WHT rate (e.g., 5% or 10%)
+  whtAmount?: number // Calculated: invoiceTotal * whtRate / 100
+  whtCertificateNumber?: string // WHT certificate/reference number
+  whtDeductionDate?: string // Date WHT was deducted
+  
+  // Final Amount Payable (Invoice Total - WHT)
+  total: number // invoiceTotal - (whtAmount || 0)
   
   // Additional information
   notes?: string
