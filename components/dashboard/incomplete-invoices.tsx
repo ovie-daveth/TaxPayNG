@@ -30,8 +30,15 @@ export function IncompleteInvoices() {
         // Get all invoices (no status filter)
         const allResult = await invoiceService.getUserInvoices(user.uid, {}, 1, 100)
 
-        // Filter out paid and cancelled invoices
-        const incomplete = allResult.data.filter(inv => inv.status !== 'paid' && inv.status !== 'cancelled')
+        // Filter: Only include invoices where BOTH supplierPaymentStatus and clientPaymentStatus are not "paid"
+        // Also exclude cancelled invoices
+        const incomplete = allResult.data.filter(inv => {
+          if (inv.status === 'cancelled') return false
+          // Invoice is pending if both payment statuses are not "paid"
+          const supplierNotPaid = inv.supplierPaymentStatus !== 'paid'
+          const clientNotPaid = inv.clientPaymentStatus !== 'paid'
+          return supplierNotPaid && clientNotPaid
+        })
         
         setIncompleteInvoices(incomplete)
 

@@ -207,10 +207,13 @@ const buildStatsFromSummary = (
     : undefined
 
   const isSmallBusinessExempt = businessType === "small-business" && !taxCalculationRaw
-  // Tax payable is always for the full year, but we show quarterly amount for display
-  const taxCardValue = taxCalculationRaw ? formatCurrency(Math.round(taxCalculationRaw.totalTax / 4)) : formatCurrency(0)
+  // Tax payable is always calculated for the full year, but we display based on the selected period
+  const taxCardValue = taxCalculationRaw 
+    ? formatCurrency(Math.round(periodType === "year" ? taxCalculationRaw.totalTax : taxCalculationRaw.totalTax / 4))
+    : formatCurrency(0)
   const monthDisplay = `${labels.monthShortLabel} ${labels.year}`
   const periodDisplay = periodType === "year" ? `${labels.year}` : labels.quarterLabel
+  const taxPeriodLabel = periodType === "year" ? "Yearly" : "Quarterly"
 
   return [
     {
@@ -250,7 +253,9 @@ const buildStatsFromSummary = (
       id: "tax-payable",
       label: "Tax Payable",
       value: taxCardValue,
-      change: isSmallBusinessExempt ? "Small company exempt" : `Based on ${labels.year} data`,
+      change: isSmallBusinessExempt 
+        ? "Small company exempt" 
+        : `${taxPeriodLabel} • Based on ${labels.year} data`,
       trend: "neutral",
       icon: isSmallBusinessExempt ? CheckCircle2 : Calculator,
       color: isSmallBusinessExempt ? "text-green-600" : "text-accent",

@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Plus, Trash2, Loader2, Info } from "lucide-react"
+import { Plus, Trash2, Loader2, Info, X } from "lucide-react"
 import { Invoice, InvoiceItem, InvoiceClient, InvoiceSupplier, InvoiceTemplateType, InvoiceType } from "@/lib/types"
 import { invoiceService, userService } from "@/lib/services"
 import { toast } from "sonner"
@@ -37,6 +37,7 @@ export function AddInvoiceDialog({
   const { profile } = useUserProfile()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSearchingUser, setIsSearchingUser] = useState(false)
+  const [userSearchMessage, setUserSearchMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   // Store unitPriceDisplay for each item (formatted string)
   const [itemDisplayValues, setItemDisplayValues] = useState<Record<string, string>>({})
   // Store currency for each item (defaults to invoice currency)
@@ -83,11 +84,12 @@ export function AddInvoiceDialog({
   // Find user by email and prefill client details
   const handleFindUserByEmail = async (email: string) => {
     if (!email || !email.includes('@')) {
-      toast.error("Please enter a valid email address")
+      setUserSearchMessage({ type: 'error', text: "Please enter a valid email address" })
       return
     }
 
     setIsSearchingUser(true)
+    setUserSearchMessage(null) // Clear previous message
     try {
       const foundUser = await userService.findUserByEmail(email.trim())
       
@@ -116,13 +118,13 @@ export function AddInvoiceDialog({
           }
           // recipientEmail remains unchanged - user's input is preserved
         }))
-        toast.success("User found! Client information has been prefilled.")
+        setUserSearchMessage({ type: 'success', text: "User found! Client information has been prefilled." })
       } else {
-        toast.error("User not found. This email is not registered on OTax.")
+        setUserSearchMessage({ type: 'error', text: "User not found. This email is not registered on OTax." })
       }
     } catch (error) {
       console.error('Error finding user:', error)
-      toast.error("Failed to search for user. Please try again.")
+      setUserSearchMessage({ type: 'error', text: "Failed to search for user. Please try again." })
     } finally {
       setIsSearchingUser(false)
     }
@@ -738,7 +740,13 @@ export function AddInvoiceDialog({
                       id="recipient-email"
                       type="email"
                       value={formData.recipientEmail || ""}
-                      onChange={(e) => setFormData(prev => ({ ...prev, recipientEmail: e.target.value }))}
+                      onChange={(e) => {
+                        setFormData(prev => ({ ...prev, recipientEmail: e.target.value }))
+                        // Clear message when user starts typing
+                        if (userSearchMessage) {
+                          setUserSearchMessage(null)
+                        }
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault()
@@ -756,9 +764,31 @@ export function AddInvoiceDialog({
                       <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Enter the email address and press Enter to find the user and prefill client details
-                  </p>
+                  {userSearchMessage && (
+                    <div className={`flex items-center gap-2 p-3 rounded-md text-sm ${
+                      userSearchMessage.type === 'success' 
+                        ? 'bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 text-green-900 dark:text-green-100' 
+                        : 'bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-100'
+                    }`}>
+                      <Info className={`w-4 h-4 flex-shrink-0 ${
+                        userSearchMessage.type === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                      }`} />
+                      <p className="flex-1">{userSearchMessage.text}</p>
+                      <button
+                        type="button"
+                        onClick={() => setUserSearchMessage(null)}
+                        className="flex-shrink-0 hover:opacity-70 transition-opacity"
+                        aria-label="Dismiss message"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                  {!userSearchMessage && (
+                    <p className="text-xs text-muted-foreground">
+                      Enter the email address and press Enter to find the user and prefill client details
+                    </p>
+                  )}
                 </form>
               )}
             </div>
@@ -1113,7 +1143,33 @@ export function AddInvoiceDialog({
                   {/* Row 2: Unit Price, Vatable, and Amount */}
                   <div className="flex items-center gap-4 -mt-3">
                     <div className="md:col-span-2 space-y-2">
-                      <Label>Unit Price</Label>
+                       <div className="flex items-center justify-between">
+                         <Label>Unit Price</Label>
+                         {(() => {
+                           const itemCurrency = itemCurrencies[item.id] || formData.currency
+                           const needsConversion = itemCurrency !== formData.currency && item.unitPrice > 0
+                           const convertedAmount = itemConvertedAmounts[item.id]
+                           
+                           if (!needsConversion || !convertedAmount || item.unitPrice === 0) return null
+                           
+                           // Calculate exchange rate per 1 unit
+                           const exchangeRate = convertedAmount / item.unitPrice
+                           
+                           return (
+                             <Tooltip>
+                               <TooltipTrigger asChild>
+                                 <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                               </TooltipTrigger>
+                               <TooltipContent className="bg-blue-600 text-white border-blue-600">
+                                 <p className="font-medium mb-1">Exchange Rate</p>
+                                 <p className="text-sm">
+                                   1 {itemCurrency} = {getCurrencySymbol(formData.currency)}{exchangeRate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                 </p>
+                               </TooltipContent>
+                             </Tooltip>
+                           )
+                         })()}
+                       </div>
                       <div className="flex gap-2">
                         <Select
                           value={itemCurrencies[item.id] || formData.currency}
