@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { DashboardNav } from "@/components/dashboard/dashboard-nav"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { Card } from "@/components/ui/card"
@@ -9,8 +10,8 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ArrowLeft, FileText, Download, Loader2 } from "lucide-react"
-import Link from "next/link"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ArrowLeft, FileText, Download, Loader2, Info, Calculator, Shield } from "lucide-react"
 import { SelfAssessmentPreview } from "@/components/reports/self-assessment-preview"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
@@ -131,13 +132,54 @@ export default function GenerateSelfAssessmentPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* <DashboardNav /> */}
-        <main className="px-4 py-6">
+        <main className="px-4 py-6 max-w-4xl mx-auto">
           {!showPreview ? (
-            <Card className="p-6 max-w-3xl mx-auto">
-              <div className="mb-6">
-                <h2 className="text-xl font-semibold">Report Configuration</h2>
-                <p className="text-sm text-muted-foreground mt-1">Configure your self-assessment filing details</p>
-              </div>
+            <div className="space-y-6">
+              {/* Back Button */}
+              <Link href="/dashboard/reports">
+                <Button variant="ghost" className="mb-4">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Reports
+                </Button>
+              </Link>
+
+              {/* Header Section */}
+              <Card className="p-6">
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="p-3 bg-primary/10 rounded-lg">
+                    <Shield className="w-6 h-6 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <h1 className="text-2xl font-semibold mb-2">Generate Self-Assessment Tax Return</h1>
+                    <p className="text-muted-foreground">
+                      Create a comprehensive self-assessment tax return report for filing with the Federal Inland Revenue Service (FIRS) 
+                      or Lagos Internal Revenue Service (LIRS). This report includes your income, expenses, reliefs, and calculated tax liability.
+                    </p>
+                  </div>
+                </div>
+
+                <Alert className="mt-4">
+                  <Info className="w-4 h-4" />
+                  <AlertDescription>
+                    <strong>What is a Self-Assessment Tax Return?</strong> A self-assessment tax return is a document that taxpayers use to 
+                    report their income, claim deductions and reliefs, and calculate their tax liability for a given tax year. 
+                    In Nigeria, self-employed individuals, freelancers, and small business owners are required to file self-assessment returns 
+                    annually with the tax authorities. This report helps you prepare and file your tax return accurately.
+                  </AlertDescription>
+                </Alert>
+              </Card>
+
+              {/* Configuration Form */}
+              <Card className="p-6">
+                <div className="mb-6">
+                  <h2 className="text-xl font-semibold flex items-center gap-2">
+                    <Calculator className="w-5 h-5" />
+                    Report Configuration
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Configure your self-assessment filing details and select what to include in the report
+                  </p>
+                </div>
 
               <form
                 className="space-y-6"
@@ -238,7 +280,7 @@ export default function GenerateSelfAssessmentPage() {
 
                 <div className="flex gap-3 pt-4">
                   <Link href="/dashboard/reports" className="flex-1">
-                    <Button type="button" variant="outline" className="w-full bg-transparent">
+                    <Button type="button" variant="outline" className="w-full">
                       Cancel
                     </Button>
                   </Link>
@@ -251,15 +293,24 @@ export default function GenerateSelfAssessmentPage() {
                     ) : (
                       <>
                         <FileText className="w-4 h-4 mr-2" />
-                        Generate Report
+                        Generate Self-Assessment
                       </>
                     )}
                   </Button>
                 </div>
               </form>
-            </Card>
+              </Card>
+            </div>
           ) : (
             <div className="space-y-6">
+              {/* Back Button */}
+              <Link href="/dashboard/reports">
+                <Button variant="ghost" className="mb-4">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Reports
+                </Button>
+              </Link>
+
               <Card className="p-6">
                 <div className="flex items-center justify-between">
                   <div>

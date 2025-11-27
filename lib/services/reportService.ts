@@ -141,7 +141,10 @@ export class ReportService extends BaseService {
         : this.calculateIncomeDataTransactionsOnly(filteredTransactions, userId)
 
       // Calculate expense data
-      const expenseData = this.calculateExpenseData(filteredTransactions, invoices, userId)
+      // If includeInvoices is false, use only transactions (don't filter out invoice-related transactions)
+      const expenseData = includeInvoices 
+        ? this.calculateExpenseData(filteredTransactions, invoices, userId)
+        : this.calculateExpenseDataTransactionsOnly(filteredTransactions, userId)
 
       // Calculate tax data
       const taxData = await this.calculateTaxData(
@@ -281,6 +284,42 @@ export class ReportService extends BaseService {
       invoiceCount: paidInvoices.length,
       transactions: incomeTransactions,
       invoices: paidInvoices
+    }
+  }
+
+  // Calculate expenses from transactions only (no invoice filtering)
+  private calculateExpenseDataTransactionsOnly(
+    transactions: Transaction[],
+    userId: string
+  ): ExpenseData {
+    // Include ALL expense transactions
+    const expenseTransactions = transactions.filter(t => t.type === 'expense')
+
+    let totalExpenses = 0
+    let taxDeductibleExpenses = 0
+    const expensesByCategory: { [key: string]: number } = {}
+
+    // Process all expense transactions
+    expenseTransactions.forEach(txn => {
+      const amount = typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0
+      totalExpenses += amount
+      
+      if (txn.taxDeductible) {
+        taxDeductibleExpenses += amount
+      }
+      
+      const category = txn.category || 'uncategorized'
+      expensesByCategory[category] = (expensesByCategory[category] || 0) + amount
+    })
+
+    return {
+      totalExpenses,
+      expensesByCategory,
+      taxDeductibleExpenses,
+      transactionCount: expenseTransactions.length,
+      invoiceCount: 0,
+      transactions: expenseTransactions,
+      invoices: []
     }
   }
 

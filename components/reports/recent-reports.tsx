@@ -15,6 +15,7 @@ import { toast } from "sonner"
 import { format } from "date-fns"
 import { SelfAssessmentPreview } from "./self-assessment-preview"
 import { IncomeStatementPreview } from "./income-statement-preview"
+import { ExpenseReportPreview } from "./expense-report-preview"
 
 export function RecentReports() {
   const { user } = useAuth()
@@ -97,7 +98,7 @@ export function RecentReports() {
   }
 
   if (reports.length === 0) {
-    return (
+  return (
       <Card className="p-6">
         <div className="mb-6">
           <h2 className="text-xl font-semibold">Recent Reports</h2>
@@ -113,48 +114,48 @@ export function RecentReports() {
 
   return (
     <>
-      <Card className="p-6">
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold">Recent Reports</h2>
-          <p className="text-sm text-muted-foreground mt-1">Your previously generated reports</p>
-        </div>
+    <Card className="p-6">
+      <div className="mb-6">
+        <h2 className="text-xl font-semibold">Recent Reports</h2>
+        <p className="text-sm text-muted-foreground mt-1">Your previously generated reports</p>
+      </div>
 
-        <div className="space-y-3">
-          {reports.map((report) => (
-            <div
-              key={report.id}
-              className="flex items-center gap-4 p-4 border border-border rounded-lg hover:bg-muted/30 transition-colors"
-            >
-              <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                <FileText className="w-5 h-5 text-primary" />
-              </div>
+      <div className="space-y-3">
+        {reports.map((report) => (
+          <div
+            key={report.id}
+            className="flex items-center gap-4 p-4 border border-border rounded-lg hover:bg-muted/30 transition-colors"
+          >
+            <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+              <FileText className="w-5 h-5 text-primary" />
+            </div>
 
-              <div className="flex-1 min-w-0">
-                <h3 className="font-medium text-sm mb-1 truncate">{report.title}</h3>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <Badge variant="secondary" className="text-xs">
-                    {report.type}
-                  </Badge>
+            <div className="flex-1 min-w-0">
+              <h3 className="font-medium text-sm mb-1 truncate">{report.title}</h3>
+              <div className="flex items-center gap-3 flex-wrap">
+                <Badge variant="secondary" className="text-xs">
+                  {report.type}
+                </Badge>
                   <span className="text-xs text-muted-foreground">{formatPeriod(report.period)}</span>
-                  <span className="text-xs text-muted-foreground">•</span>
+                <span className="text-xs text-muted-foreground">•</span>
                   <span className="text-xs text-muted-foreground">
                     Generated {format(new Date(report.generatedAt || report.createdAt), 'MMM dd, yyyy')}
                   </span>
-                </div>
               </div>
+            </div>
 
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <Badge variant={report.status === "submitted" ? "default" : "outline"} className="text-xs capitalize">
-                  {report.status}
-                </Badge>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Badge variant={report.status === "submitted" ? "default" : "outline"} className="text-xs capitalize">
+                {report.status}
+              </Badge>
                 <Button 
                   variant="ghost" 
                   size="icon"
                   onClick={() => handleView(report)}
                   title="View report"
                 >
-                  <Eye className="w-4 h-4" />
-                </Button>
+                <Eye className="w-4 h-4" />
+              </Button>
                 <Button 
                   variant="ghost" 
                   size="icon"
@@ -162,12 +163,12 @@ export function RecentReports() {
                   title="Delete report"
                 >
                   <Trash2 className="w-4 h-4" />
-                </Button>
-              </div>
+              </Button>
             </div>
-          ))}
-        </div>
-      </Card>
+          </div>
+        ))}
+      </div>
+    </Card>
 
       {/* View Report Dialog */}
       <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
@@ -198,7 +199,13 @@ export function RecentReports() {
                   onBack={() => setShowViewDialog(false)}
                 />
               )}
-              {selectedReport.type !== 'Self-Assessment' && selectedReport.type !== 'Income Statement' && (
+              {selectedReport.type === 'Expense Report' && (
+                <ExpenseReportPreview
+                  reportData={selectedReport.reportData}
+                  onBack={() => setShowViewDialog(false)}
+                />
+              )}
+              {selectedReport.type !== 'Self-Assessment' && selectedReport.type !== 'Income Statement' && selectedReport.type !== 'Expense Report' && (
                 <div className="p-8 text-center text-muted-foreground">
                   Preview not yet implemented for {selectedReport.type}
                 </div>
