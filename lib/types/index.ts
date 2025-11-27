@@ -326,14 +326,16 @@ export interface Invoice {
   // Invoice Total (Subtotal + VAT)
   invoiceTotal: number // Subtotal + VAT - Discount
   
-  // Withholding Tax (WHT) - optional
-  whtApplicable?: boolean // Whether WHT applies to this invoice
-  whtRate?: number // WHT rate (e.g., 5% or 10%)
-  whtAmount?: number // Calculated: invoiceTotal * whtRate / 100
-  whtCertificateNumber?: string // WHT certificate/reference number
-  whtDeductionDate?: string // Date WHT was deducted
+  // Withholding Tax (WHT) - deducted by client/buyer, not issuer
+  // These fields are set by the client when they deduct WHT
+  whtDeducted?: boolean // Whether client has deducted WHT
+  whtRate?: number // WHT rate applied by client (e.g., 5% or 10%)
+  whtAmount?: number // WHT amount deducted by client: invoiceTotal * whtRate / 100
+  whtDeductionDate?: string // Date WHT was deducted by client
+  whtDeductedBy?: string // User ID of client who deducted WHT
+  whtCertificateNumber?: string // WHT certificate/reference number provided by client
   
-  // Final Amount Payable (Invoice Total - WHT)
+  // Final Amount Payable (Invoice Total - WHT if deducted)
   total: number // invoiceTotal - (whtAmount || 0)
   
   // Additional information
@@ -359,9 +361,30 @@ export interface Invoice {
   // Linked transaction (if invoice was paid and recorded)
   linkedTransactionId?: string
   
+  // WHT Credit Note (created when client deducts WHT)
+  whtCreditNote?: WHTCreditNote
+  
   // Attachments
   pdfUrl?: string
   
+  createdAt: string
+  updatedAt: string
+}
+
+// WHT Credit Note - issued when client/buyer deducts withholding tax
+export interface WHTCreditNote {
+  id: string // Unique credit note ID
+  invoiceId: string // Reference to the invoice
+  creditNoteNumber: string // Auto-generated (e.g., CN-2025-001)
+  issuedDate: string // Date credit note was created
+  issuedBy: string // User ID of client who deducted WHT
+  invoiceNumber: string // Original invoice number
+  invoiceTotal: number // Invoice total before WHT deduction
+  whtRate: number // WHT rate applied (e.g., 5%)
+  whtAmount: number // WHT amount deducted
+  netAmountPaid: number // Amount actually paid (invoiceTotal - whtAmount)
+  certificateNumber?: string // WHT certificate/reference number
+  notes?: string // Additional notes
   createdAt: string
   updatedAt: string
 }

@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Search, Filter, Download, FileText, Eye, Edit, Trash2, Send, CheckCircle2, Clock, AlertCircle, LayoutGrid, Table2 } from "lucide-react"
+import { Plus, Search, Filter, Download, FileText, Eye, Edit, Trash2, Send, CheckCircle2, Clock, AlertCircle, LayoutGrid, Table2, Receipt, Info, Save, Loader2 } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -16,6 +16,11 @@ import { toast } from "sonner"
 import { AddInvoiceDialog } from "@/components/invoices/add-invoice-dialog"
 import { ViewInvoiceDialog } from "@/components/invoices/view-invoice-dialog"
 import { format } from "date-fns"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"
+import { Label } from "@/components/ui/label"
+import { formatCurrencyAmount } from "@/lib/utils/currency"
+import { documentService } from "@/lib/services"
+import { uploadToImageKit } from "@/lib/utils/imagekit"
 
 export default function InvoicesPage() {
   const { user } = useAuth()
@@ -28,6 +33,8 @@ export default function InvoicesPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<InvoiceStatus | "all">("all")
   const [typeFilter, setTypeFilter] = useState<InvoiceType | "all">("all")
+  const [showCreditNoteDialog, setShowCreditNoteDialog] = useState(false)
+  const [isSavingCreditNote, setIsSavingCreditNote] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [viewMode, setViewMode] = useState<"card" | "table">("card")
   const [pagination, setPagination] = useState({
@@ -146,6 +153,226 @@ export default function InvoicesPage() {
     }
   }
 
+  const handleSaveCreditNoteAsPDF = async () => {
+    if (!selectedInvoice?.whtCreditNote || !profile?.userId) {
+      toast.error("Credit note not found")
+      return
+    }
+
+    try {
+      setIsSavingCreditNote(true)
+
+      const creditNote = selectedInvoice.whtCreditNote
+      const invoice = selectedInvoice
+
+      // Load jsPDF dynamically
+      const { jsPDF } = await import('jspdf')
+
+      // Create jsPDF instance
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4'
+      })
+
+      // Set margins
+      const margin = 20
+      let yPos = margin
+
+      // Helper function to add text with word wrapping
+      const addText = (text: string, x: number, y: number, options: { fontSize?: number; fontStyle?: string; align?: 'left' | 'center' | 'right'; color?: [number, number, number] } = {}) => {
+        pdf.setFontSize(options.fontSize || 12)
+        pdf.setFont('helvetica', options.fontStyle || 'normal')
+        if (options.color) {
+          pdf.setTextColor(options.color[0], options.color[1], options.color[2])
+        } else {
+          pdf.setTextColor(0, 0, 0)
+        }
+        const lines = pdf.splitTextToSize(text, 170) // 210mm - 40mm margins = 170mm
+        pdf.text(lines, x, y, { align: options.align || 'left' })
+        return y + (lines.length * (options.fontSize || 12) * 0.4)
+      }
+
+      // Header
+      pdf.setFontSize(24)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(0, 0, 0)
+      const titleLines = pdf.splitTextToSize('Withholding Tax (WHT) Credit Note', 170)
+      pdf.text(titleLines, 105, yPos, { align: 'center' })
+      yPos += titleLines.length * 8 + 5
+
+      pdf.setFontSize(14)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(107, 114, 128) // #6b7280
+      pdf.text(creditNote.creditNoteNumber, 105, yPos, { align: 'center' })
+      yPos += 15
+
+      // Draw line
+      pdf.setDrawColor(229, 231, 235) // #e5e7eb
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, yPos, 190, yPos)
+      yPos += 20
+
+      // Credit Note Details
+      pdf.setFontSize(16)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(0, 0, 0)
+      pdf.text('Credit Note Details', margin, yPos)
+      yPos += 10
+
+      pdf.setFontSize(10)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(107, 114, 128)
+      pdf.text('CREDIT NOTE NUMBER', margin, yPos)
+      yPos += 5
+      pdf.setFontSize(14)
+      pdf.setTextColor(0, 0, 0)
+      pdf.text(creditNote.creditNoteNumber, margin, yPos)
+      yPos += 10
+
+      pdf.setFontSize(10)
+      pdf.setTextColor(107, 114, 128)
+      pdf.text('ISSUED DATE', margin, yPos)
+      yPos += 5
+      pdf.setFontSize(14)
+      pdf.setTextColor(0, 0, 0)
+      pdf.text(format(new Date(creditNote.issuedDate), "MMM dd, yyyy"), margin, yPos)
+      yPos += 10
+
+      pdf.setFontSize(10)
+      pdf.setTextColor(107, 114, 128)
+      pdf.text('INVOICE NUMBER', margin, yPos)
+      yPos += 5
+      pdf.setFontSize(14)
+      pdf.setTextColor(0, 0, 0)
+      pdf.text(creditNote.invoiceNumber, margin, yPos)
+      yPos += 10
+
+      if (creditNote.certificateNumber) {
+        pdf.setFontSize(10)
+        pdf.setTextColor(107, 114, 128)
+        pdf.text('WHT CERTIFICATE NUMBER', margin, yPos)
+        yPos += 5
+        pdf.setFontSize(14)
+        pdf.setTextColor(0, 0, 0)
+        pdf.text(creditNote.certificateNumber, margin, yPos)
+        yPos += 10
+      }
+
+      yPos += 5
+
+      // Amount Details
+      pdf.setFontSize(16)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(0, 0, 0)
+      pdf.text('Amount Details', margin, yPos)
+      yPos += 15
+
+      // Table
+      pdf.setFontSize(12)
+      pdf.setFont('helvetica', 'normal')
+      pdf.setTextColor(107, 114, 128)
+      pdf.text('Invoice Total:', margin, yPos)
+      pdf.setTextColor(0, 0, 0)
+      pdf.text(formatCurrencyAmount(creditNote.invoiceTotal, invoice.currency as any), 190, yPos, { align: 'right' })
+      yPos += 8
+
+      pdf.setDrawColor(229, 231, 235)
+      pdf.line(margin, yPos, 190, yPos)
+      yPos += 8
+
+      pdf.setTextColor(107, 114, 128)
+      pdf.text(`Withholding Tax (${creditNote.whtRate}%):`, margin, yPos)
+      pdf.setTextColor(220, 38, 38) // #dc2626
+      pdf.text(`-${formatCurrencyAmount(creditNote.whtAmount, invoice.currency as any)}`, 190, yPos, { align: 'right' })
+      yPos += 8
+
+      pdf.setDrawColor(229, 231, 235)
+      pdf.setLineWidth(0.5)
+      pdf.line(margin, yPos, 190, yPos)
+      yPos += 10
+
+      pdf.setFontSize(14)
+      pdf.setFont('helvetica', 'bold')
+      pdf.setTextColor(0, 0, 0)
+      pdf.text('Net Amount Paid:', margin, yPos)
+      pdf.text(formatCurrencyAmount(creditNote.netAmountPaid, invoice.currency as any), 190, yPos, { align: 'right' })
+      yPos += 15
+
+      // Notes
+      if (creditNote.notes) {
+        pdf.setFillColor(249, 250, 251) // #f9fafb
+        pdf.rect(margin, yPos, 170, 20, 'F')
+        yPos += 5
+        pdf.setFontSize(11)
+        pdf.setTextColor(107, 114, 128)
+        pdf.text('Notes', margin + 5, yPos)
+        yPos += 5
+        pdf.setFontSize(12)
+        pdf.setTextColor(0, 0, 0)
+        const notesLines = pdf.splitTextToSize(creditNote.notes, 160)
+        pdf.text(notesLines, margin + 5, yPos)
+        yPos += notesLines.length * 5 + 10
+      }
+
+      yPos += 10
+
+      // Footer
+      pdf.setDrawColor(229, 231, 235)
+      pdf.line(margin, yPos, 190, yPos)
+      yPos += 15
+
+      pdf.setFontSize(10)
+      pdf.setTextColor(107, 114, 128)
+      const footer1 = 'This credit note serves as proof that withholding tax was deducted and remitted to the tax authority.'
+      const footer1Lines = pdf.splitTextToSize(footer1, 170)
+      pdf.text(footer1Lines, 105, yPos, { align: 'center' })
+      yPos += footer1Lines.length * 5 + 5
+
+      const footer2 = `Generated on ${format(new Date(), "MMM dd, yyyy 'at' h:mm a")}`
+      pdf.text(footer2, 105, yPos, { align: 'center' })
+
+      // Get PDF as blob
+      const pdfBlob = pdf.output('blob')
+
+      // Create File from blob
+      const pdfFile = new File([pdfBlob], `WHT-Credit-Note-${creditNote.creditNoteNumber}.pdf`, { type: 'application/pdf' })
+      
+      // Upload to ImageKit
+      const uploadResult = await uploadToImageKit(pdfFile, 'documents/credit-notes')
+      
+      // Get the transaction ID from the invoice
+      const transactionId = invoice.linkedTransactionId
+      
+      // Create document record
+      const documentData = {
+        file: pdfFile,
+        name: `WHT Credit Note - ${creditNote.creditNoteNumber}`,
+        type: 'proof' as const,
+        date: creditNote.issuedDate,
+        linkedTransaction: transactionId || undefined,
+        notes: `WHT Credit Note for Invoice ${creditNote.invoiceNumber}. WHT Rate: ${creditNote.whtRate}%, Amount: ${formatCurrencyAmount(creditNote.whtAmount, invoice.currency as any)}`,
+        imageKitUrl: uploadResult.url
+      }
+
+      const result = await documentService.uploadDocument(profile.userId, documentData)
+
+      if (result.success) {
+        toast.success("Credit note saved as PDF document")
+        if (transactionId) {
+          toast.info("Document linked to transaction")
+        }
+      } else {
+        toast.error(result.error || "Failed to save credit note")
+      }
+    } catch (error) {
+      console.error("Error saving credit note as PDF:", error)
+      toast.error("Failed to save credit note as PDF")
+    } finally {
+      setIsSavingCreditNote(false)
+    }
+  }
+
   if (loading && invoices.length === 0) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -247,6 +474,27 @@ console.log("invoices", invoices)
                   <div className="flex-1 min-w-0">
                     {/* Header with document type, ID, and badges */}
                     <div className="flex items-center gap-3 mb-4 flex-wrap">
+                      {invoice.whtCreditNote && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2"
+                              onClick={() => {
+                                setSelectedInvoice(invoice)
+                                setShowCreditNoteDialog(true)
+                              }}
+                            >
+                              <Receipt className="w-3 h-3 mr-1" />
+                              <span className="text-xs">Credit Note</span>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>View WHT Credit Note</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                       <h3 className="text-lg font-semibold">
                         {isIncoming ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
                       </h3>
@@ -447,6 +695,26 @@ console.log("invoices", invoices)
                       </td>
                       <td className="p-4">
                         <div className="flex items-center justify-center gap-2">
+                          {invoice.whtCreditNote && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => {
+                                    setSelectedInvoice(invoice)
+                                    setShowCreditNoteDialog(true)
+                                  }}
+                                >
+                                  <Receipt className="w-4 h-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>View WHT Credit Note</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button 
@@ -538,7 +806,13 @@ console.log("invoices", invoices)
 
       <ViewInvoiceDialog
         open={isViewDialogOpen}
-        onOpenChange={setIsViewDialogOpen}
+        onOpenChange={(open) => {
+          setIsViewDialogOpen(open)
+          // Only clear selectedInvoice if credit note dialog is not open
+          if (!open && !showCreditNoteDialog) {
+            setSelectedInvoice(null)
+          }
+        }}
         invoice={selectedInvoice}
         onInvoiceUpdated={loadInvoices}
         onEdit={(invoice) => {
@@ -547,6 +821,123 @@ console.log("invoices", invoices)
           setIsAddDialogOpen(true)
         }}
       />
+      {/* Credit Note Dialog */}
+      <Dialog 
+        open={showCreditNoteDialog} 
+        onOpenChange={(open) => {
+          setShowCreditNoteDialog(open)
+          if (!open) {
+            // Clear selectedInvoice when credit note dialog closes
+            // Only if view dialog is not open
+            if (!isViewDialogOpen) {
+              setSelectedInvoice(null)
+            }
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>WHT Credit Note</DialogTitle>
+          </DialogHeader>
+          {selectedInvoice?.whtCreditNote ? (
+            <div className="space-y-4">
+              {/* Explanation */}
+              <div className="bg-muted/50 border border-border rounded-lg p-4 space-y-2">
+                <h4 className="font-semibold text-sm flex items-center gap-2">
+                  <Info className="w-4 h-4" />
+                  What is a Withholding Tax (WHT) Credit Note?
+                </h4>
+                <p className="text-sm text-muted-foreground">
+                  A WHT Credit Note is a document issued by the buyer/client who deducted withholding tax from your invoice payment. 
+                  This credit note serves as proof that tax was withheld and remitted to the tax authority on your behalf.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  You can use this credit note to claim the withheld tax as a credit when filing your tax returns, reducing your overall tax liability.
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Credit Note Number</Label>
+                  <p className="font-semibold">{selectedInvoice.whtCreditNote.creditNoteNumber}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Issued Date</Label>
+                  <p>{format(new Date(selectedInvoice.whtCreditNote.issuedDate), "MMM dd, yyyy")}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Invoice Number</Label>
+                  <p>{selectedInvoice.whtCreditNote.invoiceNumber}</p>
+                </div>
+                {selectedInvoice.whtCreditNote.certificateNumber && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground">WHT Certificate Number</Label>
+                    <p>{selectedInvoice.whtCreditNote.certificateNumber}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t pt-4 space-y-2">
+                <div className="flex justify-between">
+                  <span>Invoice Total:</span>
+                  <span className="font-medium">{formatCurrencyAmount(selectedInvoice.whtCreditNote.invoiceTotal, selectedInvoice.currency as any)}</span>
+                </div>
+                <div className="flex justify-between text-destructive">
+                  <span>Withholding Tax ({selectedInvoice.whtCreditNote.whtRate}%):</span>
+                  <span>-{formatCurrencyAmount(selectedInvoice.whtCreditNote.whtAmount, selectedInvoice.currency as any)}</span>
+                </div>
+                <div className="flex justify-between font-semibold border-t pt-2">
+                  <span>Net Amount Paid:</span>
+                  <span>{formatCurrencyAmount(selectedInvoice.whtCreditNote.netAmountPaid, selectedInvoice.currency as any)}</span>
+                </div>
+              </div>
+
+              {selectedInvoice.whtCreditNote.notes && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">Notes</Label>
+                  <p className="text-sm mt-1">{selectedInvoice.whtCreditNote.notes}</p>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button 
+                  variant="outline" 
+                  onClick={handleSaveCreditNoteAsPDF}
+                  disabled={isSavingCreditNote}
+                >
+                  {isSavingCreditNote ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save as PDF
+                    </>
+                  )}
+                </Button>
+                <DialogClose asChild>
+                  <Button 
+                    variant="outline"
+                    onClick={() => {
+                      if (!isViewDialogOpen) {
+                        setSelectedInvoice(null)
+                      }
+                    }}
+                  >
+                    Close
+                  </Button>
+                </DialogClose>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8">
+              <Receipt className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+              <p className="text-muted-foreground">No credit note found for this invoice.</p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

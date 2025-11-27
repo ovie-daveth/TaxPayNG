@@ -185,11 +185,7 @@ export function AddInvoiceDialog({
     discount: 0,
     // VAT fields
     vatRate: 7.5, // Default 7.5% for Nigeria
-    // WHT fields
-    whtApplicable: false,
-    whtRate: 5, // Default 5%
-    whtCertificateNumber: "",
-    whtDeductionDate: "",
+    // Note: WHT is deducted by the client/buyer, not set by the issuer
     notes: "",
     terms: "",
     paymentTerms: "Net 30",
@@ -232,10 +228,7 @@ export function AddInvoiceDialog({
         items: items,
         discount: invoice.discount || 0,
         vatRate: invoice.vatRate || 7.5,
-        whtApplicable: invoice.whtApplicable || false,
-        whtRate: invoice.whtRate || 5,
-        whtCertificateNumber: invoice.whtCertificateNumber || "",
-        whtDeductionDate: invoice.whtDeductionDate || "",
+        // Note: WHT fields are not editable by issuer - they are set by client when deducting
         notes: invoice.notes || "",
         terms: invoice.terms || "",
         paymentTerms: invoice.paymentTerms || "Net 30",
@@ -280,11 +273,7 @@ export function AddInvoiceDialog({
         discount: 0,
         // VAT fields
         vatRate: 7.5, // Default 7.5% for Nigeria
-        // WHT fields
-        whtApplicable: false,
-        whtRate: 5, // Default 5%
-        whtCertificateNumber: "",
-        whtDeductionDate: "",
+        // Note: WHT is deducted by the client/buyer, not set by the issuer
         notes: "",
         terms: "",
         paymentTerms: "Net 30",
@@ -511,21 +500,16 @@ export function AddInvoiceDialog({
     // Invoice Total = Subtotal (after discount) + VAT (on vatable items only)
     const invoiceTotal = subtotalAfterDiscount + vatAmount
     
-    // Calculate WHT (if applicable) on Invoice Total
-    let whtAmount = 0
-    if (formData.whtApplicable && formData.whtRate && formData.whtRate > 0) {
-      whtAmount = invoiceTotal * (formData.whtRate / 100)
-    }
-    
-    // Final Total = Invoice Total - WHT
-    const total = invoiceTotal - whtAmount
+    // Note: WHT is deducted by the client/buyer, not calculated here
+    // Final Total = Invoice Total (WHT will be deducted by client if applicable)
+    const total = invoiceTotal
     
     return { 
       subtotal: Math.round(subtotal * 100) / 100,
       vatAmount: Math.round(vatAmount * 100) / 100,
       taxAmount: Math.round(vatAmount * 100) / 100, // Legacy field
       invoiceTotal: Math.round(invoiceTotal * 100) / 100,
-      whtAmount: Math.round(whtAmount * 100) / 100,
+      whtAmount: 0, // WHT is not calculated by issuer - will be set by client
       total: Math.round(total * 100) / 100
     }
   }
@@ -617,11 +601,7 @@ export function AddInvoiceDialog({
         vatAmount: totals.vatAmount,
         taxAmount: totals.taxAmount, // Legacy field
         invoiceTotal: totals.invoiceTotal,
-        whtApplicable: formData.whtApplicable || undefined,
-        whtRate: formData.whtApplicable ? (formData.whtRate || undefined) : undefined,
-        whtAmount: formData.whtApplicable ? totals.whtAmount : undefined,
-        whtCertificateNumber: formData.whtApplicable ? (formData.whtCertificateNumber || undefined) : undefined,
-        whtDeductionDate: formData.whtApplicable ? (formData.whtDeductionDate || undefined) : undefined,
+        // Note: WHT fields are not set by issuer - they are set by client when deducting
         total: totals.total
       }
       
@@ -726,12 +706,7 @@ export function AddInvoiceDialog({
                 If the recipient is an OTax user, they will receive this invoice in their account
               </p>
               {formData.sendToOtaxUser && (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    handleFindUserByEmail(formData.recipientEmail || "")
-                  }}
+                <div
                   className="mt-3 space-y-2"
                 >
                   <Label htmlFor="recipient-email">Recipient Email (OTax User)</Label>
@@ -789,7 +764,7 @@ export function AddInvoiceDialog({
                       Enter the email address and press Enter to find the user and prefill client details
                     </p>
                   )}
-                </form>
+                </div>
               )}
             </div>
           )}
@@ -1076,17 +1051,6 @@ export function AddInvoiceDialog({
               <span>Invoice Total:</span>
               <span>{getCurrencySymbol(formData.currency)} {totals.invoiceTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
-            {formData.whtApplicable && totals.whtAmount > 0 && (
-              <>
-                <div className="flex justify-between items-center text-sm text-destructive border-t pt-2 mt-2">
-                  <span>Withholding Tax ({formData.whtRate || 5}%):</span>
-                  <span>-{getCurrencySymbol(formData.currency)} {totals.whtAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </div>
-                {formData.whtCertificateNumber && (
-                  <p className="text-xs text-muted-foreground mt-1">WHT Cert: {formData.whtCertificateNumber}</p>
-                )}
-              </>
-            )}
             <div className="flex justify-between items-center text-lg font-bold border-t pt-2 mt-2">
               <span>Amount Payable:</span>
               <span className="text-primary">{getCurrencySymbol(formData.currency)} {totals.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -1289,63 +1253,6 @@ export function AddInvoiceDialog({
             </div>
           </div>
 
-          {/* WHT Section */}
-          <div className="space-y-4 border-t pt-4">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="wht-applicable"
-                checked={formData.whtApplicable}
-                onCheckedChange={(checked) => setFormData(prev => ({ ...prev, whtApplicable: !!checked }))}
-                onClick={(e) => e.stopPropagation()}
-              />
-              <Label htmlFor="wht-applicable" className="font-medium cursor-pointer">
-                Withholding Tax (WHT) Applicable
-              </Label>
-            </div>
-            {formData.whtApplicable && (
-              <div className="space-y-4 pl-6 border-l-2">
-                <div className="space-y-2">
-                  <Label htmlFor="wht-rate">WHT Rate (%)</Label>
-                  <Input
-                    id="wht-rate"
-                    type="number"
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    value={formData.whtRate}
-                    onChange={(e) => setFormData(prev => ({ ...prev, whtRate: parseFloat(e.target.value) || 5 }))}
-                    onKeyDown={handleInputKeyDown}
-                    onClick={(e) => e.stopPropagation()}
-                    placeholder="5"
-                  />
-                  <p className="text-xs text-muted-foreground">Common rates: 5% or 10% (depending on transaction type)</p>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="wht-certificate">WHT Certificate Number</Label>
-                  <Input
-                    id="wht-certificate"
-                    value={formData.whtCertificateNumber}
-                    onChange={(e) => setFormData(prev => ({ ...prev, whtCertificateNumber: e.target.value }))}
-                    onKeyDown={handleInputKeyDown}
-                    onClick={(e) => e.stopPropagation()}
-                    placeholder="e.g., WH/2025/001234"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="wht-deduction-date">WHT Deduction Date</Label>
-                  <Input
-                    id="wht-deduction-date"
-                    type="date"
-                    value={formData.whtDeductionDate}
-                    onChange={(e) => setFormData(prev => ({ ...prev, whtDeductionDate: e.target.value }))}
-                    onKeyDown={handleInputKeyDown}
-                    onClick={(e) => e.stopPropagation()}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* Discount Section */}
           <div className="space-y-4 border-t pt-4">
             <div className="space-y-2">
@@ -1385,17 +1292,6 @@ export function AddInvoiceDialog({
               <span>Invoice Total:</span>
               <span>{getCurrencySymbol(formData.currency)} {totals.invoiceTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
-            {formData.whtApplicable && totals.whtAmount > 0 && (
-              <>
-                <div className="flex justify-between items-center text-sm text-destructive border-t pt-2 mt-2">
-                  <span>Withholding Tax ({formData.whtRate || 5}%):</span>
-                  <span>-{getCurrencySymbol(formData.currency)} {totals.whtAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                </div>
-                {formData.whtCertificateNumber && (
-                  <p className="text-xs text-muted-foreground mt-1">WHT Cert: {formData.whtCertificateNumber}</p>
-                )}
-              </>
-            )}
             <div className="flex justify-between items-center text-lg font-bold border-t pt-2 mt-2">
               <span>Amount Payable:</span>
               <span className="text-primary">{getCurrencySymbol(formData.currency)} {totals.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>

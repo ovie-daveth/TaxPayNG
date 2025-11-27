@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -8,6 +8,7 @@ import { FileText, ImageIcon, File, Download, Eye, Trash2, MoreVertical, LinkIco
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DeleteConfirmationModal } from "@/components/ui/delete-confirmation-modal"
 import type { Document } from "@/lib/types"
+import { transactionService } from "@/lib/services"
 
 function getFileIcon(fileType: string) {
   switch (fileType) {
@@ -56,6 +57,39 @@ export function DocumentList({ documents, onView, onDownload, onDelete }: Docume
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [transactionDescriptions, setTransactionDescriptions] = useState<Record<string, string>>({})
+
+  // Fetch transaction descriptions for linked transactions
+  useEffect(() => {
+    const fetchTransactionDescriptions = async () => {
+      const transactionIds = documents
+        .filter(doc => doc.linkedTransaction)
+        .map(doc => doc.linkedTransaction!)
+        .filter((id, index, self) => self.indexOf(id) === index) // Unique IDs
+
+      if (transactionIds.length === 0) return
+
+      const descriptions: Record<string, string> = {}
+      
+      await Promise.all(
+        transactionIds.map(async (id) => {
+          try {
+            const transaction = await transactionService.getById(id)
+            if (transaction && transaction.description) {
+              descriptions[id] = transaction.description
+            }
+          } catch (error) {
+            console.error(`Failed to fetch transaction ${id}:`, error)
+            descriptions[id] = id // Fallback to ID if fetch fails
+          }
+        })
+      )
+
+      setTransactionDescriptions(descriptions)
+    }
+
+    fetchTransactionDescriptions()
+  }, [documents])
 
   const handleDownload = async (document: Document) => {
     try {
@@ -129,7 +163,9 @@ export function DocumentList({ documents, onView, onDownload, onDelete }: Docume
                       <span className="text-xs text-muted-foreground">•</span>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
                         <LinkIcon className="w-3 h-3" />
-                        <span className="truncate max-w-[200px]">{doc.linkedTransaction}</span>
+                        <span className="truncate max-w-[200px]">
+                          {transactionDescriptions[doc.linkedTransaction] || doc.linkedTransaction}
+                        </span>
                       </div>
                     </>
                   )}

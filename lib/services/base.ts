@@ -26,10 +26,23 @@ export class BaseService {
   }
 
   // Helper method to convert Firestore timestamp to ISO string
-  protected convertTimestamp(timestamp: Timestamp | string | undefined): string {
+  protected convertTimestamp(timestamp: Timestamp | string | undefined | any): string {
     if (!timestamp) return new Date().toISOString()
     if (typeof timestamp === 'string') return timestamp
-    return timestamp.toDate().toISOString()
+    // Check if it's a Firestore Timestamp
+    if (timestamp && typeof timestamp.toDate === 'function') {
+      return timestamp.toDate().toISOString()
+    }
+    // If it's already a Date object
+    if (timestamp instanceof Date) {
+      return timestamp.toISOString()
+    }
+    // Fallback: try to parse as date string
+    try {
+      return new Date(timestamp).toISOString()
+    } catch {
+      return new Date().toISOString()
+    }
   }
 
   // Helper method to convert ISO string to Firestore timestamp
@@ -46,25 +59,44 @@ export class BaseService {
     const converted: any = {
       id: doc.id,
       ...data,
-      createdAt: this.convertTimestamp(data.createdAt),
-      updatedAt: this.convertTimestamp(data.updatedAt),
     }
     
-    // Convert other timestamp fields if present
-    if (data.uploadedAt) {
+    // Convert timestamp fields if present (only if they exist and are not already strings)
+    if (data.createdAt !== undefined) {
+      converted.createdAt = this.convertTimestamp(data.createdAt)
+    }
+    if (data.updatedAt !== undefined) {
+      converted.updatedAt = this.convertTimestamp(data.updatedAt)
+    }
+    if (data.uploadedAt !== undefined) {
       converted.uploadedAt = this.convertTimestamp(data.uploadedAt)
     }
-    if (data.date) {
+    if (data.date !== undefined) {
       converted.date = this.convertTimestamp(data.date)
     }
-    if (data.dueDate) {
+    if (data.dueDate !== undefined) {
       converted.dueDate = this.convertTimestamp(data.dueDate)
     }
-    if (data.completedAt) {
+    if (data.completedAt !== undefined) {
       converted.completedAt = this.convertTimestamp(data.completedAt)
     }
     
     return converted as T
+  }
+
+  // Helper method to remove undefined values from objects (Firestore doesn't accept undefined)
+  protected removeUndefined(obj: any): any {
+    if (obj === null || obj === undefined) return obj
+    if (Array.isArray(obj)) return obj.map(item => this.removeUndefined(item))
+    if (typeof obj !== 'object') return obj
+    
+    const cleaned: any = {}
+    for (const key in obj) {
+      if (obj[key] !== undefined) {
+        cleaned[key] = this.removeUndefined(obj[key])
+      }
+    }
+    return cleaned
   }
 
   // Helper method to prepare data for Firestore
@@ -92,7 +124,8 @@ export class BaseService {
       prepared.uploadedAt = this.convertToTimestamp(prepared.uploadedAt)
     }
 
-    return prepared
+    // Remove undefined values (Firestore doesn't accept undefined)
+    return this.removeUndefined(prepared)
   }
 
   // Get a single document by ID
