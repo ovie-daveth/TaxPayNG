@@ -350,8 +350,23 @@ export class TransactionService extends BaseService {
           }
 
           if (!start && !end) return true
-          if (start && transaction.txnDate < start) return false
-          if (end && transaction.txnDate > end) return false
+          
+          // Normalize dates to start/end of day for comparison
+          const txnDateOnly = new Date(transaction.txnDate)
+          txnDateOnly.setHours(0, 0, 0, 0)
+          
+          if (start) {
+            const startDateOnly = new Date(start)
+            startDateOnly.setHours(0, 0, 0, 0)
+            if (txnDateOnly < startDateOnly) return false
+          }
+          
+          if (end) {
+            const endDateOnly = new Date(end)
+            endDateOnly.setHours(23, 59, 59, 999)
+            if (transaction.txnDate > endDateOnly) return false
+          }
+          
           return true
         })
 

@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Plus, FileText, Calculator, Bell, Settings, Receipt, Download, FileCheck } from "lucide-react"
+import { Plus, FileText, Calculator, Bell, Settings, Receipt, Download, FileCheck, BarChart3 } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { UploadDocumentDialog } from "../documents/upload-document-dialog"
 import { useState } from "react"
@@ -81,6 +81,46 @@ export function DashboardHeader() {
           buttonIcon: Bell,
           buttonAction: () => setIsAddReminderDialogOpen(true)
         }
+      case "/dashboard/reports":
+        return {
+          title: "Reports & Filings",
+          subtitle: "Generate tax reports and self-assessment filings for LIRS/FIRS",
+          buttonText: "New Report",
+          buttonIcon: BarChart3,
+          buttonAction: () => router.push("/dashboard/reports/generate/self-assessment")
+        }
+      case "/dashboard/reports/generate/self-assessment":
+        return {
+          title: "Self-Assessment Filing",
+          subtitle: "Create LIRS/FIRS-ready self-assessment report",
+          buttonText: "",
+          buttonIcon: BarChart3,
+          buttonAction: () => {}
+        }
+      case "/dashboard/reports/generate/income-statement":
+        return {
+          title: "Income Statement",
+          subtitle: "Detailed breakdown of all income sources and categories",
+          buttonText: "",
+          buttonIcon: BarChart3,
+          buttonAction: () => {}
+        }
+      case "/dashboard/reports/generate/expense-report":
+        return {
+          title: "Expense Report",
+          subtitle: "Comprehensive report of business expenses and deductions",
+          buttonText: "",
+          buttonIcon: BarChart3,
+          buttonAction: () => {}
+        }
+      case "/dashboard/reports/generate/tax-summary":
+        return {
+          title: "Tax Summary Report",
+          subtitle: "Annual or quarterly tax calculation summary with breakdowns",
+          buttonText: "",
+          buttonIcon: BarChart3,
+          buttonAction: () => {}
+        }
       case "/dashboard/settings":
         return {
           title: "Settings",
@@ -136,8 +176,8 @@ export function DashboardHeader() {
                 <Bell className="w-4 h-4" />
               </Button>
             )}
-            {/* Show main action button except on reminders page */}
-            {pathname !== "/dashboard/reminders" && (
+            {/* Show main action button except on reminders page and report generation pages */}
+            {pathname !== "/dashboard/reminders" && pageInfo.buttonText && (
               <Button 
                 onClick={pageInfo.buttonAction}
                 size="sm"

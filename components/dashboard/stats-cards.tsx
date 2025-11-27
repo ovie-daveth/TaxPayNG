@@ -638,9 +638,22 @@ export function StatsCards({
       const yearInfo = getYearInfo(now, selectedYear)
       
       const periodStartIso = periodInfo.start.toISOString()
-      const periodEndIso = periodInfo.end > now ? nowIso : periodInfo.end.toISOString()
+      // For period end, if it's in the future, use end of today to include all transactions today
+      let periodEndDate = periodInfo.end
+      if (periodInfo.end > now) {
+        periodEndDate = new Date(now)
+        periodEndDate.setHours(23, 59, 59, 999)
+      }
+      const periodEndIso = periodEndDate.toISOString()
+      
       const yearStartIso = yearInfo.start.toISOString()
-      const yearEndIso = yearInfo.end > now ? nowIso : yearInfo.end.toISOString()
+      // For year end, if it's in the future, use end of today to include all transactions today
+      let yearEndDate = yearInfo.end
+      if (yearInfo.end > now) {
+        yearEndDate = new Date(now)
+        yearEndDate.setHours(23, 59, 59, 999)
+      }
+      const yearEndIso = yearEndDate.toISOString()
 
       const labels: PeriodLabels = {
         quarterLabel: periodInfo.label,

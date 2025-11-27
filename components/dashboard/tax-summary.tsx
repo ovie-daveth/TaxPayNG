@@ -92,10 +92,17 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
       const now = new Date()
       const yearInfo = getYearInfo(now, selectedYear)
       const yearStartIso = yearInfo.start.toISOString()
-      const yearEndIso = yearInfo.end > now ? now.toISOString() : yearInfo.end.toISOString()
+      // If current year, use end of today; otherwise use end of year
+      let yearEndDate = yearInfo.end
+      if (yearInfo.end > now) {
+        // Current year - use end of today to include all transactions today
+        yearEndDate = new Date(now)
+        yearEndDate.setHours(23, 59, 59, 999)
+      }
+      const yearEndIso = yearEndDate.toISOString()
 
       try {
-        // Fetch full year data for tax calculation
+        // Fetch full year data for tax calculation (transactions only)
         const yearSummary = await transactionService.getTransactionSummary(
           user.uid,
           yearStartIso,

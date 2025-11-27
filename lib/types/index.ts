@@ -433,3 +433,26 @@ export interface SavedClient {
   createdAt: string
   updatedAt: string
 }
+
+// Report Types
+export type ReportType = 'Self-Assessment' | 'Income Statement' | 'Expense Report' | 'Tax Summary'
+export type ReportStatus = 'draft' | 'completed' | 'submitted'
+
+export interface SavedReport {
+  id: string
+  userId: string
+  title: string
+  type: ReportType
+  reportData: any // ReportData from reportService
+  period: {
+    startDate: string
+    endDate: string
+    year: number
+    quarter?: number
+    periodType: 'annual' | 'quarterly' | 'monthly' | 'custom'
+  }
+  status: ReportStatus
+  generatedAt: string
+  createdAt: string
+  updatedAt: string
+}
