@@ -769,45 +769,25 @@ export function AddInvoiceDialog({
             </div>
           )}
 
-          {/* Template Selection */}
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="template">Template</Label>
-              <Select
-                value={formData.template}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, template: value as InvoiceTemplateType }))}
-              >
-                <SelectTrigger id="template">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {INVOICE_TEMPLATES.map(template => (
-                    <SelectItem key={template.id} value={template.type}>
-                      {template.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="currency">Currency</Label>
-              <Select
-                value={formData.currency}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, currency: value as CurrencyCode }))}
-              >
-                <SelectTrigger id="currency">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SUPPORTED_CURRENCIES.map(currency => (
-                    <SelectItem key={currency.code} value={currency.code}>
-                      {currency.symbol} {currency.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          {/* Currency Selection */}
+          {/* <div className="space-y-2">
+            <Label htmlFor="currency">Currency</Label>
+            <Select
+              value={formData.currency}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, currency: value as CurrencyCode }))}
+            >
+              <SelectTrigger id="currency">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SUPPORTED_CURRENCIES.map(currency => (
+                  <SelectItem key={currency.code} value={currency.code}>
+                    {currency.symbol} {currency.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div> */}
 
           {/* Supplier/Business Information - Only show for outgoing invoices */}
           {formData.invoiceType === 'outgoing' && (
