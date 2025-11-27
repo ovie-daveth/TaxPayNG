@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
-import { Download, Printer, ExternalLink, Upload, X, FileText, Loader2, Edit, Save, XCircle, Calculator, Plus, Info } from "lucide-react"
+import { Download, Printer, ExternalLink, Upload, X, FileText, Loader2, Edit, Save, XCircle, Calculator, Plus, Info, Receipt } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Invoice, InvoiceType, InvoiceClient, InvoiceItem } from "@/lib/types"
 import { getCurrencySymbol, formatCurrencyAmount, formatCurrencyInput, parseCurrencyInput, SUPPORTED_CURRENCIES, CurrencyCode, fetchExchangeRate, convertCurrency } from "@/lib/utils/currency"
@@ -19,6 +19,7 @@ import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { invoiceService } from "@/lib/services"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface ViewInvoiceDialogProps {
   open: boolean
@@ -45,6 +46,12 @@ export function ViewInvoiceDialog({
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
   const [isUploadingReceipt, setIsUploadingReceipt] = useState(false)
   const [taxDeductible, setTaxDeductible] = useState(true) // Default to true for bills
+  const [showWHTForm, setShowWHTForm] = useState(false)
+  const [whtRate, setWhtRate] = useState(5)
+  const [whtCertificateNumber, setWhtCertificateNumber] = useState("")
+  const [whtNotes, setWhtNotes] = useState("")
+  const [isDeductingWHT, setIsDeductingWHT] = useState(false)
+  const [showCreditNoteDialog, setShowCreditNoteDialog] = useState(false)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
   const [editedInvoice, setEditedInvoice] = useState<Invoice | null>(null)
@@ -122,15 +129,14 @@ export function ViewInvoiceDialog({
                             ? (convertedAmount)
                             : i.unitPrice
                           const itemSubtotal = i.quantity * bp
-                          const itemTaxAmount = i.tax ? itemSubtotal * (i.tax / 100) : 0
-                          return { ...i, amount: itemSubtotal + itemTaxAmount }
+                          return { ...i, amount: itemSubtotal }
                         }
                         return i
                       })
                       // Recalculate totals using current converted amounts
                       setItemConvertedAmounts(currentConverted => {
                         let subtotal = 0
-                        let totalTaxAmount = 0
+                        let vatableSubtotal = 0
                         updatedItems.forEach((i: InvoiceItem) => {
                           if (i.unitPrice === 0) return
                           const ic = itemCurrencies[i.id] || (i.currency as CurrencyCode) || prev.currency
@@ -141,16 +147,29 @@ export function ViewInvoiceDialog({
                             : i.unitPrice
                           const itemSubtotal = i.quantity * bp
                           subtotal += itemSubtotal
-                          const itemTaxAmount = i.tax ? itemSubtotal * (i.tax / 100) : 0
-                          totalTaxAmount += itemTaxAmount
+                          // Track vatable subtotal for VAT calculation
+                          if (i.vatable) {
+                            vatableSubtotal += itemSubtotal
+                          }
                         })
                         const discountAmount = prev.discount ? subtotal * (prev.discount / 100) : 0
-                        const total = subtotal + totalTaxAmount - discountAmount
+                        const subtotalAfterDiscount = subtotal - discountAmount
+                        // Apply discount proportionally to vatable items
+                        const vatableDiscountAmount = vatableSubtotal > 0 && subtotal > 0 
+                          ? (vatableSubtotal / subtotal) * discountAmount 
+                          : 0
+                        const vatableSubtotalAfterDiscount = vatableSubtotal - vatableDiscountAmount
+                        const vatRate = prev.vatRate || 7.5
+                        const vatAmount = vatableSubtotalAfterDiscount * (vatRate / 100)
+                        const invoiceTotal = subtotalAfterDiscount + vatAmount
+                        const total = invoiceTotal
                         setEditedInvoice(prevInvoice => prevInvoice ? {
                           ...prevInvoice,
                           items: updatedItems,
                           subtotal,
-                          taxAmount: totalTaxAmount,
+                          vatAmount,
+                          taxAmount: vatAmount, // Legacy field
+                          invoiceTotal,
                           total
                         } : prevInvoice)
                         return currentConverted
@@ -231,9 +250,9 @@ export function ViewInvoiceDialog({
       basePrice = item.unitPrice
     }
     
+    // Amount is just subtotal (no item-level tax/VAT)
     const subtotal = item.quantity * basePrice
-    const taxAmount = item.tax ? subtotal * (item.tax / 100) : 0
-    return subtotal + taxAmount
+    return subtotal
   }
 
   // Handle currency conversion for item unit price
@@ -435,7 +454,7 @@ export function ViewInvoiceDialog({
       const updatedItems = editedInvoice.items.map(item => {
         if (item.id === itemId) {
           const updated = { ...item, ...updates }
-          // Recalculate amount when quantity, unitPrice, or tax changes
+          // Recalculate amount when quantity or unitPrice changes
           updated.amount = calculateItemAmount(updated)
           return updated
         }
@@ -444,7 +463,7 @@ export function ViewInvoiceDialog({
       
       // Recalculate totals using converted amounts
       let subtotal = 0
-      let totalTaxAmount = 0
+      let vatableSubtotal = 0
       
       updatedItems.forEach(item => {
         if (item.unitPrice === 0) return
@@ -472,22 +491,44 @@ export function ViewInvoiceDialog({
         const itemSubtotal = item.quantity * basePrice
         subtotal += itemSubtotal
         
-        const itemTaxAmount = item.tax ? itemSubtotal * (item.tax / 100) : 0
-        totalTaxAmount += itemTaxAmount
+        // Only include in vatable subtotal if item is marked as vatable
+        if (item.vatable) {
+          vatableSubtotal += itemSubtotal
+        }
       })
       
       const discountAmount = editedInvoice.discount ? subtotal * (editedInvoice.discount / 100) : 0
-      const total = subtotal + totalTaxAmount - discountAmount
+      const subtotalAfterDiscount = subtotal - discountAmount
+      
+      // Apply discount proportionally to vatable subtotal
+      const vatableDiscountAmount = vatableSubtotal > 0 && subtotal > 0 
+        ? (vatableSubtotal / subtotal) * discountAmount 
+        : 0
+      const vatableSubtotalAfterDiscount = vatableSubtotal - vatableDiscountAmount
+      
+      // Calculate VAT only on vatable items after discount
+      const vatRate = editedInvoice.vatRate || 7.5
+      const vatAmount = vatableSubtotalAfterDiscount * (vatRate / 100)
+      
+      // Invoice Total = Subtotal (after discount) + VAT
+      const invoiceTotal = subtotalAfterDiscount + vatAmount
+      
+      // Note: WHT is deducted by client, not calculated here
+      // Final Total = Invoice Total (WHT will be deducted by client if applicable)
+      const total = invoiceTotal
       
       setEditedInvoice({
         ...editedInvoice,
         items: updatedItems,
         subtotal,
-        taxAmount: totalTaxAmount,
+        vatAmount,
+        taxAmount: vatAmount, // Legacy field
+        invoiceTotal,
         total
       })
     }
   }
+
   
   if (!invoice || !profile?.userId || (!isSender && !isRecipient && !isClient)) {
     if (invoice && profile?.userId) {
@@ -660,8 +701,489 @@ export function ViewInvoiceDialog({
     }
   }
 
+  const handleDeductWHT = async () => {
+    if (!profile?.userId || !invoice) return
+
+    if (!isClient && !isRecipient) {
+      toast.error("Only the client/buyer can deduct WHT")
+      return
+    }
+
+    if (whtRate <= 0) {
+      toast.error("Please enter a valid WHT rate")
+      return
+    }
+
+    try {
+      setIsDeductingWHT(true)
+
+      const result = await invoiceService.deductWHT(
+        invoice.id,
+        profile.userId,
+        whtRate,
+        whtCertificateNumber || undefined,
+        whtNotes || undefined
+      )
+
+      if (result.success) {
+        toast.success("WHT deducted successfully. Credit note created.")
+        setShowWHTForm(false)
+        setWhtRate(5)
+        setWhtCertificateNumber("")
+        setWhtNotes("")
+        onInvoiceUpdated?.()
+      } else {
+        toast.error(result.error || "Failed to deduct WHT")
+      }
+    } catch (error) {
+      console.error("Error deducting WHT:", error)
+      toast.error("Failed to deduct WHT")
+    } finally {
+      setIsDeductingWHT(false)
+    }
+  }
+
   const handlePrint = () => {
-    window.print()
+    // Create a print window with the invoice content
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      toast.error("Please allow popups to print")
+      return
+    }
+
+    const currentInv = currentInvoice || invoice
+    const isIncoming = displayAsIncoming
+    
+    // Get the invoice content HTML
+    // Get the logo URL - convert to base64 if needed, or use absolute URL
+    const logoUrl = window.location.origin + '/logootax.jpg'
+
+    const printContent = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>${isIncoming ? 'Bill' : 'Invoice'} ${currentInv.invoiceNumber}</title>
+  <style>
+    @page {
+      size: landscape;
+      margin: 0.5in;
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      font-size: 12px;
+      line-height: 1.5;
+      color: #000;
+      background: #fff;
+    }
+    .print-container {
+      max-width: 100%;
+      padding: 20px;
+    }
+    .logo-section {
+      text-align: center;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #e5e7eb;
+    }
+    .logo-section img {
+      max-height: 60px;
+      width: auto;
+    }
+    .header-section {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 30px;
+      padding-bottom: 20px;
+      border-bottom: 2px solid #e5e7eb;
+    }
+    .issuer-info {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .issuer-icon {
+      width: 40px;
+      height: 40px;
+      background: #e5e7eb;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+    }
+    .issuer-details h2 {
+      font-size: 18px;
+      font-weight: bold;
+      margin-bottom: 4px;
+    }
+    .issuer-details p {
+      font-size: 11px;
+      color: #6b7280;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 500;
+      background: #e5e7eb;
+      color: #374151;
+    }
+    .main-content {
+      display: grid;
+      grid-template-columns: 2fr 1fr;
+      gap: 30px;
+      margin-bottom: 30px;
+    }
+    .left-column {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .right-column {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .card {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 20px;
+      background: #fff;
+    }
+    .card h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #111827;
+    }
+    .client-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    .client-field {
+      margin-bottom: 12px;
+    }
+    .client-field-label {
+      font-size: 10px;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .client-field-value {
+      font-size: 12px;
+      font-weight: 500;
+      color: #111827;
+    }
+    .payment-summary {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 20px;
+    }
+    .payment-summary h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .payment-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      font-size: 12px;
+    }
+    .payment-row-label {
+      color: #6b7280;
+    }
+    .payment-row-value {
+      font-weight: 500;
+      color: #111827;
+    }
+    .payment-total {
+      display: flex;
+      justify-content: space-between;
+      padding-top: 12px;
+      margin-top: 12px;
+      border-top: 2px solid #e5e7eb;
+      font-size: 16px;
+      font-weight: bold;
+    }
+    .payment-total-value {
+      color: #059669;
+    }
+    .payment-status {
+      margin-top: 20px;
+      padding: 12px;
+      background: #d1fae5;
+      border-radius: 6px;
+      text-align: center;
+      font-weight: 600;
+      color: #059669;
+    }
+    .items-section {
+      margin-top: 30px;
+    }
+    .items-section h3 {
+      font-size: 14px;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .items-table {
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .items-table thead {
+      background: #f9fafb;
+    }
+    .items-table th {
+      padding: 12px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      color: #374151;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .items-table th.text-right {
+      text-align: right;
+    }
+    .items-table th.text-center {
+      text-align: center;
+    }
+    .items-table td {
+      padding: 12px;
+      font-size: 12px;
+      border-top: 1px solid #e5e7eb;
+    }
+    .items-table td.text-right {
+      text-align: right;
+    }
+    .items-table td.text-center {
+      text-align: center;
+    }
+    .pro-tip {
+      background: linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%);
+      color: white;
+      padding: 16px;
+      border-radius: 8px;
+      font-size: 11px;
+    }
+    .pro-tip h4 {
+      font-size: 12px;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+    .pro-tip p {
+      font-size: 11px;
+      opacity: 0.9;
+    }
+    @media print {
+      body {
+        print-color-adjust: exact;
+        -webkit-print-color-adjust: exact;
+      }
+      .print-container {
+        padding: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="print-container">
+    <!-- Logo Section -->
+    <div class="logo-section">
+      <img src="${logoUrl}" alt="OTax Logo" />
+    </div>
+
+    <!-- Header Section -->
+    <div class="header-section">
+      <div class="issuer-info">
+        <div class="issuer-icon">📄</div>
+        <div class="issuer-details">
+          <h2>${isSender 
+            ? (currentInv.supplier?.businessName || currentInv.supplier?.name || "Your Company")
+            : (currentInv.supplier?.businessName || currentInv.supplier?.name || "Supplier")}</h2>
+          <p>Invoice #${currentInv.invoiceNumber} • ${format(new Date(currentInv.issueDate), "MM/dd/yyyy")}</p>
+          ${currentInv.supplier?.vatRegistrationNumber ? `<p style="font-size: 10px; color: #6b7280; margin-top: 4px;">VAT Reg: ${currentInv.supplier.vatRegistrationNumber}</p>` : ''}
+        </div>
+      </div>
+      <div class="status-badge">
+        ${currentInv.status === 'sent' && isIncoming 
+          ? 'Received' 
+          : (currentInv.status.charAt(0).toUpperCase() + currentInv.status.slice(1))}
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Left Column -->
+      <div class="left-column">
+        <!-- Client Information Card -->
+        <div class="card">
+          <h3>${isSender ? "Bill To" : isIncoming ? "Bill To (You)" : "Client Information"}</h3>
+          <div class="client-grid">
+            ${currentInv.client.businessName ? `
+            <div class="client-field">
+              <div class="client-field-label">Business Name</div>
+              <div class="client-field-value">${currentInv.client.businessName}</div>
+            </div>
+            ` : ''}
+            <div class="client-field">
+              <div class="client-field-label">Name</div>
+              <div class="client-field-value">${currentInv.client.name}</div>
+            </div>
+            ${currentInv.client.email ? `
+            <div class="client-field">
+              <div class="client-field-label">Email</div>
+              <div class="client-field-value">${currentInv.client.email}</div>
+            </div>
+            ` : ''}
+            ${currentInv.client.phone ? `
+            <div class="client-field">
+              <div class="client-field-label">Phone</div>
+              <div class="client-field-value">${currentInv.client.phone}</div>
+            </div>
+            ` : ''}
+            ${currentInv.client.address ? `
+            <div class="client-field">
+              <div class="client-field-label">Address</div>
+              <div class="client-field-value">
+                ${currentInv.client.address.street || ''}
+                ${currentInv.client.address.street && (currentInv.client.address.city || currentInv.client.address.state) ? '<br>' : ''}
+                ${currentInv.client.address.city || ''}
+                ${currentInv.client.address.city && currentInv.client.address.state ? ', ' : ''}
+                ${currentInv.client.address.state || ''}
+                ${currentInv.client.address.postalCode ? '<br>' + currentInv.client.address.postalCode : ''}
+                ${currentInv.client.address.country ? '<br>' + currentInv.client.address.country : ''}
+              </div>
+            </div>
+            ` : ''}
+            ${currentInv.client.taxId ? `
+            <div class="client-field">
+              <div class="client-field-label">Tax ID (TIN)</div>
+              <div class="client-field-value">${currentInv.client.taxId}</div>
+            </div>
+            ` : ''}
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column -->
+      <div class="right-column">
+        <!-- Payment Summary Card -->
+        <div class="payment-summary">
+          <h3>Payment Summary</h3>
+          <div class="payment-row">
+            <span class="payment-row-label">Subtotal</span>
+            <span class="payment-row-value">${formatCurrencyAmount(currentInv.subtotal, currentInv.currency as any)}</span>
+          </div>
+          ${currentInv.discount && currentInv.discount > 0 ? `
+          <div class="payment-row">
+            <span class="payment-row-label">Discount (${currentInv.discount}%)</span>
+            <span class="payment-row-value">-${formatCurrencyAmount(currentInv.subtotal * (currentInv.discount / 100), currentInv.currency as any)}</span>
+          </div>
+          ` : ''}
+          ${((currentInv.vatAmount !== undefined && currentInv.vatAmount > 0) || currentInv.taxAmount > 0) ? `
+          <div class="payment-row">
+            <span class="payment-row-label">VAT (${currentInv.vatRate || 7.5}%)</span>
+            <span class="payment-row-value">${formatCurrencyAmount(currentInv.vatAmount || currentInv.taxAmount, currentInv.currency as any)}</span>
+          </div>
+          ` : ''}
+          ${(currentInv.invoiceTotal !== undefined) ? `
+          <div class="payment-total" style="border-top: 2px solid #e5e7eb; padding-top: 12px; margin-top: 12px;">
+            <span>Invoice Total</span>
+            <span class="payment-total-value">${formatCurrencyAmount(currentInv.invoiceTotal, currentInv.currency as any)}</span>
+          </div>
+          ` : ''}
+          ${(currentInv.whtDeducted && currentInv.whtAmount && currentInv.whtAmount > 0) ? `
+          <div class="payment-row" style="border-top: 1px solid #e5e7eb; padding-top: 8px; margin-top: 8px; color: #dc2626;">
+            <span class="payment-row-label">Withholding Tax (${currentInv.whtRate || 5}%)</span>
+            <span class="payment-row-value">-${formatCurrencyAmount(currentInv.whtAmount, currentInv.currency as any)}</span>
+          </div>
+          ${currentInv.whtCertificateNumber ? `
+          <div class="payment-row" style="font-size: 10px; color: #6b7280; margin-top: 4px;">
+            <span>WHT Certificate: ${currentInv.whtCertificateNumber}</span>
+          </div>
+          ` : ''}
+          ${currentInv.whtDeductionDate ? `
+          <div class="payment-row" style="font-size: 10px; color: #6b7280;">
+            <span>Deducted: ${format(new Date(currentInv.whtDeductionDate), "MMM dd, yyyy")}</span>
+          </div>
+          ` : ''}
+          ` : ''}
+          <div class="payment-total" style="border-top: 2px solid #e5e7eb; padding-top: 12px; margin-top: 12px;">
+            <span>Amount Payable</span>
+            <span class="payment-total-value">${formatCurrencyAmount(currentInv.total, currentInv.currency as any)}</span>
+          </div>
+          ${(currentInv.clientPaymentStatus === 'paid' || currentInv.supplierPaymentStatus === 'paid') ? `
+          <div class="payment-status">Payment Marked</div>
+          ` : ''}
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Items Table -->
+    <div class="items-section">
+      <h3>Items</h3>
+      <table class="items-table">
+        <thead>
+          <tr>
+            <th>Description</th>
+            <th class="text-center">Quantity</th>
+            <th class="text-right">Unit Price</th>
+            <th class="text-right">Amount (${getCurrencySymbol(currentInv.currency as any)})</th>
+            <th class="text-center">Vatable</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${currentInv.items.map((item: InvoiceItem) => {
+            const itemCurrency = item.currency || currentInv.currency
+            const itemSubtotal = item.quantity * item.unitPrice
+        // Amount is just subtotal (no item-level tax/VAT)
+        const itemAmount = itemSubtotal
+            const currencySymbol = getCurrencySymbol(currentInv.currency as any)
+            const formattedAmount = `${currencySymbol}${itemAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+            return `
+            <tr>
+              <td>${item.description}</td>
+              <td class="text-center">${item.quantity}</td>
+              <td class="text-right">${getCurrencySymbol(itemCurrency as any)}${item.unitPrice.toLocaleString()}</td>
+              <td class="text-right">${formattedAmount}</td>
+              <td class="text-center">${item.vatable ? '<span style="background: #d1fae5; color: #059669; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Yes</span>' : '<span style="background: #e5e7eb; color: #6b7280; padding: 2px 8px; border-radius: 4px; font-size: 11px;">No</span>'}</td>
+            </tr>
+            `
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>
+    `
+
+    printWindow.document.write(printContent)
+    printWindow.document.close()
+    
+    // Wait for content to load, then print
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.print()
+        // Close the window after printing (optional)
+        // printWindow.close()
+      }, 250)
+    }
   }
 
   const handleDownload = () => {
@@ -690,7 +1212,11 @@ export function ViewInvoiceDialog({
           paymentTerms: editedInvoice.paymentTerms,
           paymentInstructions: editedInvoice.paymentInstructions,
           subtotal: editedInvoice.subtotal,
-          taxAmount: editedInvoice.taxAmount,
+          vatRate: editedInvoice.vatRate,
+          vatAmount: editedInvoice.vatAmount,
+          taxAmount: editedInvoice.taxAmount, // Legacy field
+          invoiceTotal: editedInvoice.invoiceTotal,
+          // Note: WHT fields are not editable - they are set by client when deducting
           total: editedInvoice.total
         }
       )
@@ -734,7 +1260,7 @@ export function ViewInvoiceDialog({
             <DialogTitle className="text-xl">
               {displayAsIncoming ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
             </DialogTitle>
-            <div className="flex gap-2">
+            <div className="flex gap-2 mr-8">
               {/* Edit/Save/Cancel buttons - only for issuer when client hasn't paid */}
               {isSender && invoice.clientPaymentStatus !== 'paid' && (
                 <>
@@ -797,62 +1323,113 @@ export function ViewInvoiceDialog({
         </DialogHeader>
 
         <div className="flex-1 overflow-y-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-6">
-            {/* Left Column - Invoice Details */}
-            <div className="lg:col-span-2 space-y-6">
-              {/* Invoice Header Card */}
-              <Card className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                      <Calculator className="w-6 h-6 text-primary" />
-                    </div>
+          <div className="p-6 space-y-6">
+            {/* Top Section: Invoice Header and Client Info */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left: Invoice Header */}
+              <div className="lg:col-span-2">
+                <Card className="p-5">
+                  <div className="flex items-start justify-between mb-4">
                     <div>
-                      <h2 className="text-xl font-bold">
+                      <h2 className="text-lg font-bold mb-1">
                         {isSender 
                           ? (currentInvoice?.supplier?.businessName || currentInvoice?.supplier?.name || "Your Company")
                           : (currentInvoice?.supplier?.businessName || currentInvoice?.supplier?.name || "Supplier")}
                       </h2>
-                      <p className="text-sm text-muted-foreground">
-                        Invoice #{currentInvoice?.invoiceNumber || invoice.invoiceNumber} • {format(new Date(currentInvoice?.issueDate || invoice.issueDate), "MM/dd/yyyy")}
+                      <p className="text-xs text-muted-foreground mb-1">
+                        Invoice #{currentInvoice?.invoiceNumber || invoice.invoiceNumber}
                       </p>
+                      <p className="text-xs text-muted-foreground">
+                        Issue Date: {format(new Date(currentInvoice?.issueDate || invoice.issueDate), "MMM dd, yyyy")}
+                        {currentInvoice?.dueDate && ` • Due: ${format(new Date(currentInvoice.dueDate), "MMM dd, yyyy")}`}
+                      </p>
+                      {(currentInvoice?.supplier?.vatRegistrationNumber || invoice.supplier?.vatRegistrationNumber) && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          VAT Reg: {(currentInvoice?.supplier?.vatRegistrationNumber || invoice.supplier?.vatRegistrationNumber)}
+                        </p>
+                      )}
+                    </div>
+                    {!isEditing && (
+                      <Badge variant={(currentInvoice || invoice).status === 'paid' ? 'default' : (currentInvoice || invoice).status === 'overdue' ? 'destructive' : 'secondary'}>
+                        {(currentInvoice || invoice).status === 'sent' && displayAsIncoming 
+                          ? 'Received' 
+                          : ((currentInvoice || invoice).status.charAt(0).toUpperCase() + (currentInvoice || invoice).status.slice(1))}
+                      </Badge>
+                    )}
+                  </div>
+                {isEditing && editedInvoice && (
+                  <div className="mt-4 space-y-4">
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-2 block">Currency</Label>
+                      <Select
+                        value={editedInvoice.currency}
+                        onValueChange={(value) => handleInvoiceCurrencyChange(value as CurrencyCode)}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {SUPPORTED_CURRENCIES.map(currency => (
+                            <SelectItem key={currency.code} value={currency.code}>
+                              {currency.symbol} {currency.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-2 block">VAT Rate (%)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={editedInvoice.vatRate || 7.5}
+                        onChange={(e) => {
+                          const vatRate = parseFloat(e.target.value) || 7.5
+                          const subtotal = editedInvoice.subtotal
+                          const discountAmount = editedInvoice.discount ? subtotal * (editedInvoice.discount / 100) : 0
+                          const subtotalAfterDiscount = subtotal - discountAmount
+                          // Calculate vatable subtotal
+                          let vatableSubtotal = 0
+                          editedInvoice.items.forEach(item => {
+                            if (item.vatable && item.unitPrice > 0) {
+                              const itemCurrency = itemCurrencies[item.id] || (item.currency as CurrencyCode) || editedInvoice.currency
+                              const baseCurrency = editedInvoice.currency as CurrencyCode
+                              const basePrice = itemCurrency !== baseCurrency 
+                                ? (itemConvertedAmounts[item.id] || item.unitPrice)
+                                : item.unitPrice
+                              vatableSubtotal += item.quantity * basePrice
+                            }
+                          })
+                          const vatableDiscountAmount = vatableSubtotal > 0 && subtotal > 0 
+                            ? (vatableSubtotal / subtotal) * discountAmount 
+                            : 0
+                          const vatableSubtotalAfterDiscount = vatableSubtotal - vatableDiscountAmount
+                          const vatAmount = vatableSubtotalAfterDiscount * (vatRate / 100)
+                          const invoiceTotal = subtotalAfterDiscount + vatAmount
+                          // Note: WHT is deducted by client, not calculated here
+                          const total = invoiceTotal
+                          setEditedInvoice(prev => prev ? {
+                            ...prev,
+                            vatRate,
+                            vatAmount,
+                            taxAmount: vatAmount,
+                            invoiceTotal,
+                            total
+                          } : null)
+                        }}
+                        className="h-9"
+                      />
                     </div>
                   </div>
-                  {!isEditing && (
-                    <Badge variant={(currentInvoice || invoice).status === 'paid' ? 'default' : (currentInvoice || invoice).status === 'overdue' ? 'destructive' : 'secondary'}>
-                      {(currentInvoice || invoice).status === 'sent' && displayAsIncoming 
-                        ? 'Received' 
-                        : ((currentInvoice || invoice).status.charAt(0).toUpperCase() + (currentInvoice || invoice).status.slice(1))}
-                    </Badge>
-                  )}
-                </div>
-                {isEditing && editedInvoice && (
-                  <div className="mt-4">
-                    <Label className="text-xs text-muted-foreground mb-2 block">Currency</Label>
-                    <Select
-                      value={editedInvoice.currency}
-                      onValueChange={(value) => handleInvoiceCurrencyChange(value as CurrencyCode)}
-                    >
-                      <SelectTrigger className="w-full">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {SUPPORTED_CURRENCIES.map(currency => (
-                          <SelectItem key={currency.code} value={currency.code}>
-                            {currency.symbol} {currency.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
                 )}
-              </Card>
 
-              {/* Client Information Card */}
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-4">
-                  {isSender ? "Bill To" : displayAsIncoming ? "Bill To (You)" : "Client Information"}
-                </h3>
+                {/* Client Information */}
+                <div className="mt-4 pt-4 border-t">
+                  <h3 className="text-sm font-semibold mb-3 text-muted-foreground">
+                    {isSender ? "Bill To" : displayAsIncoming ? "Bill To (You)" : "Client Information"}
+                  </h3>
                 {isEditing && editedInvoice ? (
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
@@ -984,48 +1561,253 @@ export function ViewInvoiceDialog({
                     )}
                   </div>
                 )}
+                </div>
               </Card>
             </div>
 
-            {/* Right Column - Payment Summary */}
-            <div className="lg:col-span-1 space-y-4">
-              {/* Payment Summary Card */}
-              <Card className="p-6">
-                <h3 className="text-lg font-semibold mb-4">Payment Summary</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
+              {/* Right: Payment Summary */}
+              <div className="lg:col-span-1">
+                <Card className="p-5">
+                  <h3 className="text-lg font-semibold mb-5">Payment Summary</h3>
+                {isEditing && editedInvoice && (
+                  <div className="mb-4 space-y-4 p-4 bg-muted/30 rounded-lg border-b pb-4">
+                    <div>
+                      <Label className="text-xs text-muted-foreground mb-2 block">VAT Rate (%)</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.1"
+                        value={editedInvoice.vatRate || 7.5}
+                        onChange={(e) => {
+                          const vatRate = parseFloat(e.target.value) || 7.5
+                          const subtotal = editedInvoice.subtotal
+                          const discountAmount = editedInvoice.discount ? subtotal * (editedInvoice.discount / 100) : 0
+                          const subtotalAfterDiscount = subtotal - discountAmount
+                          // Calculate vatable subtotal
+                          let vatableSubtotal = 0
+                          editedInvoice.items.forEach(item => {
+                            if (item.vatable && item.unitPrice > 0) {
+                              const itemCurrency = itemCurrencies[item.id] || (item.currency as CurrencyCode) || editedInvoice.currency
+                              const baseCurrency = editedInvoice.currency as CurrencyCode
+                              const basePrice = itemCurrency !== baseCurrency 
+                                ? (itemConvertedAmounts[item.id] || item.unitPrice)
+                                : item.unitPrice
+                              vatableSubtotal += item.quantity * basePrice
+                            }
+                          })
+                          const vatableDiscountAmount = vatableSubtotal > 0 && subtotal > 0 
+                            ? (vatableSubtotal / subtotal) * discountAmount 
+                            : 0
+                          const vatableSubtotalAfterDiscount = vatableSubtotal - vatableDiscountAmount
+                          const vatAmount = vatableSubtotalAfterDiscount * (vatRate / 100)
+                          const invoiceTotal = subtotalAfterDiscount + vatAmount
+                          // Note: WHT is deducted by client, not calculated here
+                          const total = invoiceTotal
+                          setEditedInvoice(prev => prev ? {
+                            ...prev,
+                            vatRate,
+                            vatAmount,
+                            taxAmount: vatAmount,
+                            invoiceTotal,
+                            total
+                          } : null)
+                        }}
+                        className="h-9"
+                      />
+                    </div>
+                    {/* Note: WHT is deducted by the client/buyer, not set during editing */}
+                    <div className="p-3 bg-muted/30 rounded-md border">
+                      <p className="text-xs text-muted-foreground">
+                        Note: Withholding Tax (WHT) is deducted by the client/buyer when making payment, not set by the issuer.
+                      </p>
+                    </div>
+                  </div>
+                )}
+                <div className="space-y-2.5">
+                  <div className="flex justify-between items-center text-sm py-1">
                     <span className="text-muted-foreground">Subtotal</span>
                     <span className="font-medium">{formatCurrencyAmount((currentInvoice || invoice).subtotal, (currentInvoice || invoice).currency as any)}</span>
                   </div>
-                  {(currentInvoice || invoice).taxAmount > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Tax</span>
+                  
+                  {/* Discount */}
+                  {((currentInvoice?.discount && currentInvoice.discount > 0) || (invoice.discount && invoice.discount > 0)) && (
+                    <div className="flex justify-between items-center text-sm text-destructive py-1">
+                      <span>Discount ({currentInvoice?.discount || invoice.discount}%)</span>
+                      <span>-{formatCurrencyAmount(
+                        ((currentInvoice?.subtotal || invoice.subtotal) * (((currentInvoice?.discount ?? invoice.discount) ?? 0) / 100)), 
+                        (currentInvoice || invoice).currency as any
+                      )}</span>
+                    </div>
+                  )}
+                  
+                  {/* VAT */}
+                  {((currentInvoice || invoice).vatAmount !== undefined && (currentInvoice || invoice).vatAmount > 0) ? (
+                    <div className="flex justify-between items-center text-sm py-1">
+                      <span className="text-muted-foreground">VAT ({(currentInvoice || invoice).vatRate || 7.5}%)</span>
+                      <span className="font-medium">{formatCurrencyAmount((currentInvoice || invoice).vatAmount, (currentInvoice || invoice).currency as any)}</span>
+                    </div>
+                  ) : (currentInvoice || invoice).taxAmount > 0 && (
+                    <div className="flex justify-between items-center text-sm py-1">
+                      <span className="text-muted-foreground">VAT ({((currentInvoice || invoice).vatRate || 7.5)}%)</span>
                       <span className="font-medium">{formatCurrencyAmount((currentInvoice || invoice).taxAmount, (currentInvoice || invoice).currency as any)}</span>
                     </div>
                   )}
-                  {exchangeRate && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-muted-foreground">Exchange Rate</span>
-                      <span className="font-medium text-xs">{exchangeRate}</span>
+                  
+                  {/* Invoice Total */}
+                  {((currentInvoice || invoice).invoiceTotal !== undefined) && (
+                    <div className="flex justify-between items-center text-sm font-semibold border-t border-border pt-3 mt-2">
+                      <span>Invoice Total</span>
+                      <span>{formatCurrencyAmount((currentInvoice || invoice).invoiceTotal, (currentInvoice || invoice).currency as any)}</span>
                     </div>
                   )}
-                  {currentInvoice?.discount && currentInvoice.discount > 0 && (
-                    <div className="flex justify-between text-sm text-destructive">
-                      <span>Discount ({currentInvoice.discount}%)</span>
-                      <span>-{formatCurrencyAmount((currentInvoice.subtotal || 0) * (currentInvoice.discount / 100), currentInvoice.currency as any)}</span>
+                  
+                  {/* WHT - Show if deducted by client */}
+                  {((currentInvoice || invoice).whtDeducted && (currentInvoice || invoice).whtAmount && (currentInvoice || invoice).whtAmount! > 0) && (
+                    <div className="border-t border-border pt-3 mt-2 space-y-1.5">
+                      <div className="flex justify-between items-center text-sm text-destructive">
+                        <div className="flex items-center">
+                          <span>Withholding Tax ({(currentInvoice || invoice).whtRate || 5}%)</span>
+                          {(currentInvoice || invoice).whtCreditNote && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-5 px-1.5 text-destructive hover:text-destructive/80"
+                                  onClick={() => setShowCreditNoteDialog(true)}
+                                >
+                                  <Receipt className="w-3 h-3 mr-1" />
+                                 
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>View WHT Credit Note</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                        </div>
+                        <span>-{formatCurrencyAmount((currentInvoice || invoice).whtAmount!, (currentInvoice || invoice).currency as any)}</span>
+                      </div>
+                      {(currentInvoice || invoice).whtCertificateNumber && (
+                        <div className="text-xs text-muted-foreground pl-1">
+                          WHT Cert: {(currentInvoice || invoice).whtCertificateNumber}
+                        </div>
+                      )}
+                      {(currentInvoice || invoice).whtDeductionDate && (
+                        <div className="text-xs text-muted-foreground pl-1">
+                          Deducted: {format(new Date((currentInvoice || invoice).whtDeductionDate!), "MMM dd, yyyy")}
+                        </div>
+                      )}
                     </div>
                   )}
-                  {!currentInvoice?.discount && invoice.discount && invoice.discount > 0 && (
-                    <div className="flex justify-between text-sm text-destructive">
-                      <span>Discount ({invoice.discount}%)</span>
-                      <span>-{formatCurrencyAmount(invoice.subtotal * (invoice.discount / 100), invoice.currency as any)}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-lg font-bold border-t pt-3 mt-3">
-                    <span>Total</span>
+                  
+                  {/* Final Total */}
+                  <div className="flex justify-between items-center text-lg font-bold border-t-2 border-border pt-4 mt-3">
+                    <span>Amount Payable</span>
                     <span className="text-primary">{formatCurrencyAmount((currentInvoice || invoice).total, (currentInvoice || invoice).currency as any)}</span>
                   </div>
                 </div>
+
+                {/* WHT Deduction Section - Only for clients/buyers, before payment */}
+                {!(invoice.clientPaymentStatus === 'paid' && invoice.supplierPaymentStatus === 'paid') && (isClient || isRecipient) && !invoice.whtDeducted && (
+                  <div className="mt-6 space-y-3 border-t pt-4">
+                    {!showWHTForm ? (
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowWHTForm(true)}
+                        className="w-full"
+                      >
+                        <Calculator className="w-4 h-4 mr-2" />
+                        Deduct Withholding Tax (WHT)
+                      </Button>
+                    ) : (
+                      <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-semibold text-sm">Deduct Withholding Tax</h4>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setShowWHTForm(false)
+                              setWhtRate(5)
+                              setWhtCertificateNumber("")
+                              setWhtNotes("")
+                            }}
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                        <div>
+                          <Label htmlFor="wht-rate" className="text-xs">WHT Rate (%)</Label>
+                          <Input
+                            id="wht-rate"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={whtRate}
+                            onChange={(e) => setWhtRate(parseFloat(e.target.value) || 5)}
+                            placeholder="5"
+                            className="h-9"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Common rates: 5% or 10% (depending on transaction type)
+                          </p>
+                        </div>
+                        <div>
+                          <Label htmlFor="wht-certificate" className="text-xs">WHT Certificate Number (Optional)</Label>
+                          <Input
+                            id="wht-certificate"
+                            value={whtCertificateNumber}
+                            onChange={(e) => setWhtCertificateNumber(e.target.value)}
+                            placeholder="e.g., WH/2025/001234"
+                            className="h-9"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="wht-notes" className="text-xs">Notes (Optional)</Label>
+                          <Textarea
+                            id="wht-notes"
+                            value={whtNotes}
+                            onChange={(e) => setWhtNotes(e.target.value)}
+                            placeholder="Additional notes about the WHT deduction"
+                            rows={2}
+                            className="text-sm"
+                          />
+                        </div>
+                        <div className="p-3 bg-background rounded-md border">
+                          <div className="flex justify-between text-sm mb-1">
+                            <span>Invoice Total:</span>
+                            <span>{formatCurrencyAmount((currentInvoice || invoice).invoiceTotal || ((currentInvoice || invoice).subtotal + (currentInvoice || invoice).vatAmount), (currentInvoice || invoice).currency as any)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm text-destructive">
+                            <span>WHT ({whtRate}%):</span>
+                            <span>-{formatCurrencyAmount(((currentInvoice || invoice).invoiceTotal || ((currentInvoice || invoice).subtotal + (currentInvoice || invoice).vatAmount)) * (whtRate / 100), (currentInvoice || invoice).currency as any)}</span>
+                          </div>
+                          <div className="flex justify-between text-sm font-semibold border-t pt-2 mt-2">
+                            <span>Amount to Pay:</span>
+                            <span>{formatCurrencyAmount(((currentInvoice || invoice).invoiceTotal || ((currentInvoice || invoice).subtotal + (currentInvoice || invoice).vatAmount)) * (1 - whtRate / 100), (currentInvoice || invoice).currency as any)}</span>
+                          </div>
+                        </div>
+                        <Button
+                          onClick={handleDeductWHT}
+                          disabled={isDeductingWHT || whtRate <= 0}
+                          className="w-full"
+                        >
+                          {isDeductingWHT ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Processing...
+                            </>
+                          ) : (
+                            "Deduct WHT & Create Credit Note"
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Payment Actions */}
                 {!(invoice.clientPaymentStatus === 'paid' && invoice.supplierPaymentStatus === 'paid') && (
@@ -1160,28 +1942,14 @@ export function ViewInvoiceDialog({
                     ) : null}
                   </div>
                 )}
-              </Card>
-
-              {/* Pro Tip Card */}
-              <Card className="p-6 bg-gradient-to-br from-purple-500 to-blue-600 text-white">
-                <div className="flex items-start gap-3">
-                  <Info className="w-5 h-5 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <h4 className="font-semibold mb-2">Pro Tip</h4>
-                    <p className="text-sm text-white/90">
-                      You can switch currencies per item. The total is automatically converted to NGN based on current rates.
-                    </p>
-                  </div>
-                </div>
-              </Card>
+                </Card>
+              </div>
             </div>
-          </div>
+            {/* End of Top Section Grid */}
 
-          {/* Items Table Card - Full Width */}
-          <div className="px-6 pb-6">
-              <Card className="p-6">
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold mb-4">Items</h3>
+            {/* Items Table - Full Width */}
+            <Card className="p-5">
+              <h3 className="text-lg font-semibold mb-4">Items</h3>
                   {isEditing && editedInvoice ? (
                     <div className="space-y-3">
                       {editedInvoice.items.map((item, index) => (
@@ -1228,20 +1996,19 @@ export function ViewInvoiceDialog({
                               className="h-9 flex-1"
                             />
                           </div>
-                          <div className="col-span-2 flex items-center gap-1">
-                            <Info className="w-4 h-4 text-muted-foreground" />
-                            <Input
-                              type="number"
-                              min="0"
-                              value={item.tax || 0}
-                              onChange={(e) => updateItem(item.id, { tax: parseFloat(e.target.value) || 0 })}
-                              placeholder="Tax"
-                              className="h-9 flex-1"
-                            />
-                            <span className="text-sm text-muted-foreground">%</span>
-                          </div>
                           <div className="col-span-2 text-right">
+                            <Label className="text-xs text-muted-foreground mb-1 block">Amount</Label>
                             <p className="font-semibold">{formatCurrencyAmount(calculateItemAmount(item), currentInvoice?.currency as any || invoice?.currency as any)}</p>
+                          </div>
+                          <div className="col-span-2 flex items-center gap-2">
+                            <Checkbox
+                              id={`vatable-${item.id}`}
+                              checked={item.vatable || false}
+                              onCheckedChange={(checked) => updateItem(item.id, { vatable: !!checked })}
+                            />
+                            <Label htmlFor={`vatable-${item.id}`} className="text-sm cursor-pointer">
+                              Vatable
+                            </Label>
                           </div>
                         </div>
                       ))}
@@ -1254,8 +2021,8 @@ export function ViewInvoiceDialog({
                             <th className="text-left p-3 text-sm font-semibold">Description</th>
                             <th className="text-center p-3 text-sm font-semibold">Quantity</th>
                             <th className="text-right p-3 text-sm font-semibold">Unit Price</th>
-                            <th className="text-right p-3 text-sm font-semibold">Tax (%)</th>
-                            <th className="text-right p-3 text-sm font-semibold">Amount (₦)</th>
+                            <th className="text-right p-3 text-sm font-semibold">Amount</th>
+                            <th className="text-center p-3 text-sm font-semibold">Vatable</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1269,11 +2036,15 @@ export function ViewInvoiceDialog({
                                 </span>
                                 {item.unitPrice.toLocaleString()}
                               </td>
-                              <td className="p-3 text-right">
-                                {item.tax ? `${item.tax}%` : "—"}
-                              </td>
                               <td className="p-3 text-right font-semibold">
                                 {formatCurrencyAmount(calculateItemAmount(item), currentInvoice?.currency as any || invoice?.currency as any)}
+                              </td>
+                              <td className="p-3 text-center">
+                                {item.vatable ? (
+                                  <Badge variant="default" className="text-xs">Yes</Badge>
+                                ) : (
+                                  <Badge variant="secondary" className="text-xs">No</Badge>
+                                )}
                               </td>
                             </tr>
                           ))}
@@ -1281,8 +2052,7 @@ export function ViewInvoiceDialog({
                       </table>
                     </div>
                   )}
-                </div>
-              </Card>
+            </Card>
           </div>
         </div>
       </DialogContent>
@@ -1330,6 +2100,67 @@ export function ViewInvoiceDialog({
           </div>
         </div>
       </DialogContent>
+
+      {/* Credit Note Dialog */}
+      <Dialog open={showCreditNoteDialog} onOpenChange={setShowCreditNoteDialog}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>WHT Credit Note</DialogTitle>
+          </DialogHeader>
+          {invoice?.whtCreditNote && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Credit Note Number</Label>
+                  <p className="font-semibold">{invoice.whtCreditNote.creditNoteNumber}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Issued Date</Label>
+                  <p>{format(new Date(invoice.whtCreditNote.issuedDate), "MMM dd, yyyy")}</p>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Invoice Number</Label>
+                  <p>{invoice.whtCreditNote.invoiceNumber}</p>
+                </div>
+                {invoice.whtCreditNote.certificateNumber && (
+                  <div>
+                    <Label className="text-xs text-muted-foreground">WHT Certificate Number</Label>
+                    <p>{invoice.whtCreditNote.certificateNumber}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t pt-4 space-y-2">
+                <div className="flex justify-between">
+                  <span>Invoice Total:</span>
+                  <span className="font-medium">{formatCurrencyAmount(invoice.whtCreditNote.invoiceTotal, invoice.currency as any)}</span>
+                </div>
+                <div className="flex justify-between text-destructive">
+                  <span>Withholding Tax ({invoice.whtCreditNote.whtRate}%):</span>
+                  <span>-{formatCurrencyAmount(invoice.whtCreditNote.whtAmount, invoice.currency as any)}</span>
+                </div>
+                <div className="flex justify-between font-semibold border-t pt-2">
+                  <span>Net Amount Paid:</span>
+                  <span>{formatCurrencyAmount(invoice.whtCreditNote.netAmountPaid, invoice.currency as any)}</span>
+                </div>
+              </div>
+
+              {invoice.whtCreditNote.notes && (
+                <div>
+                  <Label className="text-xs text-muted-foreground">Notes</Label>
+                  <p className="text-sm mt-1">{invoice.whtCreditNote.notes}</p>
+                </div>
+              )}
+
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button variant="outline" onClick={() => setShowCreditNoteDialog(false)}>
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Dialog>
     </>
   )

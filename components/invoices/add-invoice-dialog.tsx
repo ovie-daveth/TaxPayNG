@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Plus, Trash2, Loader2, Info } from "lucide-react"
+import { Plus, Trash2, Loader2, Info, X } from "lucide-react"
 import { Invoice, InvoiceItem, InvoiceClient, InvoiceSupplier, InvoiceTemplateType, InvoiceType } from "@/lib/types"
 import { invoiceService, userService } from "@/lib/services"
 import { toast } from "sonner"
@@ -18,6 +18,7 @@ import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { INVOICE_TEMPLATES, getDefaultTemplate } from "@/lib/utils/invoiceTemplates"
 import { formatDateForInput } from "@/lib/utils/date"
 import { SUPPORTED_CURRENCIES, CurrencyCode, getCurrencySymbol, formatCurrencyInput, parseCurrencyInput, formatCurrencyAmount, fetchExchangeRate, convertCurrency } from "@/lib/utils/currency"
+import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 
 interface AddInvoiceDialogProps {
   open: boolean
@@ -36,6 +37,7 @@ export function AddInvoiceDialog({
   const { profile } = useUserProfile()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isSearchingUser, setIsSearchingUser] = useState(false)
+  const [userSearchMessage, setUserSearchMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   // Store unitPriceDisplay for each item (formatted string)
   const [itemDisplayValues, setItemDisplayValues] = useState<Record<string, string>>({})
   // Store currency for each item (defaults to invoice currency)
@@ -74,18 +76,20 @@ export function AddInvoiceDialog({
         country: profile.address?.country || "Nigeria",
         postalCode: profile.address?.postalCode || ""
       },
-      taxId: profile.taxId || ""
+      taxId: profile.taxId || "",
+      vatRegistrationNumber: "" // Will be added to profile later if needed
     }
   }, [profile, user])
 
   // Find user by email and prefill client details
   const handleFindUserByEmail = async (email: string) => {
     if (!email || !email.includes('@')) {
-      toast.error("Please enter a valid email address")
+      setUserSearchMessage({ type: 'error', text: "Please enter a valid email address" })
       return
     }
 
     setIsSearchingUser(true)
+    setUserSearchMessage(null) // Clear previous message
     try {
       const foundUser = await userService.findUserByEmail(email.trim())
       
@@ -114,13 +118,13 @@ export function AddInvoiceDialog({
           }
           // recipientEmail remains unchanged - user's input is preserved
         }))
-        toast.success("User found! Client information has been prefilled.")
+        setUserSearchMessage({ type: 'success', text: "User found! Client information has been prefilled." })
       } else {
-        toast.error("User not found. This email is not registered on OTax.")
+        setUserSearchMessage({ type: 'error', text: "User not found. This email is not registered on OTax." })
       }
     } catch (error) {
       console.error('Error finding user:', error)
-      toast.error("Failed to search for user. Please try again.")
+      setUserSearchMessage({ type: 'error', text: "Failed to search for user. Please try again." })
     } finally {
       setIsSearchingUser(false)
     }
@@ -174,11 +178,14 @@ export function AddInvoiceDialog({
         description: "",
         quantity: 1,
         unitPrice: 0,
-        tax: 0,
+        vatable: false,
         amount: 0
       }
     ] as InvoiceItem[],
     discount: 0,
+    // VAT fields
+    vatRate: 7.5, // Default 7.5% for Nigeria
+    // Note: WHT is deducted by the client/buyer, not set by the issuer
     notes: "",
     terms: "",
     paymentTerms: "Net 30",
@@ -220,6 +227,8 @@ export function AddInvoiceDialog({
         currency: invoice.currency as CurrencyCode,
         items: items,
         discount: invoice.discount || 0,
+        vatRate: invoice.vatRate || 7.5,
+        // Note: WHT fields are not editable by issuer - they are set by client when deducting
         notes: invoice.notes || "",
         terms: invoice.terms || "",
         paymentTerms: invoice.paymentTerms || "Net 30",
@@ -258,10 +267,13 @@ export function AddInvoiceDialog({
           description: "",
           quantity: 1,
           unitPrice: 0,
-          tax: 0,
+          vatable: false,
           amount: 0
         }],
         discount: 0,
+        // VAT fields
+        vatRate: 7.5, // Default 7.5% for Nigeria
+        // Note: WHT is deducted by the client/buyer, not set by the issuer
         notes: "",
         terms: "",
         paymentTerms: "Net 30",
@@ -283,9 +295,9 @@ export function AddInvoiceDialog({
     const basePrice = itemCurrency !== formData.currency 
       ? (itemConvertedAmounts[item.id] || item.unitPrice)
       : item.unitPrice
+    // Amount is just subtotal (no item-level tax/VAT)
     const subtotal = item.quantity * basePrice
-    const taxAmount = item.tax ? subtotal * (item.tax / 100) : 0
-    return subtotal + taxAmount
+    return subtotal
   }
 
   // Handle currency conversion for item unit price
@@ -432,7 +444,7 @@ export function AddInvoiceDialog({
           description: "",
           quantity: 1,
           unitPrice: 0,
-          tax: 0,
+          vatable: false,
           amount: 0
         }
       ]
@@ -447,9 +459,9 @@ export function AddInvoiceDialog({
   }
 
   const calculateTotals = () => {
-    // Calculate subtotal WITHOUT tax (sum of quantity * converted unit price)
-    let subtotalWithoutTax = 0
-    let totalTaxAmount = 0
+    // Calculate subtotal and vatable subtotal
+    let subtotal = 0
+    let vatableSubtotal = 0
     
     formData.items.forEach(item => {
       // If unit price is 0, skip this item
@@ -461,43 +473,44 @@ export function AddInvoiceDialog({
         ? (itemConvertedAmounts[item.id] || item.unitPrice)
         : item.unitPrice
       
-      // Debug logging
-      console.log(`Item: ${item.description}`, {
-        itemCurrency,
-        baseCurrency: formData.currency,
-        originalPrice: item.unitPrice,
-        convertedPrice: basePrice,
-        quantity: item.quantity,
-        tax: item.tax
-      })
-      
       // Calculate item subtotal (quantity × converted unit price)
       const itemSubtotal = item.quantity * basePrice
-      subtotalWithoutTax += itemSubtotal
+      subtotal += itemSubtotal
       
-      // Calculate tax for this item
-      const itemTaxAmount = item.tax ? itemSubtotal * (item.tax / 100) : 0
-      totalTaxAmount += itemTaxAmount
+      // Only include in vatable subtotal if item is marked as vatable
+      if (item.vatable) {
+        vatableSubtotal += itemSubtotal
+      }
     })
     
-    // Subtotal is the sum of all items (without tax)
-    const subtotal = subtotalWithoutTax
+    // Apply discount to subtotal (if any)
+    const discountAmount = formData.discount ? subtotal * (formData.discount / 100) : 0
+    const subtotalAfterDiscount = subtotal - discountAmount
     
-    // Total before discount = subtotal + tax
-    const totalBeforeDiscount = subtotal + totalTaxAmount
+    // Apply discount proportionally to vatable subtotal
+    const vatableDiscountAmount = vatableSubtotal > 0 && subtotal > 0 
+      ? (vatableSubtotal / subtotal) * discountAmount 
+      : 0
+    const vatableSubtotalAfterDiscount = vatableSubtotal - vatableDiscountAmount
     
-    // Discount is applied to the total before discount
-    const discountAmount = formData.discount ? totalBeforeDiscount * (formData.discount / 100) : 0
+    // Calculate VAT (7.5% default in Nigeria) only on vatable items after discount
+    const vatRate = formData.vatRate || 7.5
+    const vatAmount = vatableSubtotalAfterDiscount * (vatRate / 100)
     
-    // Final total
-    const total = totalBeforeDiscount - discountAmount
+    // Invoice Total = Subtotal (after discount) + VAT (on vatable items only)
+    const invoiceTotal = subtotalAfterDiscount + vatAmount
     
-    console.log('Totals:', { subtotal, totalTaxAmount, totalBeforeDiscount, discountAmount, total })
+    // Note: WHT is deducted by the client/buyer, not calculated here
+    // Final Total = Invoice Total (WHT will be deducted by client if applicable)
+    const total = invoiceTotal
     
     return { 
-      subtotal: subtotal, 
-      taxAmount: totalTaxAmount, 
-      total: total 
+      subtotal: Math.round(subtotal * 100) / 100,
+      vatAmount: Math.round(vatAmount * 100) / 100,
+      taxAmount: Math.round(vatAmount * 100) / 100, // Legacy field
+      invoiceTotal: Math.round(invoiceTotal * 100) / 100,
+      whtAmount: 0, // WHT is not calculated by issuer - will be set by client
+      total: Math.round(total * 100) / 100
     }
   }
 
@@ -584,7 +597,11 @@ export function AddInvoiceDialog({
         paymentInstructions: formData.paymentInstructions || undefined,
         status: 'draft' as const,
         subtotal: totals.subtotal,
-        taxAmount: totals.taxAmount,
+        vatRate: formData.vatRate || 7.5,
+        vatAmount: totals.vatAmount,
+        taxAmount: totals.taxAmount, // Legacy field
+        invoiceTotal: totals.invoiceTotal,
+        // Note: WHT fields are not set by issuer - they are set by client when deducting
         total: totals.total
       }
       
@@ -689,12 +706,7 @@ export function AddInvoiceDialog({
                 If the recipient is an OTax user, they will receive this invoice in their account
               </p>
               {formData.sendToOtaxUser && (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    handleFindUserByEmail(formData.recipientEmail || "")
-                  }}
+                <div
                   className="mt-3 space-y-2"
                 >
                   <Label htmlFor="recipient-email">Recipient Email (OTax User)</Label>
@@ -703,7 +715,13 @@ export function AddInvoiceDialog({
                       id="recipient-email"
                       type="email"
                       value={formData.recipientEmail || ""}
-                      onChange={(e) => setFormData(prev => ({ ...prev, recipientEmail: e.target.value }))}
+                      onChange={(e) => {
+                        setFormData(prev => ({ ...prev, recipientEmail: e.target.value }))
+                        // Clear message when user starts typing
+                        if (userSearchMessage) {
+                          setUserSearchMessage(null)
+                        }
+                      }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
                           e.preventDefault()
@@ -721,53 +739,55 @@ export function AddInvoiceDialog({
                       <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Enter the email address and press Enter to find the user and prefill client details
-                  </p>
-                </form>
+                  {userSearchMessage && (
+                    <div className={`flex items-center gap-2 p-3 rounded-md text-sm ${
+                      userSearchMessage.type === 'success' 
+                        ? 'bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 text-green-900 dark:text-green-100' 
+                        : 'bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 text-red-900 dark:text-red-100'
+                    }`}>
+                      <Info className={`w-4 h-4 flex-shrink-0 ${
+                        userSearchMessage.type === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+                      }`} />
+                      <p className="flex-1">{userSearchMessage.text}</p>
+                      <button
+                        type="button"
+                        onClick={() => setUserSearchMessage(null)}
+                        className="flex-shrink-0 hover:opacity-70 transition-opacity"
+                        aria-label="Dismiss message"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                  {!userSearchMessage && (
+                    <p className="text-xs text-muted-foreground">
+                      Enter the email address and press Enter to find the user and prefill client details
+                    </p>
+                  )}
+                </div>
               )}
             </div>
           )}
 
-          {/* Template Selection */}
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="template">Template</Label>
-              <Select
-                value={formData.template}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, template: value as InvoiceTemplateType }))}
-              >
-                <SelectTrigger id="template">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {INVOICE_TEMPLATES.map(template => (
-                    <SelectItem key={template.id} value={template.type}>
-                      {template.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="currency">Currency</Label>
-              <Select
-                value={formData.currency}
-                onValueChange={(value) => setFormData(prev => ({ ...prev, currency: value as CurrencyCode }))}
-              >
-                <SelectTrigger id="currency">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SUPPORTED_CURRENCIES.map(currency => (
-                    <SelectItem key={currency.code} value={currency.code}>
-                      {currency.symbol} {currency.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+          {/* Currency Selection */}
+          {/* <div className="space-y-2">
+            <Label htmlFor="currency">Currency</Label>
+            <Select
+              value={formData.currency}
+              onValueChange={(value) => setFormData(prev => ({ ...prev, currency: value as CurrencyCode }))}
+            >
+              <SelectTrigger id="currency">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {SUPPORTED_CURRENCIES.map(currency => (
+                  <SelectItem key={currency.code} value={currency.code}>
+                    {currency.symbol} {currency.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div> */}
 
           {/* Supplier/Business Information - Only show for outgoing invoices */}
           {formData.invoiceType === 'outgoing' && (
@@ -868,16 +888,30 @@ export function AddInvoiceDialog({
                 />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="supplier-tin">Tax Identification Number (TIN)</Label>
-              <Input
-                id="supplier-tin"
-                value={formData.supplier?.taxId || ""}
-                  onChange={(e) => setFormData(prev => ({ ...prev, supplier: { ...(prev.supplier || getInitialSupplier()), taxId: e.target.value } }))}
-                onKeyDown={handleInputKeyDown}
-                onClick={(e) => e.stopPropagation()}
-                placeholder="Your TIN"
-              />
+            <div className="grid md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="supplier-tin">Tax Identification Number (TIN)</Label>
+                <Input
+                  id="supplier-tin"
+                  value={formData.supplier?.taxId || ""}
+                    onChange={(e) => setFormData(prev => ({ ...prev, supplier: { ...(prev.supplier || getInitialSupplier()), taxId: e.target.value } }))}
+                  onKeyDown={handleInputKeyDown}
+                  onClick={(e) => e.stopPropagation()}
+                  placeholder="Your TIN"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="supplier-vat">VAT Registration Number</Label>
+                <Input
+                  id="supplier-vat"
+                  value={formData.supplier?.vatRegistrationNumber || ""}
+                    onChange={(e) => setFormData(prev => ({ ...prev, supplier: { ...(prev.supplier || getInitialSupplier()), vatRegistrationNumber: e.target.value } }))}
+                  onKeyDown={handleInputKeyDown}
+                  onClick={(e) => e.stopPropagation()}
+                  placeholder="VAT Reg Number (if VAT-registered)"
+                />
+                <p className="text-xs text-muted-foreground">Required if your business is VAT-registered</p>
+              </div>
             </div>
           </div>
           )}
@@ -976,6 +1010,33 @@ export function AddInvoiceDialog({
             </div>
           </div>
 
+          {/* Payment Summary Totals */}
+          <div className="space-y-3 border-t pt-4 bg-muted/30 p-4 rounded-lg">
+            <h4 className="font-semibold text-sm mb-3">Payment Summary</h4>
+            <div className="flex justify-between items-center text-sm">
+              <span>Subtotal:</span>
+              <span className="font-medium">{getCurrencySymbol(formData.currency)} {totals.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            {formData.discount > 0 && (
+              <div className="flex justify-between items-center text-sm text-destructive">
+                <span>Discount ({formData.discount}%):</span>
+                <span>-{getCurrencySymbol(formData.currency)} {(totals.subtotal * formData.discount / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center text-sm">
+              <span>VAT ({formData.vatRate || 7.5}%):</span>
+              <span className="font-medium">{getCurrencySymbol(formData.currency)} {totals.vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm font-semibold border-t pt-2 mt-2">
+              <span>Invoice Total:</span>
+              <span>{getCurrencySymbol(formData.currency)} {totals.invoiceTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between items-center text-lg font-bold border-t pt-2 mt-2">
+              <span>Amount Payable:</span>
+              <span className="text-primary">{getCurrencySymbol(formData.currency)} {totals.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+          </div>
+
           {/* Invoice Items */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
@@ -986,13 +1047,11 @@ export function AddInvoiceDialog({
               </Button>
             </div>
             
-            {/* Tax Calculation Explanation */}
+            {/* Note about Item Tax (for non-VAT items) */}
             <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
               <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               <AlertDescription className="text-sm text-blue-900 dark:text-blue-100">
-                <strong>Tax Calculation:</strong> Tax is calculated per item. Each item's tax is applied to its subtotal (quantity × unit price). 
-                For example, if an item costs {getCurrencySymbol(formData.currency)}1,000 with 7.5% tax, the tax amount is {getCurrencySymbol(formData.currency)}75. 
-                The total invoice tax is the sum of all item taxes.
+                <strong>Note:</strong> Item-level tax is for specific item taxes only. VAT (7.5%) will be calculated at invoice level and added to the subtotal.
               </AlertDescription>
             </Alert>
             
@@ -1011,7 +1070,7 @@ export function AddInvoiceDialog({
                         placeholder="Item description"
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-2 w-20">
                       <Label>Quantity</Label>
                       <Input
                         type="number"
@@ -1020,14 +1079,41 @@ export function AddInvoiceDialog({
                         onChange={(e) => updateItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
                         onKeyDown={handleInputKeyDown}
                         onClick={(e) => e.stopPropagation()}
+                        className="w-full"
                       />
                     </div>
                   </div>
 
-                  {/* Row 2: Unit Price, Tax, and Amount */}
+                  {/* Row 2: Unit Price, Vatable, and Amount */}
                   <div className="flex items-center gap-4 -mt-3">
                     <div className="md:col-span-2 space-y-2">
-                      <Label>Unit Price</Label>
+                       <div className="flex items-center justify-between">
+                         <Label>Unit Price</Label>
+                         {(() => {
+                           const itemCurrency = itemCurrencies[item.id] || formData.currency
+                           const needsConversion = itemCurrency !== formData.currency && item.unitPrice > 0
+                           const convertedAmount = itemConvertedAmounts[item.id]
+                           
+                           if (!needsConversion || !convertedAmount || item.unitPrice === 0) return null
+                           
+                           // Calculate exchange rate per 1 unit
+                           const exchangeRate = convertedAmount / item.unitPrice
+                           
+                           return (
+                             <Tooltip>
+                               <TooltipTrigger asChild>
+                                 <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                               </TooltipTrigger>
+                               <TooltipContent className="bg-blue-600 text-white border-blue-600">
+                                 <p className="font-medium mb-1">Exchange Rate</p>
+                                 <p className="text-sm">
+                                   1 {itemCurrency} = {getCurrencySymbol(formData.currency)}{exchangeRate.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                 </p>
+                               </TooltipContent>
+                             </Tooltip>
+                           )
+                         })()}
+                       </div>
                       <div className="flex gap-2">
                         <Select
                           value={itemCurrencies[item.id] || formData.currency}
@@ -1051,30 +1137,57 @@ export function AddInvoiceDialog({
                           onChange={(e) => handleUnitPriceChange(item.id, e.target.value)}
                           onKeyDown={handleInputKeyDown}
                           onClick={(e) => e.stopPropagation()}
-                          className="text-lg font-medium flex-1"
+                          className="text-lg font-medium flex-1"  
                         />
                       </div>
                     </div>
-                    <div className="space-y-2">
-                      <Label>Tax %</Label>
-                      <Input
-                        type="number"
-                        min="0"
-                        step="0.1"
-                        value={item.tax === 0 ? "" : item.tax}
-                        onChange={(e) => {
-                          const value = e.target.value === "" ? 0 : parseFloat(e.target.value) || 0
-                          updateItem(item.id, { tax: value })
-                        }}
-                        onFocus={(e) => {
-                          if (e.target.value === "0" || e.target.value === "") {
-                            e.target.select()
-                          }
-                        }}
-                        onKeyDown={handleInputKeyDown}
-                        onClick={(e) => e.stopPropagation()}
-                        placeholder="0"
-                      />
+                    <div className="space-y-2 flex-1 min-w-[140px]">
+                     <div className="flex items-center justify-between">
+                     <Label>Amount ({getCurrencySymbol(formData.currency)})</Label>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                            </TooltipTrigger>
+                            <TooltipContent className="bg-blue-600 text-white border-blue-600">
+                              <p>Amount is calculated as Quantity × Unit Price</p>
+                            </TooltipContent>
+                          </Tooltip>
+                     </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <div className="h-9 px-3 py-2 rounded-md border border-input bg-muted text-base font-semibold flex items-center justify-end cursor-help min-w-0">
+                            <span className="truncate text-right w-full">
+                              {getCurrencySymbol(formData.currency)} {calculateItemAmount(item).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </span>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-blue-600 text-white border-blue-600 max-w-xs">
+                          <p className="break-words">
+                            {getCurrencySymbol(formData.currency)} {calculateItemAmount(item).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                      {/* <p className="text-xs text-muted-foreground">Qty × Unit Price</p> */}
+                    </div>
+                    <div className="space-y-2 flex flex-col justify-end">
+                      <div className="flex items-center space-x-2 pt-6">
+                        <Checkbox
+                          id={`vatable-${item.id}`}
+                          checked={item.vatable || false}
+                          onCheckedChange={(checked) => updateItem(item.id, { vatable: !!checked })}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                        <div className="flex flex-col">
+                          <Label htmlFor={`vatable-${item.id}`} className="text-sm cursor-pointer">
+                            Vatable
+                          </Label>
+                          {item.vatable && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              VAT: {getCurrencySymbol(formData.currency)}{(calculateItemAmount(item) * (formData.vatRate || 7.5) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                          )}
+                        </div>
+                      </div>
                     </div>
                     {/* <div className="space-y-2">
                       <div className="flex items-center justify-between">
@@ -1101,30 +1214,27 @@ export function AddInvoiceDialog({
             </div>
           </div>
 
-          {/* Totals */}
-          <div className="space-y-2 border-t pt-4">
-            <div className="flex justify-between text-sm">
-              <span>Subtotal:</span>
-              <span>{getCurrencySymbol(formData.currency)} {totals.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span>Tax:</span>
-              <span>{getCurrencySymbol(formData.currency)} {totals.taxAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-            {formData.discount > 0 && (
-              <div className="flex justify-between text-sm">
-                <span>Discount ({formData.discount}%):</span>
-                <span>-{getCurrencySymbol(formData.currency)} {(totals.subtotal * formData.discount / 100).toFixed(2)}</span>
-              </div>
-            )}
-            <div className="flex justify-between text-lg font-semibold border-t pt-2">
-              <span>Total:</span>
-              <span>{getCurrencySymbol(formData.currency)} {totals.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+          {/* VAT Section */}
+          <div className="space-y-4 border-t pt-4">
+            <div className="space-y-2">
+              <Label htmlFor="vat-rate">VAT Rate (%)</Label>
+              <Input
+                id="vat-rate"
+                type="number"
+                min="0"
+                max="100"
+                step="0.1"
+                value={formData.vatRate}
+                onChange={(e) => setFormData(prev => ({ ...prev, vatRate: parseFloat(e.target.value) || 7.5 }))}
+                onKeyDown={handleInputKeyDown}
+                onClick={(e) => e.stopPropagation()}
+              />
+              <p className="text-xs text-muted-foreground">Default: 7.5% (Nigeria VAT rate)</p>
             </div>
           </div>
 
-          {/* Additional Fields */}
-          <div className="grid md:grid-cols-2 gap-4">
+          {/* Discount Section */}
+          <div className="space-y-4 border-t pt-4">
             <div className="space-y-2">
               <Label htmlFor="discount">Discount %</Label>
               <Input
@@ -1132,12 +1242,44 @@ export function AddInvoiceDialog({
                 type="number"
                 min="0"
                 max="100"
+                step="0.1"
                 value={formData.discount}
                 onChange={(e) => setFormData(prev => ({ ...prev, discount: parseFloat(e.target.value) || 0 }))}
                 onKeyDown={handleInputKeyDown}
                 onClick={(e) => e.stopPropagation()}
               />
             </div>
+          </div>
+
+          {/* Payment Summary Totals */}
+          <div className="space-y-3 border-t pt-4 bg-muted/30 p-4 rounded-lg">
+            <h4 className="font-semibold text-sm mb-3">Payment Summary</h4>
+            <div className="flex justify-between items-center text-sm">
+              <span>Subtotal:</span>
+              <span className="font-medium">{getCurrencySymbol(formData.currency)} {totals.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            {formData.discount > 0 && (
+              <div className="flex justify-between items-center text-sm text-destructive">
+                <span>Discount ({formData.discount}%):</span>
+                <span>-{getCurrencySymbol(formData.currency)} {(totals.subtotal * formData.discount / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            )}
+            <div className="flex justify-between items-center text-sm">
+              <span>VAT ({formData.vatRate || 7.5}%):</span>
+              <span className="font-medium">{getCurrencySymbol(formData.currency)} {totals.vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between items-center text-sm font-semibold border-t pt-2 mt-2">
+              <span>Invoice Total:</span>
+              <span>{getCurrencySymbol(formData.currency)} {totals.invoiceTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+            <div className="flex justify-between items-center text-lg font-bold border-t pt-2 mt-2">
+              <span>Amount Payable:</span>
+              <span className="text-primary">{getCurrencySymbol(formData.currency)} {totals.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+            </div>
+          </div>
+
+          {/* Additional Fields */}
+          <div className="grid md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="payment-terms">Payment Terms</Label>
               <Input

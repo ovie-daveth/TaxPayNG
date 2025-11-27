@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -8,6 +8,7 @@ import { FileText, ImageIcon, File, Download, Eye, Trash2, MoreVertical } from "
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DeleteConfirmationModal } from "@/components/ui/delete-confirmation-modal"
 import type { Document } from "@/lib/types"
+import { transactionService } from "@/lib/services"
 
 function getFileIcon(fileType: string) {
   switch (fileType) {
@@ -56,6 +57,39 @@ export function DocumentGrid({ documents, onView, onDownload, onDelete }: Docume
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [documentToDelete, setDocumentToDelete] = useState<Document | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
+  const [transactionDescriptions, setTransactionDescriptions] = useState<Record<string, string>>({})
+
+  // Fetch transaction descriptions for linked transactions
+  useEffect(() => {
+    const fetchTransactionDescriptions = async () => {
+      const transactionIds = documents
+        .filter(doc => doc.linkedTransaction)
+        .map(doc => doc.linkedTransaction!)
+        .filter((id, index, self) => self.indexOf(id) === index) // Unique IDs
+
+      if (transactionIds.length === 0) return
+
+      const descriptions: Record<string, string> = {}
+      
+      await Promise.all(
+        transactionIds.map(async (id) => {
+          try {
+            const transaction = await transactionService.getById(id)
+            if (transaction && transaction.description) {
+              descriptions[id] = transaction.description
+            }
+          } catch (error) {
+            console.error(`Failed to fetch transaction ${id}:`, error)
+            descriptions[id] = id // Fallback to ID if fetch fails
+          }
+        })
+      )
+
+      setTransactionDescriptions(descriptions)
+    }
+
+    fetchTransactionDescriptions()
+  }, [documents])
 
   const handleDownload = async (document: Document) => {
     try {
@@ -147,7 +181,9 @@ export function DocumentGrid({ documents, onView, onDownload, onDelete }: Docume
           {doc.linkedTransaction && (
             <div className="bg-muted/50 rounded p-2 mb-3">
               <p className="text-xs text-muted-foreground mb-0.5">Linked to:</p>
-              <p className="text-xs font-medium truncate">{doc.linkedTransaction}</p>
+              <p className="text-xs font-medium truncate">
+                {transactionDescriptions[doc.linkedTransaction] || doc.linkedTransaction}
+              </p>
             </div>
           )}
 

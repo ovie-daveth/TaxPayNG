@@ -1,5 +1,5 @@
 import { BaseService } from './base'
-import { Invoice, InvoiceFilters, InvoiceItem, ApiResponse, PaginatedResponse, SavedClient } from '@/lib/types'
+import { Invoice, InvoiceFilters, InvoiceItem, ApiResponse, PaginatedResponse, SavedClient, WHTCreditNote } from '@/lib/types'
 
 export class InvoiceService extends BaseService {
   private sendingInvoices: Set<string> = new Set() // Track invoices being sent to prevent duplicates
@@ -50,30 +50,59 @@ export class InvoiceService extends BaseService {
     }
   }
 
-  // Calculate invoice totals
-  private calculateTotals(items: InvoiceItem[], discount?: number): {
+  // Calculate invoice totals with VAT and WHT support
+  // VAT is only applied to items marked as vatable
+  private calculateTotals(
+    items: InvoiceItem[], 
+    discount?: number,
+    vatRate?: number
+  ): {
     subtotal: number
-    taxAmount: number
+    vatAmount: number
+    taxAmount: number // Legacy field, equals vatAmount
+    invoiceTotal: number
     total: number
   } {
     let subtotal = 0
-    let taxAmount = 0
+    let vatableSubtotal = 0 // Subtotal of vatable items only
     
+    // Calculate subtotal and vatable subtotal
     items.forEach(item => {
       const itemSubtotal = item.quantity * item.unitPrice
       subtotal += itemSubtotal
       
-      if (item.tax) {
-        taxAmount += itemSubtotal * (item.tax / 100)
+      // Only include in vatable subtotal if item is marked as vatable
+      if (item.vatable) {
+        vatableSubtotal += itemSubtotal
       }
     })
     
+    // Apply discount to subtotal (if any)
     const discountAmount = discount ? subtotal * (discount / 100) : 0
-    const total = subtotal + taxAmount - discountAmount
+    const subtotalAfterDiscount = subtotal - discountAmount
+    
+    // Apply discount proportionally to vatable subtotal
+    const vatableDiscountAmount = vatableSubtotal > 0 && subtotal > 0 
+      ? (vatableSubtotal / subtotal) * discountAmount 
+      : 0
+    const vatableSubtotalAfterDiscount = vatableSubtotal - vatableDiscountAmount
+    
+    // Calculate VAT (7.5% default in Nigeria) only on vatable items after discount
+    const effectiveVatRate = vatRate !== undefined ? vatRate : 7.5
+    const vatAmount = vatableSubtotalAfterDiscount * (effectiveVatRate / 100)
+    
+    // Invoice Total = Subtotal (after discount) + VAT (on vatable items only)
+    const invoiceTotal = subtotalAfterDiscount + vatAmount
+    
+    // Note: WHT is deducted by the client/buyer, not calculated here
+    // Final Total = Invoice Total (WHT will be deducted by client if applicable)
+    const total = invoiceTotal
     
     return {
       subtotal: Math.round(subtotal * 100) / 100,
-      taxAmount: Math.round(taxAmount * 100) / 100,
+      vatAmount: Math.round(vatAmount * 100) / 100,
+      taxAmount: Math.round(vatAmount * 100) / 100, // Legacy field
+      invoiceTotal: Math.round(invoiceTotal * 100) / 100,
       total: Math.round(total * 100) / 100
     }
   }
@@ -838,6 +867,118 @@ export class InvoiceService extends BaseService {
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred'
+      }
+    }
+  }
+
+  // Deduct Withholding Tax (WHT) - called by client/buyer
+  async deductWHT(
+    invoiceId: string,
+    userId: string,
+    whtRate: number,
+    certificateNumber?: string,
+    notes?: string
+  ): Promise<ApiResponse<{ invoice: Invoice; creditNote: WHTCreditNote }>> {
+    try {
+      const invoice = await this.getById(invoiceId)
+      if (!invoice) {
+        return {
+          success: false,
+          error: 'Invoice not found'
+        }
+      }
+
+      // Verify user is the client/buyer (not the issuer)
+      const isRecipient = invoice.recipientUserId === userId
+      const isClient = invoice.client?.id === userId
+      const isIssuer = invoice.userId === userId
+
+      if (isIssuer) {
+        return {
+          success: false,
+          error: 'Only the client/buyer can deduct WHT, not the invoice issuer'
+        }
+      }
+
+      if (!isClient && !isRecipient) {
+        return {
+          success: false,
+          error: 'Only the client/buyer can deduct WHT. You must be the recipient of this invoice.'
+        }
+      }
+
+      // Check if WHT already deducted
+      if (invoice.whtDeducted) {
+        return {
+          success: false,
+          error: 'WHT has already been deducted for this invoice'
+        }
+      }
+
+      // Calculate WHT amount
+      const invoiceTotal = invoice.invoiceTotal || (invoice.subtotal + invoice.vatAmount)
+      const whtAmount = invoiceTotal * (whtRate / 100)
+      const netAmountPaid = invoiceTotal - whtAmount
+
+      // Generate credit note number
+      const year = new Date().getFullYear()
+      const creditNoteNumber = `CN-${year}-${Date.now().toString().slice(-6)}`
+
+      // Create credit note (only include optional fields if they have values)
+      const creditNote: WHTCreditNote = {
+        id: crypto.randomUUID(),
+        invoiceId: invoiceId,
+        creditNoteNumber,
+        issuedDate: new Date().toISOString(),
+        issuedBy: userId,
+        invoiceNumber: invoice.invoiceNumber,
+        invoiceTotal,
+        whtRate,
+        whtAmount: Math.round(whtAmount * 100) / 100,
+        netAmountPaid: Math.round(netAmountPaid * 100) / 100,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        ...(certificateNumber && { certificateNumber }),
+        ...(notes && { notes })
+      }
+
+      // Update invoice with WHT deduction and credit note
+      const updateData: Partial<Invoice> = {
+        whtDeducted: true,
+        whtRate,
+        whtAmount: creditNote.whtAmount,
+        whtDeductionDate: new Date().toISOString(),
+        whtDeductedBy: userId,
+        total: creditNote.netAmountPaid, // Update total to reflect WHT deduction
+        whtCreditNote: creditNote,
+        updatedAt: new Date().toISOString()
+      }
+
+      if (certificateNumber) {
+        updateData.whtCertificateNumber = certificateNumber
+      }
+
+      const updateResult = await this.updateInvoice(invoiceId, userId, updateData)
+
+      if (updateResult.success && updateResult.data) {
+        return {
+          success: true,
+          data: {
+            invoice: updateResult.data,
+            creditNote
+          }
+        }
+      } else {
+        return {
+          success: false,
+          error: updateResult.error || 'Failed to update invoice with WHT deduction'
+        }
+      }
+    } catch (error: any) {
+      console.error('Error deducting WHT:', error)
+      return {
+        success: false,
+        error: error.message || 'Failed to deduct WHT'
       }
     }
   }

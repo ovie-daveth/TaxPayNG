@@ -245,8 +245,8 @@ export interface InvoiceItem {
   quantity: number
   unitPrice: number
   currency?: string // Currency code for this item (if different from invoice currency)
-  tax?: number // Tax percentage (e.g., 7.5 for 7.5%)
-  amount: number // quantity * unitPrice * (1 + tax/100)
+  vatable?: boolean // Whether this item is subject to VAT (default: false)
+  amount: number // quantity * unitPrice (converted to invoice currency if needed)
 }
 
 export interface InvoiceClient {
@@ -278,6 +278,7 @@ export interface InvoiceSupplier {
     postalCode?: string
   }
   taxId?: string // TIN from user profile
+  vatRegistrationNumber?: string // VAT registration number for VAT-registered businesses
 }
 
 export interface Invoice {
@@ -312,9 +313,30 @@ export interface Invoice {
   
   // Totals
   subtotal: number
-  taxAmount: number
+  
+  // VAT (Value Added Tax) - 7.5% in Nigeria
+  vatRate?: number // Default: 7.5%
+  vatAmount: number // Calculated: subtotal * vatRate / 100
+  
+  // Legacy tax field (deprecated - use vatAmount)
+  taxAmount: number // Kept for backward compatibility, should equal vatAmount
+  
   discount?: number
-  total: number
+  
+  // Invoice Total (Subtotal + VAT)
+  invoiceTotal: number // Subtotal + VAT - Discount
+  
+  // Withholding Tax (WHT) - deducted by client/buyer, not issuer
+  // These fields are set by the client when they deduct WHT
+  whtDeducted?: boolean // Whether client has deducted WHT
+  whtRate?: number // WHT rate applied by client (e.g., 5% or 10%)
+  whtAmount?: number // WHT amount deducted by client: invoiceTotal * whtRate / 100
+  whtDeductionDate?: string // Date WHT was deducted by client
+  whtDeductedBy?: string // User ID of client who deducted WHT
+  whtCertificateNumber?: string // WHT certificate/reference number provided by client
+  
+  // Final Amount Payable (Invoice Total - WHT if deducted)
+  total: number // invoiceTotal - (whtAmount || 0)
   
   // Additional information
   notes?: string
@@ -339,9 +361,30 @@ export interface Invoice {
   // Linked transaction (if invoice was paid and recorded)
   linkedTransactionId?: string
   
+  // WHT Credit Note (created when client deducts WHT)
+  whtCreditNote?: WHTCreditNote
+  
   // Attachments
   pdfUrl?: string
   
+  createdAt: string
+  updatedAt: string
+}
+
+// WHT Credit Note - issued when client/buyer deducts withholding tax
+export interface WHTCreditNote {
+  id: string // Unique credit note ID
+  invoiceId: string // Reference to the invoice
+  creditNoteNumber: string // Auto-generated (e.g., CN-2025-001)
+  issuedDate: string // Date credit note was created
+  issuedBy: string // User ID of client who deducted WHT
+  invoiceNumber: string // Original invoice number
+  invoiceTotal: number // Invoice total before WHT deduction
+  whtRate: number // WHT rate applied (e.g., 5%)
+  whtAmount: number // WHT amount deducted
+  netAmountPaid: number // Amount actually paid (invoiceTotal - whtAmount)
+  certificateNumber?: string // WHT certificate/reference number
+  notes?: string // Additional notes
   createdAt: string
   updatedAt: string
 }
