@@ -251,7 +251,14 @@ export function AnalyticsInsights({
 
     if (periodType === "year") {
       currentPeriodStart = getYearStart(now, effectiveYear)
-      currentPeriodEnd = getYearEnd(now, effectiveYear) > now ? now : getYearEnd(now, effectiveYear)
+      // If current year, use end of today; otherwise use end of year
+      if (effectiveYear === now.getFullYear() && getYearEnd(now, effectiveYear) > now) {
+        const endOfToday = new Date(now)
+        endOfToday.setHours(23, 59, 59, 999)
+        currentPeriodEnd = endOfToday
+      } else {
+        currentPeriodEnd = getYearEnd(now, effectiveYear)
+      }
       previousPeriodStart = getPreviousYearStart(now, effectiveYear)
       previousPeriodEnd = getPreviousYearEnd(now, effectiveYear)
       monthsInPeriod = 12
@@ -259,7 +266,14 @@ export function AnalyticsInsights({
       const quarterDate = new Date(effectiveYear, (effectiveQuarter - 1) * 3, 1)
       const quarterInfo = getQuarterInfo(quarterDate, effectiveQuarter, effectiveYear)
       currentPeriodStart = quarterInfo.start
-      currentPeriodEnd = quarterInfo.end > now ? now : quarterInfo.end
+      // If current quarter, use end of today; otherwise use end of quarter
+      if (quarterInfo.end > now) {
+        const endOfToday = new Date(now)
+        endOfToday.setHours(23, 59, 59, 999)
+        currentPeriodEnd = endOfToday
+      } else {
+        currentPeriodEnd = quarterInfo.end
+      }
       const prevQuarterInfo = getPreviousQuarterInfo(quarterDate, effectiveQuarter, effectiveYear)
       previousPeriodStart = prevQuarterInfo.start
       previousPeriodEnd = prevQuarterInfo.end
@@ -458,7 +472,14 @@ export function AnalyticsInsights({
 
         if (periodType === "year") {
           currentPeriodStart = getYearStart(now, effectiveYear)
-          currentPeriodEnd = getYearEnd(now, effectiveYear) > now ? now : getYearEnd(now, effectiveYear)
+          // If current year, use end of today; otherwise use end of year
+          if (effectiveYear === now.getFullYear() && getYearEnd(now, effectiveYear) > now) {
+            const endOfToday = new Date(now)
+            endOfToday.setHours(23, 59, 59, 999)
+            currentPeriodEnd = endOfToday
+          } else {
+            currentPeriodEnd = getYearEnd(now, effectiveYear)
+          }
           previousPeriodStart = getPreviousYearStart(now, effectiveYear)
           previousPeriodEnd = getPreviousYearEnd(now, effectiveYear)
           yearStart = currentPeriodStart
@@ -467,12 +488,26 @@ export function AnalyticsInsights({
           const quarterDate = new Date(effectiveYear, (effectiveQuarter - 1) * 3, 1)
           const quarterInfo = getQuarterInfo(quarterDate, effectiveQuarter, effectiveYear)
           currentPeriodStart = quarterInfo.start
-          currentPeriodEnd = quarterInfo.end > now ? now : quarterInfo.end
+          // If current quarter, use end of today; otherwise use end of quarter
+          if (quarterInfo.end > now) {
+            const endOfToday = new Date(now)
+            endOfToday.setHours(23, 59, 59, 999)
+            currentPeriodEnd = endOfToday
+          } else {
+            currentPeriodEnd = quarterInfo.end
+          }
           const prevQuarterInfo = getPreviousQuarterInfo(quarterDate, effectiveQuarter, effectiveYear)
           previousPeriodStart = prevQuarterInfo.start
           previousPeriodEnd = prevQuarterInfo.end
           yearStart = getYearStart(now, effectiveYear)
-          yearEnd = getYearEnd(now, effectiveYear) > now ? now : getYearEnd(now, effectiveYear)
+          // If current year, use end of today; otherwise use end of year
+          if (effectiveYear === now.getFullYear() && getYearEnd(now, effectiveYear) > now) {
+            const endOfToday = new Date(now)
+            endOfToday.setHours(23, 59, 59, 999)
+            yearEnd = endOfToday
+          } else {
+            yearEnd = getYearEnd(now, effectiveYear)
+          }
         }
         
         // Fetch transactions for current period, previous period, and full year (for accurate projections)

@@ -10,6 +10,7 @@ import { transactionService } from "@/lib/services/transactionService"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { toast } from "sonner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { ChevronDown, ChevronUp } from "lucide-react"
 
 type DashboardBusinessType = "freelancer" | "creator" | "small-business"
 
@@ -38,15 +39,23 @@ const getYearInfo = (date: Date, year?: number) => {
   return { year: y, start, end, label }
 }
 
+interface TaxBracket {
+  amount: number
+  rate: number
+  tax: number
+}
+
 interface SummaryState {
   yearLabel: string
   taxableIncome: number
   totalReliefs: number
   manualReliefs: number
   deductions: number
+  grossIncome: number
   taxPayable: number
   monthlySetAside: number
   isSmallBusinessExempt: boolean
+  taxBrackets?: TaxBracket[]
 }
 
 export function TaxSummary({ businessType = "freelancer", useMockData = false }: TaxSummaryProps) {
@@ -64,9 +73,14 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
       totalReliefs: 200_000,
       manualReliefs: 200_000,
       deductions: 50_000,
+      grossIncome: 1_610_000,
       taxPayable: 234_000,
       monthlySetAside: 234_000 / 12,
       isSmallBusinessExempt: false,
+      taxBrackets: [
+        { amount: 800_000, rate: 0, tax: 0 },
+        { amount: 760_000, rate: 15, tax: 114_000 },
+      ],
     }),
     []
   )
@@ -132,6 +146,8 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
 
         const isSmallBusinessExempt = !taxCalculation && businessType === "small-business"
 
+        // Taxable income is already calculated as (income - expenses) - reliefs in calculateNigerianTax
+        // So we need to show: Gross Income, then deduct expenses and reliefs separately
         const calculatedTaxableIncome = taxCalculation
           ? taxCalculation.taxableIncome
           : Math.max(totalIncome - totalExpenses, 0)
@@ -153,9 +169,11 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
           totalReliefs: calculatedReliefs,
           manualReliefs,
           deductions: totalExpenses,
+          grossIncome: totalIncome, // Store gross income for display
           taxPayable: adjustedTaxPayable,
           monthlySetAside: adjustedMonthlySetAside,
           isSmallBusinessExempt,
+          taxBrackets: taxCalculation?.taxBrackets || [],
         })
       } catch (error) {
         console.error("Error loading tax summary:", error)
@@ -185,6 +203,7 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
   }, [businessType, mockSummary, useMockData, user, selectedYear])
 
   const displaySummary = summary ?? mockSummary
+  const [showTaxCalculation, setShowTaxCalculation] = useState(false)
 
   // Generate year options (current year and previous 2 years)
   const yearOptions = Array.from({ length: 3 }, (_, i) => currentYear - i)
@@ -224,8 +243,14 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
       ) : (
         <div className="space-y-3 sm:space-y-4">
           <div className="flex items-center justify-between py-2.5 sm:py-3 border-b border-border">
-            <span className="text-xs sm:text-sm text-muted-foreground">Taxable Income</span>
-            <span className="font-semibold text-xs sm:text-sm">{formatCurrency(displaySummary.taxableIncome)}</span>
+            <span className="text-xs sm:text-sm text-muted-foreground">Gross Income</span>
+            <span className="font-semibold text-xs sm:text-sm">{formatCurrency(displaySummary.grossIncome ?? (displaySummary.taxableIncome + displaySummary.deductions + displaySummary.totalReliefs))}</span>
+          </div>
+          <div className="flex items-center justify-between py-2.5 sm:py-3 border-b border-border">
+            <span className="text-xs sm:text-sm text-muted-foreground">Work Expenses</span>
+            <span className="font-semibold text-xs sm:text-sm text-primary">
+              -{formatCurrency(Math.abs(displaySummary.deductions))}
+            </span>
           </div>
           <div className="flex items-center justify-between py-2.5 sm:py-3 border-b border-border">
             <span className="text-xs sm:text-sm text-muted-foreground">Tax Relief</span>
@@ -234,10 +259,8 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
             </span>
           </div>
           <div className="flex items-center justify-between py-2.5 sm:py-3 border-b border-border">
-            <span className="text-xs sm:text-sm text-muted-foreground">Work Expenses</span>
-            <span className="font-semibold text-xs sm:text-sm text-primary">
-              -{formatCurrency(Math.abs(displaySummary.deductions))}
-            </span>
+            <span className="text-xs sm:text-sm font-medium">Taxable Income</span>
+            <span className="font-semibold text-xs sm:text-sm">{formatCurrency(displaySummary.taxableIncome)}</span>
           </div>
           <div className="flex items-center justify-between py-2.5 sm:py-3">
             <span className="text-xs sm:text-sm font-medium">Tax Payable</span>
@@ -245,6 +268,47 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
               {displaySummary.isSmallBusinessExempt ? "Exempt" : formatCurrency(displaySummary.taxPayable)}
             </span>
           </div>
+          
+          {/* Tax Calculation Breakdown */}
+          {!displaySummary.isSmallBusinessExempt && displaySummary.taxBrackets && displaySummary.taxBrackets.length > 0 && (
+            <div className="border-t border-border mt-2 pt-2">
+              <button
+                onClick={() => setShowTaxCalculation(!showTaxCalculation)}
+                className="w-full flex items-center justify-between py-2 hover:bg-muted/50 rounded transition-colors"
+              >
+                <span className="text-[11px] sm:text-xs text-muted-foreground">
+                  How tax is calculated
+                </span>
+                {showTaxCalculation ? (
+                  <ChevronUp className="w-3 h-3 text-muted-foreground" />
+                ) : (
+                  <ChevronDown className="w-3 h-3 text-muted-foreground" />
+                )}
+              </button>
+              {showTaxCalculation && (
+                <div className="mt-3 pt-3 border-t border-border space-y-2">
+                  <p className="text-[10px] sm:text-xs text-muted-foreground mb-2">
+                    Tax is calculated progressively on each bracket:
+                  </p>
+                  {displaySummary.taxBrackets.map((bracket, index) => (
+                    <div key={index} className="flex items-center justify-between py-1.5 text-[11px] sm:text-xs">
+                      <span className="text-muted-foreground">
+                        {formatCurrency(bracket.amount)} @ {bracket.rate}%
+                      </span>
+                      <span className="font-medium">{formatCurrency(bracket.tax)}</span>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between pt-2 border-t border-border mt-2">
+                    <span className="text-[11px] sm:text-xs font-medium">Total Tax</span>
+                    <span className="text-xs sm:text-sm font-bold text-primary">
+                      {formatCurrency(displaySummary.taxPayable)}
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {!displaySummary.isSmallBusinessExempt && (
             <p className="text-[11px] sm:text-xs text-muted-foreground text-right">
               Monthly set aside: {formatCurrency(displaySummary.monthlySetAside)}

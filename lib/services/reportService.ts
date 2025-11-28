@@ -389,17 +389,19 @@ export class ReportService extends BaseService {
     const netIncome = grossIncome - totalExpenses
 
     // Prepare tax calculation data
+    // Note: calculateNigerianTax expects gross income, not net income
+    // It will subtract businessExpenses internally
     const taxCalcData = {
       businessType: profile.businessType || 'freelancer',
       period: 'yearly' as const,
-      income: netIncome,
+      income: grossIncome, // Pass gross income, not net income
       rentPaid: latestCalculation?.rentPaid || 0,
       pensionContribution: latestCalculation?.pensionContribution || 0,
       healthInsurance: latestCalculation?.healthInsurance || 0,
       housingFund: 0, // NHF - typically calculated separately, can be added to profile later
       lifeInsurance: latestCalculation?.lifeInsurance || 0,
       charitableDonations: latestCalculation?.charitableDonations || 0,
-      businessExpenses: businessExpenses,
+      businessExpenses: businessExpenses, // This will be subtracted from gross income in the calculator
       dependents: latestCalculation?.dependents || 0
     }
 
@@ -513,6 +515,25 @@ export class ReportService extends BaseService {
       }
     } catch (error) {
       console.error('Error fetching report:', error)
+      throw error
+    }
+  }
+
+  // Update a report
+  async updateReport(
+    reportId: string,
+    type: 'Self-Assessment' | 'Income Statement' | 'Expense Report' | 'Tax Summary',
+    updates: Partial<SavedReport>
+  ): Promise<void> {
+    try {
+      const collectionName = this.getCollectionName(type)
+      const baseService = new BaseService(collectionName)
+      await baseService.update(reportId, {
+        ...updates,
+        updatedAt: new Date().toISOString()
+      })
+    } catch (error) {
+      console.error('Error updating report:', error)
       throw error
     }
   }

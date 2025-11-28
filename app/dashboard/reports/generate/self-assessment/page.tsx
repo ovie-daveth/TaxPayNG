@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { DashboardNav } from "@/components/dashboard/dashboard-nav"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { Card } from "@/components/ui/card"
@@ -19,11 +20,15 @@ import { reportService, ReportData } from "@/lib/services"
 import { toast } from "sonner"
 
 export default function GenerateSelfAssessmentPage() {
+  const router = useRouter()
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const [showPreview, setShowPreview] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [reportData, setReportData] = useState<ReportData | null>(null)
+  const [reportId, setReportId] = useState<string | null>(null)
+  const [isEditing, setIsEditing] = useState(true) // Start in edit mode by default
+  const [isSaving, setIsSaving] = useState(false)
   const [formData, setFormData] = useState({
     taxYear: new Date().getFullYear().toString(),
     period: 'annual' as 'annual' | 'q1' | 'q2' | 'q3' | 'q4',
@@ -33,6 +38,49 @@ export default function GenerateSelfAssessmentPage() {
     includeReliefs: true,
     includeDocuments: false
   })
+
+  // Load existing report if editing
+  useEffect(() => {
+    const loadExistingReport = () => {
+      try {
+        const editingReportStr = sessionStorage.getItem('editingReport')
+        if (editingReportStr) {
+          const editingReport = JSON.parse(editingReportStr)
+          
+          // Verify it's a Self-Assessment report
+          if (editingReport.type !== 'Self-Assessment') {
+            sessionStorage.removeItem('editingReport')
+            return
+          }
+
+          // Use report data directly from sessionStorage (no database fetch needed)
+          if (editingReport.reportData) {
+            setReportId(editingReport.id)
+            setReportData(editingReport.reportData)
+            
+            // Set form data based on report period
+            const period = editingReport.reportData.period
+            setFormData(prev => ({
+              ...prev,
+              taxYear: period.year.toString(),
+              period: period.quarter ? `q${period.quarter}` as any : 'annual'
+            }))
+            
+            setShowPreview(true)
+            setIsEditing(true)
+            
+            // Clear sessionStorage after loading
+            sessionStorage.removeItem('editingReport')
+          }
+        }
+      } catch (error) {
+        console.error("Error loading existing report:", error)
+        sessionStorage.removeItem('editingReport')
+      }
+    }
+
+    loadExistingReport()
+  }, [])
 
   // Calculate period dates based on year and period
   const getPeriodDates = (year: number, period: string) => {
@@ -109,18 +157,12 @@ export default function GenerateSelfAssessmentPage() {
 
       const title = `Self-Assessment Filing - ${periodLabel}`
 
-      // Save the report
-      await reportService.saveReport(
-        profile.userId,
-        title,
-        'Self-Assessment',
-        data,
-        'completed'
-      )
-
+      // Don't save immediately - let user edit first
+      setReportId(null) // No report ID yet - will be created on save
       setReportData(data)
       setShowPreview(true)
-      toast.success("Report generated and saved successfully")
+      setIsEditing(true) // Start in edit mode
+      toast.success("Report generated. Please review and save when ready.")
     } catch (error) {
       console.error("Error generating report:", error)
       toast.error(error instanceof Error ? error.message : "Failed to generate report")
@@ -129,10 +171,77 @@ export default function GenerateSelfAssessmentPage() {
     }
   }
 
+  const handleSave = async () => {
+    if (!reportData || !profile?.userId) {
+      toast.error("Missing report information")
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      // Generate report title if not already set
+      const period = reportData.period
+      const periodLabel = period.periodType === 'annual' 
+        ? `Annual ${period.year}`
+        : period.quarter 
+        ? `Q${period.quarter} ${period.year}`
+        : `${new Date(period.startDate).toLocaleDateString()} - ${new Date(period.endDate).toLocaleDateString()}`
+      const title = `Self-Assessment Filing - ${periodLabel}`
+
+      // Include any additional metadata in reportData
+      // The reportData should already have all metadata from the preview component via onDataChange
+      const reportDataToSave = {
+        ...reportData,
+        // Ensure metadata exists and includes all fields
+        metadata: {
+          ...(reportData as any).metadata,
+          personalInfo: (reportData as any).metadata?.personalInfo || {},
+          attachments: (reportData as any).metadata?.attachments || {},
+          reliefEvidence: (reportData as any).metadata?.reliefEvidence || {},
+          reliefNotes: (reportData as any).metadata?.reliefNotes || {},
+          manualTaxCredits: (reportData as any).metadata?.manualTaxCredits || [],
+          declarationInfo: (reportData as any).metadata?.declarationInfo || {}
+        }
+      }
+
+      if (reportId) {
+        // Update existing report
+        await reportService.updateReport(
+          reportId,
+          'Self-Assessment',
+          {
+            reportData: reportDataToSave
+          }
+        )
+        toast.success("Report updated successfully")
+      } else {
+        // Create new report
+        const savedReportId = await reportService.saveReport(
+          profile.userId,
+          title,
+          'Self-Assessment',
+          reportDataToSave,
+          'draft' // Save as draft initially
+        )
+        setReportId(savedReportId)
+        toast.success("Report saved successfully")
+      }
+      // Close preview and redirect to reports page
+      setTimeout(() => {
+        router.push('/dashboard/reports')
+      }, 1000) // Small delay to show success message
+    } catch (error) {
+      console.error("Error saving report:", error)
+      toast.error(error instanceof Error ? error.message : "Failed to save report")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* <DashboardNav /> */}
-        <main className="px-4 py-6 max-w-4xl mx-auto">
+        <main className="px-4 py-6">
           {!showPreview ? (
             <div className="space-y-6">
               {/* Back Button */}
@@ -315,21 +424,44 @@ export default function GenerateSelfAssessmentPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-xl font-semibold">Report Preview</h2>
-                    <p className="text-sm text-muted-foreground mt-1">Review your self-assessment filing</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {reportId ? 'Edit your saved self-assessment filing' : 'Review and edit your self-assessment filing before saving'}
+                    </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setShowPreview(false)}>
-                      Edit
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowPreview(false)}
+                      disabled={isSaving}
+                    >
+                      Back to Form
                     </Button>
-                    <Button>
-                      <Download className="w-4 h-4 mr-2" />
-                      Download PDF
+                    <Button 
+                      onClick={handleSave}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="w-4 h-4 mr-2" />
+                          {reportId ? 'Save Changes' : 'Save Report'}
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
               </Card>
               {reportData ? (
-                <SelfAssessmentPreview reportData={reportData} formData={formData} />
+                <SelfAssessmentPreview 
+                  reportData={reportData} 
+                  formData={formData}
+                  isEditing={isEditing}
+                  onDataChange={setReportData}
+                />
               ) : (
                 <Card className="p-8">
                   <div className="text-center text-muted-foreground">

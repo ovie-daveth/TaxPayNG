@@ -6,7 +6,8 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-import { Eye, FileText, Trash2, Loader2 } from "lucide-react"
+import { Eye, FileText, Trash2, Loader2, Edit } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { reportService } from "@/lib/services"
@@ -16,8 +17,10 @@ import { format } from "date-fns"
 import { SelfAssessmentPreview } from "./self-assessment-preview"
 import { IncomeStatementPreview } from "./income-statement-preview"
 import { ExpenseReportPreview } from "./expense-report-preview"
+import { TaxSummaryPreview } from "./tax-summary-preview"
 
 export function RecentReports() {
+  const router = useRouter()
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const [reports, setReports] = useState<SavedReport[]>([])
@@ -52,6 +55,27 @@ export function RecentReports() {
   const handleView = (report: SavedReport) => {
     setSelectedReport(report)
     setShowViewDialog(true)
+  }
+
+  const handleEdit = (report: SavedReport) => {
+    // Navigate to the appropriate edit page based on report type
+    const editRoutes: Record<string, string> = {
+      'Self-Assessment': '/dashboard/reports/generate/self-assessment',
+      'Income Statement': '/dashboard/reports/generate/income-statement',
+      'Expense Report': '/dashboard/reports/generate/expense-report',
+      'Tax Summary': '/dashboard/reports/generate/tax-summary'
+    }
+    
+    const route = editRoutes[report.type]
+    if (route) {
+      // Store report data in sessionStorage to load in edit mode
+      sessionStorage.setItem('editingReport', JSON.stringify({
+        id: report.id,
+        reportData: report.reportData,
+        type: report.type
+      }))
+      router.push(route)
+    }
   }
 
   const handleDeleteClick = (report: SavedReport) => {
@@ -145,24 +169,34 @@ export function RecentReports() {
             </div>
 
             <div className="flex items-center gap-2 flex-shrink-0">
-              <Badge variant={report.status === "submitted" ? "default" : "outline"} className="text-xs capitalize">
+              <Badge variant={report.status === "submitted" ? "default" : report.status === "completed" ? "secondary" : "outline"} className="text-xs capitalize">
                 {report.status}
               </Badge>
+              {report.status === 'draft' && (
                 <Button 
                   variant="ghost" 
                   size="icon"
-                  onClick={() => handleView(report)}
-                  title="View report"
+                  onClick={() => handleEdit(report)}
+                  title="Edit report"
                 >
+                  <Edit className="w-4 h-4" />
+                </Button>
+              )}
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => handleView(report)}
+                title="View report"
+              >
                 <Eye className="w-4 h-4" />
               </Button>
-                <Button 
-                  variant="ghost" 
-                  size="icon"
-                  onClick={() => handleDeleteClick(report)}
-                  title="Delete report"
-                >
-                  <Trash2 className="w-4 h-4" />
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => handleDeleteClick(report)}
+                title="Delete report"
+              >
+                <Trash2 className="w-4 h-4" />
               </Button>
             </div>
           </div>
@@ -205,7 +239,13 @@ export function RecentReports() {
                   onBack={() => setShowViewDialog(false)}
                 />
               )}
-              {selectedReport.type !== 'Self-Assessment' && selectedReport.type !== 'Income Statement' && selectedReport.type !== 'Expense Report' && (
+              {selectedReport.type === 'Tax Summary' && (
+                <TaxSummaryPreview
+                  reportData={selectedReport.reportData}
+                  onBack={() => setShowViewDialog(false)}
+                />
+              )}
+              {selectedReport.type !== 'Self-Assessment' && selectedReport.type !== 'Income Statement' && selectedReport.type !== 'Expense Report' && selectedReport.type !== 'Tax Summary' && (
                 <div className="p-8 text-center text-muted-foreground">
                   Preview not yet implemented for {selectedReport.type}
                 </div>

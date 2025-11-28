@@ -7,14 +7,14 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, ArrowLeft, Info, FileText, TrendingDown } from "lucide-react"
-import { ExpenseReportPreview } from "@/components/reports/expense-report-preview"
+import { Loader2, ArrowLeft, Info, FileText, Calculator } from "lucide-react"
+import { TaxSummaryPreview } from "@/components/reports/tax-summary-preview"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { reportService, ReportData } from "@/lib/services"
 import { toast } from "sonner"
 
-export default function GenerateExpenseReportPage() {
+export default function GenerateTaxSummaryPage() {
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const [showPreview, setShowPreview] = useState(false)
@@ -84,7 +84,7 @@ export default function GenerateExpenseReportPage() {
         periodType: periodInfo.periodType
       }
 
-      // For expense report, use only transaction data (no invoices)
+      // For tax summary, use only transaction data (no invoices)
       const data = await reportService.generateReportData(
         profile.userId,
         period,
@@ -98,23 +98,23 @@ export default function GenerateExpenseReportPage() {
         ? `Q${period.quarter} ${period.year}`
         : `${new Date(period.startDate).toLocaleDateString()} - ${new Date(period.endDate).toLocaleDateString()}`
 
-      const title = `Expense Report - ${periodLabel}`
+      const title = `Tax Summary Report - ${periodLabel}`
 
       // Save the report as draft
       await reportService.saveReport(
         profile.userId,
         title,
-        'Expense Report',
+        'Tax Summary',
         data,
         'draft' // All reports are saved as draft initially
       )
 
       setReportData(data)
       setShowPreview(true)
-      toast.success("Expense report generated and saved successfully")
+      toast.success("Tax summary report generated and saved successfully")
     } catch (error) {
-      console.error("Error generating expense report:", error)
-      toast.error(error instanceof Error ? error.message : "Failed to generate expense report")
+      console.error("Error generating tax summary:", error)
+      toast.error(error instanceof Error ? error.message : "Failed to generate tax summary")
     } finally {
       setIsGenerating(false)
     }
@@ -137,14 +137,14 @@ export default function GenerateExpenseReportPage() {
             <Card className="p-6">
               <div className="flex items-start gap-4 mb-4">
                 <div className="p-3 bg-primary/10 rounded-lg">
-                  <TrendingDown className="w-6 h-6 text-primary" />
+                  <Calculator className="w-6 h-6 text-primary" />
                 </div>
                 <div className="flex-1">
-                  <h1 className="text-2xl font-semibold mb-2">Generate Expense Report</h1>
+                  <h1 className="text-2xl font-semibold mb-2">Generate Tax Summary Report</h1>
                   <p className="text-muted-foreground">
-                    Create a comprehensive expense report showing your total expenses, expenses by category, 
-                    and tax-deductible expenses for the selected period. This report helps you track business 
-                    expenses and identify tax deductions.
+                    Create a comprehensive tax summary report showing your income, expenses, reliefs, 
+                    and calculated tax liability for the selected period. This report provides a clear 
+                    overview of your tax obligations and helps with tax planning.
                   </p>
                 </div>
               </div>
@@ -152,11 +152,11 @@ export default function GenerateExpenseReportPage() {
               <Alert className="mt-4">
                 <Info className="w-4 h-4" />
                 <AlertDescription>
-                  <strong>What is an Expense Report?</strong> An expense report is a detailed breakdown of all 
-                  business expenses incurred during a specific period. It categorizes expenses by type and identifies 
-                  which expenses are tax-deductible. This report is essential for tax planning, budgeting, and 
-                  understanding your business spending patterns. Use it to maximize your tax deductions and manage 
-                  your cash flow effectively.
+                  <strong>What is a Tax Summary Report?</strong> A tax summary report provides a consolidated 
+                  view of your financial data and tax calculations for a specific period. It includes your total 
+                  income, total expenses, applicable reliefs and deductions, taxable income, and the calculated 
+                  tax payable. This report is useful for understanding your tax position, planning payments, 
+                  and preparing for tax filing deadlines.
                 </AlertDescription>
               </Alert>
             </Card>
@@ -169,7 +169,7 @@ export default function GenerateExpenseReportPage() {
                   Report Configuration
                 </h2>
                 <p className="text-sm text-muted-foreground mt-1">
-                  Select the period for your expense report
+                  Select the period for your tax summary report
                 </p>
               </div>
 
@@ -234,7 +234,7 @@ export default function GenerateExpenseReportPage() {
                     ) : (
                       <>
                         <FileText className="w-4 h-4 mr-2" />
-                        Generate Expense Report
+                        Generate Tax Summary
                       </>
                     )}
                   </Button>
@@ -252,7 +252,7 @@ export default function GenerateExpenseReportPage() {
               </Button>
             </Link>
 
-            <ExpenseReportPreview
+            <TaxSummaryPreview
               reportData={reportData}
               onBack={() => setShowPreview(false)}
             />

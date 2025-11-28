@@ -101,13 +101,13 @@ export default function GenerateIncomeStatementPage() {
 
       const title = `Income Statement - ${periodLabel}`
 
-      // Save the report
+      // Save the report as draft
       await reportService.saveReport(
         profile.userId,
         title,
         'Income Statement',
         data,
-        'completed'
+        'draft' // All reports are saved as draft initially
       )
 
       setReportData(data)
