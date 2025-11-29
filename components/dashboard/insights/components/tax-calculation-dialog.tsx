@@ -171,8 +171,8 @@ export function TaxCalculationDialog({
                   <p>• Estimated tax: {formatCurrency(calculationDetails.estimatedTax)}</p>
                   <p>• Effective rate: {calculationDetails.effectiveRate.toFixed(1)}%</p>
                   {calculationDetails.periodType === "quarter" && (
-                    <p className="mt-2 text-xs">
-                      • Quarterly reserve: {formatCurrency(calculationDetails.estimatedTax / 4)} (Annual tax ÷ 4)
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      • Note: Quarterly tax should be calculated based on actual income in that quarter, not annual tax ÷ 4
                     </p>
                   )}
                 </>

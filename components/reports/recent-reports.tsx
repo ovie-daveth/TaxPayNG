@@ -221,6 +221,8 @@ export function RecentReports() {
                     includeTax: true,
                     includeReliefs: true
                   }}
+                  reportId={selectedReport.id}
+                  showFileButton={true}
                 />
               )}
               {selectedReport.type === 'Income Statement' && (

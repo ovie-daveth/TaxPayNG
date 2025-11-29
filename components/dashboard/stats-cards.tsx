@@ -15,7 +15,7 @@ import {
   CheckCircle2,
 } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
-import { transactionService } from "@/lib/services/transactionService"
+import { transactionService, taxPaymentService } from "@/lib/services"
 import { toast } from "sonner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
@@ -153,7 +153,8 @@ const buildStatsFromSummary = (
   businessType: DashboardBusinessType,
   formatCurrency: (amount: number) => string,
   labels: PeriodLabels,
-  periodType: PeriodType
+  periodType: PeriodType,
+  taxPaymentsTotal: number = 0 // Total tax payments made in the year
 ): StatDefinition[] => {
   // Use period summary for display (income/expenses)
   const totalIncome = periodSummary?.totalIncome ?? 0
@@ -176,27 +177,59 @@ const buildStatsFromSummary = (
   const incomeBreakdown = buildCategoryBreakdown(periodSummary, "income", totalIncome, formatCurrency)
   const expenseBreakdown = buildCategoryBreakdown(periodSummary, "expenses", totalExpenses, formatCurrency)
 
-  // Use FULL YEAR data for tax calculation
+  // Calculate tax based on the SELECTED PERIOD's income (not full year divided by 4)
+  // This ensures if income only came in Q4, we show Q4 tax, not annual/4
+  const periodIncome = periodSummary?.totalIncome ?? 0
+  const periodExpenses = periodSummary?.totalExpenses ?? 0
+  
+  // Also get full year data for context
   const yearIncome = yearSummary?.totalIncome ?? 0
   const yearExpenses = yearSummary?.totalExpenses ?? 0
 
   const calculatedBusinessType = businessType === "small-business" ? "sme" : businessType
-  const taxCalculationRaw =
-    businessType === "small-business" && yearIncome <= SMALL_BUSINESS_TURNOVER_THRESHOLD
+  
+  // Calculate tax for the selected period (quarter or year)
+  const periodTaxCalculationRaw =
+    businessType === "small-business" && periodIncome <= SMALL_BUSINESS_TURNOVER_THRESHOLD
       ? null
-      : calculateNigerianTax({
+      : periodIncome > 0 // Only calculate if period has income
+      ? calculateNigerianTax({
           businessType: calculatedBusinessType,
           period: "yearly",
-          income: yearIncome, // Use full year income
+          income: periodIncome, // Use selected period income
           rentPaid: 0,
           pensionContribution: 0,
           healthInsurance: 0,
           housingFund: 0,
           lifeInsurance: 0,
           charitableDonations: 0,
-          businessExpenses: yearExpenses, // Use full year expenses
+          businessExpenses: periodExpenses, // Use selected period expenses
           dependents: 0,
         })
+      : null
+
+  // Also calculate full year tax for yearly view or context
+  const yearTaxCalculationRaw =
+    businessType === "small-business" && yearIncome <= SMALL_BUSINESS_TURNOVER_THRESHOLD
+      ? null
+      : yearIncome > 0
+      ? calculateNigerianTax({
+          businessType: calculatedBusinessType,
+          period: "yearly",
+          income: yearIncome,
+          rentPaid: 0,
+          pensionContribution: 0,
+          healthInsurance: 0,
+          housingFund: 0,
+          lifeInsurance: 0,
+          charitableDonations: 0,
+          businessExpenses: yearExpenses,
+          dependents: 0,
+        })
+      : null
+
+  // Use period tax for display, year tax for yearly view
+  const taxCalculationRaw = periodType === "year" ? yearTaxCalculationRaw : periodTaxCalculationRaw
 
   const taxCalculation = taxCalculationRaw
     ? {
@@ -207,9 +240,12 @@ const buildStatsFromSummary = (
     : undefined
 
   const isSmallBusinessExempt = businessType === "small-business" && !taxCalculationRaw
-  // Tax payable is always calculated for the full year, but we display based on the selected period
+  // Calculate net tax payable after deducting payments
+  const grossTaxPayable = taxCalculationRaw ? taxCalculationRaw.totalTax : 0
+  const netTaxPayable = Math.max(0, grossTaxPayable - taxPaymentsTotal)
+  // Tax payable is calculated from the selected period's income
   const taxCardValue = taxCalculationRaw 
-    ? formatCurrency(Math.round(periodType === "year" ? taxCalculationRaw.totalTax : taxCalculationRaw.totalTax / 4))
+    ? formatCurrency(Math.round(netTaxPayable))
     : formatCurrency(0)
   const monthDisplay = `${labels.monthShortLabel} ${labels.year}`
   const periodDisplay = periodType === "year" ? `${labels.year}` : labels.quarterLabel
@@ -255,6 +291,8 @@ const buildStatsFromSummary = (
       value: taxCardValue,
       change: isSmallBusinessExempt 
         ? "Small company exempt" 
+        : taxPaymentsTotal > 0
+        ? `${taxPeriodLabel} • Paid: ${formatCurrency(taxPaymentsTotal)}`
         : `${taxPeriodLabel} • Based on ${labels.year} data`,
       trend: "neutral",
       icon: isSmallBusinessExempt ? CheckCircle2 : Calculator,
@@ -666,10 +704,18 @@ export function StatsCards({
         transactionService.getTransactionSummary(user.uid, periodStartIso, periodEndIso), // Selected period
         transactionService.getTransactionSummary(user.uid, monthStartIso, nowIso), // Current month
         transactionService.getTransactionSummary(user.uid, yearStartIso, yearEndIso), // Full year for tax
+        taxPaymentService.getUserPaymentsSimple(user.uid), // Tax payments
       ])
-        .then(([periodSummary, monthSummary, yearSummary]) => {
+        .then(([periodSummary, monthSummary, yearSummary, taxPayments]) => {
           if (!isMounted) return
-          setStats(buildStatsFromSummary(periodSummary, monthSummary, yearSummary, businessType, formatCurrencyValue, labels, periodType))
+          // Filter payments for the selected year
+          const yearPayments = taxPayments.filter(payment => {
+            if (payment.status !== 'completed') return false
+            const paymentDate = new Date(payment.createdAt || payment.paymentDate || '')
+            return paymentDate >= yearInfo.start && paymentDate <= yearInfo.end
+          })
+          const totalPayments = yearPayments.reduce((sum, payment) => sum + (payment.amount || 0), 0)
+          setStats(buildStatsFromSummary(periodSummary, monthSummary, yearSummary, businessType, formatCurrencyValue, labels, periodType, totalPayments))
         })
         .catch((error) => {
           console.error("Error loading transaction summary:", error)

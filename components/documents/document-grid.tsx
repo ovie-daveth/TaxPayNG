@@ -77,10 +77,18 @@ export function DocumentGrid({ documents, onView, onDownload, onDelete }: Docume
             const transaction = await transactionService.getById(id)
             if (transaction && transaction.description) {
               descriptions[id] = transaction.description
+            } else {
+              // Transaction exists but has no description - use ID as fallback
+              descriptions[id] = id
             }
-          } catch (error) {
-            console.error(`Failed to fetch transaction ${id}:`, error)
-            descriptions[id] = id // Fallback to ID if fetch fails
+          } catch (error: any) {
+            // Silently handle "Document not found" errors (transaction may have been deleted)
+            // Only log unexpected errors
+            if (error?.message && !error.message.includes('Document not found')) {
+              console.error(`Failed to fetch transaction ${id}:`, error)
+            }
+            // Use ID as fallback for missing transactions
+            descriptions[id] = id
           }
         })
       )

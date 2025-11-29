@@ -196,6 +196,9 @@ export interface TaxPayment {
   taxDuration: string // e.g., "October 2024", "Jan-Mar 2024", "2024"
   paymentMethod: 'remitta' | 'interswitch' | 'paystack' | 'firs'
   status: 'pending' | 'completed' | 'failed'
+  rrr?: string // Remita Retrieval Reference
+  transactionRef?: string // Payment transaction reference
+  paymentDate?: string // Date when payment was completed
   taxCalculation?: {
     businessType: string
     income: number
@@ -437,6 +440,8 @@ export interface SavedClient {
 // Report Types
 export type ReportType = 'Self-Assessment' | 'Income Statement' | 'Expense Report' | 'Tax Summary'
 export type ReportStatus = 'draft' | 'completed' | 'submitted'
+export type FilingStatus = 'not_filed' | 'filed' | 'submitted' | 'acknowledged'
+export type FilingMethod = 'direct' | 'agent' | 'email' | null
 
 export interface SavedReport {
   id: string
@@ -455,4 +460,16 @@ export interface SavedReport {
   generatedAt: string
   createdAt: string
   updatedAt: string
+  rrr?: string // Remita Retrieval Reference
+  paymentStatus?: 'unpaid' | 'paid' // Payment status
+  transactionRef?: string // Payment transaction reference
+  paymentDate?: string // Date when payment was made
+  // Filing fields
+  filingStatus?: FilingStatus // Status of filing
+  filingMethod?: FilingMethod // Method used to file (direct/agent/email)
+  filingDate?: string // Date when return was filed
+  acknowledgmentNumber?: string // IRS acknowledgment number
+  ticketId?: string // Filing agent ticket ID
+  balanceDue?: number // Balance due after reconciliation (positive = owe, negative = credit, 0 = balanced)
+  taxesAlreadyPaid?: number // Total taxes already paid during the year
 }

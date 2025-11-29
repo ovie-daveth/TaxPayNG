@@ -15,6 +15,7 @@ import { faqData } from "@/app/faq/components/data"
 import { AuditSubscriptionsDialog } from "@/components/dashboard/audit-subscriptions-dialog"
 import { calculateTaxRecommendation, type CalculationDetailsType, type PeriodType } from "./utils/tax-calculation"
 import { TaxCalculationDialog } from "./components/tax-calculation-dialog"
+import { calculateNigerianTax } from "@/lib/tax-calculator"
 
 type DashboardBusinessType = "freelancer" | "creator"
 
@@ -408,14 +409,50 @@ export function AnalyticsInsights({
           description = `You kept ${formatCurrency(netCash)} after expenses. ${taxAdvice} No tax reserve needed, but keep tracking your income.`
         } else if (isLowEarner) {
           // Low tax bracket
-          const reserveForPeriod = periodType === "year" ? reserveTarget : reserveTarget / 4
+          // Calculate actual period tax instead of dividing annual by 4
+          let reserveForPeriod = reserveTarget
+          if (periodType === "quarter" && currentIncomeTotal > 0) {
+            // Calculate tax for this quarter's actual income
+            const quarterTax = calculateNigerianTax({
+              businessType: businessType === "small-business" ? "sme" : businessType,
+              period: "yearly",
+              income: currentIncomeTotal,
+              businessExpenses: currentExpenseTotal,
+              rentPaid: 0,
+              pensionContribution: 0,
+              healthInsurance: 0,
+              housingFund: 0,
+              lifeInsurance: 0,
+              charitableDonations: 0,
+              dependents: 0,
+            })
+            reserveForPeriod = quarterTax.totalTax
+          }
           description = `You kept ${formatCurrency(netCash)} after expenses. ${taxAdvice} Set aside ${formatCurrency(reserveForPeriod)} for tax this ${periodLabel}.`
         } else if (reliefCoversReserve) {
           // Reliefs cover tax
           description = `You kept ${formatCurrency(netCash)} after expenses. Your reliefs (${formatCurrency(reliefTotal)}) may cover most of your tax liability. ${taxAdvice}`
         } else {
           // Standard case
-          const reserveForPeriod = periodType === "year" ? reserveTarget : reserveTarget / 4
+          // Calculate actual period tax instead of dividing annual by 4
+          let reserveForPeriod = reserveTarget
+          if (periodType === "quarter" && currentIncomeTotal > 0) {
+            // Calculate tax for this quarter's actual income
+            const quarterTax = calculateNigerianTax({
+              businessType: businessType === "small-business" ? "sme" : businessType,
+              period: "yearly",
+              income: currentIncomeTotal,
+              businessExpenses: currentExpenseTotal,
+              rentPaid: 0,
+              pensionContribution: 0,
+              healthInsurance: 0,
+              housingFund: 0,
+              lifeInsurance: 0,
+              charitableDonations: 0,
+              dependents: 0,
+            })
+            reserveForPeriod = quarterTax.totalTax
+          }
           const reservePercentage = netCash > 0 ? ((reserveForPeriod / netCash) * 100).toFixed(0) : "0"
           description = `You kept ${formatCurrency(netCash)} after expenses. ${taxAdvice} Set aside ${formatCurrency(reserveForPeriod)} for tax this ${periodLabel} (${reservePercentage}% of what you kept).`
         }

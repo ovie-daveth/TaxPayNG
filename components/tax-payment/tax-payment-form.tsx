@@ -225,6 +225,22 @@ export function TaxPaymentForm({ onPay, processing, onCheckDuplicate }: TaxPayme
         }
       }
       
+      // For Remita/Interswitch/Paystack, navigate to generate-rrr page
+      if (['remitta', 'interswitch', 'paystack'].includes(selectedMethod)) {
+        // Store payment data in localStorage for the generate-rrr page
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('payment_amount', paymentAmount.toString())
+          localStorage.setItem('payment_method', selectedMethod)
+          localStorage.setItem('payment_period', period)
+          localStorage.setItem('payment_taxDuration', taxDuration)
+          localStorage.setItem('payment_taxCalculation', JSON.stringify(calculatedTaxFull || {}))
+        }
+        // Navigate to generate-rrr page
+        window.location.href = `/dashboard/payment/generate-rrr`
+        return
+      }
+      
+      // For FIRS, proceed with direct payment
       // Clear localStorage when payment is initiated
       clearPaymentData()
       // Pass the full tax calculation and RRR details if they exist

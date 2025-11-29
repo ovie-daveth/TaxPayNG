@@ -21,32 +21,76 @@ import { Badge } from "@/components/ui/badge"
 import { User, Building2, CreditCard, Bell, Shield } from "lucide-react"
 
 export default function SettingsPage() {
-  const { user } = useAuth()
+  const { user, loading: authLoading } = useAuth()
   const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
-  const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [subscriptionData, setSubscriptionData] = useState({
     isSubscribe: false,
     subscriptionType: null as string | null,
   })
+  const [profileData, setProfileData] = useState({
+    firstName: '',
+    lastName: '',
+    phone: '',
+    taxId: '',
+    address: {
+      street: '',
+      city: '',
+      state: '',
+      country: 'Nigeria',
+      postalCode: ''
+    }
+  })
+
+  // Loading state: show skeleton while auth or profile is loading
+  const isLoading = authLoading || profileLoading
 
   useEffect(() => {
-    if (!profileLoading && profile) {
-      setSubscriptionData({
-        isSubscribe: profile.isSubscribe ?? false,
-        subscriptionType: profile.subscriptionType || null,
-      })
-      setIsLoading(false)
-    } else if (!profileLoading) {
-      setIsLoading(false)
+    if (profileLoading || !profile) {
+      return
     }
-  }, [profile, profileLoading])
+
+    setSubscriptionData({
+      isSubscribe: profile.isSubscribe ?? false,
+      subscriptionType: profile.subscriptionType || null,
+    })
+    
+    // Parse firstName and lastName - explicitly check for truthy values
+    let firstName = (profile.firstName && String(profile.firstName).trim()) || ''
+    let lastName = (profile.lastName && String(profile.lastName).trim()) || ''
+    
+    // If firstName/lastName don't exist but user has displayName, try to extract from displayName
+    if ((!firstName || !lastName) && user?.displayName) {
+      const nameParts = String(user.displayName).trim().split(/\s+/)
+      if (!firstName && nameParts[0]) firstName = nameParts[0]
+      if (!lastName && nameParts.length > 1) lastName = nameParts.slice(1).join(' ')
+    }
+    
+    setProfileData({
+      firstName,
+      lastName,
+      phone: profile.phone || '',
+      taxId: profile.taxId || '',
+      address: {
+        street: profile.address?.street || '',
+        city: profile.address?.city || '',
+        state: profile.address?.state || '',
+        country: profile.address?.country || 'Nigeria',
+        postalCode: profile.address?.postalCode || ''
+      }
+    })
+  }, [profile, profileLoading, user?.uid, user?.displayName])
 
   if (isLoading) {
     return (
-      <main className="h-screen flex items-center justify-center">
+      <div className="h-screen flex flex-col overflow-hidden">
+        <DashboardNav />
+        <main className="flex-1 overflow-hidden">
+          <div className="container mx-auto px-6 py-8 max-w-7xl h-full overflow-y-auto hide-scrollbar">
             <SettingsSkeleton />
-          </main>
+          </div>
+        </main>
+      </div>
     )
   }
 
@@ -100,27 +144,150 @@ export default function SettingsPage() {
           <div className="space-y-6">
                     <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="full-name">Full Name</Label>
-                        <Input id="full-name" defaultValue={profile ? `${profile.firstName} ${profile.lastName}` : ""} />
+                    <Label htmlFor="firstName">First Name</Label>
+                        <Input 
+                          id="firstName" 
+                          value={profileData.firstName}
+                          onChange={(e) => setProfileData(prev => ({ ...prev, firstName: e.target.value }))}
+                        />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="lastName">Last Name</Label>
+                        <Input 
+                          id="lastName"
+                          value={profileData.lastName}
+                          onChange={(e) => setProfileData(prev => ({ ...prev, lastName: e.target.value }))}
+                        />
+                  </div>
+                </div>
+                    <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <Label htmlFor="email">Email</Label>
                         <Input id="email" type="email" defaultValue={profile?.email || ""} disabled />
                         <p className="text-xs text-muted-foreground">Email cannot be changed</p>
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="phone">Phone Number</Label>
+                        <Input 
+                          id="phone" 
+                          value={profileData.phone}
+                          onChange={(e) => setProfileData(prev => ({ ...prev, phone: e.target.value }))}
+                        />
+                  </div>
                 </div>
                     <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number</Label>
-                        <Input id="phone" defaultValue={profile?.phone || ""} />
-                  </div>
-                  <div className="space-y-2">
                     <Label htmlFor="tin">Tax Identification Number</Label>
-                        <Input id="tin" defaultValue={profile?.taxId || ""} />
+                        <Input 
+                          id="tin"
+                          value={profileData.taxId}
+                          onChange={(e) => setProfileData(prev => ({ ...prev, taxId: e.target.value }))}
+                        />
                   </div>
                 </div>
+                    <Separator />
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Address</h3>
+                      <div className="space-y-2">
+                        <Label htmlFor="street">Street Address</Label>
+                        <Input 
+                          id="street"
+                          value={profileData.address.street}
+                          onChange={(e) => setProfileData(prev => ({ 
+                            ...prev, 
+                            address: { ...prev.address, street: e.target.value }
+                          }))}
+                        />
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label htmlFor="city">City</Label>
+                          <Input 
+                            id="city"
+                            value={profileData.address.city}
+                            onChange={(e) => setProfileData(prev => ({ 
+                              ...prev, 
+                              address: { ...prev.address, city: e.target.value }
+                            }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="state">State</Label>
+                          <Input 
+                            id="state"
+                            value={profileData.address.state}
+                            onChange={(e) => setProfileData(prev => ({ 
+                              ...prev, 
+                              address: { ...prev.address, state: e.target.value }
+                            }))}
+                          />
+                        </div>
+                      </div>
+                      <div className="grid md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label htmlFor="country">Country</Label>
+                          <Input 
+                            id="country"
+                            value={profileData.address.country}
+                            onChange={(e) => setProfileData(prev => ({ 
+                              ...prev, 
+                              address: { ...prev.address, country: e.target.value }
+                            }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="postalCode">Postal Code</Label>
+                          <Input 
+                            id="postalCode"
+                            value={profileData.address.postalCode}
+                            onChange={(e) => setProfileData(prev => ({ 
+                              ...prev, 
+                              address: { ...prev.address, postalCode: e.target.value }
+                            }))}
+                          />
+                        </div>
+                      </div>
+                    </div>
                     <div className="flex justify-end">
-                      <Button size="lg">Save Changes</Button>
+                      <Button 
+                        size="lg"
+                        onClick={async () => {
+                          if (!user?.uid) {
+                            toast.error("User not authenticated")
+                            return
+                          }
+                          setIsSaving(true)
+                          try {
+                            const result = await userService.upsertProfile(user.uid, {
+                              firstName: profileData.firstName,
+                              lastName: profileData.lastName,
+                              phone: profileData.phone,
+                              taxId: profileData.taxId || undefined,
+                              address: {
+                                street: profileData.address.street,
+                                city: profileData.address.city,
+                                state: profileData.address.state,
+                                country: profileData.address.country,
+                                postalCode: profileData.address.postalCode
+                              }
+                            })
+                            if (result.success) {
+                              toast.success("Profile updated successfully")
+                              await refetchProfile()
+                            } else {
+                              toast.error(result.error || "Failed to update profile")
+                            }
+                          } catch (error) {
+                            toast.error("Failed to update profile")
+                            console.error(error)
+                          } finally {
+                            setIsSaving(false)
+                          }
+                        }}
+                        disabled={isSaving}
+                      >
+                        {isSaving ? "Saving..." : "Save Changes"}
+                      </Button>
                     </div>
               </div>
             </Card>

@@ -6,7 +6,7 @@ import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Calculator } from "lucide-react"
 import { calculateNigerianTax } from "@/lib/tax-calculator"
-import { transactionService } from "@/lib/services/transactionService"
+import { transactionService, taxPaymentService } from "@/lib/services"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { toast } from "sonner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -117,15 +117,26 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
 
       try {
         // Fetch full year data for tax calculation (transactions only)
-        const yearSummary = await transactionService.getTransactionSummary(
-          user.uid,
-          yearStartIso,
-          yearEndIso
-        )
+        const [yearSummary, taxPayments] = await Promise.all([
+          transactionService.getTransactionSummary(
+            user.uid,
+            yearStartIso,
+            yearEndIso
+          ),
+          taxPaymentService.getUserPaymentsSimple(user.uid)
+        ])
 
         const totalIncome = yearSummary?.totalIncome ?? 0
         const totalExpenses = yearSummary?.totalExpenses ?? 0
         const manualReliefs = yearSummary?.totalReliefs ?? 0
+
+        // Filter payments for the selected year
+        const yearPayments = taxPayments.filter(payment => {
+          if (payment.status !== 'completed') return false
+          const paymentDate = new Date(payment.createdAt || payment.paymentDate || '')
+          return paymentDate >= yearInfo.start && paymentDate <= yearInfo.end
+        })
+        const totalPayments = yearPayments.reduce((sum, payment) => sum + (payment.amount || 0), 0)
 
         const taxCalculation =
           businessType === "small-business" && totalIncome <= SMALL_BUSINESS_TURNOVER_THRESHOLD
@@ -155,9 +166,10 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
         const calculatedReliefs = (taxCalculation ? taxCalculation.totalReliefs : 0) + manualReliefs
 
         const rawTaxPayable = taxCalculation ? taxCalculation.totalTax : 0
-        const adjustedTaxPayable = Math.max(rawTaxPayable - manualReliefs, 0)
+        // Deduct both manual reliefs and tax payments from gross tax payable
+        const adjustedTaxPayable = Math.max(rawTaxPayable - manualReliefs - totalPayments, 0)
         const adjustedMonthlySetAside = Math.max(
-          (taxCalculation?.monthlySetAside ?? rawTaxPayable / 12) - manualReliefs / 12,
+          (taxCalculation?.monthlySetAside ?? rawTaxPayable / 12) - (manualReliefs + totalPayments) / 12,
           0
         )
 

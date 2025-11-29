@@ -10,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ReportData } from "@/lib/services/reportService"
 import { formatCurrencyAmount } from "@/lib/utils/currency"
 import { format } from "date-fns"
-import { Printer, ArrowLeft, Plus, Trash2, X, Upload, Loader2 } from "lucide-react"
+import { Printer, ArrowLeft, Plus, Trash2, X, Upload, Loader2, FileCheck } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
@@ -31,9 +32,12 @@ interface SelfAssessmentPreviewProps {
   isEditing?: boolean
   onDataChange?: (data: ReportData) => void
   onBack?: () => void
+  reportId?: string
+  showFileButton?: boolean
 }
 
-export function SelfAssessmentPreview({ reportData, formData, isEditing = false, onDataChange, onBack }: SelfAssessmentPreviewProps) {
+export function SelfAssessmentPreview({ reportData, formData, isEditing = false, onDataChange, onBack, reportId, showFileButton = false }: SelfAssessmentPreviewProps) {
+  const router = useRouter()
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const [taxCredits, setTaxCredits] = useState<{ paye: number; wht: number; provisional: number; other: number; total: number }>({
@@ -1089,6 +1093,16 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           </Button>
         )}
         <div className={onBack ? "flex gap-3" : "flex gap-3 ml-auto"}>
+          {showFileButton && reportId && !isEditing && (
+            <Button
+              onClick={() => {
+                router.push(`/dashboard/reports/file/${reportId}`)
+              }}
+            >
+              <FileCheck className="w-4 h-4 mr-2" />
+              File Return
+            </Button>
+          )}
           <Button
             variant="outline"
             onClick={handlePrint}
