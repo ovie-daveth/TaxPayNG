@@ -122,6 +122,7 @@ export default function PaymentSuccessPage() {
         name: `Tax Payment Receipt - ${paymentData.rrr}`,
         type: "proof",
         imageKitUrl: uploadResult.url,
+        fileSize: uploadResult.size, // Use size from ImageKit upload result
         notes: `RRR: ${paymentData.rrr}, Transaction: ${paymentData.transactionRef}`,
         linkedTransaction: paymentData.transactionRef
       })

@@ -93,13 +93,16 @@ export class DocumentService extends BaseService {
     try {
       const file = uploadData.file
       
+      // Use fileSize from uploadData if provided (from ImageKit result), otherwise use file.size
+      const fileSize = uploadData.fileSize || file.size || 0
+      
       // Check storage limit
       const profile = await userService.getProfile(userId)
       if (profile) {
         const storageLimit = profile.storageLimit || 500 * 1024 * 1024 // Default 500MB
         const currentStorageUsed = profile.storageUsed || 0
         
-        if (currentStorageUsed + file.size > storageLimit) {
+        if (currentStorageUsed + fileSize > storageLimit) {
           const remainingBytes = storageLimit - currentStorageUsed
           const remainingMB = (remainingBytes / (1024 * 1024)).toFixed(2)
           const limitMB = (storageLimit / (1024 * 1024)).toFixed(2)
@@ -140,7 +143,7 @@ export class DocumentService extends BaseService {
         }
       }
 
-      // Create document record in Firestore
+      // Create document record in Firestore (fileSize already defined above)
       const documentData: any = {
         userId,
         name: uploadData.name,
@@ -148,7 +151,7 @@ export class DocumentService extends BaseService {
         type: uploadData.type,
         fileType: this.getFileType(file.type),
         mimeType: file.type,
-        size: file.size,
+        size: fileSize,
         url: downloadURL,
         uploadedAt: uploadData.date || new Date().toISOString(),
         linkedTransaction: uploadData.linkedTransaction || null,
@@ -166,7 +169,7 @@ export class DocumentService extends BaseService {
       const createdDocument = await this.getById(documentId)
 
       // Update storage used
-      await userService.updateStorageUsed(userId, file.size)
+      await userService.updateStorageUsed(userId, fileSize)
 
       return {
         success: true,

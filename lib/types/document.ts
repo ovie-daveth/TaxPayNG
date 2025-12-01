@@ -32,4 +32,5 @@ export interface UploadDocumentData {
   linkedTransaction?: string
   notes?: string
   imageKitUrl?: string
+  fileSize?: number // Optional: size from ImageKit upload result (in bytes)
 }

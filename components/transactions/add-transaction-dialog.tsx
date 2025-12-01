@@ -37,6 +37,7 @@ export function AddTransactionDialog({
   defaultCategory,
   defaultDescription
 }: AddTransactionDialogProps) {
+  
   const [formData, setFormData] = useState({
     type: 'income' as Transaction['type'],
     description: '',

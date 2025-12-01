@@ -17,8 +17,8 @@ import { format } from "date-fns"
 import { toast } from "sonner"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
-import { invoiceService } from "@/lib/services"
-import { uploadToImageKit } from "@/lib/utils/imagekit"
+import { invoiceService, documentService } from "@/lib/services"
+import { uploadToImageKit, ImageUploadResult } from "@/lib/utils/imagekit"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 interface ViewInvoiceDialogProps {
@@ -44,6 +44,7 @@ export function ViewInvoiceDialog({
   const [paymentMethod, setPaymentMethod] = useState("")
   const [paymentReference, setPaymentReference] = useState("")
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [receiptUploadResult, setReceiptUploadResult] = useState<ImageUploadResult | null>(null)
   const [isUploadingReceipt, setIsUploadingReceipt] = useState(false)
   const [taxDeductible, setTaxDeductible] = useState(true) // Default to true for bills
   const [showWHTForm, setShowWHTForm] = useState(false)
@@ -554,6 +555,9 @@ export function ViewInvoiceDialog({
       // Upload to ImageKit
       const result = await uploadToImageKit(file, 'invoices/receipts')
       
+      // Store the upload result (includes size)
+      setReceiptUploadResult(result)
+      
       // Return the ImageKit URL
       return result.url
     } catch (error) {
@@ -578,17 +582,25 @@ export function ViewInvoiceDialog({
       setIsMarkingPaid(true)
 
       let receiptUrl: string | undefined
+      let uploadResult: ImageUploadResult | null = null
 
       // Get ImageKit URL from file if already uploaded, otherwise upload now
       if (receiptFile) {
-        // Check if file already has ImageKit URL (uploaded when selected)
-        if ((receiptFile as any).imageKitUrl) {
+        // Use stored upload result if available
+        if (receiptUploadResult) {
+          receiptUrl = receiptUploadResult.url
+          uploadResult = receiptUploadResult
+        } else if ((receiptFile as any).imageKitUrl) {
+          // Fallback: check if file already has ImageKit URL (uploaded when selected)
           receiptUrl = (receiptFile as any).imageKitUrl
+          // Try to get upload result from file metadata
+          uploadResult = (receiptFile as any).uploadResult || null
         } else {
           // Fallback: upload now if not already uploaded
           const uploadedUrl = await handleReceiptUpload(receiptFile)
-          if (uploadedUrl) {
+          if (uploadedUrl && receiptUploadResult) {
             receiptUrl = uploadedUrl
+            uploadResult = receiptUploadResult
           }
         }
       }
@@ -606,6 +618,25 @@ export function ViewInvoiceDialog({
         return
       }
 
+      // Save receipt to document database with file size
+      if (receiptFile && uploadResult && user?.uid) {
+        try {
+          await documentService.uploadDocument(user.uid, {
+            file: receiptFile,
+            name: `Invoice Payment Receipt - ${invoice.invoiceNumber}`,
+            type: "receipt",
+            imageKitUrl: receiptUrl,
+            fileSize: uploadResult.size, // Use size from ImageKit upload result
+            date: new Date().toISOString(),
+            notes: `Invoice: ${invoice.invoiceNumber}, Payment Method: ${paymentMethod || 'N/A'}, Reference: ${paymentReference || 'N/A'}`,
+            linkedTransaction: undefined // Will be linked after transaction is created
+          })
+        } catch (error) {
+          console.error("Error saving receipt to documents:", error)
+          // Don't block the payment flow if document save fails
+        }
+      }
+
       const result = await invoiceService.markAsPaid(
         invoice.id,
         profile.userId,
@@ -621,6 +652,7 @@ export function ViewInvoiceDialog({
         setPaymentMethod("")
         setPaymentReference("")
         setReceiptFile(null)
+        setReceiptUploadResult(null)
         setTaxDeductible(true) // Reset to default
         onInvoiceUpdated?.()
         onOpenChange(false)
@@ -1348,34 +1380,34 @@ export function ViewInvoiceDialog({
                           VAT Reg: {(currentInvoice?.supplier?.vatRegistrationNumber || invoice.supplier?.vatRegistrationNumber)}
                         </p>
                       )}
-                    </div>
-                    {!isEditing && (
-                      <Badge variant={(currentInvoice || invoice).status === 'paid' ? 'default' : (currentInvoice || invoice).status === 'overdue' ? 'destructive' : 'secondary'}>
-                        {(currentInvoice || invoice).status === 'sent' && displayAsIncoming 
-                          ? 'Received' 
-                          : ((currentInvoice || invoice).status.charAt(0).toUpperCase() + (currentInvoice || invoice).status.slice(1))}
-                      </Badge>
-                    )}
                   </div>
+                  {!isEditing && (
+                    <Badge variant={(currentInvoice || invoice).status === 'paid' ? 'default' : (currentInvoice || invoice).status === 'overdue' ? 'destructive' : 'secondary'}>
+                      {(currentInvoice || invoice).status === 'sent' && displayAsIncoming 
+                        ? 'Received' 
+                        : ((currentInvoice || invoice).status.charAt(0).toUpperCase() + (currentInvoice || invoice).status.slice(1))}
+                    </Badge>
+                  )}
+                </div>
                 {isEditing && editedInvoice && (
                   <div className="mt-4 space-y-4">
                     <div>
-                      <Label className="text-xs text-muted-foreground mb-2 block">Currency</Label>
-                      <Select
-                        value={editedInvoice.currency}
-                        onValueChange={(value) => handleInvoiceCurrencyChange(value as CurrencyCode)}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {SUPPORTED_CURRENCIES.map(currency => (
-                            <SelectItem key={currency.code} value={currency.code}>
-                              {currency.symbol} {currency.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                    <Label className="text-xs text-muted-foreground mb-2 block">Currency</Label>
+                    <Select
+                      value={editedInvoice.currency}
+                      onValueChange={(value) => handleInvoiceCurrencyChange(value as CurrencyCode)}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {SUPPORTED_CURRENCIES.map(currency => (
+                          <SelectItem key={currency.code} value={currency.code}>
+                            {currency.symbol} {currency.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     </div>
                     <div>
                       <Label className="text-xs text-muted-foreground mb-2 block">VAT Rate (%)</Label>
@@ -1428,8 +1460,8 @@ export function ViewInvoiceDialog({
                 {/* Client Information */}
                 <div className="mt-4 pt-4 border-t">
                   <h3 className="text-sm font-semibold mb-3 text-muted-foreground">
-                    {isSender ? "Bill To" : displayAsIncoming ? "Bill To (You)" : "Client Information"}
-                  </h3>
+                  {isSender ? "Bill To" : displayAsIncoming ? "Bill To (You)" : "Client Information"}
+                </h3>
                 {isEditing && editedInvoice ? (
                   <div className="grid grid-cols-2 gap-4">
                     <div className="col-span-2">
@@ -1692,13 +1724,13 @@ export function ViewInvoiceDialog({
                       {(currentInvoice || invoice).whtCertificateNumber && (
                         <div className="text-xs text-muted-foreground pl-1">
                           WHT Cert: {(currentInvoice || invoice).whtCertificateNumber}
-                        </div>
-                      )}
+                    </div>
+                  )}
                       {(currentInvoice || invoice).whtDeductionDate && (
                         <div className="text-xs text-muted-foreground pl-1">
                           Deducted: {format(new Date((currentInvoice || invoice).whtDeductionDate!), "MMM dd, yyyy")}
-                        </div>
-                      )}
+                    </div>
+                  )}
                     </div>
                   )}
                   
@@ -1858,11 +1890,14 @@ export function ViewInvoiceDialog({
                                     try {
                                       const result = await uploadToImageKit(file, 'invoices/receipts')
                                       ;(file as any).imageKitUrl = result.url
+                                      ;(file as any).uploadResult = result
+                                      setReceiptUploadResult(result)
                                       toast.success("Receipt uploaded successfully")
                                     } catch (error) {
                                       console.error("Error uploading receipt:", error)
                                       toast.error("Failed to upload receipt")
                                       setReceiptFile(null)
+                                      setReceiptUploadResult(null)
                                     } finally {
                                       setIsUploadingReceipt(false)
                                     }
@@ -1942,14 +1977,14 @@ export function ViewInvoiceDialog({
                     ) : null}
                   </div>
                 )}
-                </Card>
-              </div>
-            </div>
+              </Card>
+                  </div>
+                </div>
             {/* End of Top Section Grid */}
 
             {/* Items Table - Full Width */}
             <Card className="p-5">
-              <h3 className="text-lg font-semibold mb-4">Items</h3>
+                  <h3 className="text-lg font-semibold mb-4">Items</h3>
                   {isEditing && editedInvoice ? (
                     <div className="space-y-3">
                       {editedInvoice.items.map((item, index) => (
@@ -2052,7 +2087,7 @@ export function ViewInvoiceDialog({
                       </table>
                     </div>
                   )}
-            </Card>
+              </Card>
           </div>
         </div>
       </DialogContent>
@@ -2159,7 +2194,7 @@ export function ViewInvoiceDialog({
               </div>
             </div>
           )}
-        </DialogContent>
+      </DialogContent>
       </Dialog>
     </Dialog>
     </>

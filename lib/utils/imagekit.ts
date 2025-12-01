@@ -8,6 +8,11 @@ export interface ImageUploadResult {
 
 /**
  * Upload a file to ImageKit via our API route
+ * 
+ * @param file - The file to upload
+ * @param folder - The folder path (e.g., 'transactions', 'documents', 'receipts')
+ *                 Note: Blog uploads (folder starting with 'blog') are exempted from user-specific folders
+ *                 All other uploads are automatically organized as: users/{userId}/{folder}
  */
 export async function uploadToImageKit(file: File, folder: string = 'transactions'): Promise<ImageUploadResult> {
   try {
