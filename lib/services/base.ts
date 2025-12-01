@@ -1,15 +1,15 @@
-import { 
-  collection, 
-  doc, 
-  getDoc, 
-  getDocs, 
-  addDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where, 
-  orderBy, 
-  limit, 
+import {
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  limit,
   startAfter,
   DocumentSnapshot,
   QueryDocumentSnapshot,
@@ -29,14 +29,24 @@ export class BaseService {
   protected convertTimestamp(timestamp: Timestamp | string | undefined | any): string {
     if (!timestamp) return new Date().toISOString()
     if (typeof timestamp === 'string') return timestamp
-    // Check if it's a Firestore Timestamp
+
+    // Check if it's a plain timestamp object with seconds/nanoseconds (from Firestore)
+    // This happens when Firestore returns a document immediately after an update
+    if (timestamp && typeof timestamp.seconds === 'number') {
+      const date = new Date(timestamp.seconds * 1000 + (timestamp.nanoseconds || 0) / 1000000)
+      return date.toISOString()
+    }
+
+    // Check if it's a Firestore Timestamp instance
     if (timestamp && typeof timestamp.toDate === 'function') {
       return timestamp.toDate().toISOString()
     }
+
     // If it's already a Date object
     if (timestamp instanceof Date) {
       return timestamp.toISOString()
     }
+
     // Fallback: try to parse as date string
     try {
       return new Date(timestamp).toISOString()
@@ -55,12 +65,12 @@ export class BaseService {
   protected convertDocument<T>(doc: any): T {
     const data = doc.data() as any
     if (!data) throw new Error('Document data not found')
-    
+
     const converted: any = {
       id: doc.id,
       ...data,
     }
-    
+
     // Convert timestamp fields if present (only if they exist and are not already strings)
     if (data.createdAt !== undefined) {
       converted.createdAt = this.convertTimestamp(data.createdAt)
@@ -80,7 +90,7 @@ export class BaseService {
     if (data.completedAt !== undefined) {
       converted.completedAt = this.convertTimestamp(data.completedAt)
     }
-    
+
     return converted as T
   }
 
@@ -89,7 +99,7 @@ export class BaseService {
     if (obj === null || obj === undefined) return obj
     if (Array.isArray(obj)) return obj.map(item => this.removeUndefined(item))
     if (typeof obj !== 'object') return obj
-    
+
     const cleaned: any = {}
     for (const key in obj) {
       if (obj[key] !== undefined) {
@@ -102,7 +112,7 @@ export class BaseService {
   // Helper method to prepare data for Firestore
   protected prepareData(data: any, includeTimestamps = true) {
     const prepared = { ...data }
-    
+
     if (includeTimestamps) {
       prepared.updatedAt = serverTimestamp()
       if (!prepared.id) {
@@ -133,7 +143,7 @@ export class BaseService {
     try {
       const docRef = doc(db, this.collectionName, id)
       const docSnap = await getDoc(docRef)
-      
+
       if (!docSnap.exists()) {
         throw new Error('Document not found')
       }
@@ -150,7 +160,7 @@ export class BaseService {
     try {
       const collectionRef = collection(db, this.collectionName)
       let q: any = collectionRef
-      
+
       if (filters && filters.length > 0) {
         filters.forEach(filter => {
           q = query(q, where(filter.field, filter.operator, filter.value))
@@ -206,18 +216,18 @@ export class BaseService {
 
   // Get documents with pagination
   async getPaginated(
-    page: number = 1, 
-    pageSize: number = 10, 
-    filters?: any[], 
-    orderByField?: string, 
+    page: number = 1,
+    pageSize: number = 10,
+    filters?: any[],
+    orderByField?: string,
     orderDirection: 'asc' | 'desc' = 'desc'
   ): Promise<{ data: any[], total: number }> {
     try {
       const offset = (page - 1) * pageSize
-      
+
       const collectionRef = collection(db, this.collectionName)
       let q: any = collectionRef
-      
+
       if (filters && filters.length > 0) {
         filters.forEach(filter => {
           q = query(q, where(filter.field, filter.operator, filter.value))
@@ -234,7 +244,7 @@ export class BaseService {
 
       // Get paginated results
       q = query(q, limit(pageSize))
-      
+
       const querySnapshot = await getDocs(q)
       const data = querySnapshot.docs.map(doc => this.convertDocument(doc))
 

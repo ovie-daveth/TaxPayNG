@@ -28,16 +28,16 @@ interface AddTransactionDialogProps {
   defaultDescription?: string
 }
 
-export function AddTransactionDialog({ 
-  open, 
-  onOpenChange, 
-  onSubmit, 
+export function AddTransactionDialog({
+  open,
+  onOpenChange,
+  onSubmit,
   transaction,
   defaultType,
   defaultCategory,
   defaultDescription
 }: AddTransactionDialogProps) {
-  
+
   const [formData, setFormData] = useState({
     type: 'income' as Transaction['type'],
     description: '',
@@ -68,7 +68,7 @@ export function AddTransactionDialog({
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0]
       setSelectedFile(file)
-      
+
       // Auto-upload file to ImageKit
       await uploadFileToImageKit(file)
     }
@@ -87,7 +87,7 @@ export function AddTransactionDialog({
 
       // Perform OCR
       const result = await ocrService.extractReceiptData(file)
-      
+
       clearInterval(progressInterval)
       setOcrProgress(100)
 
@@ -107,7 +107,7 @@ export function AddTransactionDialog({
             notes: result.notes || prev.notes, // Extract remarks/notes from receipt
             type: 'expense' as Transaction['type'] // Receipts are usually expenses
           }
-          
+
           // Convert to NGN if not already
           if (prev.currency !== 'NGN') {
             handleCurrencyConversion(rawAmount, prev.currency)
@@ -115,7 +115,7 @@ export function AddTransactionDialog({
             setConvertedAmountNGN(parseFloat(rawAmount) || null)
             setExchangeRate(1)
           }
-          
+
           return updated
         })
       }
@@ -143,7 +143,7 @@ export function AddTransactionDialog({
 
   const uploadFileToImageKit = async (file: File) => {
     setUploadingImages(true)
-    
+
     try {
       const result = await uploadToImageKit(file, 'transactions')
       setUploadedImage(result)
@@ -205,7 +205,7 @@ export function AddTransactionDialog({
         amount: result.rawValue,
         amountDisplay: result.displayValue
       }))
-      
+
       // Convert to NGN if currency is not NGN
       if (formData.currency !== 'NGN' && result.rawValue) {
         handleCurrencyConversion(result.rawValue, formData.currency)
@@ -220,19 +220,77 @@ export function AddTransactionDialog({
   // Handle currency change
   const handleCurrencyChange = async (newCurrency: CurrencyCode) => {
     setFormData(prev => ({ ...prev, currency: newCurrency }))
-    
+
     // Convert existing amount to NGN
     if (formData.amount) {
       await handleCurrencyConversion(formData.amount, newCurrency)
     }
   }
 
+  // useEffect(() => {
+  //   if (transaction) {
+  //     // Editing existing transaction - show all fields immediately
+  //     const transactionCurrency = (transaction as any).currency || 'NGN' as CurrencyCode
+  //     const amountStr = transaction.amount.toString()
+
+  //     setFormData({
+  //       type: transaction.type,
+  //       description: transaction.description,
+  //       amount: amountStr,
+  //       amountDisplay: formatCurrencyInput(amountStr),
+  //       currency: transactionCurrency,
+  //       date: formatDateForInput(transaction.date),
+  //       category: transaction.category,
+  //       paymentMethod: transaction.paymentMethod,
+  //       notes: transaction.notes || '',
+  //       taxDeductible: transaction.taxDeductible,
+  //       tags: transaction.tags || [],
+  //       attachments: transaction.attachments || []
+  //     })
+
+  //     // Initialize conversion if currency is not NGN
+  //     if (transactionCurrency !== 'NGN') {
+  //       handleCurrencyConversion(amountStr, transactionCurrency)
+  //     } else {
+  //       setConvertedAmountNGN(transaction.amount)
+  //       setExchangeRate(1)
+  //     }
+
+  //     setSelectedFile(null)
+  //     setUploadedImage(null)
+  //     setOcrResult(null)
+  //     setShowFormFields(true) // Show fields for editing
+  //   } else {
+  //     // New transaction - start with file input only
+  //     setFormData({
+  //       type: defaultType ?? 'income',
+  //       description: defaultDescription ?? '',
+  //       amount: '',
+  //       amountDisplay: '',
+  //       currency: 'NGN' as CurrencyCode,
+  //       date: new Date().toISOString().split('T')[0],
+  //       category: defaultCategory ?? '',
+  //       paymentMethod: 'Bank Transfer',
+  //       notes: '',
+  //       taxDeductible: false,
+  //       tags: [],
+  //       attachments: []
+  //     })
+  //     setSelectedFile(null)
+  //     setUploadedImage(null)
+  //     setOcrResult(null)
+  //     setShowFormFields(false) // Hide fields initially for new transactions
+  //     setConvertedAmountNGN(null)
+  //     setExchangeRate(null)
+  //   }
+  // }, [transaction, open, defaultType, defaultCategory, defaultDescription])
+
   useEffect(() => {
     if (transaction) {
       // Editing existing transaction - show all fields immediately
       const transactionCurrency = (transaction as any).currency || 'NGN' as CurrencyCode
       const amountStr = transaction.amount.toString()
-      
+
       setFormData({
         type: transaction.type,
         description: transaction.description,
@@ -247,7 +305,7 @@ export function AddTransactionDialog({
         tags: transaction.tags || [],
         attachments: transaction.attachments || []
       })
-      
+
       // Initialize conversion if currency is not NGN
       if (transactionCurrency !== 'NGN') {
         handleCurrencyConversion(amountStr, transactionCurrency)
@@ -255,9 +313,24 @@ export function AddTransactionDialog({
         setConvertedAmountNGN(transaction.amount)
         setExchangeRate(1)
       }
-      
+
+      // Load existing attachment if available
+      if (transaction.attachments && transaction.attachments.length > 0) {
+        const attachmentUrl = transaction.attachments[0]
+        // Extract filename from URL (last part after the last /)
+        const filename = attachmentUrl.split('/').pop() || 'attachment'
+        setUploadedImage({
+          url: attachmentUrl,
+          name: filename,
+          fileId: '', // Not needed for existing attachments
+          thumbnailUrl: attachmentUrl,
+          size: 0 // Size unknown for existing attachments
+        })
+      } else {
+        setUploadedImage(null)
+      }
+
       setSelectedFile(null)
-      setUploadedImage(null)
       setOcrResult(null)
       setShowFormFields(true) // Show fields for editing
     } else {
@@ -294,12 +367,12 @@ export function AddTransactionDialog({
     try {
       // Get image URL from uploaded image
       const imageUrl = uploadedImage ? [uploadedImage.url] : []
-      
+
       // Use converted NGN amount for storage (always store in NGN)
-      const amountToStore = formData.currency === 'NGN' 
-        ? parseFloat(formData.amount) 
+      const amountToStore = formData.currency === 'NGN'
+        ? parseFloat(formData.amount)
         : (convertedAmountNGN || parseFloat(formData.amount))
-      
+
       const result = await onSubmit({
         type: formData.type,
         description: formData.description,
@@ -314,31 +387,31 @@ export function AddTransactionDialog({
       })
 
       console.log("Result:", result)
-      
+
       if (result.success) {
         const hasAttachment = uploadedImage !== null
-        const successMessage = transaction 
-          ? 'Transaction updated successfully!' 
-          : hasAttachment 
+        const successMessage = transaction
+          ? 'Transaction updated successfully!'
+          : hasAttachment
             ? 'Transaction added successfully! Document also saved.'
             : 'Transaction added successfully!'
-        
+
         toast.success(successMessage)
         onOpenChange(false)
-        
+
         // Dispatch custom event to notify other components of the change
-        const event = new CustomEvent('transactionChanged', { 
-          detail: { 
+        const event = new CustomEvent('transactionChanged', {
+          detail: {
             action: transaction ? 'updated' : 'created',
-            transactionId: result.data?.id 
-          } 
+            transactionId: result.data?.id
+          }
         })
         window.dispatchEvent(event)
-        
+
         // Dispatch document changed event if document was created
         if (hasAttachment && !transaction) {
-          const docEvent = new CustomEvent('documentChanged', { 
-            detail: { action: 'created' } 
+          const docEvent = new CustomEvent('documentChanged', {
+            detail: { action: 'created' }
           })
           window.dispatchEvent(docEvent)
         }
@@ -376,7 +449,7 @@ export function AddTransactionDialog({
                     <div className="space-y-2">
                       <p>Scanning receipt... {ocrProgress}%</p>
                       <div className="w-full bg-muted rounded-full h-2">
-                        <div 
+                        <div
                           className="bg-primary h-2 rounded-full transition-all duration-300"
                           style={{ width: `${ocrProgress}%` }}
                         />
@@ -414,9 +487,8 @@ export function AddTransactionDialog({
               />
               <label
                 htmlFor="file-upload"
-                className={`border-2 border-dashed border-border rounded-lg p-12 text-center hover:border-primary transition-colors block ${
-                  uploadingImages || isScanning ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-                }`}
+                className={`border-2 border-dashed border-border rounded-lg p-12 text-center hover:border-primary transition-colors block ${uploadingImages || isScanning ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                  }`}
               >
                 <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                 <p className="text-sm font-medium mb-1">
@@ -480,7 +552,7 @@ export function AddTransactionDialog({
                     )}
                   </Button>
                 </div>
-                
+
                 {isScanning && (
                   <Alert>
                     <Loader2 className="h-4 w-4 animate-spin" />
@@ -488,7 +560,7 @@ export function AddTransactionDialog({
                       <div className="space-y-2">
                         <p>Scanning receipt... {ocrProgress}%</p>
                         <div className="w-full bg-muted rounded-full h-2">
-                          <div 
+                          <div
                             className="bg-primary h-2 rounded-full transition-all duration-300"
                             style={{ width: `${ocrProgress}%` }}
                           />
@@ -508,8 +580,8 @@ export function AddTransactionDialog({
                           {ocrResult.confidence >= 70 ? '✓ Data extracted successfully' : '⚠ Low confidence - please review'}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          Confidence: {Math.round(ocrResult.confidence)}% | 
-                          Amount: {ocrResult.amount ? `₦${ocrResult.amount}` : 'Not found'} | 
+                          Confidence: {Math.round(ocrResult.confidence)}% |
+                          Amount: {ocrResult.amount ? `₦${ocrResult.amount}` : 'Not found'} |
                           Merchant: {ocrResult.merchant || 'Not found'}
                         </p>
                         <Button
@@ -551,9 +623,8 @@ export function AddTransactionDialog({
                 />
                 <label
                   htmlFor="file-upload-secondary"
-                  className={`border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors block ${
-                    uploadingImages || isScanning ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-                  }`}
+                  className={`border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary transition-colors block ${uploadingImages || isScanning ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                    }`}
                 >
                   <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground">
@@ -561,7 +632,7 @@ export function AddTransactionDialog({
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">Images or PDF up to 10MB</p>
                 </label>
-                
+
                 {uploadedImage && (
                   <div className="mt-2">
                     <div className="flex items-center justify-between p-2 bg-primary/5 rounded-lg border border-primary/20">
@@ -594,8 +665,8 @@ export function AddTransactionDialog({
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="type">Transaction Type</Label>
-                  <Select 
-                    value={formData.type} 
+                  <Select
+                    value={formData.type}
                     onValueChange={(value) => setFormData(prev => ({ ...prev, type: value as Transaction['type'] }))}
                   >
                     <SelectTrigger id="type">
@@ -610,8 +681,8 @@ export function AddTransactionDialog({
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="currency">Currency</Label>
-                  <Select 
-                    value={formData.currency} 
+                  <Select
+                    value={formData.currency}
                     onValueChange={(value) => handleCurrencyChange(value as CurrencyCode)}
                   >
                     <SelectTrigger id="currency">
@@ -632,10 +703,10 @@ export function AddTransactionDialog({
                 <Label htmlFor="amount">
                   Amount ({getCurrencySymbol(formData.currency)})
                 </Label>
-                <Input 
-                  id="amount" 
-                  type="text" 
-                  placeholder="0.00" 
+                <Input
+                  id="amount"
+                  type="text"
+                  placeholder="0.00"
                   value={formData.amountDisplay}
                   onChange={(e) => handleAmountChange(e.target.value)}
                   required
@@ -644,16 +715,16 @@ export function AddTransactionDialog({
                 {formData.currency !== 'NGN' && convertedAmountNGN !== null && (
                   <div className="text-xs text-muted-foreground space-y-1 mt-2 p-2 bg-muted/50 rounded-md">
                     <p className="font-medium">
-                      ≈ ₦{convertedAmountNGN.toLocaleString('en-NG', { 
-                        minimumFractionDigits: 2, 
-                        maximumFractionDigits: 2 
+                      ≈ ₦{convertedAmountNGN.toLocaleString('en-NG', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
                       })}
                     </p>
                     {exchangeRate && (
                       <p className="text-xs">
-                        Exchange Rate: 1 {formData.currency} = ₦{exchangeRate.toLocaleString('en-NG', { 
-                          minimumFractionDigits: 2, 
-                          maximumFractionDigits: 2 
+                        Exchange Rate: 1 {formData.currency} = ₦{exchangeRate.toLocaleString('en-NG', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2
                         })}
                       </p>
                     )}
@@ -672,111 +743,111 @@ export function AddTransactionDialog({
                 )}
               </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="description">Description</Label>
-            <Input 
-              id="description" 
-              placeholder="e.g., Client payment for website design" 
-              value={formData.description}
-              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-              required
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Input
+                  id="description"
+                  placeholder="e.g., Client payment for website design"
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  required
+                />
+              </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="category">Category</Label>
-              <Select 
-                value={formData.category} 
-                onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
-              >
-                <SelectTrigger id="category">
-                  <SelectValue placeholder="Select category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Services">Services</SelectItem>
-                  <SelectItem value="Consulting">Consulting</SelectItem>
-                  <SelectItem value="Projects">Projects</SelectItem>
-                  <SelectItem value="Rent">Rent</SelectItem>
-                  <SelectItem value="Software">Software</SelectItem>
-                  <SelectItem value="Utilities">Utilities</SelectItem>
-                  <SelectItem value="Marketing">Marketing</SelectItem>
-                  <SelectItem value="Food">Food</SelectItem>
-                  <SelectItem value="Transport">Transport</SelectItem>
-                  <SelectItem value="Entertainment">Entertainment</SelectItem>
-                  <SelectItem value="Healthcare">Healthcare</SelectItem>
-                  <SelectItem value="Education">Education</SelectItem>
-                  <SelectItem value="Other">Other</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="date">Date</Label>
-              <Input 
-                id="date" 
-                type="date" 
-                value={formData.date}
-                onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
-                required
-              />
-            </div>
-          </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="category">Category</Label>
+                  <Select
+                    value={formData.category}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                  >
+                    <SelectTrigger id="category">
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Services">Services</SelectItem>
+                      <SelectItem value="Consulting">Consulting</SelectItem>
+                      <SelectItem value="Projects">Projects</SelectItem>
+                      <SelectItem value="Rent">Rent</SelectItem>
+                      <SelectItem value="Software">Software</SelectItem>
+                      <SelectItem value="Utilities">Utilities</SelectItem>
+                      <SelectItem value="Marketing">Marketing</SelectItem>
+                      <SelectItem value="Food">Food</SelectItem>
+                      <SelectItem value="Transport">Transport</SelectItem>
+                      <SelectItem value="Entertainment">Entertainment</SelectItem>
+                      <SelectItem value="Healthcare">Healthcare</SelectItem>
+                      <SelectItem value="Education">Education</SelectItem>
+                      <SelectItem value="Other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="date">Date</Label>
+                  <Input
+                    id="date"
+                    type="date"
+                    value={formData.date}
+                    onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+                    required
+                  />
+                </div>
+              </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="payment-method">Payment Method</Label>
-              <Select 
-                value={formData.paymentMethod} 
-                onValueChange={(value) => setFormData(prev => ({ ...prev, paymentMethod: value }))}
-              >
-                <SelectTrigger id="payment-method">
-                  <SelectValue placeholder="Select method" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
-                  <SelectItem value="Cash">Cash</SelectItem>
-                  <SelectItem value="Card">Card</SelectItem>
-                  <SelectItem value="Mobile Money">Mobile Money</SelectItem>
-                  <SelectItem value="Check">Check</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="payment-method">Payment Method</Label>
+                  <Select
+                    value={formData.paymentMethod}
+                    onValueChange={(value) => setFormData(prev => ({ ...prev, paymentMethod: value }))}
+                  >
+                    <SelectTrigger id="payment-method">
+                      <SelectValue placeholder="Select method" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                      <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="Card">Card</SelectItem>
+                      <SelectItem value="Mobile Money">Mobile Money</SelectItem>
+                      <SelectItem value="Check">Check</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes (Optional)</Label>
-            <Textarea 
-              id="notes" 
-              placeholder="Add any additional notes..." 
-              rows={3}
-              value={formData.notes}
-              onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="notes">Notes (Optional)</Label>
+                <Textarea
+                  id="notes"
+                  placeholder="Add any additional notes..."
+                  rows={3}
+                  value={formData.notes}
+                  onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                />
+              </div>
 
-          <div className="space-y-2">
-            <Label>Tags (Optional)</Label>
-            <TagsInput
-              tags={formData.tags}
-              onTagsChange={(tags) => setFormData(prev => ({ ...prev, tags }))}
-              placeholder="Add tags like 'business', 'travel', 'meals'..."
-              maxTags={5}
-            />
-          </div>
+              <div className="space-y-2">
+                <Label>Tags (Optional)</Label>
+                <TagsInput
+                  tags={formData.tags}
+                  onTagsChange={(tags) => setFormData(prev => ({ ...prev, tags }))}
+                  placeholder="Add tags like 'business', 'travel', 'meals'..."
+                  maxTags={5}
+                />
+              </div>
 
-          <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-            <div className="space-y-0.5">
-              <Label htmlFor="tax-deductible" className="cursor-pointer">
-                Tax Deductible
-              </Label>
-              <p className="text-xs text-muted-foreground">Mark this expense as tax deductible</p>
-            </div>
-            <Switch 
-              id="tax-deductible" 
-              checked={formData.taxDeductible}
-              onCheckedChange={(checked) => setFormData(prev => ({ ...prev, taxDeductible: checked }))}
-            />
-          </div>
+              <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                <div className="space-y-0.5">
+                  <Label htmlFor="tax-deductible" className="cursor-pointer">
+                    Tax Deductible
+                  </Label>
+                  <p className="text-xs text-muted-foreground">Mark this expense as tax deductible</p>
+                </div>
+                <Switch
+                  id="tax-deductible"
+                  checked={formData.taxDeductible}
+                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, taxDeductible: checked }))}
+                />
+              </div>
 
               <div className="flex gap-3 pt-4">
                 <Button
@@ -792,20 +863,20 @@ export function AddTransactionDialog({
                       if (showFormFields && !transaction) {
                         setShowFormFields(false)
                         setOcrResult(null)
-          setFormData({
-          type: defaultType ?? 'income',
-          description: defaultDescription ?? '',
-          amount: '',
-          amountDisplay: '',
-          currency: 'NGN' as CurrencyCode,
-          date: new Date().toISOString().split('T')[0],
-          category: defaultCategory ?? '',
-          paymentMethod: 'Bank Transfer',
-          notes: '',
-          taxDeductible: false,
-          tags: [],
-          attachments: []
-        })
+                        setFormData({
+                          type: defaultType ?? 'income',
+                          description: defaultDescription ?? '',
+                          amount: '',
+                          amountDisplay: '',
+                          currency: 'NGN' as CurrencyCode,
+                          date: new Date().toISOString().split('T')[0],
+                          category: defaultCategory ?? '',
+                          paymentMethod: 'Bank Transfer',
+                          notes: '',
+                          taxDeductible: false,
+                          tags: [],
+                          attachments: []
+                        })
                       } else {
                         onOpenChange(false)
                       }
