@@ -147,6 +147,7 @@ export function TransactionList({
   }
 
   const handleSubmit = async (data: Omit<Transaction, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
+   console.log("Data from handleSubmit:", data)
     try {
       let result
       if (editingTransaction) {
@@ -263,7 +264,7 @@ export function TransactionList({
                         )}
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{transaction.description}</span>
+                        <span className="text-sm font-medium">{transaction.description.slice(0, 25)}</span>
                         {transaction.attachments && transaction.attachments.length > 0 && (
                           <button
                             onClick={() => handleViewImages(transaction)}

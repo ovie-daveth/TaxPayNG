@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { DashboardNav } from "@/components/dashboard/dashboard-nav"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { Card } from "@/components/ui/card"
@@ -18,12 +19,26 @@ import { userService } from "@/lib/services"
 import { toast } from "sonner"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { User, Building2, CreditCard, Bell, Shield } from "lucide-react"
+import { User, Building2, CreditCard, Bell, Shield, Upload, X, CheckCircle2 } from "lucide-react"
+import { uploadToImageKit } from "@/lib/utils/imagekit"
 
 export default function SettingsPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
   const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
   const [isSaving, setIsSaving] = useState(false)
+  const kycSectionRef = useRef<HTMLDivElement>(null)
+  const [kycDocuments, setKycDocuments] = useState({
+    id: '',
+    passport: '',
+    driverLicense: ''
+  })
+  const [uploadingKYC, setUploadingKYC] = useState({
+    id: false,
+    passport: false,
+    driverLicense: false
+  })
   const [subscriptionData, setSubscriptionData] = useState({
     isSubscribe: false,
     subscriptionType: null as string | null,
@@ -79,7 +94,27 @@ export default function SettingsPage() {
         postalCode: profile.address?.postalCode || ''
       }
     })
+
+    // Load KYC documents from profile
+    setKycDocuments({
+      id: profile.kycDocuments?.id || '',
+      passport: profile.kycDocuments?.passport || '',
+      driverLicense: profile.kycDocuments?.driverLicense || ''
+    })
   }, [profile, profileLoading, user?.uid, user?.displayName])
+
+  // Handle URL params to scroll to KYC section
+  useEffect(() => {
+    const tab = searchParams.get('tab')
+    const section = searchParams.get('section')
+    
+    if (tab === 'profile' && section === 'kyc' && kycSectionRef.current) {
+      // Small delay to ensure the tab is rendered
+      setTimeout(() => {
+        kycSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }, 300)
+    }
+  }, [searchParams])
 
   if (isLoading) {
     return (
@@ -105,7 +140,7 @@ export default function SettingsPage() {
             </p>
           </div>
 
-          <Tabs defaultValue="profile" className="w-full">
+          <Tabs defaultValue={searchParams.get('tab') || 'profile'} className="w-full">
             <TabsList className={`grid w-full mb-6 ${profile?.businessType === 'freelancer' ? 'grid-cols-4' : 'grid-cols-5'}`}>
               <TabsTrigger value="profile" className="flex items-center gap-2">
                 <User className="w-4 h-4" />
@@ -245,6 +280,238 @@ export default function SettingsPage() {
                               address: { ...prev.address, postalCode: e.target.value }
                             }))}
                           />
+                        </div>
+                      </div>
+                    </div>
+                    <Separator />
+                    <div ref={kycSectionRef} className="space-y-4" id="kyc-section">
+                      <div>
+                        <h3 className="text-lg font-semibold">KYC Documents</h3>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Upload your identity documents for verification (ID, Passport, or Driver's License)
+                        </p>
+                      </div>
+                      <div className="grid md:grid-cols-3 gap-4">
+                        {/* National ID */}
+                        <div className="space-y-2">
+                          <Label>National ID / Voter's Card</Label>
+                          <div className="border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center min-h-[120px]">
+                            {kycDocuments.id ? (
+                              <div className="flex flex-col items-center gap-2 w-full">
+                                <CheckCircle2 className="w-8 h-8 text-green-500" />
+                                <p className="text-sm text-muted-foreground text-center">Document uploaded</p>
+                                <div className="flex gap-2 mt-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => window.open(kycDocuments.id, '_blank')}
+                                  >
+                                    View
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={async () => {
+                                      if (!user?.uid) return
+                                      setUploadingKYC(prev => ({ ...prev, id: true }))
+                                      try {
+                                        await userService.upsertProfile(user.uid, {
+                                          kycDocuments: { ...kycDocuments, id: '' }
+                                        })
+                                        setKycDocuments(prev => ({ ...prev, id: '' }))
+                                        toast.success("Document removed")
+                                        await refetchProfile()
+                                      } catch (error) {
+                                        toast.error("Failed to remove document")
+                                      } finally {
+                                        setUploadingKYC(prev => ({ ...prev, id: false }))
+                                      }
+                                    }}
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <label className="cursor-pointer flex flex-col items-center gap-2 w-full">
+                                <Upload className="w-6 h-6 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">Click to upload</span>
+                                <input
+                                  type="file"
+                                  accept="image/*,.pdf"
+                                  className="hidden"
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0]
+                                    if (!file || !user?.uid) return
+                                    setUploadingKYC(prev => ({ ...prev, id: true }))
+                                    try {
+                                      const result = await uploadToImageKit(file, 'kyc')
+                                      await userService.upsertProfile(user.uid, {
+                                        kycDocuments: { ...kycDocuments, id: result.url }
+                                      })
+                                      setKycDocuments(prev => ({ ...prev, id: result.url }))
+                                      toast.success("ID document uploaded successfully")
+                                      await refetchProfile()
+                                    } catch (error) {
+                                      toast.error("Failed to upload document")
+                                    } finally {
+                                      setUploadingKYC(prev => ({ ...prev, id: false }))
+                                    }
+                                  }}
+                                  disabled={uploadingKYC.id}
+                                />
+                                {uploadingKYC.id && <span className="text-xs text-muted-foreground">Uploading...</span>}
+                              </label>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Passport */}
+                        <div className="space-y-2">
+                          <Label>Passport</Label>
+                          <div className="border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center min-h-[120px]">
+                            {kycDocuments.passport ? (
+                              <div className="flex flex-col items-center gap-2 w-full">
+                                <CheckCircle2 className="w-8 h-8 text-green-500" />
+                                <p className="text-sm text-muted-foreground text-center">Document uploaded</p>
+                                <div className="flex gap-2 mt-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => window.open(kycDocuments.passport, '_blank')}
+                                  >
+                                    View
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={async () => {
+                                      if (!user?.uid) return
+                                      setUploadingKYC(prev => ({ ...prev, passport: true }))
+                                      try {
+                                        await userService.upsertProfile(user.uid, {
+                                          kycDocuments: { ...kycDocuments, passport: '' }
+                                        })
+                                        setKycDocuments(prev => ({ ...prev, passport: '' }))
+                                        toast.success("Document removed")
+                                        await refetchProfile()
+                                      } catch (error) {
+                                        toast.error("Failed to remove document")
+                                      } finally {
+                                        setUploadingKYC(prev => ({ ...prev, passport: false }))
+                                      }
+                                    }}
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <label className="cursor-pointer flex flex-col items-center gap-2 w-full">
+                                <Upload className="w-6 h-6 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">Click to upload</span>
+                                <input
+                                  type="file"
+                                  accept="image/*,.pdf"
+                                  className="hidden"
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0]
+                                    if (!file || !user?.uid) return
+                                    setUploadingKYC(prev => ({ ...prev, passport: true }))
+                                    try {
+                                      const result = await uploadToImageKit(file, 'kyc')
+                                      await userService.upsertProfile(user.uid, {
+                                        kycDocuments: { ...kycDocuments, passport: result.url }
+                                      })
+                                      setKycDocuments(prev => ({ ...prev, passport: result.url }))
+                                      toast.success("Passport uploaded successfully")
+                                      await refetchProfile()
+                                    } catch (error) {
+                                      toast.error("Failed to upload document")
+                                    } finally {
+                                      setUploadingKYC(prev => ({ ...prev, passport: false }))
+                                    }
+                                  }}
+                                  disabled={uploadingKYC.passport}
+                                />
+                                {uploadingKYC.passport && <span className="text-xs text-muted-foreground">Uploading...</span>}
+                              </label>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Driver's License */}
+                        <div className="space-y-2">
+                          <Label>Driver's License</Label>
+                          <div className="border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center min-h-[120px]">
+                            {kycDocuments.driverLicense ? (
+                              <div className="flex flex-col items-center gap-2 w-full">
+                                <CheckCircle2 className="w-8 h-8 text-green-500" />
+                                <p className="text-sm text-muted-foreground text-center">Document uploaded</p>
+                                <div className="flex gap-2 mt-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => window.open(kycDocuments.driverLicense, '_blank')}
+                                  >
+                                    View
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={async () => {
+                                      if (!user?.uid) return
+                                      setUploadingKYC(prev => ({ ...prev, driverLicense: true }))
+                                      try {
+                                        await userService.upsertProfile(user.uid, {
+                                          kycDocuments: { ...kycDocuments, driverLicense: '' }
+                                        })
+                                        setKycDocuments(prev => ({ ...prev, driverLicense: '' }))
+                                        toast.success("Document removed")
+                                        await refetchProfile()
+                                      } catch (error) {
+                                        toast.error("Failed to remove document")
+                                      } finally {
+                                        setUploadingKYC(prev => ({ ...prev, driverLicense: false }))
+                                      }
+                                    }}
+                                  >
+                                    <X className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : (
+                              <label className="cursor-pointer flex flex-col items-center gap-2 w-full">
+                                <Upload className="w-6 h-6 text-muted-foreground" />
+                                <span className="text-sm text-muted-foreground">Click to upload</span>
+                                <input
+                                  type="file"
+                                  accept="image/*,.pdf"
+                                  className="hidden"
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0]
+                                    if (!file || !user?.uid) return
+                                    setUploadingKYC(prev => ({ ...prev, driverLicense: true }))
+                                    try {
+                                      const result = await uploadToImageKit(file, 'kyc')
+                                      await userService.upsertProfile(user.uid, {
+                                        kycDocuments: { ...kycDocuments, driverLicense: result.url }
+                                      })
+                                      setKycDocuments(prev => ({ ...prev, driverLicense: result.url }))
+                                      toast.success("Driver's License uploaded successfully")
+                                      await refetchProfile()
+                                    } catch (error) {
+                                      toast.error("Failed to upload document")
+                                    } finally {
+                                      setUploadingKYC(prev => ({ ...prev, driverLicense: false }))
+                                    }
+                                  }}
+                                  disabled={uploadingKYC.driverLicense}
+                                />
+                                {uploadingKYC.driverLicense && <span className="text-xs text-muted-foreground">Uploading...</span>}
+                              </label>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>

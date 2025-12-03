@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { useRouter, useParams, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Label } from "@/components/ui/label"
-import { CheckCircle2, Download, FileText, ArrowLeft, Loader2 } from "lucide-react"
+import { CheckCircle2, Download, FileText, ArrowLeft, Loader2, Clock, Mail, UserCheck } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { reportService } from "@/lib/services"
@@ -28,8 +28,18 @@ export default function FilingConfirmationPage() {
 
   const acknowledgmentNumber = searchParams.get("acknowledgment")
   const ticketId = searchParams.get("ticketId")
+  const requestId = searchParams.get("requestId")
   const method = searchParams.get("method")
   const paidAmount = searchParams.get("amount")
+
+  // Determine filing method: agent (requestId or ticketId), direct (acknowledgment), or email (method=email)
+  // Priority: URL params > report data
+  const filingMethod = useMemo(() => {
+    if (requestId || ticketId) return 'agent'
+    if (acknowledgmentNumber) return 'direct'
+    if (method === 'email') return 'email'
+    return report?.filingMethod || null
+  }, [requestId, ticketId, acknowledgmentNumber, method, report?.filingMethod])
 
   useEffect(() => {
     if (reportId && profile?.userId) {
@@ -123,7 +133,7 @@ Generated: ${new Date().toISOString()}
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="container mx-auto px-4 py-6 max-w-4xl">
+      <main className="mx-auto px-4 py-6">
         <div className="space-y-6">
           <Link href="/dashboard/reports">
             <Button variant="ghost" className="mb-4">
@@ -132,14 +142,32 @@ Generated: ${new Date().toISOString()}
             </Button>
           </Link>
 
-          {/* Success Alert */}
-          <Alert className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30">
-            <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-500" />
-            <AlertTitle className="text-green-800 dark:text-green-200">Tax Return Filed Successfully!</AlertTitle>
-            <AlertDescription className="text-green-700 dark:text-green-300">
-              Your annual tax return has been submitted successfully.
-            </AlertDescription>
-          </Alert>
+          {/* Success Alert - Dynamic based on filing method */}
+          {filingMethod === 'agent' ? (
+            <Alert className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30">
+              <Clock className="h-4 w-4 text-blue-600 dark:text-blue-500" />
+              <AlertTitle className="text-blue-800 dark:text-blue-200">Tax Return Submitted Successfully!</AlertTitle>
+              <AlertDescription className="text-blue-700 dark:text-blue-300">
+                Your annual tax return has been submitted successfully. It is now pending with an agent for review and filing. We will update you once the filing is complete.
+              </AlertDescription>
+            </Alert>
+          ) : filingMethod === 'email' ? (
+            <Alert className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30">
+              <Mail className="h-4 w-4 text-green-600 dark:text-green-500" />
+              <AlertTitle className="text-green-800 dark:text-green-200">Tax Return Sent Successfully!</AlertTitle>
+              <AlertDescription className="text-green-700 dark:text-green-300">
+                Your annual tax return has been submitted successfully via email to the IRS.
+              </AlertDescription>
+            </Alert>
+          ) : (
+            <Alert className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30">
+              <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-500" />
+              <AlertTitle className="text-green-800 dark:text-green-200">Tax Return Filed Successfully!</AlertTitle>
+              <AlertDescription className="text-green-700 dark:text-green-300">
+                Your annual tax return has been submitted successfully.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Filing Summary */}
           <Card>
@@ -163,12 +191,12 @@ Generated: ${new Date().toISOString()}
                     <p className="font-mono font-semibold">{acknowledgmentNumber}</p>
                   </div>
                 )}
-                {ticketId && (
+                {(requestId || ticketId) && (
                   <div className="col-span-2">
-                    <Label className="text-muted-foreground">Filing Ticket ID</Label>
-                    <p className="font-mono font-semibold">{ticketId}</p>
+                    <Label className="text-muted-foreground">Filing Request ID</Label>
+                    <p className="font-mono font-semibold">{requestId || ticketId}</p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Your filing is being processed by our agent. You'll receive updates on the status.
+                      Your filing request is pending with an agent. You'll receive updates once an agent is assigned and the filing is processed.
                     </p>
                   </div>
                 )}
@@ -213,14 +241,20 @@ Generated: ${new Date().toISOString()}
                   </p>
                 </div>
               )}
-              {ticketId && (
+              {(requestId || ticketId) && (
                 <div className="p-4 bg-muted rounded-lg">
-                  <p className="text-sm font-medium mb-2">Agent Assignment</p>
+                  <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                    <UserCheck className="w-4 h-4" />
+                    Agent Filing Request
+                  </p>
                   <p className="text-xs text-muted-foreground">
-                    Ticket ID: <span className="font-mono">{ticketId}</span>
+                    Request ID: <span className="font-mono">{requestId || ticketId}</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-2">
+                    <strong>Status:</strong> Pending Agent Assignment → Agent Review → Filed → Completed
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Status: Pending → In Review → Filed → Completed
+                    An agent will be assigned to your request shortly. You'll receive notifications as your filing progresses.
                   </p>
                 </div>
               )}

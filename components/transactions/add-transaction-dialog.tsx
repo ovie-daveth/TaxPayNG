@@ -44,7 +44,7 @@ export function AddTransactionDialog({
     amount: '',
     amountDisplay: '', // Formatted display value with commas
     currency: 'NGN' as CurrencyCode,
-    date: new Date().toISOString().split('T')[0],
+    date: "",
     category: '',
     paymentMethod: 'Bank Transfer',
     notes: '',
@@ -226,64 +226,6 @@ export function AddTransactionDialog({
       await handleCurrencyConversion(formData.amount, newCurrency)
     }
   }
-
-  // useEffect(() => {
-  //   if (transaction) {
-  //     // Editing existing transaction - show all fields immediately
-  //     const transactionCurrency = (transaction as any).currency || 'NGN' as CurrencyCode
-  //     const amountStr = transaction.amount.toString()
-
-  //     setFormData({
-  //       type: transaction.type,
-  //       description: transaction.description,
-  //       amount: amountStr,
-  //       amountDisplay: formatCurrencyInput(amountStr),
-  //       currency: transactionCurrency,
-  //       date: formatDateForInput(transaction.date),
-  //       category: transaction.category,
-  //       paymentMethod: transaction.paymentMethod,
-  //       notes: transaction.notes || '',
-  //       taxDeductible: transaction.taxDeductible,
-  //       tags: transaction.tags || [],
-  //       attachments: transaction.attachments || []
-  //     })
-
-  //     // Initialize conversion if currency is not NGN
-  //     if (transactionCurrency !== 'NGN') {
-  //       handleCurrencyConversion(amountStr, transactionCurrency)
-  //     } else {
-  //       setConvertedAmountNGN(transaction.amount)
-  //       setExchangeRate(1)
-  //     }
-
-  //     setSelectedFile(null)
-  //     setUploadedImage(null)
-  //     setOcrResult(null)
-  //     setShowFormFields(true) // Show fields for editing
-  //   } else {
-  //     // New transaction - start with file input only
-  //     setFormData({
-  //       type: defaultType ?? 'income',
-  //       description: defaultDescription ?? '',
-  //       amount: '',
-  //       amountDisplay: '',
-  //       currency: 'NGN' as CurrencyCode,
-  //       date: new Date().toISOString().split('T')[0],
-  //       category: defaultCategory ?? '',
-  //       paymentMethod: 'Bank Transfer',
-  //       notes: '',
-  //       taxDeductible: false,
-  //       tags: [],
-  //       attachments: []
-  //     })
-  //     setSelectedFile(null)
-  //     setUploadedImage(null)
-  //     setOcrResult(null)
-  //     setShowFormFields(false) // Hide fields initially for new transactions
-  //     setConvertedAmountNGN(null)
-  //     setExchangeRate(null)
-  //   }
-  // }, [transaction, open, defaultType, defaultCategory, defaultDescription])
 
   useEffect(() => {
     if (transaction) {

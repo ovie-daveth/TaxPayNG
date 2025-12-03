@@ -17,6 +17,7 @@ import Link from "next/link"
 import { format } from "date-fns"
 import jsPDF from "jspdf"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
+import { DocumentSelectionModal } from "@/components/filing/document-selection-modal"
 
 interface PaymentData {
   rrr: string
@@ -42,6 +43,8 @@ export default function PaymentSuccessPage() {
   const [selectedState, setSelectedState] = useState<string>("")
   const [submitting, setSubmitting] = useState(false)
   const [submissionMethod, setSubmissionMethod] = useState<"direct" | "agent" | "email" | null>(null)
+  const [showDocumentModal, setShowDocumentModal] = useState(false)
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([])
 
   const paymentData: PaymentData = {
     rrr: searchParams.get("rrr") || "",
@@ -175,10 +178,19 @@ export default function PaymentSuccessPage() {
     }
   }
 
-  const handleAgentSubmission = async () => {
+  const handleAgentSubmission = () => {
     if (!report || !selectedState) return
+    // Show document selection modal first
+    setShowDocumentModal(true)
+  }
 
+  const handleDocumentSelection = async (documentIds: string[]) => {
+    if (!report || !selectedState || !user?.uid) return
+
+    setSelectedDocumentIds(documentIds)
+    setShowDocumentModal(false)
     setSubmitting(true)
+
     try {
       const response = await fetch("/api/filing/agent/assign", {
         method: "POST",
@@ -186,24 +198,25 @@ export default function PaymentSuccessPage() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          userId: user?.uid,
+          userId: user.uid,
           state: selectedState,
           reportId: report.id,
-          rrr: paymentData.rrr
+          rrr: paymentData.rrr,
+          supportingDocuments: documentIds
         }),
       })
 
       const data = await response.json()
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to assign agent")
+        throw new Error(data.error || "Failed to submit filing request")
       }
 
-      toast.success("Filing agent assigned. You'll be notified of updates.")
-      router.push(`/dashboard/reports/file/${reportId}/confirmation?ticketId=${data.ticketId}&amount=${paymentData.amount}`)
+      toast.success("Filing request submitted successfully. An agent will be assigned shortly.")
+      router.push(`/dashboard/reports/file/${reportId}/confirmation?requestId=${data.requestId}&amount=${paymentData.amount}`)
     } catch (error) {
-      console.error("Error assigning agent:", error)
-      toast.error(error instanceof Error ? error.message : "Failed to assign agent")
+      console.error("Error submitting filing request:", error)
+      toast.error(error instanceof Error ? error.message : "Failed to submit filing request")
     } finally {
       setSubmitting(false)
     }
@@ -478,6 +491,16 @@ export default function PaymentSuccessPage() {
           </Card>
         </div>
       </main>
+
+      {/* Document Selection Modal */}
+      {user?.uid && (
+        <DocumentSelectionModal
+          open={showDocumentModal}
+          onOpenChange={setShowDocumentModal}
+          onConfirm={handleDocumentSelection}
+          userId={user.uid}
+        />
+      )}
     </div>
   )
 }

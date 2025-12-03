@@ -62,109 +62,96 @@ export function calculateTaxRecommendation(params: {
     effectiveQuarter,
   } = params
 
-  // Project annual income based on actual year-to-date data
-  let projectedAnnualIncome: number
-  let projectedAnnualExpenses: number
-  let projectedAnnualReliefs: number
+  // Get current date to calculate months completed/remaining
+  const now = new Date()
+  const currentMonth = now.getMonth() + 1 // 1-12 (January = 1, December = 12)
+  const currentYear = now.getFullYear()
 
-  if (periodType === "year") {
-    // For year view, use actual data
-    projectedAnnualIncome = ytdIncome
-    projectedAnnualExpenses = ytdExpenses
-    projectedAnnualReliefs = ytdReliefs
-  } else {
-    // For quarter view, calculate based on year-to-date and remaining time
-    const now = new Date()
-    const currentMonth = now.getMonth() + 1 // 1-12
-    const currentYear = now.getFullYear()
+  // Calculate months completed YTD (not based on quarters)
+  // If viewing current year, use actual months elapsed; otherwise assume full year
+  const isCurrentYear = effectiveYear === currentYear
+  const monthsCompleted = isCurrentYear ? currentMonth : 12
+  const monthsRemaining = 12 - monthsCompleted
 
-    // Check if we're looking at the current year and current/previous quarters
-    const isCurrentYear = effectiveYear === currentYear
-    const isCurrentOrPastQuarter = effectiveQuarter <= Math.ceil(currentMonth / 3)
+  // Calculate monthly averages from YTD data (this is the key change)
+  const avgMonthlyIncome = monthsCompleted > 0 ? ytdIncome / monthsCompleted : 0
+  const avgMonthlyExpenses = monthsCompleted > 0 ? ytdExpenses / monthsCompleted : 0
+  const avgMonthlyReliefs = monthsCompleted > 0 ? ytdReliefs / monthsCompleted : 0
 
-    // Calculate months elapsed in the current quarter
-    const quarterStartMonth = (effectiveQuarter - 1) * 3 + 1 // Q1=1, Q2=4, Q3=7, Q4=10
-    const monthsInCurrentQuarter = isCurrentYear && isCurrentOrPastQuarter
-      ? Math.max(0, currentMonth - quarterStartMonth + 1)
-      : 3 // If past quarter or different year, assume full quarter
-    const monthsRemainingInQuarter = Math.max(0, 3 - monthsInCurrentQuarter)
+  // Project remaining months based on monthly averages
+  const projectedRemainingMonthsIncome = avgMonthlyIncome * monthsRemaining
+  const projectedRemainingMonthsExpenses = avgMonthlyExpenses * monthsRemaining
+  const projectedRemainingMonthsReliefs = avgMonthlyReliefs * monthsRemaining
 
-    // Calculate completed quarters (full quarters before current one)
-    const completedQuarters = Math.max(0, effectiveQuarter - 1)
-    const quartersRemaining = 4 - effectiveQuarter
-
-    // Calculate total months elapsed YTD (completed quarters * 3 + months in current quarter)
-    const totalMonthsElapsedYTD = completedQuarters * 3 + monthsInCurrentQuarter
-
-    // Calculate average monthly income/expenses for current quarter only (for display)
-    const avgMonthlyIncomeInQuarter =
-      monthsInCurrentQuarter > 0 ? currentIncomeTotal / monthsInCurrentQuarter : 0
-    const avgMonthlyExpensesInQuarter =
-      monthsInCurrentQuarter > 0 ? currentExpenseTotal / monthsInCurrentQuarter : 0
-    const avgMonthlyReliefsInQuarter =
-      monthsInCurrentQuarter > 0 ? reliefTotal / monthsInCurrentQuarter : 0
-
-    // Calculate YTD average per month (for projections - this is what we should use)
-    // This gives us a better projection based on actual year-to-date performance
-    const avgMonthlyIncomeYTD = totalMonthsElapsedYTD > 0 ? ytdIncome / totalMonthsElapsedYTD : 0
-    const avgMonthlyExpensesYTD = totalMonthsElapsedYTD > 0 ? ytdExpenses / totalMonthsElapsedYTD : 0
-    const avgMonthlyReliefsYTD = totalMonthsElapsedYTD > 0 ? ytdReliefs / totalMonthsElapsedYTD : 0
-
-    // Calculate average per quarter from completed quarters
-    const completedQuartersIncome = completedQuarters > 0 ? ytdIncome - currentIncomeTotal : 0
-    const completedQuartersExpenses = completedQuarters > 0 ? ytdExpenses - currentExpenseTotal : 0
-    const completedQuartersReliefs = completedQuarters > 0 ? ytdReliefs - reliefTotal : 0
-
-    const avgQuarterlyIncome =
-      completedQuarters > 0
-        ? completedQuartersIncome / completedQuarters
-        : monthsInCurrentQuarter > 0
-          ? avgMonthlyIncomeInQuarter * 3
-          : 0
-    const avgQuarterlyExpenses =
-      completedQuarters > 0
-        ? completedQuartersExpenses / completedQuarters
-        : monthsInCurrentQuarter > 0
-          ? avgMonthlyExpensesInQuarter * 3
-          : 0
-    const avgQuarterlyReliefs =
-      completedQuarters > 0
-        ? completedQuartersReliefs / completedQuarters
-        : monthsInCurrentQuarter > 0
-          ? avgMonthlyReliefsInQuarter * 3
-          : 0
-
-    // Project remaining months in current quarter using YTD average (better projection)
-    const projectedRemainingMonthsIncome = avgMonthlyIncomeYTD * monthsRemainingInQuarter
-    const projectedRemainingMonthsExpenses = avgMonthlyExpensesYTD * monthsRemainingInQuarter
-    const projectedRemainingMonthsReliefs = avgMonthlyReliefsYTD * monthsRemainingInQuarter
-
-    // Project remaining full quarters using YTD average (consistent with remaining months projection)
-    // Convert YTD monthly average to quarterly: monthly average * 3 months per quarter
-    const avgQuarterlyIncomeFromYTD = avgMonthlyIncomeYTD * 3
-    const avgQuarterlyExpensesFromYTD = avgMonthlyExpensesYTD * 3
-    const avgQuarterlyReliefsFromYTD = avgMonthlyReliefsYTD * 3
-    
-    const projectedRemainingQuartersIncome = avgQuarterlyIncomeFromYTD * quartersRemaining
-    const projectedRemainingQuartersExpenses = avgQuarterlyExpensesFromYTD * quartersRemaining
-    const projectedRemainingQuartersReliefs = avgQuarterlyReliefsFromYTD * quartersRemaining
-
-    // Total projection = YTD + Remaining months in current quarter + Remaining quarters
-    projectedAnnualIncome =
-      ytdIncome + projectedRemainingMonthsIncome + projectedRemainingQuartersIncome
-    projectedAnnualExpenses =
-      ytdExpenses + projectedRemainingMonthsExpenses + projectedRemainingQuartersExpenses
-    projectedAnnualReliefs =
-      ytdReliefs + projectedRemainingMonthsReliefs + projectedRemainingQuartersReliefs
-  }
+  // Calculate projected annual totals (actual YTD + projected remaining)
+  const projectedAnnualIncome = ytdIncome + projectedRemainingMonthsIncome
+  const projectedAnnualExpenses = ytdExpenses + projectedRemainingMonthsExpenses
+  const projectedAnnualReliefs = ytdReliefs + projectedRemainingMonthsReliefs
 
   // Tax exemption threshold: Gross income ≤ ₦1,200,000 is completely exempt
   const GROSS_INCOME_EXEMPTION_THRESHOLD = 1200000
 
-  // Tax brackets apply to taxable income (after expenses and reliefs)
-  const TAX_FREE_THRESHOLD = 800000 // First ₦800k of taxable income is 0%
-  const BRACKET_1_MAX = 3000000
-  const BRACKET_2_MAX = 12000000
+  // Calculate taxable income (income - expenses - reliefs)
+  const projectedTaxableIncome = Math.max(
+    0,
+    projectedAnnualIncome - projectedAnnualExpenses - projectedAnnualReliefs
+  )
+
+  // Nigeria PIT brackets (as specified by user)
+  // First ₦300,000 → 7%
+  // Next ₦300,000 → 11%
+  // Next ₦500,000 → 15%
+  // Next ₦500,000 → 19%
+  // Next ₦1,600,000 → 21%
+  // Above ₦3,200,000 → 24%
+  const calculateNigerianPIT = (taxableIncome: number): number => {
+    if (taxableIncome <= 0) return 0
+
+    let remainingIncome = taxableIncome
+    let totalTax = 0
+
+    // First ₦300,000 → 7%
+    if (remainingIncome > 0) {
+      const amount = Math.min(remainingIncome, 300000)
+      totalTax += amount * 0.07
+      remainingIncome -= amount
+    }
+
+    // Next ₦300,000 → 11%
+    if (remainingIncome > 0) {
+      const amount = Math.min(remainingIncome, 300000)
+      totalTax += amount * 0.11
+      remainingIncome -= amount
+    }
+
+    // Next ₦500,000 → 15%
+    if (remainingIncome > 0) {
+      const amount = Math.min(remainingIncome, 500000)
+      totalTax += amount * 0.15
+      remainingIncome -= amount
+    }
+
+    // Next ₦500,000 → 19%
+    if (remainingIncome > 0) {
+      const amount = Math.min(remainingIncome, 500000)
+      totalTax += amount * 0.19
+      remainingIncome -= amount
+    }
+
+    // Next ₦1,600,000 → 21%
+    if (remainingIncome > 0) {
+      const amount = Math.min(remainingIncome, 1600000)
+      totalTax += amount * 0.21
+      remainingIncome -= amount
+    }
+
+    // Above ₦3,200,000 → 24%
+    if (remainingIncome > 0) {
+      totalTax += remainingIncome * 0.24
+    }
+
+    return totalTax
+  }
 
   let taxAdvice: string
   let reserveTarget: number
@@ -176,53 +163,40 @@ export function calculateTaxRecommendation(params: {
     isLowEarner = true
     taxAdvice = `Your projected annual gross income (${formatCurrency(projectedAnnualIncome)}) is at or below ₦1,200,000. You are completely exempt from tax.`
     reserveTarget = 0
+  } else if (projectedTaxableIncome <= 0) {
+    // Taxable income is zero or negative after expenses and reliefs
+    isLowEarner = true
+    taxAdvice = `Your projected annual taxable income is ₦0 or negative after expenses and reliefs. You may not owe any tax this year.`
+    reserveTarget = 0
   } else {
-    // Calculate taxable income (income - expenses - reliefs)
-    const projectedTaxableIncome = Math.max(
-      0,
-      projectedAnnualIncome - projectedAnnualExpenses - projectedAnnualReliefs
-    )
+    // Calculate tax using progressive PIT brackets
+    const estimatedTax = calculateNigerianPIT(projectedTaxableIncome)
+    reserveTarget = estimatedTax
+    const calculatedEffectiveRate = (estimatedTax / projectedTaxableIncome) * 100
 
-    if (projectedTaxableIncome <= TAX_FREE_THRESHOLD) {
-      // Taxable income below ₦800k (but gross income was above ₦1.2M)
+    if (projectedTaxableIncome <= 300000) {
       isLowEarner = true
-      taxAdvice = `Your projected annual taxable income (${formatCurrency(projectedTaxableIncome)}) is below ₦800,000 after expenses and reliefs. You may not owe any tax this year.`
-      reserveTarget = 0
-    } else if (projectedTaxableIncome <= BRACKET_1_MAX) {
-      // 15% bracket (₦800k - ₦3M)
+      taxAdvice = `Your projected annual taxable income (${formatCurrency(projectedTaxableIncome)}) falls in the 7% bracket. Estimated tax: ${formatCurrency(estimatedTax)} (effective rate: ${calculatedEffectiveRate.toFixed(1)}%).`
+    } else if (projectedTaxableIncome <= 600000) {
       isLowEarner = true
-      // Calculate tax: 0% on first 800k, 15% on remainder
-      const taxableAboveThreshold = projectedTaxableIncome - TAX_FREE_THRESHOLD
-      const estimatedTax = taxableAboveThreshold * 0.15
-      reserveTarget = estimatedTax
-      const effectiveRate = (estimatedTax / projectedTaxableIncome) * 100
-      taxAdvice = `Your projected annual taxable income (${formatCurrency(projectedTaxableIncome)}) falls in the 15% bracket. Estimated tax: ${formatCurrency(estimatedTax)} (effective rate: ${effectiveRate.toFixed(1)}%).`
-    } else if (projectedTaxableIncome <= BRACKET_2_MAX) {
-      // 18% bracket (₦3M - ₦12M)
-      // Calculate tax: 0% on first 800k, 15% on next 2.2M, 18% on remainder
-      const taxOnFirstBracket = (BRACKET_1_MAX - TAX_FREE_THRESHOLD) * 0.15
-      const taxableInSecondBracket = projectedTaxableIncome - BRACKET_1_MAX
-      const estimatedTax = taxOnFirstBracket + taxableInSecondBracket * 0.18
-      reserveTarget = estimatedTax
-      const effectiveRate = (estimatedTax / projectedTaxableIncome) * 100
-      taxAdvice = `Your projected annual taxable income (${formatCurrency(projectedTaxableIncome)}) falls in the 18% bracket. Estimated tax: ${formatCurrency(estimatedTax)} (effective rate: ${effectiveRate.toFixed(1)}%).`
+      taxAdvice = `Your projected annual taxable income (${formatCurrency(projectedTaxableIncome)}) falls in the 11% bracket. Estimated tax: ${formatCurrency(estimatedTax)} (effective rate: ${calculatedEffectiveRate.toFixed(1)}%).`
+    } else if (projectedTaxableIncome <= 1100000) {
+      isLowEarner = true
+      taxAdvice = `Your projected annual taxable income (${formatCurrency(projectedTaxableIncome)}) falls in the 15% bracket. Estimated tax: ${formatCurrency(estimatedTax)} (effective rate: ${calculatedEffectiveRate.toFixed(1)}%).`
+    } else if (projectedTaxableIncome <= 1600000) {
+      taxAdvice = `Your projected annual taxable income (${formatCurrency(projectedTaxableIncome)}) falls in the 19% bracket. Estimated tax: ${formatCurrency(estimatedTax)} (effective rate: ${calculatedEffectiveRate.toFixed(1)}%).`
+    } else if (projectedTaxableIncome <= 3200000) {
+      taxAdvice = `Your projected annual taxable income (${formatCurrency(projectedTaxableIncome)}) falls in the 21% bracket. Estimated tax: ${formatCurrency(estimatedTax)} (effective rate: ${calculatedEffectiveRate.toFixed(1)}%).`
     } else {
-      // Higher brackets (18%+ effective rate)
-      // Use a conservative estimate of 20-25% effective rate
-      const estimatedTax = projectedTaxableIncome * 0.22 // Conservative 22% average
-      reserveTarget = estimatedTax
-      taxAdvice = `Your projected annual taxable income (${formatCurrency(projectedTaxableIncome)}) is in a higher tax bracket. Estimated tax: ${formatCurrency(estimatedTax)} (approximately 20-25% effective rate).`
+      taxAdvice = `Your projected annual taxable income (${formatCurrency(projectedTaxableIncome)}) is above ₦3,200,000. Estimated tax: ${formatCurrency(estimatedTax)} (effective rate: ${calculatedEffectiveRate.toFixed(1)}%).`
     }
   }
 
-  const projectedTaxableIncome = Math.max(
-    0,
-    projectedAnnualIncome - projectedAnnualExpenses - projectedAnnualReliefs
-  )
   const effectiveRate =
     reserveTarget > 0 && projectedTaxableIncome > 0 ? (reserveTarget / projectedTaxableIncome) * 100 : 0
 
-  // Calculate detailed breakdown for display
+  // Calculate detailed breakdown for display (month-based, not quarter-based)
+  // For quarter view, calculate months in current quarter for display purposes
   let monthsInCurrentQuarter = 3
   let monthsRemainingInQuarter = 0
   let avgMonthlyIncomeInQuarter = 0
@@ -235,9 +209,7 @@ export function calculateTaxRecommendation(params: {
   let avgQuarterlyReliefs = 0
 
   if (periodType === "quarter") {
-    const now = new Date()
-    const currentMonth = now.getMonth() + 1
-    const currentYear = now.getFullYear()
+    // Calculate quarter info for display purposes only
     const isCurrentYear = effectiveYear === currentYear
     const isCurrentOrPastQuarter = effectiveQuarter <= Math.ceil(currentMonth / 3)
 
@@ -254,34 +226,17 @@ export function calculateTaxRecommendation(params: {
       monthsInCurrentQuarter > 0 ? currentExpenseTotal / monthsInCurrentQuarter : 0
     avgMonthlyReliefsInQuarter = monthsInCurrentQuarter > 0 ? reliefTotal / monthsInCurrentQuarter : 0
 
-    const completedQuartersIncome = completedQuarters > 0 ? ytdIncome - currentIncomeTotal : 0
-    const completedQuartersExpenses = completedQuarters > 0 ? ytdExpenses - currentExpenseTotal : 0
-    const completedQuartersReliefs = completedQuarters > 0 ? ytdReliefs - reliefTotal : 0
-
-    avgQuarterlyIncome =
-      completedQuarters > 0
-        ? completedQuartersIncome / completedQuarters
-        : monthsInCurrentQuarter > 0
-          ? avgMonthlyIncomeInQuarter * 3
-          : projectedAnnualIncome / 4
-    avgQuarterlyExpenses =
-      completedQuarters > 0
-        ? completedQuartersExpenses / completedQuarters
-        : monthsInCurrentQuarter > 0
-          ? avgMonthlyExpensesInQuarter * 3
-          : projectedAnnualExpenses / 4
-    avgQuarterlyReliefs =
-      completedQuarters > 0
-        ? completedQuartersReliefs / completedQuarters
-        : monthsInCurrentQuarter > 0
-          ? avgMonthlyReliefsInQuarter * 3
-          : projectedAnnualReliefs / 4
+    // Calculate quarterly averages from monthly averages (for display)
+    avgQuarterlyIncome = avgMonthlyIncome * 3
+    avgQuarterlyExpenses = avgMonthlyExpenses * 3
+    avgQuarterlyReliefs = avgMonthlyReliefs * 3
   } else {
-    completedQuarters = 4
-    quartersRemaining = 0
-    avgQuarterlyIncome = projectedAnnualIncome / 4
-    avgQuarterlyExpenses = projectedAnnualExpenses / 4
-    avgQuarterlyReliefs = projectedAnnualReliefs / 4
+    // For year view, calculate from monthly averages
+    completedQuarters = Math.ceil(monthsCompleted / 3)
+    quartersRemaining = 4 - completedQuarters
+    avgQuarterlyIncome = avgMonthlyIncome * 3
+    avgQuarterlyExpenses = avgMonthlyExpenses * 3
+    avgQuarterlyReliefs = avgMonthlyReliefs * 3
   }
 
   return {

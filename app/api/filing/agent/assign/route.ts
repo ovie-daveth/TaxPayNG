@@ -1,39 +1,42 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { BaseService } from '@/lib/services/base'
 import { getAdminDb } from '@/lib/firebase-admin'
-
-class FilingTicketService extends BaseService {
-  constructor() {
-    super('filingTickets')
-  }
-}
+import { FilingRequest } from '@/lib/types'
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { userId, state, reportId, rrr } = body
+    const { userId, state, reportId, rrr, supportingDocuments } = body
 
-    if (!userId || !state || !reportId) {
+    if (!userId || !state || !reportId || !rrr) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       )
     }
 
-    const ticketService = new FilingTicketService()
+    if (!supportingDocuments || !Array.isArray(supportingDocuments) || supportingDocuments.length === 0) {
+      return NextResponse.json(
+        { error: 'At least one supporting document is required' },
+        { status: 400 }
+      )
+    }
+
+    const db = getAdminDb()
     
-    const ticketData = {
+    const requestData: Omit<FilingRequest, 'id'> = {
       userId,
       state,
       reportId,
       rrr,
+      supportingDocuments,
       status: 'pending',
-      assignedAt: new Date().toISOString(),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     }
 
-    const ticketId = await ticketService.create(ticketData)
+    // Create document using Admin SDK (bypasses security rules)
+    const requestRef = await db.collection('filingRequests').add(requestData)
+    const requestId = requestRef.id
 
     // Update report with filing status using Admin SDK
     try {
@@ -42,8 +45,6 @@ export async function POST(request: NextRequest) {
       await reportRef.update({
         filingStatus: 'submitted',
         filingMethod: 'agent',
-        ticketId,
-        status: 'completed',
         updatedAt: new Date().toISOString()
       })
     } catch (error) {
@@ -51,19 +52,16 @@ export async function POST(request: NextRequest) {
       // Continue even if update fails
     }
 
-    // TODO: Notify agent via email/notification system
-
     return NextResponse.json({
       success: true,
-      ticketId,
-      message: 'Filing agent assigned successfully'
+      requestId,
+      message: 'Filing request submitted successfully. An agent will be assigned shortly.'
     })
   } catch (error) {
-    console.error('Error assigning agent:', error)
+    console.error('Error creating filing request:', error)
     return NextResponse.json(
-      { error: 'Failed to assign agent' },
+      { error: 'Failed to submit filing request' },
       { status: 500 }
     )
   }
 }
-

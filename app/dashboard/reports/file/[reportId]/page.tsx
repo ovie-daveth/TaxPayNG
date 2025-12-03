@@ -130,18 +130,12 @@ export default function FileTaxReturnPage() {
       actionLabel: !isTINVerified ? "Add TIN" : undefined
     })
 
-    // 3. Check if KYC is uploaded (check for identity documents)
+    // 3. Check if KYC is uploaded (check for identity documents in profile)
     try {
-      const documentsResult = await documentService.getUserDocuments(user.uid)
-      const documents = documentsResult.data || []
-      const hasKYCDocuments = documents.some(doc => 
-        doc.type === 'proof' || 
-        doc.name?.toLowerCase().includes('id') ||
-        doc.name?.toLowerCase().includes('passport') ||
-        doc.name?.toLowerCase().includes('license') ||
-        doc.originalName?.toLowerCase().includes('id') ||
-        doc.originalName?.toLowerCase().includes('passport') ||
-        doc.originalName?.toLowerCase().includes('license')
+      const hasKYCDocuments = !!(
+        profile.kycDocuments?.id || 
+        profile.kycDocuments?.passport || 
+        profile.kycDocuments?.driverLicense
       )
       
       checks.push({
@@ -150,7 +144,7 @@ export default function FileTaxReturnPage() {
         message: hasKYCDocuments
           ? "KYC documents are uploaded"
           : "Please upload your identity documents (ID, Passport, or Driver's License)",
-        actionUrl: !hasKYCDocuments ? "/dashboard/documents" : undefined,
+        actionUrl: !hasKYCDocuments ? "/dashboard/settings?tab=profile&section=kyc" : undefined,
         actionLabel: !hasKYCDocuments ? "Upload Documents" : undefined
       })
     } catch (error) {
@@ -159,7 +153,7 @@ export default function FileTaxReturnPage() {
         name: "KYC Documents",
         status: false,
         message: "Unable to verify KYC documents",
-        actionUrl: "/dashboard/documents",
+        actionUrl: "/dashboard/settings?tab=profile&section=kyc",
         actionLabel: "Upload Documents"
       })
     }

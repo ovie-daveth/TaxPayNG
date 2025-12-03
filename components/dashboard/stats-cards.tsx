@@ -249,7 +249,7 @@ const buildStatsFromSummary = (
     : formatCurrency(0)
   const monthDisplay = `${labels.monthShortLabel} ${labels.year}`
   const periodDisplay = periodType === "year" ? `${labels.year}` : labels.quarterLabel
-  const taxPeriodLabel = periodType === "year" ? "Yearly" : "Quarterly"
+  const taxPeriodDisplay = periodType === "year" ? `${labels.year}` : labels.quarterLabel
 
   return [
     {
@@ -292,8 +292,8 @@ const buildStatsFromSummary = (
       change: isSmallBusinessExempt 
         ? "Small company exempt" 
         : taxPaymentsTotal > 0
-        ? `${taxPeriodLabel} • Paid: ${formatCurrency(taxPaymentsTotal)}`
-        : `${taxPeriodLabel} • Based on ${labels.year} data`,
+        ? `${taxPeriodDisplay} • Paid: ${formatCurrency(taxPaymentsTotal)}`
+        : taxPeriodDisplay,
       trend: "neutral",
       icon: isSmallBusinessExempt ? CheckCircle2 : Calculator,
       color: isSmallBusinessExempt ? "text-green-600" : "text-accent",

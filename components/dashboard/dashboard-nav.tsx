@@ -8,8 +8,10 @@ import { Calculator, LayoutDashboard, Receipt, FileText, Bell, Settings, LogOut,
 import { useState } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { useAuth } from "@/lib/hooks/useAuth"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { toast } from "sonner"
 import OtaxLogo from "../OtaxLogo"
+import { User } from "lucide-react"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -28,7 +30,8 @@ export function DashboardNav() {
   const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { sidebarCollapsed, toggleSidebar } = useSidebar()
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
+  const { profile } = useUserProfile()
 
   const handleLogout = async () => {
     const result = await logout()
@@ -73,7 +76,11 @@ export function DashboardNav() {
         <nav className="flex-1 p-4 space-y-8">
           {navItems.map((item) => {
             const Icon = item.icon
-            const isActive = pathname === item.href
+            // For Dashboard, only match exact path (not sub-routes)
+            // For other routes, match exact path or sub-routes
+            const isActive = item.href === "/dashboard"
+              ? pathname === item.href || pathname === item.href + "/"
+              : pathname === item.href || pathname?.startsWith(item.href + "/")
             return (
               <Link key={item.href} href={item.href}>
                 <div
@@ -98,7 +105,41 @@ export function DashboardNav() {
           })}
         </nav>
 
-        <div className="p-4 border-t border-border">
+        <div className="p-4 border-t border-border space-y-3">
+          {/* User Info */}
+          {profile && (
+            <div className={cn(
+              "flex items-center gap-2 px-2 py-2 rounded-lg transition-all duration-200",
+              sidebarCollapsed ? "justify-center" : "justify-start"
+            )}>
+              <div className={cn(
+                "flex-shrink-0 rounded-full bg-primary/10 p-1.5 flex items-center justify-center",
+                sidebarCollapsed ? "w-8 h-8" : "w-9 h-9"
+              )}>
+                <User className={cn(
+                  "text-primary",
+                  sidebarCollapsed ? "w-4 h-4" : "w-5 h-5"
+                )} />
+              </div>
+              {!sidebarCollapsed && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {profile.firstName && profile.lastName 
+                      ? `${profile.firstName} ${profile.lastName}`
+                      : profile.firstName || profile.lastName || profile.email?.split('@')[0] || 'User'
+                    }
+                  </p>
+                  {profile.email && (
+                    <p className="text-xs text-muted-foreground truncate">
+                      {profile.email}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Logout Button */}
           <Button 
             variant="ghost" 
             className={cn(
@@ -126,7 +167,17 @@ export function DashboardNav() {
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <Calculator className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="font-semibold text-lg">OTax</span>
+            <div className="flex flex-col">
+              <span className="font-semibold text-lg">OTax</span>
+              {profile && (
+                <span className="text-xs text-muted-foreground">
+                  {profile.firstName && profile.lastName 
+                    ? `${profile.firstName} ${profile.lastName}`
+                    : profile.firstName || profile.lastName || profile.email?.split('@')[0] || 'User'
+                  }
+                </span>
+              )}
+            </div>
           </Link>
           <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -138,7 +189,11 @@ export function DashboardNav() {
           <nav className="border-t border-border p-4 space-y-1">
             {navItems.map((item) => {
               const Icon = item.icon
-              const isActive = pathname === item.href
+              // For Dashboard, only match exact path (not sub-routes)
+              // For other routes, match exact path or sub-routes
+              const isActive = item.href === "/dashboard"
+                ? pathname === item.href || pathname === item.href + "/"
+                : pathname === item.href || pathname?.startsWith(item.href + "/")
               return (
                 <Link key={item.href} href={item.href} onClick={() => setMobileMenuOpen(false)}>
                   <div

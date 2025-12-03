@@ -414,7 +414,7 @@ export function AnalyticsInsights({
           if (periodType === "quarter" && currentIncomeTotal > 0) {
             // Calculate tax for this quarter's actual income
             const quarterTax = calculateNigerianTax({
-              businessType: businessType === "small-business" ? "sme" : businessType,
+              businessType: businessType,
               period: "yearly",
               income: currentIncomeTotal,
               businessExpenses: currentExpenseTotal,
@@ -439,7 +439,7 @@ export function AnalyticsInsights({
           if (periodType === "quarter" && currentIncomeTotal > 0) {
             // Calculate tax for this quarter's actual income
             const quarterTax = calculateNigerianTax({
-              businessType: businessType === "small-business" ? "sme" : businessType,
+              businessType: businessType,
               period: "yearly",
               income: currentIncomeTotal,
               businessExpenses: currentExpenseTotal,

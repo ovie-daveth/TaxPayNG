@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ReportData } from "@/lib/services/reportService"
 import { formatCurrencyAmount } from "@/lib/utils/currency"
 import { format } from "date-fns"
-import { Printer, ArrowLeft, Plus, Trash2, X, Upload, Loader2, FileCheck } from "lucide-react"
+import { Printer, ArrowLeft, Plus, Trash2, X, Upload, Loader2, FileCheck, Clock, Mail, CheckCircle2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
@@ -34,9 +34,11 @@ interface SelfAssessmentPreviewProps {
   onBack?: () => void
   reportId?: string
   showFileButton?: boolean
+  filingStatus?: 'not_filed' | 'filed' | 'submitted' | 'acknowledged'
+  filingMethod?: 'direct' | 'agent' | 'email' | null
 }
 
-export function SelfAssessmentPreview({ reportData, formData, isEditing = false, onDataChange, onBack, reportId, showFileButton = false }: SelfAssessmentPreviewProps) {
+export function SelfAssessmentPreview({ reportData, formData, isEditing = false, onDataChange, onBack, reportId, showFileButton = false, filingStatus, filingMethod }: SelfAssessmentPreviewProps) {
   const router = useRouter()
   const { user } = useAuth()
   const { profile } = useUserProfile()
@@ -1094,14 +1096,52 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
         )}
         <div className={onBack ? "flex gap-3" : "flex gap-3 ml-auto"}>
           {showFileButton && reportId && !isEditing && (
-            <Button
-              onClick={() => {
-                router.push(`/dashboard/reports/file/${reportId}`)
-              }}
-            >
-              <FileCheck className="w-4 h-4 mr-2" />
-              File Return
-            </Button>
+            (() => {
+              // Determine button text and icon based on filing status and method
+              const isFiled = filingStatus === 'filed' || filingStatus === 'submitted' || filingStatus === 'acknowledged'
+              
+              let buttonText = "File Return"
+              let ButtonIcon = FileCheck
+              let buttonVariant: "default" | "outline" | "secondary" = "default"
+              let isDisabled = false
+              
+              if (isFiled) {
+                if (filingMethod === 'agent') {
+                  // Agent filing: show "Awaiting Agent" for submitted/pending, or completed status
+                  buttonText = "Awaiting Agent"
+                  ButtonIcon = Clock
+                  buttonVariant = "outline"
+                  isDisabled = true
+                } else if (filingMethod === 'direct') {
+                  // Direct filing: show "Filed and Completed" when acknowledged or filed
+                  buttonText = "Filed and Completed"
+                  ButtonIcon = CheckCircle2
+                  buttonVariant = "outline"
+                  isDisabled = true
+                } else if (filingMethod === 'email') {
+                  // Email filing: show "Mail Sent, Pending Response"
+                  buttonText = "Mail Sent, Pending Response"
+                  ButtonIcon = Mail
+                  buttonVariant = "outline"
+                  isDisabled = true
+                }
+              }
+              
+              return (
+                <Button
+                  onClick={() => {
+                    if (!isDisabled) {
+                      router.push(`/dashboard/reports/file/${reportId}`)
+                    }
+                  }}
+                  variant={buttonVariant}
+                  disabled={isDisabled}
+                >
+                  <ButtonIcon className="w-4 h-4 mr-2" />
+                  {buttonText}
+                </Button>
+              )
+            })()
           )}
           <Button
             variant="outline"

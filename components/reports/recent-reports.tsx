@@ -223,6 +223,8 @@ export function RecentReports() {
                   }}
                   reportId={selectedReport.id}
                   showFileButton={true}
+                  filingStatus={selectedReport.filingStatus}
+                  filingMethod={selectedReport.filingMethod}
                 />
               )}
               {selectedReport.type === 'Income Statement' && (

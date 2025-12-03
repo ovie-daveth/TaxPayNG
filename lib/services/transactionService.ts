@@ -22,6 +22,7 @@ export class TransactionService extends BaseService {
         { field: 'userId', operator: '==', value: userId }
       ])
       
+      console.log("allTransactions from getUserTransactions:", allTransactions)
       // Convert startDate/endDate to dateRange if needed
       let dateRange = filters?.dateRange
       if (!dateRange && (filters?.startDate || filters?.endDate)) {
@@ -230,7 +231,7 @@ export class TransactionService extends BaseService {
       // Verify ownership
       const existingTransaction = await this.getById(transactionId)
       if (existingTransaction.userId !== userId) {
-        return {
+        return { 
           success: false,
           error: 'Unauthorized: You can only update your own transactions'
         }

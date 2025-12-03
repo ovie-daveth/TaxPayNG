@@ -25,6 +25,11 @@ export interface UserProfile {
     taxCertificate?: string
     businessLicense?: string
   }
+  kycDocuments?: {
+    id?: string // National ID, Voter's Card, etc.
+    passport?: string
+    driverLicense?: string
+  }
   role?: 'user' | 'admin' | 'editor' // User role - defaults to 'user'
   lastLogin?: string // Last login timestamp
   createdAt: string
@@ -473,4 +478,24 @@ export interface SavedReport {
   ticketId?: string // Filing agent ticket ID
   balanceDue?: number // Balance due after reconciliation (positive = owe, negative = credit, 0 = balanced)
   taxesAlreadyPaid?: number // Total taxes already paid during the year
+}
+
+// Filing Request Types
+export type FilingRequestStatus = 'pending' | 'assigned' | 'in_progress' | 'completed' | 'cancelled'
+
+export interface FilingRequest {
+  id: string
+  userId: string
+  reportId: string
+  state: string
+  rrr: string
+  status: FilingRequestStatus
+  supportingDocuments: string[] // Array of document IDs or URLs
+  assignedAgentId?: string
+  assignedAgentName?: string
+  assignedAt?: string
+  completedAt?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
 }

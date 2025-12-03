@@ -22,6 +22,7 @@ export function useTransactions(userId: string | null) {
 
     try {
       const result = await transactionService.getUserTransactions(userId, filters, page, pageSize)
+      console.log("result from loadTransactions:", result)
       setTransactions(result.data)
       setPagination(result.pagination)
     } catch (err) {
@@ -65,6 +66,7 @@ export function useTransactions(userId: string | null) {
   }, [userId])
 
   const updateTransaction = useCallback(async (transactionId: string, updateData: Partial<Transaction>) => {
+    console.log("updateData from updateTransaction:", updateData)
     if (!userId) return { success: false, error: 'User not authenticated' }
 
     setLoading(true)
