@@ -1,4 +1,4 @@
-export type BusinessType = 'freelancer' | 'creator' | 'sme' | 'individual'
+export type BusinessType = 'freelancer' | 'creator' | 'sme'  | 'agent'
 
 // Subscription Types
 export type SubscriptionType = 'PRO' | 'GOLD' | 'PLATINUM' | 'Small Business' | 'Big Business' | null
@@ -46,6 +46,10 @@ export interface UserProfile {
   transactionCountResetDate?: string // Date when transaction count was last reset
   storageLimit?: number // Storage limit in bytes (e.g., 500MB = 500 * 1024 * 1024)
   storageUsed?: number // Current storage used in bytes
+  // Agent-specific fields
+  agentStates?: string[] // States the agent can handle
+  agentCertification?: string // URL to certification document
+  agentKycCompleted?: boolean // Whether agent has completed KYC
 }
 
 // Transaction Types

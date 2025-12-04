@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { Button } from "@/components/ui/button"
@@ -23,6 +24,8 @@ import { documentService } from "@/lib/services"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
 
 export default function InvoicesPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const [invoices, setInvoices] = useState<Invoice[]>([])
@@ -85,6 +88,22 @@ export default function InvoicesPage() {
     window.addEventListener('createInvoice', handleCreateInvoice)
     return () => window.removeEventListener('createInvoice', handleCreateInvoice)
   }, [])
+
+  // Handle invoiceId query parameter to open specific invoice
+  useEffect(() => {
+    const invoiceId = searchParams?.get('invoiceId')
+    if (invoiceId && invoices.length > 0 && !isViewDialogOpen) {
+      const invoice = invoices.find(inv => inv.id === invoiceId)
+      if (invoice) {
+        setSelectedInvoice(invoice)
+        setIsViewDialogOpen(true)
+        // Remove query parameter from URL after opening
+        const newUrl = new URL(window.location.href)
+        newUrl.searchParams.delete('invoiceId')
+        router.replace(newUrl.pathname + newUrl.search, { scroll: false })
+      }
+    }
+  }, [searchParams, invoices, router, isViewDialogOpen])
 
   const getStatusBadge = (status: InvoiceStatus, invoiceType?: InvoiceType) => {
     const variants: Record<InvoiceStatus, { variant: "default" | "secondary" | "destructive" | "outline", icon: any }> = {

@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-import { Eye, FileText, Trash2, Loader2, Edit } from "lucide-react"
+import { Eye, FileText, Trash2, Loader2, Edit, MessageSquare } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
@@ -172,6 +172,20 @@ export function RecentReports() {
               <Badge variant={report.status === "submitted" ? "default" : report.status === "completed" ? "secondary" : "outline"} className="text-xs capitalize">
                 {report.status}
               </Badge>
+              {report.filingMethod === 'agent' && report.filingStatus === 'submitted' && (
+                <Button 
+                  variant="ghost" 
+                  size="icon"
+                  onClick={() => {
+                    // Extract requestId from report metadata or navigate to filing requests list
+                    // For now, navigate to filing requests page where user can find their request
+                    router.push('/dashboard/filing-requests')
+                  }}
+                  title="View filing request status"
+                >
+                  <MessageSquare className="w-4 h-4" />
+                </Button>
+              )}
               {report.status === 'draft' && (
                 <Button 
                   variant="ghost" 

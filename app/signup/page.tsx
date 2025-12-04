@@ -8,22 +8,33 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Calculator, Eye, EyeOff } from "lucide-react"
+import { Calculator, Eye, EyeOff, MapPin } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { toast } from "sonner"
 import { TokenInputDialog } from "@/components/waitlist/token-input-dialog"
 import { sendSignupVerification } from "@/lib/utils/emailVerification"
 
-type SignupBusinessType = '' | 'freelancer' | 'creator' | 'sme' | 'large_corporation'
-type AllowedBusinessType = Extract<SignupBusinessType, 'freelancer' | 'creator' | 'sme'>
+const NIGERIAN_STATES = [
+  "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
+  "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "Gombe", "Imo",
+  "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos",
+  "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers",
+  "Sokoto", "Taraba", "Yobe", "Zamfara", "FCT"
+]
+
+type SignupBusinessType = '' | 'freelancer' | 'creator' | 'sme' | 'large_corporation' | 'agent'
+type AllowedBusinessType = Extract<SignupBusinessType, 'freelancer' | 'creator' | 'sme' | 'agent'>
 type SignupPayload = {
   email: string
   password: string
   firstName: string
   lastName: string
   businessType: AllowedBusinessType
+  agentStates?: string[]
+  phone?: string
 }
 
 export default function SignupPage() {
@@ -38,12 +49,16 @@ export default function SignupPage() {
     businessType: SignupBusinessType
     password: string
     confirmPassword: string
+    phone: string
+    agentStates: string[]
   }>({
     fullName: '',
     email: '',
     businessType: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    phone: '',
+    agentStates: []
   })
   const [showVerificationDialog, setShowVerificationDialog] = useState(false)
   const [pendingEmail, setPendingEmail] = useState("")
@@ -52,16 +67,22 @@ export default function SignupPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   // Redirect to login after successful signup (no auto-login)
+  // For agents, redirect to agent KYC page after login
   useEffect(() => {
     if (signupSuccess && !loading && !user) {
       console.log("Signup successful, redirecting to /login")
+      // Store that this is an agent signup for redirect after login
+      if (formData.businessType === 'agent') {
+        sessionStorage.setItem('agentSignup', 'true')
+      }
       router.push("/login")
     }
-  }, [signupSuccess, loading, user, router])
+  }, [signupSuccess, loading, user, router, formData.businessType])
 
   const isSME = formData.businessType === 'sme'
   const isCreator = formData.businessType === 'creator'
-  const businessNameLabel = isSME ? 'Company Name' : isCreator ? 'Creator or Brand Name' : 'Full Name'
+  const isAgent = formData.businessType === 'agent'
+  const businessNameLabel = isSME ? 'Company Name' : isCreator ? 'Creator or Brand Name' : isAgent ? 'Full Name' : 'Full Name'
   const businessNamePlaceholder = isSME
     ? 'Acme Corporation Ltd'
     : isCreator
@@ -77,6 +98,10 @@ export default function SignupPage() {
         firstName: payload.firstName,
         lastName: payload.lastName,
         businessType: payload.businessType,
+        ...(payload.businessType === 'agent' && {
+          phone: payload.phone,
+          agentStates: payload.agentStates
+        })
       })
 
       console.log("result now", result)
@@ -112,9 +137,21 @@ export default function SignupPage() {
     }
 
     // Validate supported business type
-    if (!['freelancer', 'creator', 'sme'].includes(formData.businessType)) {
+    if (!['freelancer', 'creator', 'sme', 'agent'].includes(formData.businessType)) {
       toast.error('Please select a supported business type')
       return
+    }
+
+    // Validate agent-specific fields
+    if (formData.businessType === 'agent') {
+      if (!formData.phone || formData.phone.trim() === '') {
+        toast.error('Phone number is required for agents')
+        return
+      }
+      if (formData.agentStates.length === 0) {
+        toast.error('Please select at least one state you can handle')
+        return
+      }
     }
 
     // Split full name into first and last name
@@ -136,6 +173,10 @@ export default function SignupPage() {
       firstName,
       lastName,
       businessType,
+      ...(formData.businessType === 'agent' && {
+        phone: formData.phone.trim(),
+        agentStates: formData.agentStates
+      })
     }
 
     // If email already verified in this session for the same address, proceed directly
@@ -243,6 +284,7 @@ export default function SignupPage() {
                   <SelectItem value="freelancer">Freelancer</SelectItem>
                   <SelectItem value="creator">Creator / Influencer</SelectItem>
                   <SelectItem value="sme">Small Business</SelectItem>
+                  <SelectItem value="agent">Tax Filing Agent</SelectItem>
                   <SelectItem value="large_corporation">Large Corporation</SelectItem>
                 </SelectContent>
               </Select>
@@ -273,6 +315,68 @@ export default function SignupPage() {
                 required 
               />
             </div>
+
+            {/* Agent-specific fields */}
+            {isAgent && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="phone">Phone Number *</Label>
+                  <Input 
+                    id="phone" 
+                    type="tel" 
+                    placeholder="08012345678" 
+                    value={formData.phone}
+                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                    required 
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Required for agent registration
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>States You Can Handle *</Label>
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Select all states where you can provide tax filing services
+                  </p>
+                  <div className="border rounded-lg p-4 max-h-48 overflow-y-auto space-y-2">
+                    {NIGERIAN_STATES.map((state) => (
+                      <div key={state} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`state-${state}`}
+                          checked={formData.agentStates.includes(state)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setFormData(prev => ({
+                                ...prev,
+                                agentStates: [...prev.agentStates, state]
+                              }))
+                            } else {
+                              setFormData(prev => ({
+                                ...prev,
+                                agentStates: prev.agentStates.filter(s => s !== state)
+                              }))
+                            }
+                          }}
+                        />
+                        <Label
+                          htmlFor={`state-${state}`}
+                          className="text-sm font-normal cursor-pointer flex items-center gap-2"
+                        >
+                          <MapPin className="w-3 h-3" />
+                          {state}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
+                  {formData.agentStates.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      {formData.agentStates.length} state{formData.agentStates.length !== 1 ? 's' : ''} selected
+                    </p>
+                  )}
+                </div>
+              </>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>

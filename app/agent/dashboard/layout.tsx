@@ -1,0 +1,79 @@
+"use client"
+
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { AgentSidebar } from "@/components/agent/agent-sidebar"
+import { AgentHeader } from "@/components/agent/agent-header"
+import { SidebarProvider, useSidebar } from "@/lib/contexts/sidebar-context"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { cn } from "@/lib/utils"
+import { Loader2 } from "lucide-react"
+
+function LayoutContent({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  const { sidebarCollapsed } = useSidebar()
+  const { user, loading } = useAuth()
+  const { profile, loading: profileLoading } = useUserProfile()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!loading && !profileLoading) {
+      if (!user) {
+        router.push("/login")
+        return
+      }
+      if (profile?.businessType !== 'agent') {
+        router.push('/dashboard')
+        return
+      }
+      if (profile?.agentKycCompleted !== true) {
+        router.push('/agent/kyc')
+        return
+      }
+    }
+  }, [user, profile, loading, profileLoading, router])
+
+  if (loading || profileLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
+
+  if (!user || profile?.businessType !== 'agent') {
+    return null
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <AgentSidebar />
+      <div className={cn(
+        "flex-1 transition-all duration-300 ease-in-out",
+        sidebarCollapsed ? "md:ml-16" : "md:ml-64"
+      )}>
+        <AgentHeader />
+        <main className="container mx-auto px-4 py-6 max-w-7xl">
+          {children}
+        </main>
+      </div>
+    </div>
+  )
+}
+
+export default function AgentDashboardLayout({
+  children,
+}: Readonly<{
+  children: React.ReactNode
+}>) {
+  return (
+    <SidebarProvider>
+      <LayoutContent>{children}</LayoutContent>
+    </SidebarProvider>
+  )
+}
+

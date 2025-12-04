@@ -31,6 +31,9 @@ export default function FilingConfirmationPage() {
   const requestId = searchParams.get("requestId")
   const method = searchParams.get("method")
   const paidAmount = searchParams.get("amount")
+  
+  // Store requestId in state for navigation
+  const [filingRequestId, setFilingRequestId] = useState<string | null>(requestId || ticketId || null)
 
   // Determine filing method: agent (requestId or ticketId), direct (acknowledgment), or email (method=email)
   // Priority: URL params > report data
@@ -192,12 +195,22 @@ Generated: ${new Date().toISOString()}
                   </div>
                 )}
                 {(requestId || ticketId) && (
-                  <div className="col-span-2">
-                    <Label className="text-muted-foreground">Filing Request ID</Label>
-                    <p className="font-mono font-semibold">{requestId || ticketId}</p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Your filing request is pending with an agent. You'll receive updates once an agent is assigned and the filing is processed.
-                    </p>
+                  <div className="col-span-2 space-y-2">
+                    <div>
+                      <Label className="text-muted-foreground">Filing Request ID</Label>
+                      <p className="font-mono font-semibold">{requestId || ticketId}</p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Your filing request is pending with an agent. You'll receive updates once an agent is assigned and the filing is processed.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/dashboard/filing-requests/${requestId || ticketId}`)}
+                    >
+                      <UserCheck className="w-4 h-4 mr-2" />
+                      Track Status & Message Agent
+                    </Button>
                   </div>
                 )}
                 {method === "email" && (
@@ -242,7 +255,7 @@ Generated: ${new Date().toISOString()}
                 </div>
               )}
               {(requestId || ticketId) && (
-                <div className="p-4 bg-muted rounded-lg">
+                <div className="p-4 bg-muted rounded-lg space-y-3">
                   <p className="text-sm font-medium mb-2 flex items-center gap-2">
                     <UserCheck className="w-4 h-4" />
                     Agent Filing Request
@@ -256,6 +269,15 @@ Generated: ${new Date().toISOString()}
                   <p className="text-xs text-muted-foreground mt-1">
                     An agent will be assigned to your request shortly. You'll receive notifications as your filing progresses.
                   </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/dashboard/filing-requests/${requestId || ticketId}`)}
+                    className="w-full mt-3"
+                  >
+                    <UserCheck className="w-4 h-4 mr-2" />
+                    View Status & Messages
+                  </Button>
                 </div>
               )}
               {method === "email" && (

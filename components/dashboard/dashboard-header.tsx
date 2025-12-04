@@ -8,6 +8,7 @@ import { useState } from "react"
 import { AddTransactionDialog } from "../transactions/add-transaction-dialog"
 import { AddReminderDialog } from "../reminders/add-reminder-dialog"
 import { ThemeToggle } from "../theme-toggle"
+import { NotificationBell } from "../notifications/notification-bell"
 import { useDocumentsFirebase } from "@/lib/hooks/use-documents-firebase"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useTransactions } from "@/lib/hooks/useTransactions"
@@ -27,6 +28,17 @@ export function DashboardHeader() {
   const { createReminder } = useReminders(pathname !== "/dashboard/reminders" ? (user?.uid || null) : null)
 
   const getPageInfo = (path: string) => {
+    // Handle dynamic routes first
+    if (path.startsWith("/dashboard/filing-requests/") && path !== "/dashboard/filing-requests") {
+      return {
+        title: "Filing Request Status",
+        subtitle: "View status updates and communicate with your agent",
+        buttonText: "",
+        buttonIcon: FileText,
+        buttonAction: () => {}
+      }
+    }
+    
     switch (path) {
       case "/dashboard":
         return {
@@ -88,6 +100,14 @@ export function DashboardHeader() {
           buttonText: "New Report",
           buttonIcon: BarChart3,
           buttonAction: () => router.push("/dashboard/reports/generate/self-assessment")
+        }
+      case "/dashboard/filing-requests":
+        return {
+          title: "Filing Requests",
+          subtitle: "Track the status of your tax filing requests submitted to agents",
+          buttonText: "",
+          buttonIcon: FileText,
+          buttonAction: () => {}
         }
       case "/dashboard/reports/generate/self-assessment":
         return {
@@ -152,6 +172,7 @@ export function DashboardHeader() {
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 line-clamp-2">{pageInfo.subtitle}</p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            <NotificationBell />
             <ThemeToggle />
             {pageInfo.showExportButton && (
               <Button 

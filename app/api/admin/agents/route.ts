@@ -5,19 +5,24 @@ export async function GET(request: NextRequest) {
   try {
     const db = getAdminDb()
     
-    // Get all users with role 'agent' or create a simple list
-    // For now, we'll get all users and filter, or you can create a dedicated agents collection
-    const usersSnapshot = await db.collection('userProfiles')
-      .where('role', 'in', ['agent', 'admin'])
+    // Get all users with businessType 'agent' and agentKycCompleted = true
+    // Also include users with role 'agent' for backward compatibility
+    const agentSnapshot = await db.collection('userProfiles')
+      .where('businessType', '==', 'agent')
+      .where('agentKycCompleted', '==', true)
       .get()
     
-    const agents = usersSnapshot.docs.map(doc => ({
-      id: doc.id,
-      userId: doc.data().userId,
-      name: `${doc.data().firstName || ''} ${doc.data().lastName || ''}`.trim() || doc.data().email?.split('@')[0] || 'Unknown',
-      email: doc.data().email,
-      ...doc.data()
-    }))
+    const agents = agentSnapshot.docs.map(doc => {
+      const data = doc.data()
+      return {
+        id: doc.id,
+        userId: data.userId,
+        name: `${data.firstName || ''} ${data.lastName || ''}`.trim() || data.email?.split('@')[0] || 'Unknown',
+        email: data.email,
+        agentStates: data.agentStates || [],
+        ...data
+      }
+    })
     
     // If no agents found, return empty array (admin can manually assign any user)
     return NextResponse.json({
