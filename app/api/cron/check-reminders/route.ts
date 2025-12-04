@@ -188,50 +188,26 @@ export async function GET(request: NextRequest) {
           continue
         }
 
-        // Call the send-email API route
-        // For local development, use localhost; for production, use the app URL
-        let baseUrl = 'http://localhost:3000'
-        if (process.env.NEXT_PUBLIC_APP_URL) {
-          baseUrl = process.env.NEXT_PUBLIC_APP_URL
-        } else if (process.env.VERCEL_URL) {
-          baseUrl = `https://${process.env.VERCEL_URL}`
-        }
+        // Call the send-email function directly (no HTTP request needed)
+        const { sendReminderEmail } = await import('@/lib/utils/reminder-email')
         
-        const response = await fetch(`${baseUrl}/api/reminders/send-email`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            reminderId: reminder.id,
-            userId: reminder.data.userId,
-            userEmail: profile.email,
-            userName: `${profile.firstName} ${profile.lastName}`,
-            reminderTitle: reminder.data.title,
-            reminderDescription: reminder.data.description,
-            dueDate: reminder.data.dueDate,
-            priority: reminder.data.priority || 'medium'
-          })
+        const emailResult = await sendReminderEmail({
+          reminderId: reminder.id,
+          userId: reminder.data.userId,
+          userEmail: profile.email,
+          userName: `${profile.firstName} ${profile.lastName}`,
+          reminderTitle: reminder.data.title,
+          reminderDescription: reminder.data.description,
+          dueDate: reminder.data.dueDate,
+          priority: reminder.data.priority || 'medium'
         })
 
-        if (response.ok) {
+        if (emailResult.success) {
           results.sent++
-          console.log(`✅ Successfully sent reminder ${reminder.id} to ${profile.email}`)
+          console.log(`✅ Successfully sent reminder ${reminder.id} to ${profile.email} (Message ID: ${emailResult.messageId})`)
         } else {
           results.failed++
-          let errorMessage = 'Unknown error'
-          try {
-            const errorData = await response.json()
-            errorMessage = errorData.error || errorData.message || `HTTP ${response.status}`
-          } catch (parseError) {
-            // If response is not JSON, try to get text
-            try {
-              const errorText = await response.text()
-              errorMessage = errorText || `HTTP ${response.status}: ${response.statusText}`
-            } catch (textError) {
-              errorMessage = `HTTP ${response.status}: ${response.statusText}`
-            }
-          }
+          const errorMessage = emailResult.error || 'Unknown error'
           results.errors.push(`Reminder ${reminder.id}: ${errorMessage}`)
           console.error(`❌ Failed to send reminder ${reminder.id}:`, errorMessage)
         }
