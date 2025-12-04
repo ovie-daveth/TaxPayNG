@@ -1,13 +1,14 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Plus, FileText, Calculator, Bell, Settings, Receipt, Download, FileCheck } from "lucide-react"
+import { Plus, FileText, Calculator, Bell, Settings, Receipt, Download, FileCheck, BarChart3 } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { UploadDocumentDialog } from "../documents/upload-document-dialog"
 import { useState } from "react"
 import { AddTransactionDialog } from "../transactions/add-transaction-dialog"
 import { AddReminderDialog } from "../reminders/add-reminder-dialog"
 import { ThemeToggle } from "../theme-toggle"
+import { NotificationBell } from "../notifications/notification-bell"
 import { useDocumentsFirebase } from "@/lib/hooks/use-documents-firebase"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useTransactions } from "@/lib/hooks/useTransactions"
@@ -23,10 +24,21 @@ export function DashboardHeader() {
   const { user } = useAuth()
   const { uploadDocument } = useDocumentsFirebase()
   const { createTransaction } = useTransactions(user?.uid || null)
-  // Only load reminders hook when not on reminders page to avoid duplicate state
-  const { createReminder } = useReminders(pathname !== "/dashboard/reminders" ? (user?.uid || null) : null)
+  // Load reminders hook for header actions
+  const { createReminder } = useReminders(user?.uid || null)
 
   const getPageInfo = (path: string) => {
+    // Handle dynamic routes first
+    if (path.startsWith("/dashboard/filing-requests/") && path !== "/dashboard/filing-requests") {
+      return {
+        title: "Filing Request Status",
+        subtitle: "View status updates and communicate with your agent",
+        buttonText: "",
+        buttonIcon: FileText,
+        buttonAction: () => {}
+      }
+    }
+    
     switch (path) {
       case "/dashboard":
         return {
@@ -81,6 +93,62 @@ export function DashboardHeader() {
           buttonIcon: Bell,
           buttonAction: () => setIsAddReminderDialogOpen(true)
         }
+      case "/dashboard/reports":
+        return {
+          title: "Reports & Filings",
+          subtitle: "Generate tax reports and self-assessment filings for LIRS/FIRS",
+          buttonText: "New Report",
+          buttonIcon: BarChart3,
+          buttonAction: () => router.push("/dashboard/reports/generate/self-assessment")
+        }
+      case "/dashboard/filing-requests":
+        return {
+          title: "Filing Requests",
+          subtitle: "Track the status of your tax filing requests submitted to agents",
+          buttonText: "",
+          buttonIcon: FileText,
+          buttonAction: () => {}
+        }
+      case "/dashboard/reports/generate/self-assessment":
+        return {
+          title: "Self-Assessment Filing",
+          subtitle: "Create LIRS/FIRS-ready self-assessment report",
+          buttonText: "",
+          buttonIcon: BarChart3,
+          buttonAction: () => {}
+        }
+      case "/dashboard/reports/generate/income-statement":
+        return {
+          title: "Income Statement",
+          subtitle: "Detailed breakdown of all income sources and categories",
+          buttonText: "",
+          buttonIcon: BarChart3,
+          buttonAction: () => {}
+        }
+      case "/dashboard/reports/generate/expense-report":
+        return {
+          title: "Expense Report",
+          subtitle: "Comprehensive report of business expenses and deductions",
+          buttonText: "",
+          buttonIcon: BarChart3,
+          buttonAction: () => {}
+        }
+      case "/dashboard/reports/generate/tax-summary":
+        return {
+          title: "Tax Summary Report",
+          subtitle: "Annual or quarterly tax calculation summary with breakdowns",
+          buttonText: "",
+          buttonIcon: BarChart3,
+          buttonAction: () => {}
+        }
+      case "/dashboard/payment":
+        return {
+          title: "Payment",
+          subtitle: "Manage your tax payments and receipts",
+          buttonText: "New Payment",
+          buttonIcon: Plus,
+          buttonAction: () => router.push("/dashboard/payment/add")
+        }
       case "/dashboard/settings":
         return {
           title: "Settings",
@@ -112,6 +180,7 @@ export function DashboardHeader() {
             <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 line-clamp-2">{pageInfo.subtitle}</p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
+            <NotificationBell />
             <ThemeToggle />
             {pageInfo.showExportButton && (
               <Button 
@@ -136,8 +205,8 @@ export function DashboardHeader() {
                 <Bell className="w-4 h-4" />
               </Button>
             )}
-            {/* Show main action button except on reminders page */}
-            {pathname !== "/dashboard/reminders" && (
+            {/* Show main action button except on report generation pages */}
+            {pageInfo.buttonText && (
               <Button 
                 onClick={pageInfo.buttonAction}
                 size="sm"
@@ -162,14 +231,12 @@ export function DashboardHeader() {
         onSubmit={createTransaction}
         transaction={null}
       />
-      {/* Always render AddReminderDialog except on reminders page to avoid duplicate state */}
-      {pathname !== "/dashboard/reminders" && (
-        <AddReminderDialog 
-          open={isAddReminderDialogOpen} 
-          onOpenChange={setIsAddReminderDialogOpen}
-          onSubmit={createReminder}
-        />
-      )}
+      {/* Render AddReminderDialog for all pages */}
+      <AddReminderDialog 
+        open={isAddReminderDialogOpen} 
+        onOpenChange={setIsAddReminderDialogOpen}
+        onSubmit={createReminder}
+      />
     </div>
   )
 }

@@ -26,10 +26,36 @@ function LayoutContent({
   }, [user, loading, router])
 
   useEffect(() => {
-    if (!profile) return
+    // Wait for profile to load
+    if (profileLoading) {
+      return
+    }
+
+    // If profile is null, don't redirect (might still be loading)
+    if (!profile) {
+      return
+    }
     
     const currentPath = window.location.pathname
     console.log("Dashboard layout - businessType:", profile.businessType, "current path:", currentPath)
+    
+    // Agent redirects - agents have their own pages, redirect them away from dashboard
+    if (profile.businessType === 'agent') {
+      // Only redirect if we're in the dashboard area (not already on agent pages)
+      if (!currentPath.startsWith('/agent')) {
+        // If KYC not completed, go to KYC page
+        console.log("Agent KYC completed:", profile.agentKycCompleted)
+        if (profile.agentKycCompleted !== true) {
+          router.push('/agent/kyc')
+          return
+        }
+        // If KYC completed, go to agent dashboard
+        router.push('/agent/dashboard')
+        return
+      }
+      // Already on agent pages, don't interfere
+      return
+    }
     
     if (profile.businessType === 'sme' && !currentPath.startsWith('/dashboard-sme')) {
       console.log("Redirecting SME to /dashboard-sme")

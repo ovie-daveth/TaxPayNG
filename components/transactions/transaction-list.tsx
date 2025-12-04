@@ -23,10 +23,10 @@ interface TransactionListProps {
   onRefresh?: () => void
 }
 
-export function TransactionList({ 
-  transactions, 
-  loading, 
-  onUpdateTransaction, 
+export function TransactionList({
+  transactions,
+  loading,
+  onUpdateTransaction,
   onDeleteTransaction,
   onRefresh
 }: TransactionListProps) {
@@ -47,11 +47,11 @@ export function TransactionList({
   useEffect(() => {
     const handleTransactionChanged = (event: CustomEvent) => {
       const { action, transactionId } = event.detail || {}
-      
+
       // Only highlight newly created transactions
       if (action === 'created' && transactionId) {
         setHighlightedTransactionId(transactionId)
-        
+
         // Remove highlight after 3 seconds
         setTimeout(() => {
           setHighlightedTransactionId(null)
@@ -60,14 +60,14 @@ export function TransactionList({
     }
 
     window.addEventListener('transactionChanged', handleTransactionChanged as EventListener)
-    
+
     return () => {
       window.removeEventListener('transactionChanged', handleTransactionChanged as EventListener)
     }
   }, [])
 
   console.log("Transactions:", transactions)
-  
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
@@ -88,35 +88,35 @@ export function TransactionList({
 
   const handleDeleteConfirm = async () => {
     if (!transactionToDelete || isDeleting) return
-    
+
     const deletedTransactionId = transactionToDelete
     console.log('Starting delete operation for:', deletedTransactionId)
     setIsDeleting(true)
-    
+
     try {
       const result = await onDeleteTransaction(deletedTransactionId)
       console.log('Delete result:', result)
-      
+
       if (result && result.success) {
         console.log('Delete successful')
-        
+
         // Close dialog immediately
         setIsDeleteDialogOpen(false)
-        
+
         // Clean up state and refresh
         setTimeout(() => {
           setTransactionToDelete(null)
           setIsDeleting(false)
-          
+
           if (onRefresh) {
             onRefresh()
           }
-          
-          window.dispatchEvent(new CustomEvent('transactionChanged', { 
-            detail: { 
+
+          window.dispatchEvent(new CustomEvent('transactionChanged', {
+            detail: {
               action: 'deleted',
-              transactionId: deletedTransactionId 
-            } 
+              transactionId: deletedTransactionId
+            }
           }))
         }, 100)
       } else {
@@ -147,6 +147,7 @@ export function TransactionList({
   }
 
   const handleSubmit = async (data: Omit<Transaction, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
+   console.log("Data from handleSubmit:", data)
     try {
       let result
       if (editingTransaction) {
@@ -156,21 +157,21 @@ export function TransactionList({
         result = await createTransaction(data)
         console.log("Result from handleSubmit:", result)
       }
-      
+
       if (result && result.success) {
         setIsAddDialogOpen(false)
         if (onRefresh) {
           onRefresh()
         }
-        
-        window.dispatchEvent(new CustomEvent('transactionChanged', { 
-          detail: { 
+
+        window.dispatchEvent(new CustomEvent('transactionChanged', {
+          detail: {
             action: editingTransaction ? 'updated' : 'created',
-            transactionId: result.data?.id 
-          } 
+            transactionId: result.data?.id
+          }
         }))
       }
-      
+
       return result // Return the result so add-transaction-dialog can read it
     } catch (error) {
       console.error('Error in handleSubmit:', error)
@@ -208,7 +209,7 @@ export function TransactionList({
             </Button>
           </div>
         </Card>
-        
+
         <AddTransactionDialog
           open={isAddDialogOpen}
           onOpenChange={setIsAddDialogOpen}
@@ -218,7 +219,7 @@ export function TransactionList({
       </>
     )
   }
-  
+
   return (
     <Card className="overflow-hidden">
       {/* Desktop View */}
@@ -239,92 +240,90 @@ export function TransactionList({
             {transactions.map((transaction) => {
               const isHighlighted = highlightedTransactionId === transaction.id
               return (
-              <tr 
-                key={`${transaction.id}-${transaction.updatedAt || transaction.createdAt}`} 
-                className={`border-b border-border last:border-0 hover:bg-muted/30 transition-all duration-500 ${
-                  isHighlighted 
-                    ? 'bg-primary/15 border-l-4 border-primary shadow-lg' 
-                    : ''
-                }`}
-                style={isHighlighted ? {
-                  animation: 'highlightFade 3s ease-out forwards'
-                } : undefined}
-              >
-                <td className="py-4 px-4 text-sm">{formatDate(transaction.date)}</td>
-                <td className="py-4 px-4">
-                  <div className="flex items-center gap-2">
-                    <div
-                      className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                        transaction.type === "income" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"
-                      }`}
-                    >
-                      {transaction.type === "income" ? (
-                        <ArrowUpRight className="w-4 h-4" />
-                      ) : (
-                        <ArrowDownRight className="w-4 h-4" />
-                      )}
-                    </div>
+                <tr
+                  key={`${transaction.id}-${transaction.updatedAt || transaction.createdAt}`}
+                  className={`border-b border-border last:border-0 hover:bg-muted/30 transition-all duration-500 ${isHighlighted
+                      ? 'bg-primary/15 border-l-4 border-primary shadow-lg'
+                      : ''
+                    }`}
+                  style={isHighlighted ? {
+                    animation: 'highlightFade 3s ease-out forwards'
+                  } : undefined}
+                >
+                  <td className="py-4 px-4 text-sm">{formatDate(transaction.date)}</td>
+                  <td className="py-4 px-4">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{transaction.description}</span>
-                      {transaction.attachments && transaction.attachments.length > 0 && (
-                        <button
-                          onClick={() => handleViewImages(transaction)}
-                          className="hover:bg-muted rounded p-1 transition-colors cursor-pointer"
-                          title={`View ${transaction.attachments.length} receipt(s)`}
-                        >
-                          <Paperclip className="w-3 h-3 text-muted-foreground hover:text-primary" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </td>
-                <td className="py-4 px-4">
-                  <Badge variant="secondary" className="text-xs">
-                    {transaction.category}
-                  </Badge>
-                </td>
-                <td className="py-4 px-4 text-sm text-muted-foreground">{transaction.paymentMethod}</td>
-                <td className="py-4 px-4 text-right">
-                  <span
-                    className={`font-semibold ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}
-                  >
-                    {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
-                  </span>
-                </td>
-                <td className="py-4 px-4 text-center">
-                  {transaction.taxDeductible ? (
-                    <Badge variant="outline" className="text-xs">
-                      Tax Deductible
-                    </Badge>
-                  ) : (
-                    <Badge variant="outline" className="text-xs">
-                      Tax Non-deductible
-                    </Badge>
-                  )}
-                </td>
-                <td className="py-4 px-4 text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreVertical className="w-4 h-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="cursor-pointer" onClick={() => handleEdit(transaction)}>
-                        <Pencil className="w-4 h-4 mr-2" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem 
-                        className="text-destructive cursor-pointer"
-                        onClick={() => handleDeleteClick(transaction.id)}
+                      <div
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${transaction.type === "income" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"
+                          }`}
                       >
-                        <Trash2 className="w-4 h-4 mr-2" />
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </td>
-              </tr>
+                        {transaction.type === "income" ? (
+                          <ArrowUpRight className="w-4 h-4" />
+                        ) : (
+                          <ArrowDownRight className="w-4 h-4" />
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium">{transaction.description.slice(0, 25)}</span>
+                        {transaction.attachments && transaction.attachments.length > 0 && (
+                          <button
+                            onClick={() => handleViewImages(transaction)}
+                            className="hover:bg-muted rounded p-1 transition-colors cursor-pointer"
+                            title={`View ${transaction.attachments.length} receipt(s)`}
+                          >
+                            <Paperclip className="w-3 h-3 text-muted-foreground hover:text-primary" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-4 px-4">
+                    <Badge variant="secondary" className="text-xs">
+                      {transaction.category}
+                    </Badge>
+                  </td>
+                  <td className="py-4 px-4 text-sm text-muted-foreground">{transaction.paymentMethod}</td>
+                  <td className="py-4 px-4 text-right">
+                    <span
+                      className={`font-semibold ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}
+                    >
+                      {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
+                    </span>
+                  </td>
+                  <td className="py-4 px-4 text-center">
+                    {transaction.taxDeductible ? (
+                      <Badge variant="outline" className="text-xs">
+                        Tax Deductible
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs">
+                        Tax Non-deductible
+                      </Badge>
+                    )}
+                  </td>
+                  <td className="py-4 px-4 text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon">
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem className="cursor-pointer" onClick={() => handleEdit(transaction)}>
+                          <Pencil className="w-4 h-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="text-destructive cursor-pointer"
+                          onClick={() => handleDeleteClick(transaction.id)}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </td>
+                </tr>
               )
             })}
           </tbody>
@@ -336,85 +335,83 @@ export function TransactionList({
         {transactions.map((transaction) => {
           const isHighlighted = highlightedTransactionId === transaction.id
           return (
-          <div 
-            key={`mobile-${transaction.id}-${transaction.updatedAt || transaction.createdAt}`} 
-            className={`p-4 transition-all duration-500 ${
-              isHighlighted 
-                ? 'bg-primary/15 border-l-4 border-primary shadow-lg' 
-                : ''
-            }`}
-            style={isHighlighted ? {
-              animation: 'highlightFade 3s ease-out'
-            } : undefined}
-          >
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex items-center gap-3">
-                <div
-                  className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                    transaction.type === "income" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"
-                  }`}
-                >
-                  {transaction.type === "income" ? (
-                    <ArrowUpRight className="w-5 h-5" />
-                  ) : (
-                    <ArrowDownRight className="w-5 h-5" />
-                  )}
-                </div>
-                <div>
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-sm">{transaction.description}</p>
-                    {transaction.attachments && transaction.attachments.length > 0 && (
-                      <button
-                        onClick={() => handleViewImages(transaction)}
-                        className="hover:bg-muted rounded p-1 transition-colors"
-                        title={`View ${transaction.attachments.length} receipt(s)`}
-                      >
-                        <Paperclip className="w-3 h-3 text-muted-foreground hover:text-primary" />
-                      </button>
+            <div
+              key={`mobile-${transaction.id}-${transaction.updatedAt || transaction.createdAt}`}
+              className={`p-4 transition-all duration-500 ${isHighlighted
+                  ? 'bg-primary/15 border-l-4 border-primary shadow-lg'
+                  : ''
+                }`}
+              style={isHighlighted ? {
+                animation: 'highlightFade 3s ease-out'
+              } : undefined}
+            >
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div
+                    className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${transaction.type === "income" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"
+                      }`}
+                  >
+                    {transaction.type === "income" ? (
+                      <ArrowUpRight className="w-5 h-5" />
+                    ) : (
+                      <ArrowDownRight className="w-5 h-5" />
                     )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-1">{formatDate(transaction.date)}</p>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-medium text-sm">{transaction.description}</p>
+                      {transaction.attachments && transaction.attachments.length > 0 && (
+                        <button
+                          onClick={() => handleViewImages(transaction)}
+                          className="hover:bg-muted rounded p-1 transition-colors"
+                          title={`View ${transaction.attachments.length} receipt(s)`}
+                        >
+                          <Paperclip className="w-3 h-3 text-muted-foreground hover:text-primary" />
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">{formatDate(transaction.date)}</p>
+                  </div>
                 </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon">
+                      <MoreVertical className="w-4 h-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem className="cursor-pointer" onClick={() => handleEdit(transaction)}>
+                      <Pencil className="w-4 h-4 mr-2" />
+                      Edit
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-destructive cursor-pointer"
+                      onClick={() => handleDeleteClick(transaction.id)}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem className="cursor-pointer" onClick={() => handleEdit(transaction)}>
-                    <Pencil className="w-4 h-4 mr-2" />
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem 
-                    className="text-destructive cursor-pointer"
-                    onClick={() => handleDeleteClick(transaction.id)}
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary" className="text-xs">
-                  {transaction.category}
-                </Badge>
-                {transaction.taxDeductible && (
-                  <Badge variant="outline" className="text-xs">
-                    Tax Deductible
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs">
+                    {transaction.category}
                   </Badge>
-                )}
+                  {transaction.taxDeductible && (
+                    <Badge variant="outline" className="text-xs">
+                      Tax Deductible
+                    </Badge>
+                  )}
+                </div>
+                <span className={`font-semibold ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}>
+                  {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
+                </span>
               </div>
-              <span className={`font-semibold ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}>
-                {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
-              </span>
             </div>
-          </div>
           )
-        })} 
+        })}
       </div>
 
       {/* Add Transaction Dialog */}

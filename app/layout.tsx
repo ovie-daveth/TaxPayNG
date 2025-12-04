@@ -4,6 +4,7 @@ import { GeistMono } from 'geist/font/mono'
 import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
+import { UserProfileProvider } from '@/lib/contexts/user-profile-context'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -56,8 +57,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
-          <Toaster />
+          <UserProfileProvider>
+            {children}
+            <Toaster />
+          </UserProfileProvider>
         </ThemeProvider>
         <Analytics />
       </body>

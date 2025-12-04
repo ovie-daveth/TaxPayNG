@@ -15,6 +15,7 @@ import { faqData } from "@/app/faq/components/data"
 import { AuditSubscriptionsDialog } from "@/components/dashboard/audit-subscriptions-dialog"
 import { calculateTaxRecommendation, type CalculationDetailsType, type PeriodType } from "./utils/tax-calculation"
 import { TaxCalculationDialog } from "./components/tax-calculation-dialog"
+import { calculateNigerianTax } from "@/lib/tax-calculator"
 
 type DashboardBusinessType = "freelancer" | "creator"
 
@@ -251,7 +252,14 @@ export function AnalyticsInsights({
 
     if (periodType === "year") {
       currentPeriodStart = getYearStart(now, effectiveYear)
-      currentPeriodEnd = getYearEnd(now, effectiveYear) > now ? now : getYearEnd(now, effectiveYear)
+      // If current year, use end of today; otherwise use end of year
+      if (effectiveYear === now.getFullYear() && getYearEnd(now, effectiveYear) > now) {
+        const endOfToday = new Date(now)
+        endOfToday.setHours(23, 59, 59, 999)
+        currentPeriodEnd = endOfToday
+      } else {
+        currentPeriodEnd = getYearEnd(now, effectiveYear)
+      }
       previousPeriodStart = getPreviousYearStart(now, effectiveYear)
       previousPeriodEnd = getPreviousYearEnd(now, effectiveYear)
       monthsInPeriod = 12
@@ -259,7 +267,14 @@ export function AnalyticsInsights({
       const quarterDate = new Date(effectiveYear, (effectiveQuarter - 1) * 3, 1)
       const quarterInfo = getQuarterInfo(quarterDate, effectiveQuarter, effectiveYear)
       currentPeriodStart = quarterInfo.start
-      currentPeriodEnd = quarterInfo.end > now ? now : quarterInfo.end
+      // If current quarter, use end of today; otherwise use end of quarter
+      if (quarterInfo.end > now) {
+        const endOfToday = new Date(now)
+        endOfToday.setHours(23, 59, 59, 999)
+        currentPeriodEnd = endOfToday
+      } else {
+        currentPeriodEnd = quarterInfo.end
+      }
       const prevQuarterInfo = getPreviousQuarterInfo(quarterDate, effectiveQuarter, effectiveYear)
       previousPeriodStart = prevQuarterInfo.start
       previousPeriodEnd = prevQuarterInfo.end
@@ -394,14 +409,50 @@ export function AnalyticsInsights({
           description = `You kept ${formatCurrency(netCash)} after expenses. ${taxAdvice} No tax reserve needed, but keep tracking your income.`
         } else if (isLowEarner) {
           // Low tax bracket
-          const reserveForPeriod = periodType === "year" ? reserveTarget : reserveTarget / 4
+          // Calculate actual period tax instead of dividing annual by 4
+          let reserveForPeriod = reserveTarget
+          if (periodType === "quarter" && currentIncomeTotal > 0) {
+            // Calculate tax for this quarter's actual income
+            const quarterTax = calculateNigerianTax({
+              businessType: businessType,
+              period: "yearly",
+              income: currentIncomeTotal,
+              businessExpenses: currentExpenseTotal,
+              rentPaid: 0,
+              pensionContribution: 0,
+              healthInsurance: 0,
+              housingFund: 0,
+              lifeInsurance: 0,
+              charitableDonations: 0,
+              dependents: 0,
+            })
+            reserveForPeriod = quarterTax.totalTax
+          }
           description = `You kept ${formatCurrency(netCash)} after expenses. ${taxAdvice} Set aside ${formatCurrency(reserveForPeriod)} for tax this ${periodLabel}.`
         } else if (reliefCoversReserve) {
           // Reliefs cover tax
           description = `You kept ${formatCurrency(netCash)} after expenses. Your reliefs (${formatCurrency(reliefTotal)}) may cover most of your tax liability. ${taxAdvice}`
         } else {
           // Standard case
-          const reserveForPeriod = periodType === "year" ? reserveTarget : reserveTarget / 4
+          // Calculate actual period tax instead of dividing annual by 4
+          let reserveForPeriod = reserveTarget
+          if (periodType === "quarter" && currentIncomeTotal > 0) {
+            // Calculate tax for this quarter's actual income
+            const quarterTax = calculateNigerianTax({
+              businessType: businessType,
+              period: "yearly",
+              income: currentIncomeTotal,
+              businessExpenses: currentExpenseTotal,
+              rentPaid: 0,
+              pensionContribution: 0,
+              healthInsurance: 0,
+              housingFund: 0,
+              lifeInsurance: 0,
+              charitableDonations: 0,
+              dependents: 0,
+            })
+            reserveForPeriod = quarterTax.totalTax
+          }
           const reservePercentage = netCash > 0 ? ((reserveForPeriod / netCash) * 100).toFixed(0) : "0"
           description = `You kept ${formatCurrency(netCash)} after expenses. ${taxAdvice} Set aside ${formatCurrency(reserveForPeriod)} for tax this ${periodLabel} (${reservePercentage}% of what you kept).`
         }
@@ -458,7 +509,14 @@ export function AnalyticsInsights({
 
         if (periodType === "year") {
           currentPeriodStart = getYearStart(now, effectiveYear)
-          currentPeriodEnd = getYearEnd(now, effectiveYear) > now ? now : getYearEnd(now, effectiveYear)
+          // If current year, use end of today; otherwise use end of year
+          if (effectiveYear === now.getFullYear() && getYearEnd(now, effectiveYear) > now) {
+            const endOfToday = new Date(now)
+            endOfToday.setHours(23, 59, 59, 999)
+            currentPeriodEnd = endOfToday
+          } else {
+            currentPeriodEnd = getYearEnd(now, effectiveYear)
+          }
           previousPeriodStart = getPreviousYearStart(now, effectiveYear)
           previousPeriodEnd = getPreviousYearEnd(now, effectiveYear)
           yearStart = currentPeriodStart
@@ -467,12 +525,26 @@ export function AnalyticsInsights({
           const quarterDate = new Date(effectiveYear, (effectiveQuarter - 1) * 3, 1)
           const quarterInfo = getQuarterInfo(quarterDate, effectiveQuarter, effectiveYear)
           currentPeriodStart = quarterInfo.start
-          currentPeriodEnd = quarterInfo.end > now ? now : quarterInfo.end
+          // If current quarter, use end of today; otherwise use end of quarter
+          if (quarterInfo.end > now) {
+            const endOfToday = new Date(now)
+            endOfToday.setHours(23, 59, 59, 999)
+            currentPeriodEnd = endOfToday
+          } else {
+            currentPeriodEnd = quarterInfo.end
+          }
           const prevQuarterInfo = getPreviousQuarterInfo(quarterDate, effectiveQuarter, effectiveYear)
           previousPeriodStart = prevQuarterInfo.start
           previousPeriodEnd = prevQuarterInfo.end
           yearStart = getYearStart(now, effectiveYear)
-          yearEnd = getYearEnd(now, effectiveYear) > now ? now : getYearEnd(now, effectiveYear)
+          // If current year, use end of today; otherwise use end of year
+          if (effectiveYear === now.getFullYear() && getYearEnd(now, effectiveYear) > now) {
+            const endOfToday = new Date(now)
+            endOfToday.setHours(23, 59, 59, 999)
+            yearEnd = endOfToday
+          } else {
+            yearEnd = getYearEnd(now, effectiveYear)
+          }
         }
         
         // Fetch transactions for current period, previous period, and full year (for accurate projections)

@@ -56,7 +56,7 @@ export function ImageViewerModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
-        <DialogHeader className="p-6 pb-4 border-b">
+        <DialogHeader className="p-6 pb-4 border-b pr-12">
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2">
               {title}
@@ -66,7 +66,7 @@ export function ImageViewerModal({
                 </Badge>
               )}
             </DialogTitle>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 mr-2">
               <Button
                 variant="outline"
                 size="sm"

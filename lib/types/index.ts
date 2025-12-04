@@ -1,4 +1,4 @@
-export type BusinessType = 'freelancer' | 'creator' | 'sme' | 'individual'
+export type BusinessType = 'freelancer' | 'creator' | 'sme'  | 'agent'
 
 // Subscription Types
 export type SubscriptionType = 'PRO' | 'GOLD' | 'PLATINUM' | 'Small Business' | 'Big Business' | null
@@ -25,6 +25,11 @@ export interface UserProfile {
     taxCertificate?: string
     businessLicense?: string
   }
+  kycDocuments?: {
+    id?: string // National ID, Voter's Card, etc.
+    passport?: string
+    driverLicense?: string
+  }
   role?: 'user' | 'admin' | 'editor' // User role - defaults to 'user'
   lastLogin?: string // Last login timestamp
   createdAt: string
@@ -41,6 +46,10 @@ export interface UserProfile {
   transactionCountResetDate?: string // Date when transaction count was last reset
   storageLimit?: number // Storage limit in bytes (e.g., 500MB = 500 * 1024 * 1024)
   storageUsed?: number // Current storage used in bytes
+  // Agent-specific fields
+  agentStates?: string[] // States the agent can handle
+  agentCertification?: string // URL to certification document
+  agentKycCompleted?: boolean // Whether agent has completed KYC
 }
 
 // Transaction Types
@@ -109,6 +118,7 @@ export interface UploadDocumentData {
   linkedTransaction?: string
   notes?: string
   imageKitUrl?: string
+  fileSize?: number // Optional: size from ImageKit upload result (in bytes)
 }
 
 export interface DocumentFilters {
@@ -133,6 +143,8 @@ export interface Reminder {
   priority: 'low' | 'medium' | 'high'
   isCompleted: boolean
   completedAt?: string
+  emailSent?: boolean // Whether reminder email has been sent
+  emailSentAt?: string // Timestamp when email was sent
   recurring?: {
     frequency: 'daily' | 'weekly' | 'monthly' | 'yearly'
     interval: number
@@ -196,6 +208,9 @@ export interface TaxPayment {
   taxDuration: string // e.g., "October 2024", "Jan-Mar 2024", "2024"
   paymentMethod: 'remitta' | 'interswitch' | 'paystack' | 'firs'
   status: 'pending' | 'completed' | 'failed'
+  rrr?: string // Remita Retrieval Reference
+  transactionRef?: string // Payment transaction reference
+  paymentDate?: string // Date when payment was completed
   taxCalculation?: {
     businessType: string
     income: number
@@ -429,6 +444,69 @@ export interface SavedClient {
     postalCode?: string
   }
   taxId?: string
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
+
+// Report Types
+export type ReportType = 'Self-Assessment' | 'Income Statement' | 'Expense Report' | 'Tax Summary'
+export type ReportStatus = 'draft' | 'completed' | 'submitted'
+export type FilingStatus = 'not_filed' | 'filed' | 'submitted' | 'acknowledged'
+export type FilingMethod = 'direct' | 'agent' | 'email' | null
+
+export interface SavedReport {
+  id: string
+  userId: string
+  title: string
+  type: ReportType
+  reportData: any // ReportData from reportService
+  period: {
+    startDate: string
+    endDate: string
+    year: number
+    quarter?: number
+    periodType: 'annual' | 'quarterly' | 'monthly' | 'custom'
+  }
+  status: ReportStatus
+  generatedAt: string
+  createdAt: string
+  updatedAt: string
+  rrr?: string // Remita Retrieval Reference
+  paymentStatus?: 'unpaid' | 'paid' // Payment status
+  transactionRef?: string // Payment transaction reference
+  paymentDate?: string // Date when payment was made
+  // Filing fields
+  filingStatus?: FilingStatus // Status of filing
+  filingMethod?: FilingMethod // Method used to file (direct/agent/email)
+  filingDate?: string // Date when return was filed
+  acknowledgmentNumber?: string // IRS acknowledgment number
+  ticketId?: string // Filing agent ticket ID
+  balanceDue?: number // Balance due after reconciliation (positive = owe, negative = credit, 0 = balanced)
+  taxesAlreadyPaid?: number // Total taxes already paid during the year
+  completedDocumentUrl?: string // URL of the completed/stamped document from agent filing
+  completedDocumentName?: string // Name of the completed document
+  completedDocumentId?: string // Document ID of the completed document
+}
+
+// Filing Request Types
+export type FilingRequestStatus = 'pending' | 'assigned' | 'in_progress' | 'completed' | 'cancelled'
+
+export interface FilingRequest {
+  id: string
+  userId: string
+  reportId: string
+  state: string
+  rrr: string
+  status: FilingRequestStatus
+  supportingDocuments: string[] // Array of document IDs or URLs
+  assignedAgentId?: string
+  assignedAgentName?: string
+  assignedAt?: string
+  completedAt?: string
+  completedDocumentUrl?: string // URL of the completed/stamped document uploaded by agent
+  completedDocumentName?: string // Name of the completed document
+  completedDocumentId?: string // Document ID in the documents collection
   notes?: string
   createdAt: string
   updatedAt: string

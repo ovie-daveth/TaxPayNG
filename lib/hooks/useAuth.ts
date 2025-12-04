@@ -49,6 +49,8 @@ interface SignUpData {
   firstName: string
   lastName: string
   businessType: BusinessType
+  phone?: string
+  agentStates?: string[]
 }
 
 interface SignInData {
@@ -92,14 +94,24 @@ export function useAuth() {
       })
 
       // Create user profile in Firestore
-      const profileResult = await userService.upsertProfile(user.uid, {
+      const profileData: any = {
         email: data.email,
         firstName: data.firstName,
         lastName: data.lastName,
         businessType: data.businessType,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
-      })
+      }
+
+      // Add agent-specific fields if businessType is agent
+      if (data.businessType === 'agent') {
+        profileData.phone = data.phone
+        profileData.agentStates = data.agentStates || []
+        profileData.agentKycCompleted = false
+        profileData.role = 'agent' // Set role to agent
+      }
+
+      const profileResult = await userService.upsertProfile(user.uid, profileData)
 
       console.log("Profile result:", profileResult)
 

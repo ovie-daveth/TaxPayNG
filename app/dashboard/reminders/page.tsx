@@ -57,18 +57,6 @@ export default function RemindersPage() {
     <div className="">
         <main className="container mx-auto px-4 py-6 max-w-7xl">
           <div className="space-y-6">
-            {/* Header with Add Button */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold">Reminders</h1>
-                <p className="text-sm text-muted-foreground mt-1">Manage your tax deadlines and important dates</p>
-              </div>
-              <Button onClick={() => setIsAddDialogOpen(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Reminder
-              </Button>
-            </div>
-
             {/* Error Message */}
             {error && (
               <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">

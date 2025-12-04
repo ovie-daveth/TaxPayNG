@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { Button } from "@/components/ui/button"
@@ -23,6 +24,8 @@ import { documentService } from "@/lib/services"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
 
 export default function InvoicesPage() {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const [invoices, setInvoices] = useState<Invoice[]>([])
@@ -36,7 +39,7 @@ export default function InvoicesPage() {
   const [showCreditNoteDialog, setShowCreditNoteDialog] = useState(false)
   const [isSavingCreditNote, setIsSavingCreditNote] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [viewMode, setViewMode] = useState<"card" | "table">("card")
+  const [viewMode, setViewMode] = useState<"card" | "table">("table")
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -85,6 +88,22 @@ export default function InvoicesPage() {
     window.addEventListener('createInvoice', handleCreateInvoice)
     return () => window.removeEventListener('createInvoice', handleCreateInvoice)
   }, [])
+
+  // Handle invoiceId query parameter to open specific invoice
+  useEffect(() => {
+    const invoiceId = searchParams?.get('invoiceId')
+    if (invoiceId && invoices.length > 0 && !isViewDialogOpen) {
+      const invoice = invoices.find(inv => inv.id === invoiceId)
+      if (invoice) {
+        setSelectedInvoice(invoice)
+        setIsViewDialogOpen(true)
+        // Remove query parameter from URL after opening
+        const newUrl = new URL(window.location.href)
+        newUrl.searchParams.delete('invoiceId')
+        router.replace(newUrl.pathname + newUrl.search, { scroll: false })
+      }
+    }
+  }, [searchParams, invoices, router, isViewDialogOpen])
 
   const getStatusBadge = (status: InvoiceStatus, invoiceType?: InvoiceType) => {
     const variants: Record<InvoiceStatus, { variant: "default" | "secondary" | "destructive" | "outline", icon: any }> = {
@@ -399,29 +418,29 @@ console.log("invoices", invoices)
             />
           </div>
           <div className="flex gap-2 items-center w-full sm:w-auto">
-            <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as "all" | "outgoing" | "incoming")}>
+          <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as "all" | "outgoing" | "incoming")}>
               <SelectTrigger className="w-full sm:w-[200px]">
-                <SelectValue placeholder="Filter by type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="outgoing">Outgoing (You send)</SelectItem>
-                <SelectItem value="incoming">Incoming (You receive)</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as InvoiceStatus | "all")}>
+              <SelectValue placeholder="Filter by type" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="outgoing">Outgoing (You send)</SelectItem>
+              <SelectItem value="incoming">Incoming (You receive)</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as InvoiceStatus | "all")}>
               <SelectTrigger className="w-full sm:w-[180px]">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="sent">Sent</SelectItem>
-                <SelectItem value="paid">Paid</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="draft">Draft</SelectItem>
+              <SelectItem value="sent">Sent</SelectItem>
+              <SelectItem value="paid">Paid</SelectItem>
+              <SelectItem value="overdue">Overdue</SelectItem>
+              <SelectItem value="cancelled">Cancelled</SelectItem>
+            </SelectContent>
+          </Select>
             <div className="flex border rounded-md">
               <Button
                 variant={viewMode === "card" ? "default" : "ghost"}
@@ -469,7 +488,7 @@ console.log("invoices", invoices)
               : (invoice.supplierPaymentStatus || 'Pending')
             
             return (
-              <Card key={invoice.id} className="p-6 hover:shadow-md transition-shadow">
+            <Card key={invoice.id} className="p-6 hover:shadow-md transition-shadow">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
                     {/* Header with document type, ID, and badges */}
@@ -495,13 +514,13 @@ console.log("invoices", invoices)
                           </TooltipContent>
                         </Tooltip>
                       )}
-                      <h3 className="text-lg font-semibold">
+                    <h3 className="text-lg font-semibold">
                         {isIncoming ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
-                      </h3>
+                    </h3>
                       {invoice.status === "sent" && (
                         <Badge variant="outline" className="text-xs">
                           {isIncoming ? 'Incoming' : 'Outgoing'}
-                        </Badge>
+                  </Badge>
                       )}
                       <Badge 
                         variant="outline" 
@@ -518,7 +537,7 @@ console.log("invoices", invoices)
                     {/* Content grid */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       {/* Client/From */}
-                      <div>
+                    <div>
                         <p className="text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
                           {isIncoming ? 'From' : 'Client'}
                         </p>
@@ -532,11 +551,11 @@ console.log("invoices", invoices)
                           <p className="text-xs text-muted-foreground mt-0.5">
                             {isIncoming ? invoice.supplier?.email : invoice.client.email}
                           </p>
-                        )}
-                      </div>
+                      )}
+                    </div>
                       
                       {/* Dates */}
-                      <div>
+                    <div>
                         <p className="text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
                           Dates
                         </p>
@@ -546,57 +565,57 @@ console.log("invoices", invoices)
                         <p className="text-sm text-foreground">
                           Due: <span className="font-medium">{format(new Date(invoice.dueDate), "MMM dd, yyyy")}</span>
                         </p>
-                      </div>
+                    </div>
                       
                       {/* Amount */}
-                      <div>
+                    <div>
                         <p className="text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
                           Amount
                         </p>
                         <p className="text-xl font-semibold text-foreground">
-                          {invoice.currency} {invoice.total.toLocaleString()}
-                        </p>
-                      </div>
+                        {invoice.currency} {invoice.total.toLocaleString()}
+                      </p>
                     </div>
                   </div>
+                </div>
                   
                   {/* Action buttons */}
                   <div className="flex gap-2 flex-shrink-0">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button 
-                          variant="outline" 
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button 
+                        variant="outline" 
                           size="icon"
                           className="h-9 w-9"
-                          onClick={() => {
-                            setSelectedInvoice(invoice)
-                            setIsViewDialogOpen(true)
-                          }}
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>View Invoice</p>
-                      </TooltipContent>
-                    </Tooltip>
-                    {invoice.status === "draft" && invoice.userId === profile?.userId && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
+                        onClick={() => {
+                          setSelectedInvoice(invoice)
+                          setIsViewDialogOpen(true)
+                        }}
+                      >
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>View Invoice</p>
+                    </TooltipContent>
+                  </Tooltip>
+                  {invoice.status === "draft" && invoice.userId === profile?.userId && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
                           <Button 
                             variant="outline" 
                             size="icon"
                             className="h-9 w-9"
                             onClick={() => handleMarkAsSent(invoice.id)}
                           >
-                            <Send className="w-4 h-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Mark as Sent</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
+                          <Send className="w-4 h-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>Mark as Sent</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button 
@@ -605,16 +624,16 @@ console.log("invoices", invoices)
                           className="h-9 w-9"
                           onClick={() => handleDelete(invoice.id)}
                         >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Delete Invoice</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </div>
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Delete Invoice</p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
-              </Card>
+              </div>
+            </Card>
             )
           })}
         </div>
@@ -772,7 +791,7 @@ console.log("invoices", invoices)
                 })}
               </tbody>
             </table>
-          </div>
+        </div>
         </Card>
       )}
 

@@ -837,6 +837,43 @@ export class InvoiceService extends BaseService {
         }
       }
 
+      // Create notification for recipient via API route (to avoid client-side firebase-admin import)
+      try {
+        // Get sender info
+        const { userService } = await import('./userService')
+        const sender = await userService.getProfile(senderUserId)
+        const senderName = sender ? `${sender.firstName} ${sender.lastName}` : 'Someone'
+        
+        // Call API route to create notification (server-side only)
+        const response = await fetch('/api/notifications/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: recipient.userId,
+            type: 'invoice',
+            title: `New invoice from ${senderName}`,
+            message: `You have received invoice ${invoice.invoiceNumber} for ₦${invoice.invoiceTotal.toLocaleString()}`,
+            link: `/dashboard/invoices?invoiceId=${invoiceId}`,
+            metadata: {
+              invoiceId,
+              invoiceNumber: invoice.invoiceNumber,
+              senderId: senderUserId,
+              senderName,
+              amount: invoice.invoiceTotal
+            }
+          })
+        })
+        
+        if (!response.ok) {
+          console.error('Failed to create invoice notification')
+        }
+      } catch (error) {
+        console.error('Error creating invoice notification:', error)
+        // Don't fail invoice send if notification creation fails
+      }
+
       // Update invoice to add recipient information (single invoice approach)
       // No copy is created - both sender and recipient reference the same invoice
       const updateData: Partial<Invoice> = {

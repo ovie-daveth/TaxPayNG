@@ -29,14 +29,25 @@ export class BaseService {
   protected convertTimestamp(timestamp: Timestamp | string | undefined | any): string {
     if (!timestamp) return new Date().toISOString()
     if (typeof timestamp === 'string') return timestamp
-    // Check if it's a Firestore Timestamp
-    if (timestamp && typeof timestamp.toDate === 'function') {
-      return timestamp.toDate().toISOString()
+    
+    // Handle Firestore Timestamp object (with seconds and nanoseconds)
+    if (timestamp && typeof timestamp === 'object') {
+      // Check if it's a Firestore Timestamp with toDate method
+      if (typeof timestamp.toDate === 'function') {
+        return timestamp.toDate().toISOString()
+      }
+      // Handle plain object with seconds property (from Firestore)
+      if (timestamp.seconds !== undefined) {
+        const date = new Date(timestamp.seconds * 1000)
+        return date.toISOString()
+      }
     }
+    
     // If it's already a Date object
     if (timestamp instanceof Date) {
       return timestamp.toISOString()
     }
+    
     // Fallback: try to parse as date string
     try {
       return new Date(timestamp).toISOString()
@@ -48,6 +59,19 @@ export class BaseService {
   // Helper method to convert ISO string to Firestore timestamp
   protected convertToTimestamp(dateString?: string): Timestamp | ReturnType<typeof serverTimestamp> {
     if (!dateString) return serverTimestamp()
+    
+    // Parse date string (format: YYYY-MM-DD) and create date at local midnight
+    // This prevents timezone issues where UTC midnight gets converted to previous day in local time
+    const dateParts = dateString.split('-')
+    if (dateParts.length === 3) {
+      const year = parseInt(dateParts[0], 10)
+      const month = parseInt(dateParts[1], 10) - 1 // Month is 0-indexed
+      const day = parseInt(dateParts[2], 10)
+      const date = new Date(year, month, day) // Creates date at local midnight
+      return Timestamp.fromDate(date)
+    }
+    
+    // Fallback to original behavior for other date formats
     return Timestamp.fromDate(new Date(dateString))
   }
 
@@ -150,7 +174,6 @@ export class BaseService {
     try {
       const collectionRef = collection(db, this.collectionName)
       let q: any = collectionRef
-      
       if (filters && filters.length > 0) {
         filters.forEach(filter => {
           q = query(q, where(filter.field, filter.operator, filter.value))

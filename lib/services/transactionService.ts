@@ -22,6 +22,7 @@ export class TransactionService extends BaseService {
         { field: 'userId', operator: '==', value: userId }
       ])
       
+      console.log("allTransactions from getUserTransactions:", allTransactions)
       // Convert startDate/endDate to dateRange if needed
       let dateRange = filters?.dateRange
       if (!dateRange && (filters?.startDate || filters?.endDate)) {
@@ -230,7 +231,7 @@ export class TransactionService extends BaseService {
       // Verify ownership
       const existingTransaction = await this.getById(transactionId)
       if (existingTransaction.userId !== userId) {
-        return {
+        return { 
           success: false,
           error: 'Unauthorized: You can only update your own transactions'
         }
@@ -350,8 +351,23 @@ export class TransactionService extends BaseService {
           }
 
           if (!start && !end) return true
-          if (start && transaction.txnDate < start) return false
-          if (end && transaction.txnDate > end) return false
+          
+          // Normalize dates to start/end of day for comparison
+          const txnDateOnly = new Date(transaction.txnDate)
+          txnDateOnly.setHours(0, 0, 0, 0)
+          
+          if (start) {
+            const startDateOnly = new Date(start)
+            startDateOnly.setHours(0, 0, 0, 0)
+            if (txnDateOnly < startDateOnly) return false
+          }
+          
+          if (end) {
+            const endDateOnly = new Date(end)
+            endDateOnly.setHours(23, 59, 59, 999)
+            if (transaction.txnDate > endDateOnly) return false
+          }
+          
           return true
         })
 

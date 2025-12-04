@@ -25,30 +25,63 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
-    if (!loading && !profileLoading && user && profile) {
-      // Check if user needs to verify TIN or upload documents
-      if (!profile.taxId) {
-        router.push("/verify-tin")
-        return
-      }
-
-      if (profile.businessType === 'sme' && !profile.businessDocuments) {
-        router.push("/verify-tin")
-        return
-      }
-
-      if (profile.businessType === 'creator') {
-        router.push("/dashboard-creator")
-        return
-      }
-
-      if (profile.businessType === 'sme') {
-        router.push("/dashboard-sme")
-        return
-      }
-
-      router.push("/dashboard")
+    // Wait for loading to complete
+    if (loading || profileLoading) {
+      return
     }
+
+    // If user is logged in but profile is null, wait a bit more
+    if (user && !profile) {
+      console.log("Login page - user logged in but profile is null, waiting...")
+      return
+    }
+
+    // If user is not logged in, don't redirect
+    if (!user) {
+      return
+    }
+
+    // If profile is still null after user is logged in, something might be wrong
+    // But don't redirect in a loop - just return
+    if (!profile) {
+      return
+    }
+
+    // Agent-specific redirects
+    if (profile.businessType === 'agent') {
+      // Only redirect if agentKycCompleted is explicitly true
+      // undefined or false means they need to complete KYC
+      console.log("Agent KYC completed:", profile.agentKycCompleted)
+      if (profile.agentKycCompleted !== true) {
+        router.push("/agent/kyc")
+        return
+      }
+      router.push("/agent/dashboard")
+      return
+    }
+
+    // Check if user needs to verify TIN or upload documents
+    if (!profile.taxId) {
+      router.push("/verify-tin")
+      return
+    }
+
+    if (profile.businessType === 'sme' && !profile.businessDocuments) {
+      router.push("/verify-tin")
+      return
+    }
+
+    if (profile.businessType === 'creator') {
+      router.push("/dashboard-creator")
+      return
+    }
+
+    if (profile.businessType === 'sme') {
+      router.push("/dashboard-sme")
+      return
+    }
+
+    router.push("/dashboard")
   }, [user, loading, profile, profileLoading, router])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {

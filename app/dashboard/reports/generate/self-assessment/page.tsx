@@ -1,72 +1,322 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { DashboardNav } from "@/components/dashboard/dashboard-nav"
+import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
-import { ArrowLeft, FileText, Download } from "lucide-react"
-import Link from "next/link"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { ArrowLeft, FileText, Download, Loader2, Info, Calculator, Shield } from "lucide-react"
 import { SelfAssessmentPreview } from "@/components/reports/self-assessment-preview"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { reportService, ReportData } from "@/lib/services"
+import { toast } from "sonner"
 
 export default function GenerateSelfAssessmentPage() {
+  const router = useRouter()
+  const { user } = useAuth()
+  const { profile } = useUserProfile()
   const [showPreview, setShowPreview] = useState(false)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [reportData, setReportData] = useState<ReportData | null>(null)
+  const [reportId, setReportId] = useState<string | null>(null)
+  const [isEditing, setIsEditing] = useState(true) // Start in edit mode by default
+  const [isSaving, setIsSaving] = useState(false)
+  const [formData, setFormData] = useState({
+    taxYear: new Date().getFullYear().toString(),
+    period: 'annual' as 'annual' | 'q1' | 'q2' | 'q3' | 'q4',
+    includeIncome: true,
+    includeExpenses: true,
+    includeTax: true,
+    includeReliefs: true,
+    includeDocuments: false
+  })
+
+  // Load existing report if editing
+  useEffect(() => {
+    const loadExistingReport = () => {
+      try {
+        const editingReportStr = sessionStorage.getItem('editingReport')
+        if (editingReportStr) {
+          const editingReport = JSON.parse(editingReportStr)
+          
+          // Verify it's a Self-Assessment report
+          if (editingReport.type !== 'Self-Assessment') {
+            sessionStorage.removeItem('editingReport')
+            return
+          }
+
+          // Use report data directly from sessionStorage (no database fetch needed)
+          if (editingReport.reportData) {
+            setReportId(editingReport.id)
+            setReportData(editingReport.reportData)
+            
+            // Set form data based on report period
+            const period = editingReport.reportData.period
+            setFormData(prev => ({
+              ...prev,
+              taxYear: period.year.toString(),
+              period: period.quarter ? `q${period.quarter}` as any : 'annual'
+            }))
+            
+            setShowPreview(true)
+            setIsEditing(true)
+            
+            // Clear sessionStorage after loading
+            sessionStorage.removeItem('editingReport')
+          }
+        }
+      } catch (error) {
+        console.error("Error loading existing report:", error)
+        sessionStorage.removeItem('editingReport')
+      }
+    }
+
+    loadExistingReport()
+  }, [])
+
+  // Calculate period dates based on year and period
+  const getPeriodDates = (year: number, period: string) => {
+    const now = new Date()
+    const currentYear = now.getFullYear()
+    const currentMonth = now.getMonth() + 1 // 1-12
+    
+    if (period === 'annual') {
+      // If current year, use today as end date; otherwise use Dec 31
+      const endDate = year === currentYear 
+        ? now.toISOString().split('T')[0] // Today's date
+        : `${year}-12-31`
+      return {
+        startDate: `${year}-01-01`,
+        endDate,
+        periodType: 'annual' as const
+      }
+    }
+    
+    const quarters: { [key: string]: { start: string; end: string; endMonth: number } } = {
+      q1: { start: `${year}-01-01`, end: `${year}-03-31`, endMonth: 3 },
+      q2: { start: `${year}-04-01`, end: `${year}-06-30`, endMonth: 6 },
+      q3: { start: `${year}-07-01`, end: `${year}-09-30`, endMonth: 9 },
+      q4: { start: `${year}-10-01`, end: `${year}-12-31`, endMonth: 12 }
+    }
+    
+    const quarter = quarters[period]
+    // If current year and current quarter, use today as end date; otherwise use quarter end
+    const endDate = (year === currentYear && currentMonth <= quarter.endMonth)
+      ? now.toISOString().split('T')[0] // Today's date
+      : quarter.end
+    
+    return {
+      startDate: quarter.start,
+      endDate,
+      periodType: 'quarterly' as const,
+      quarter: parseInt(period[1])
+    }
+  }
+
+  const handleGenerate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user?.uid || !profile?.userId) {
+      toast.error("Please log in to generate reports")
+      return
+    }
+
+    setIsGenerating(true)
+    try {
+      const year = parseInt(formData.taxYear)
+      const periodInfo = getPeriodDates(year, formData.period)
+      
+      const period = {
+        startDate: periodInfo.startDate,
+        endDate: periodInfo.endDate,
+        year,
+        quarter: periodInfo.quarter,
+        periodType: periodInfo.periodType
+      }
+
+      // For self-assessment, use only transaction data (no invoices)
+      const data = await reportService.generateReportData(
+        profile.userId,
+        period,
+        false // includeInvoices = false (use only transactions)
+      )
+
+      // Generate report title
+      const periodLabel = period.periodType === 'annual' 
+        ? `Annual ${period.year}`
+        : period.quarter 
+        ? `Q${period.quarter} ${period.year}`
+        : `${new Date(period.startDate).toLocaleDateString()} - ${new Date(period.endDate).toLocaleDateString()}`
+
+      const title = `Self-Assessment Filing - ${periodLabel}`
+
+      // Don't save immediately - let user edit first
+      setReportId(null) // No report ID yet - will be created on save
+      setReportData(data)
+      setShowPreview(true)
+      setIsEditing(true) // Start in edit mode
+      toast.success("Report generated. Please review and save when ready.")
+    } catch (error) {
+      console.error("Error generating report:", error)
+      toast.error(error instanceof Error ? error.message : "Failed to generate report")
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const handleSave = async () => {
+    if (!reportData || !profile?.userId) {
+      toast.error("Missing report information")
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      // Generate report title if not already set
+      const period = reportData.period
+      const periodLabel = period.periodType === 'annual' 
+        ? `Annual ${period.year}`
+        : period.quarter 
+        ? `Q${period.quarter} ${period.year}`
+        : `${new Date(period.startDate).toLocaleDateString()} - ${new Date(period.endDate).toLocaleDateString()}`
+      const title = `Self-Assessment Filing - ${periodLabel}`
+
+      // Include any additional metadata in reportData
+      // The reportData should already have all metadata from the preview component via onDataChange
+      const reportDataToSave = {
+        ...reportData,
+        // Ensure metadata exists and includes all fields
+        metadata: {
+          ...(reportData as any).metadata,
+          personalInfo: (reportData as any).metadata?.personalInfo || {},
+          attachments: (reportData as any).metadata?.attachments || {},
+          reliefEvidence: (reportData as any).metadata?.reliefEvidence || {},
+          reliefNotes: (reportData as any).metadata?.reliefNotes || {},
+          manualTaxCredits: (reportData as any).metadata?.manualTaxCredits || [],
+          declarationInfo: (reportData as any).metadata?.declarationInfo || {}
+        }
+      }
+
+      if (reportId) {
+        // Update existing report
+        await reportService.updateReport(
+          reportId,
+          'Self-Assessment',
+          {
+            reportData: reportDataToSave
+          }
+        )
+        toast.success("Report updated successfully")
+      } else {
+        // Create new report
+        const savedReportId = await reportService.saveReport(
+          profile.userId,
+          title,
+          'Self-Assessment',
+          reportDataToSave,
+          'draft' // Save as draft initially
+        )
+        setReportId(savedReportId)
+        toast.success("Report saved successfully")
+      }
+      // Close preview and redirect to reports page
+      setTimeout(() => {
+        router.push('/dashboard/reports')
+      }, 1000) // Small delay to show success message
+    } catch (error) {
+      console.error("Error saving report:", error)
+      toast.error(error instanceof Error ? error.message : "Failed to save report")
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-background">
-      <DashboardNav />
-      <div className="flex-1 md:ml-64">
-        <div className="border-b border-border bg-card">
-          <div className="container mx-auto px-4 py-4 max-w-7xl">
-            <div className="flex items-center gap-4">
+      {/* <DashboardNav /> */}
+        <main className="px-4 py-6">
+          {!showPreview ? (
+            <div className="space-y-6">
+              {/* Back Button */}
               <Link href="/dashboard/reports">
-                <Button variant="ghost" size="icon">
-                  <ArrowLeft className="w-5 h-5" />
+                <Button variant="ghost" className="mb-4">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Reports
                 </Button>
               </Link>
-              <div>
-                <h1 className="text-2xl font-bold">Generate Self-Assessment Filing</h1>
-                <p className="text-sm text-muted-foreground mt-1">Create LIRS/FIRS-ready self-assessment report</p>
-              </div>
-            </div>
-          </div>
-        </div>
 
-        <main className="container mx-auto px-4 py-6 max-w-7xl">
-          {!showPreview ? (
-            <Card className="p-6 max-w-3xl mx-auto">
-              <div className="mb-6">
-                <h2 className="text-xl font-semibold">Report Configuration</h2>
-                <p className="text-sm text-muted-foreground mt-1">Configure your self-assessment filing details</p>
-              </div>
+              {/* Header Section */}
+              <Card className="p-6">
+                <div className="flex items-start gap-4 mb-4">
+                  <div className="p-3 bg-primary/10 rounded-lg">
+                    <Shield className="w-6 h-6 text-primary" />
+                  </div>
+                  <div className="flex-1">
+                    <h1 className="text-2xl font-semibold mb-2">Generate Self-Assessment Tax Return</h1>
+                    <p className="text-muted-foreground">
+                      Create a comprehensive self-assessment tax return report for filing with the Federal Inland Revenue Service (FIRS) 
+                      or Lagos Internal Revenue Service (LIRS). This report includes your income, expenses, reliefs, and calculated tax liability.
+                    </p>
+                  </div>
+                </div>
+
+                <Alert className="mt-4">
+                  <Info className="w-4 h-4" />
+                  <AlertDescription>
+                    <strong>What is a Self-Assessment Tax Return?</strong> A self-assessment tax return is a document that taxpayers use to 
+                    report their income, claim deductions and reliefs, and calculate their tax liability for a given tax year. 
+                    In Nigeria, self-employed individuals, freelancers, and small business owners are required to file self-assessment returns 
+                    annually with the tax authorities. This report helps you prepare and file your tax return accurately.
+                  </AlertDescription>
+                </Alert>
+              </Card>
+
+              {/* Configuration Form */}
+              <Card className="p-6">
+                <div className="mb-6">
+                  <h2 className="text-xl font-semibold flex items-center gap-2">
+                    <Calculator className="w-5 h-5" />
+                    Report Configuration
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Configure your self-assessment filing details and select what to include in the report
+                  </p>
+                </div>
 
               <form
                 className="space-y-6"
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  setShowPreview(true)
-                }}
+                onSubmit={handleGenerate}
               >
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="tax-year">Tax Year</Label>
-                    <Select defaultValue="2024">
+                    <Select 
+                      value={formData.taxYear}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, taxYear: value }))}
+                    >
                       <SelectTrigger id="tax-year">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="2024">2024</SelectItem>
-                        <SelectItem value="2023">2023</SelectItem>
-                        <SelectItem value="2022">2022</SelectItem>
+                        {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map(year => (
+                          <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor="period">Period</Label>
-                    <Select defaultValue="annual">
+                    <Select 
+                      value={formData.period}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, period: value as any }))}
+                    >
                       <SelectTrigger id="period">
                         <SelectValue />
                       </SelectTrigger>
@@ -81,51 +331,55 @@ export default function GenerateSelfAssessmentPage() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="tin">Tax Identification Number (TIN)</Label>
-                  <Input id="tin" placeholder="Enter your TIN" />
-                </div>
-
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="business-name">Business Name</Label>
-                    <Input id="business-name" placeholder="Your business name" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="business-address">Business Address</Label>
-                    <Input id="business-address" placeholder="Business address" />
-                  </div>
-                </div>
-
                 <div className="border-t border-border pt-6">
                   <h3 className="font-semibold mb-4">Include in Report</h3>
                   <div className="space-y-3">
                     <div className="flex items-center space-x-2">
-                      <Checkbox id="include-income" defaultChecked />
+                      <Checkbox 
+                        id="include-income" 
+                        checked={formData.includeIncome}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, includeIncome: !!checked }))}
+                      />
                       <Label htmlFor="include-income" className="cursor-pointer font-normal">
                         Income Statement (All transactions)
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Checkbox id="include-expenses" defaultChecked />
+                      <Checkbox 
+                        id="include-expenses" 
+                        checked={formData.includeExpenses}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, includeExpenses: !!checked }))}
+                      />
                       <Label htmlFor="include-expenses" className="cursor-pointer font-normal">
                         Expense Breakdown
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Checkbox id="include-tax" defaultChecked />
+                      <Checkbox 
+                        id="include-tax" 
+                        checked={formData.includeTax}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, includeTax: !!checked }))}
+                      />
                       <Label htmlFor="include-tax" className="cursor-pointer font-normal">
                         Tax Calculation Details
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Checkbox id="include-reliefs" defaultChecked />
+                      <Checkbox 
+                        id="include-reliefs" 
+                        checked={formData.includeReliefs}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, includeReliefs: !!checked }))}
+                      />
                       <Label htmlFor="include-reliefs" className="cursor-pointer font-normal">
                         Reliefs and Deductions
                       </Label>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Checkbox id="include-documents" />
+                      <Checkbox 
+                        id="include-documents"
+                        checked={formData.includeDocuments}
+                        onCheckedChange={(checked) => setFormData(prev => ({ ...prev, includeDocuments: !!checked }))}
+                      />
                       <Label htmlFor="include-documents" className="cursor-pointer font-normal">
                         Supporting Documents (Receipts & Invoices)
                       </Label>
@@ -135,41 +389,89 @@ export default function GenerateSelfAssessmentPage() {
 
                 <div className="flex gap-3 pt-4">
                   <Link href="/dashboard/reports" className="flex-1">
-                    <Button type="button" variant="outline" className="w-full bg-transparent">
+                    <Button type="button" variant="outline" className="w-full">
                       Cancel
                     </Button>
                   </Link>
-                  <Button type="submit" className="flex-1">
-                    <FileText className="w-4 h-4 mr-2" />
-                    Generate Report
+                  <Button type="submit" className="flex-1" disabled={isGenerating}>
+                    {isGenerating ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Generating...
+                      </>
+                    ) : (
+                      <>
+                        <FileText className="w-4 h-4 mr-2" />
+                        Generate Self-Assessment
+                      </>
+                    )}
                   </Button>
                 </div>
               </form>
-            </Card>
+              </Card>
+            </div>
           ) : (
             <div className="space-y-6">
+              {/* Back Button */}
+              <Link href="/dashboard/reports">
+                <Button variant="ghost" className="mb-4">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Back to Reports
+                </Button>
+              </Link>
+
               <Card className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <h2 className="text-xl font-semibold">Report Preview</h2>
-                    <p className="text-sm text-muted-foreground mt-1">Review your self-assessment filing</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {reportId ? 'Edit your saved self-assessment filing' : 'Review and edit your self-assessment filing before saving'}
+                    </p>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="outline" onClick={() => setShowPreview(false)}>
-                      Edit
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setShowPreview(false)}
+                      disabled={isSaving}
+                    >
+                      Back to Form
                     </Button>
-                    <Button>
-                      <Download className="w-4 h-4 mr-2" />
-                      Download PDF
+                    <Button 
+                      onClick={handleSave}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="w-4 h-4 mr-2" />
+                          {reportId ? 'Save Changes' : 'Save Report'}
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
               </Card>
-              <SelfAssessmentPreview />
+              {reportData ? (
+                <SelfAssessmentPreview 
+                  reportData={reportData} 
+                  formData={formData}
+                  isEditing={isEditing}
+                  onDataChange={setReportData}
+                />
+              ) : (
+                <Card className="p-8">
+                  <div className="text-center text-muted-foreground">
+                    No report data available
+                  </div>
+                </Card>
+              )}
             </div>
           )}
         </main>
-      </div>
     </div>
   )
 }
