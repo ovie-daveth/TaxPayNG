@@ -27,15 +27,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Format due date
-    const dueDateObj = new Date(dueDate)
-    const formattedDate = dueDateObj.toLocaleDateString('en-NG', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    })
+    let formattedDate: string
+    try {
+      const dueDateObj = new Date(dueDate)
+      if (isNaN(dueDateObj.getTime())) {
+        throw new Error('Invalid date')
+      }
+      formattedDate = dueDateObj.toLocaleDateString('en-NG', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    } catch (dateError) {
+      // Fallback to ISO string if formatting fails
+      formattedDate = typeof dueDate === 'string' ? dueDate : new Date().toISOString()
+      console.warn('⚠️ Could not format due date, using fallback:', dueDate)
+    }
 
     // Priority emoji
     const priorityEmoji = {

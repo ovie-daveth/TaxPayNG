@@ -216,10 +216,24 @@ export async function GET(request: NextRequest) {
 
         if (response.ok) {
           results.sent++
+          console.log(`✅ Successfully sent reminder ${reminder.id} to ${profile.email}`)
         } else {
           results.failed++
-          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }))
-          results.errors.push(`Reminder ${reminder.id}: ${errorData.error || 'Failed to send'}`)
+          let errorMessage = 'Unknown error'
+          try {
+            const errorData = await response.json()
+            errorMessage = errorData.error || errorData.message || `HTTP ${response.status}`
+          } catch (parseError) {
+            // If response is not JSON, try to get text
+            try {
+              const errorText = await response.text()
+              errorMessage = errorText || `HTTP ${response.status}: ${response.statusText}`
+            } catch (textError) {
+              errorMessage = `HTTP ${response.status}: ${response.statusText}`
+            }
+          }
+          results.errors.push(`Reminder ${reminder.id}: ${errorMessage}`)
+          console.error(`❌ Failed to send reminder ${reminder.id}:`, errorMessage)
         }
       } catch (error: any) {
         results.failed++
