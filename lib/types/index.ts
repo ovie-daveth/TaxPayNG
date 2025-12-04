@@ -143,6 +143,8 @@ export interface Reminder {
   priority: 'low' | 'medium' | 'high'
   isCompleted: boolean
   completedAt?: string
+  emailSent?: boolean // Whether reminder email has been sent
+  emailSentAt?: string // Timestamp when email was sent
   recurring?: {
     frequency: 'daily' | 'weekly' | 'monthly' | 'yearly'
     interval: number

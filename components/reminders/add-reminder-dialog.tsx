@@ -24,6 +24,7 @@ export function AddReminderDialog({ open, onOpenChange, onSubmit, editingReminde
     title: '',
     description: '',
     dueDate: '',
+    dueTime: '',
     type: 'other' as Reminder['type'],
     priority: 'medium' as Reminder['priority'],
     isCompleted: false
@@ -35,25 +36,40 @@ export function AddReminderDialog({ open, onOpenChange, onSubmit, editingReminde
   // Populate form when editing
   useEffect(() => {
     if (editingReminder) {
-      // Convert ISO date string to YYYY-MM-DD format for date input
-      const dateValue = editingReminder.dueDate.includes('T') 
-        ? editingReminder.dueDate.split('T')[0] 
-        : editingReminder.dueDate
+      // Parse ISO datetime string to separate date and time
+      let dateValue = ''
+      let timeValue = ''
+      
+      if (editingReminder.dueDate.includes('T')) {
+        const [date, time] = editingReminder.dueDate.split('T')
+        dateValue = date
+        // Extract time part (HH:MM) from ISO string (might have timezone)
+        timeValue = time.split('.')[0].substring(0, 5) // Get HH:MM from HH:MM:SS or HH:MM:SS.sss
+      } else {
+        dateValue = editingReminder.dueDate
+        timeValue = '09:00' // Default to 9 AM if no time specified
+      }
       
       setFormData({
         title: editingReminder.title,
         description: editingReminder.description || '',
         dueDate: dateValue,
+        dueTime: timeValue,
         type: editingReminder.type,
         priority: editingReminder.priority,
         isCompleted: editingReminder.isCompleted
       })
     } else {
-      // Reset form when not editing
+      // Reset form when not editing - default to current date and 9 AM
+      const now = new Date()
+      const defaultDate = now.toISOString().split('T')[0]
+      const defaultTime = '09:00'
+      
       setFormData({
         title: '',
         description: '',
-        dueDate: '',
+        dueDate: defaultDate,
+        dueTime: defaultTime,
         type: 'other',
         priority: 'medium',
         isCompleted: false
@@ -64,10 +80,13 @@ export function AddReminderDialog({ open, onOpenChange, onSubmit, editingReminde
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!formData.title || !formData.dueDate) {
+    if (!formData.title || !formData.dueDate || !formData.dueTime) {
       toast.error('Please fill all required fields')
       return
     }
+
+    // Combine date and time into ISO datetime string
+    const combinedDateTime = `${formData.dueDate}T${formData.dueTime}:00`
 
     setIsSubmitting(true)
     try {
@@ -76,7 +95,7 @@ export function AddReminderDialog({ open, onOpenChange, onSubmit, editingReminde
         await onUpdate(editingReminder.id, {
           title: formData.title,
           description: formData.description || undefined,
-          dueDate: formData.dueDate,
+          dueDate: combinedDateTime,
           type: formData.type,
           priority: formData.priority
         })
@@ -86,7 +105,7 @@ export function AddReminderDialog({ open, onOpenChange, onSubmit, editingReminde
         await onSubmit({
           title: formData.title,
           description: formData.description || undefined,
-          dueDate: formData.dueDate,
+          dueDate: combinedDateTime,
           type: formData.type,
           priority: formData.priority,
           isCompleted: false
@@ -95,10 +114,15 @@ export function AddReminderDialog({ open, onOpenChange, onSubmit, editingReminde
       }
       
       // Reset form
+      const now = new Date()
+      const defaultDate = now.toISOString().split('T')[0]
+      const defaultTime = '09:00'
+      
       setFormData({
         title: '',
         description: '',
-        dueDate: '',
+        dueDate: defaultDate,
+        dueTime: defaultTime,
         type: 'other',
         priority: 'medium',
         isCompleted: false
@@ -142,15 +166,27 @@ export function AddReminderDialog({ open, onOpenChange, onSubmit, editingReminde
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="reminder-date">Due Date *</Label>
-            <Input 
-              id="reminder-date" 
-              type="date" 
-              value={formData.dueDate}
-              onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
-              required 
-            />
+          <div className="grid sm:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="reminder-date">Due Date *</Label>
+              <Input 
+                id="reminder-date" 
+                type="date" 
+                value={formData.dueDate}
+                onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
+                required 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reminder-time">Due Time *</Label>
+              <Input 
+                id="reminder-time" 
+                type="time" 
+                value={formData.dueTime}
+                onChange={(e) => setFormData(prev => ({ ...prev, dueTime: e.target.value }))}
+                required 
+              />
+            </div>
           </div>
 
           <div className="grid sm:grid-cols-2 gap-4">
@@ -202,7 +238,7 @@ export function AddReminderDialog({ open, onOpenChange, onSubmit, editingReminde
             <Button 
               type="submit" 
               className="flex-1"
-              disabled={!formData.title || !formData.dueDate || isSubmitting}
+              disabled={!formData.title || !formData.dueDate || !formData.dueTime || isSubmitting}
             >
               {isSubmitting ? (
                 <>
