@@ -482,6 +482,9 @@ export interface SavedReport {
   ticketId?: string // Filing agent ticket ID
   balanceDue?: number // Balance due after reconciliation (positive = owe, negative = credit, 0 = balanced)
   taxesAlreadyPaid?: number // Total taxes already paid during the year
+  completedDocumentUrl?: string // URL of the completed/stamped document from agent filing
+  completedDocumentName?: string // Name of the completed document
+  completedDocumentId?: string // Document ID of the completed document
 }
 
 // Filing Request Types
@@ -499,6 +502,9 @@ export interface FilingRequest {
   assignedAgentName?: string
   assignedAt?: string
   completedAt?: string
+  completedDocumentUrl?: string // URL of the completed/stamped document uploaded by agent
+  completedDocumentName?: string // Name of the completed document
+  completedDocumentId?: string // Document ID in the documents collection
   notes?: string
   createdAt: string
   updatedAt: string

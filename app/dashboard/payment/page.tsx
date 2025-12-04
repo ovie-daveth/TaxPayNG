@@ -1,20 +1,33 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { PaymentReceipt } from "@/components/tax-payment/payment-receipt"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft } from "lucide-react"
-import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation"
-import { SimplifiedPaymentForm } from "@/components/tax-payment/simplified-payment-form"
-import { taxPaymentService, documentService } from "@/lib/services"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { PaymentReceipt } from "@/components/tax-payment/payment-receipt"
 import { useAuth } from "@/lib/hooks/useAuth"
-import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { taxPaymentService } from "@/lib/services"
+import { TaxPayment } from "@/lib/types"
+import { 
+  ArrowLeft, 
+  Download, 
+  Search, 
+  X, 
+  LayoutGrid, 
+  Table2, 
+  Filter,
+  Calendar,
+  TrendingUp,
+  Wallet,
+  CheckCircle2,
+  Loader2,
+  Copy,
+  Sparkles
+} from "lucide-react"
 import { toast } from "sonner"
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { CheckCircle2, XCircle, AlertCircle, Loader2 } from "lucide-react"
-import Link from "next/link"
+import { formatCurrency, cn } from "@/lib/utils"
 
 interface PaymentData {
   amount: number
@@ -29,435 +42,497 @@ interface PaymentData {
   state?: string
 }
 
-interface PaymentFormData {
-  period: 'monthly' | 'quarterly' | 'yearly'
-  amount: number
-  taxDuration: string
-  calculatedAmount?: number
-  pendingPeriods?: Array<{
-    period: string
-    amount: number
-    taxDuration: string
-  }>
-  isManual: boolean
-}
+type ViewMode = "grid" | "table"
+type FilterCategory = "period" | "method" | "status"
 
-interface SystemCheck {
-  name: string
-  status: boolean
-  message: string
-  actionUrl?: string
-  actionLabel?: string
-}
-
-export default function PaymentPage() {
+export default function PaymentHistoryPage() {
   const router = useRouter()
   const { user } = useAuth()
-  const { profile, loading: profileLoading } = useUserProfile()
+  const [payments, setPayments] = useState<TaxPayment[]>([])
+  const [filteredPayments, setFilteredPayments] = useState<TaxPayment[]>([])
+  const [loading, setLoading] = useState(true)
+  const [selectedPayment, setSelectedPayment] = useState<PaymentData | null>(null)
   const [showReceipt, setShowReceipt] = useState(false)
-  const [paymentData, setPaymentData] = useState<PaymentData | null>(null)
-  const [processing, setProcessing] = useState(false)
-  const [paymentFormData, setPaymentFormData] = useState<PaymentFormData | null>(null)
-  const [showValidation, setShowValidation] = useState(false)
-  const [systemChecks, setSystemChecks] = useState<SystemCheck[]>([])
-  const [allChecksPassed, setAllChecksPassed] = useState(false)
-  const [checking, setChecking] = useState(false)
+  
+  // View mode
+  const [viewMode, setViewMode] = useState<ViewMode>("grid")
+  
+  // Filters
+  const [searchTerm, setSearchTerm] = useState("")
+  const [showFilters, setShowFilters] = useState(false)
+  const [activePeriod, setActivePeriod] = useState<string | null>(null)
+  const [activeMethod, setActiveMethod] = useState<string | null>(null)
+  const [activeStatus, setActiveStatus] = useState<string | null>(null)
 
-  // Mock payment processing
-  const processPayment = async (amount: number, method: string): Promise<PaymentData> => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 2000))
+  useEffect(() => {
+    if (user?.uid) {
+      loadPayments()
+    }
+  }, [user])
+
+  useEffect(() => {
+    applyFilters()
+  }, [payments, searchTerm, activePeriod, activeMethod, activeStatus])
+
+  const loadPayments = async () => {
+    if (!user?.uid) return
     
-    const transactionId = `TXN${Date.now()}${Math.random().toString(36).substr(2, 9).toUpperCase()}`
-    
-    const tips = [
-      "Keep this receipt for your records",
-      "File your tax returns on time to avoid penalties",
-      "Consider consulting a tax professional for complex situations",
-      "Maintain records of all deductions and expenses",
-      "Set reminders for upcoming tax deadlines"
-    ]
-    
-    return {
-      amount,
-      tips,
-      status: "Success",
-      transactionId,
-      method: method.charAt(0).toUpperCase() + method.slice(1),
-      taxDuration: "", // Will be set by caller
-      timestamp: new Date().toISOString()
+    setLoading(true)
+    try {
+      const result = await taxPaymentService.getUserPaymentsSimple(user.uid)
+      setPayments(result)
+    } catch (error) {
+      console.error("Error loading payments:", error)
+      toast.error("Failed to load payment history")
+    } finally {
+      setLoading(false)
     }
   }
 
-  const performSystemChecks = async () => {
-    if (!profile || !user?.uid) return
+  const applyFilters = () => {
+    let filtered = [...payments]
 
-    setChecking(true)
-    const checks: SystemCheck[] = []
-
-    // 1. Check if profile is complete
-    const isProfileComplete = !!(
-      profile.firstName &&
-      profile.lastName &&
-      profile.address &&
-      profile.address.street &&
-      profile.address.city &&
-      profile.address.state &&
-      profile.phone
-    )
-    
-    checks.push({
-      name: "Profile Complete",
-      status: isProfileComplete,
-      message: isProfileComplete 
-        ? "Your profile information is complete"
-        : "Please complete your profile information (name, address, phone)",
-      actionUrl: !isProfileComplete ? "/dashboard/settings" : undefined,
-      actionLabel: !isProfileComplete ? "Complete Profile" : undefined
-    })
-
-    // 2. Check if TIN is verified
-    const taxId = profile.taxId
-    const isTINVerified = !!(taxId && typeof taxId === 'string' && taxId.trim().length > 0)
-    checks.push({
-      name: "TIN Verified",
-      status: isTINVerified,
-      message: isTINVerified
-        ? "Your Tax Identification Number is verified"
-        : "Please verify your Tax Identification Number (TIN)",
-      actionUrl: !isTINVerified ? "/dashboard/settings" : undefined,
-      actionLabel: !isTINVerified ? "Add TIN" : undefined
-    })
-
-    // 3. Check if KYC is uploaded (check for identity documents in profile)
-    try {
-      const hasKYCDocuments = !!(
-        profile.kycDocuments?.id || 
-        profile.kycDocuments?.passport || 
-        profile.kycDocuments?.driverLicense
+    // Search filter
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase()
+      filtered = filtered.filter(payment => 
+        payment.transactionId.toLowerCase().includes(term) ||
+        payment.taxDuration.toLowerCase().includes(term) ||
+        payment.amount.toString().includes(term)
       )
-      
-      checks.push({
-        name: "KYC Documents",
-        status: hasKYCDocuments,
-        message: hasKYCDocuments
-          ? "KYC documents are uploaded"
-          : "Please upload your identity documents (ID, Passport, or Driver's License)",
-        actionUrl: !hasKYCDocuments ? "/dashboard/settings?tab=profile&section=kyc" : undefined,
-        actionLabel: !hasKYCDocuments ? "Upload Documents" : undefined
-      })
-    } catch (error) {
-      console.error("Error checking KYC documents:", error)
-      checks.push({
-        name: "KYC Documents",
-        status: false,
-        message: "Unable to verify KYC documents",
-        actionUrl: "/dashboard/settings?tab=profile&section=kyc",
-        actionLabel: "Upload Documents"
-      })
     }
 
-    setSystemChecks(checks)
-    const passed = checks.every(check => check.status)
-    setAllChecksPassed(passed)
-    setChecking(false)
+    // Period filter
+    if (activePeriod) {
+      filtered = filtered.filter(payment => payment.period === activePeriod)
+    }
+
+    // Method filter
+    if (activeMethod) {
+      filtered = filtered.filter(payment => payment.paymentMethod === activeMethod)
+    }
+
+    // Status filter
+    if (activeStatus) {
+      filtered = filtered.filter(payment => payment.status === activeStatus)
+    }
+
+    setFilteredPayments(filtered)
   }
 
-  const handlePaymentFormContinue = async (data: PaymentFormData) => {
-    // Store payment data
-    setPaymentFormData(data)
-    
-    // Store in localStorage for the generate-rrr page
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('payment_amount', data.amount.toString())
-      localStorage.setItem('payment_period', data.period)
-      localStorage.setItem('payment_taxDuration', data.taxDuration)
-      if (data.calculatedAmount) {
-        localStorage.setItem('payment_calculatedAmount', data.calculatedAmount.toString())
-      }
+  const handleViewReceipt = (payment: TaxPayment) => {
+    const paymentData: PaymentData = {
+      amount: payment.amount,
+      tips: [
+        "Keep this receipt for your records",
+        "File your tax returns on time to avoid penalties",
+        "Consider consulting a tax professional for complex situations",
+        "Maintain records of all deductions and expenses",
+        "Set reminders for upcoming tax deadlines"
+      ],
+      status: payment.status === 'completed' ? "Success" : payment.status,
+      transactionId: payment.transactionId,
+      method: payment.paymentMethod.charAt(0).toUpperCase() + payment.paymentMethod.slice(1),
+      taxDuration: payment.taxDuration,
+      timestamp: payment.createdAt
     }
     
-    // Perform system checks before navigating
-    await performSystemChecks()
-    setShowValidation(true)
-  }
-
-  const handleProceedToRRR = () => {
-    if (allChecksPassed) {
-      // Navigate to generate RRR page
-      router.push('/dashboard/payment/generate-rrr')
-    } else {
-      toast.error("Please complete all required checks before proceeding")
-    }
-  }
-
-  const handlePay = async (amount: number, method: string, period: string, taxDuration: string, taxCalculation?: any, rrr?: string, tin?: string, state?: string) => {
-    setProcessing(true)
-    
-    try {
-      // Simulate payment processing based on method
-      let paymentResult: PaymentData
-      
-      if (method === "firs") {
-        // Open FIRS in new tab
-        const confirmProceed = window.confirm(
-          "You will be redirected to the FIRS official payment portal. Continue?"
-        )
-        if (!confirmProceed) {
-          setProcessing(false)
-          return
-        }
-        window.open("https://firs.gov.ng", "_blank")
-        // Still process as success for demo
-        paymentResult = await processPayment(amount, method)
-      } else {
-        // Mock payment for other gateways
-        paymentResult = await processPayment(amount, method)
-      }
-      
-      // Save payment to Firebase
-      if (user?.uid) {
-        try {
-          console.log('Attempting to save payment to Firebase...')
-          console.log('Payment data:', { 
-            transactionId: paymentResult.transactionId, 
-            amount: paymentResult.amount, 
-            period,
-            method 
-          })
-          
-          const saveResult = await taxPaymentService.createPayment(user.uid, {
-            transactionId: paymentResult.transactionId,
-            amount: paymentResult.amount,
-            period: period as 'monthly' | 'quarterly' | 'yearly',
-            taxDuration: taxDuration,
-            paymentMethod: method as 'remitta' | 'interswitch' | 'paystack' | 'firs',
-            status: 'completed',
-            taxCalculation: taxCalculation,
-            notes: 'Payment completed successfully'
-          })
-          
-          console.log('Save result:', saveResult)
-          
-          if (!saveResult.success) {
-            console.error('Failed to save payment to Firebase:', saveResult.error)
-            toast.error(`Payment completed but failed to save record: ${saveResult.error}`)
-          } else {
-            toast.success('Payment saved successfully')
-          }
-        } catch (error) {
-          console.error('Error saving payment to Firebase:', error)
-          toast.error('Payment completed but failed to save record. Please check console for details.')
-        }
-      } else {
-        console.error('User not found, cannot save payment')
-        toast.error('Payment completed but user not authenticated')
-      }
-      
-      // Add taxDuration and RRR details to paymentResult
-      paymentResult.taxDuration = taxDuration
-      if (rrr) paymentResult.rrr = rrr
-      if (tin) paymentResult.tin = tin
-      if (state) paymentResult.state = state
-      
-      setPaymentData(paymentResult)
-      setShowReceipt(true)
-      setProcessing(false)
-    } catch (error) {
-      console.error("Payment processing error:", error)
-      toast.error("Payment failed. Please try again.")
-      setProcessing(false)
-    }
+    setSelectedPayment(paymentData)
+    setShowReceipt(true)
   }
 
   const handleCloseReceipt = () => {
-    // Clear any remaining localStorage data
-    if (typeof window !== 'undefined') {
-      localStorage.removeItem('tax_payment_step')
-      localStorage.removeItem('tax_payment_period')
-      localStorage.removeItem('tax_payment_amount')
-      localStorage.removeItem('tax_payment_method')
-      localStorage.removeItem('tax_payment_calculated')
-      localStorage.removeItem('tax_payment_calculated_full')
-      localStorage.removeItem('tax_payment_tab')
-      localStorage.removeItem('tax_payment_tax_duration')
+    setShowReceipt(false)
+    setSelectedPayment(null)
+  }
+
+  const getStatusBadge = (status: string) => {
+    const config = {
+      completed: { icon: CheckCircle2, color: "text-green-600 bg-green-50 border-green-200", label: "Completed" },
+      pending: { icon: Loader2, color: "text-yellow-600 bg-yellow-50 border-yellow-200", label: "Pending" },
+      failed: { icon: X, color: "text-red-600 bg-red-50 border-red-200", label: "Failed" }
     }
     
-    setShowReceipt(false)
-    router.push("/dashboard")
+    const { icon: Icon, color, label } = config[status as keyof typeof config] || config.pending
+    
+    return (
+      <span className={cn(
+        "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border",
+        color
+      )}>
+        <Icon className="w-3 h-3" />
+        {label}
+      </span>
+    )
   }
 
-  // Check for duplicate payment
-  const checkDuplicatePayment = async (period: string, taxDuration: string): Promise<{ isDuplicate: boolean; payment?: any }> => {
-    if (!user?.uid) {
-      return { isDuplicate: false }
-    }
-
-    try {
-      // Get all payments for this user using simple query (no index required)
-      const payments = await taxPaymentService.getUserPaymentsSimple(user.uid)
-      
-      if (payments && payments.length > 0) {
-        // Check if any payment exists with the same period and taxDuration
-        const duplicate = payments.find(payment => 
-          payment.period === period && 
-          payment.taxDuration === taxDuration &&
-          payment.status === 'completed'
-        )
-        
-        if (duplicate) {
-          return { isDuplicate: true, payment: duplicate }
-        }
-      }
-      
-      return { isDuplicate: false }
-    } catch (error) {
-      console.error('Error checking duplicate payment:', error)
-      return { isDuplicate: false }
+  const toggleFilter = (type: FilterCategory, value: string | null) => {
+    switch (type) {
+      case "period":
+        setActivePeriod(activePeriod === value ? null : value)
+        break
+      case "method":
+        setActiveMethod(activeMethod === value ? null : value)
+        break
+      case "status":
+        setActiveStatus(activeStatus === value ? null : value)
+        break
     }
   }
+
+  const clearAllFilters = () => {
+    setSearchTerm("")
+    setActivePeriod(null)
+    setActiveMethod(null)
+    setActiveStatus(null)
+  }
+
+  const copyTransactionId = (id: string) => {
+    navigator.clipboard.writeText(id)
+    toast.success("Transaction ID copied!")
+  }
+
+  const totalAmount = filteredPayments.reduce((sum, p) => sum + p.amount, 0)
+  const completedCount = filteredPayments.filter(p => p.status === 'completed').length
 
   return (
     <>
       {/* Receipt Modal */}
-      {showReceipt && paymentData && (
+      {showReceipt && selectedPayment && (
         <PaymentReceipt 
-          paymentData={paymentData} 
+          paymentData={selectedPayment} 
           onDownload={() => {}} 
           onClose={handleCloseReceipt}
         />
       )}
-
+      
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-6 ">
+    <div className="container mx-auto px-4 py-6 animate-in fade-in duration-300">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
         <Button 
           variant="ghost" 
-          onClick={() => {
-            if (showValidation) {
-              setShowValidation(false)
-            } else {
-              router.back()
-            }
-          }}
-          className="mb-6"
+          onClick={() => router.back()}
+          className="mb-0"
         >
           <ArrowLeft className="w-4 h-4 mr-2" />
           Back
         </Button>
 
-        {showValidation ? (
-          <div className="space-y-6 max-w-3xl mx-auto">
-            <Card>
-              <CardHeader>
-                <CardTitle>System Checks</CardTitle>
-                <CardDescription>
-                  Please ensure all requirements are met before generating RRR
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                {checking || profileLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                    <span className="ml-2 text-muted-foreground">Checking requirements...</span>
+        <div className="flex items-center gap-3">
+          <Button
+            variant={showFilters ? "default" : "outline"}
+            onClick={() => setShowFilters(!showFilters)}
+            className="gap-2"
+          >
+            <Filter className="w-4 h-4" />
+            Filters
+          </Button>
+          
+          <div className="flex items-center gap-1 bg-muted p-1 rounded-lg">
+            <Button
+              variant={viewMode === "grid" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("grid")}
+              className="gap-2"
+            >
+              <LayoutGrid className="w-4 h-4" />
+            </Button>
+            <Button
+              variant={viewMode === "table" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("table")}
+              className="gap-2"
+            >
+              <Table2 className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+        <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Total Payments</p>
+                <p className="text-3xl font-bold">{filteredPayments.length}</p>
+              </div>
+              <div className="p-3 bg-primary/10 rounded-full group-hover:scale-110 transition-transform">
+                <Wallet className="w-6 h-6 text-primary" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Total Amount</p>
+                <p className="text-3xl font-bold">{formatCurrency(totalAmount)}</p>
+              </div>
+              <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-full group-hover:scale-110 transition-transform">
+                <TrendingUp className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300">
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground mb-1">Completed</p>
+                <p className="text-3xl font-bold">{completedCount}</p>
+              </div>
+              <div className="p-3 bg-green-100 dark:bg-green-900/20 rounded-full group-hover:scale-110 transition-transform">
+                <CheckCircle2 className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters Panel */}
+      {showFilters && (
+        <Card className="mb-6 animate-in slide-in-from-top duration-300">
+          <CardContent className="p-6">
+            <div className="space-y-4">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by transaction ID, amount, or duration..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+                {searchTerm && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-2 top-1"
+                    onClick={() => setSearchTerm("")}
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+
+              {/* Filter Chips */}
+              <div className="flex flex-wrap gap-2">
+                {/* Period Filters */}
+                {["monthly", "quarterly", "yearly"].map(period => (
+                  <Button
+                    key={period}
+                    variant={activePeriod === period ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => toggleFilter("period", period)}
+                    className="capitalize"
+                  >
+                    <Calendar className="w-3 h-3 mr-1" />
+                    {period}
+                  </Button>
+                ))}
+
+                {/* Method Filters */}
+                {["paystack", "remitta", "interswitch", "firs"].map(method => (
+                  <Button
+                    key={method}
+                    variant={activeMethod === method ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => toggleFilter("method", method)}
+                    className="capitalize"
+                  >
+                    {method}
+                  </Button>
+                ))}
+
+                {/* Status Filters */}
+                {["completed", "pending", "failed"].map(status => (
+                  <Button
+                    key={status}
+                    variant={activeStatus === status ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => toggleFilter("status", status)}
+                    className="capitalize"
+                  >
+                    {status}
+                  </Button>
+                ))}
+
+                {(activePeriod || activeMethod || activeStatus || searchTerm) && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearAllFilters}
+                    className="ml-auto text-muted-foreground"
+                  >
+                    <X className="w-3 h-3 mr-1" />
+                    Clear All
+                  </Button>
+                )}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Content */}
+      {loading ? (
+        <Card className="p-12 text-center">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
+          <p className="text-muted-foreground">Loading payments...</p>
+        </Card>
+      ) : filteredPayments.length === 0 ? (
+        <Card className="p-12 text-center">
+          <div className="max-w-md mx-auto">
+            <div className="p-4 bg-muted rounded-full w-20 h-20 mx-auto mb-4 flex items-center justify-center">
+              <Sparkles className="w-10 h-10 text-muted-foreground" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">No payments found</h3>
+            <p className="text-muted-foreground mb-6">
+              {payments.length === 0 
+                ? "Make your first payment to get started!" 
+                : "Try adjusting your filters to see more results."}
+            </p>
+            {payments.length === 0 && (
+              <Button onClick={() => router.push("/dashboard/payment")} size="lg">
+                Make Payment
+              </Button>
+            )}
+          </div>
+        </Card>
+      ) : viewMode === "grid" ? (
+        /* Grid View */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredPayments.map((payment, index) => (
+            <Card 
+              key={payment.id} 
+              className="group hover:shadow-xl transition-all duration-300 cursor-pointer border-2 hover:border-primary/50 animate-in fade-in slide-in-from-bottom-4"
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="font-bold text-lg mb-1 group-hover:text-primary transition-colors">
+                      {payment.taxDuration}
+                    </h3>
+                    {getStatusBadge(payment.status)}
                   </div>
-                ) : (
-                  <div className="space-y-4">
-                    {systemChecks.filter(check => !check.status).length > 0 ? (
-                      <>
-                        <Alert className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20">
-                          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                          <AlertTitle className="text-amber-800 dark:text-amber-200">
-                            Action Required
-                          </AlertTitle>
-                          <AlertDescription className="text-amber-700 dark:text-amber-300">
-                            Please complete the following requirements before generating RRR
-                          </AlertDescription>
-                        </Alert>
+                </div>
 
-                        <Accordion type="single" collapsible className="w-full">
-                          {systemChecks
-                            .filter(check => !check.status)
-                            .map((check, index) => (
-                              <AccordionItem key={index} value={`check-${index}`}>
-                                <AccordionTrigger className="hover:no-underline">
-                                  <div className="flex items-center gap-3 w-full">
-                                    <XCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                                    <span className="font-medium text-amber-800 dark:text-amber-200">
-                                      {check.name}
-                                    </span>
-                                  </div>
-                                </AccordionTrigger>
-                                <AccordionContent>
-                                  <div className="pl-8 space-y-3">
-                                    <p className="text-sm text-muted-foreground">{check.message}</p>
-                                    {check.actionUrl && check.actionLabel && (
-                                      <Link href={check.actionUrl}>
-                                        <Button variant="outline" size="sm">
-                                          {check.actionLabel}
-                                        </Button>
-                                      </Link>
-                                    )}
-                                  </div>
-                                </AccordionContent>
-                              </AccordionItem>
-                            ))}
-                        </Accordion>
-                      </>
-                    ) : (
-                      <Alert className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20">
-                        <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                        <AlertTitle className="text-green-800 dark:text-green-200">
-                          All Checks Passed
-                        </AlertTitle>
-                        <AlertDescription className="text-green-700 dark:text-green-300">
-                          You're ready to generate RRR and proceed with payment
-                        </AlertDescription>
-                      </Alert>
-                    )}
+                <div className="space-y-3 mb-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Amount</span>
+                    <span className="text-xl font-bold">{formatCurrency(payment.amount)}</span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Period</span>
+                    <span className="text-sm font-medium capitalize">{payment.period}</span>
+                  </div>
+                  
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">Method</span>
+                    <span className="text-sm font-medium capitalize">{payment.paymentMethod}</span>
+                  </div>
 
-                    <div className="flex justify-end gap-3 pt-4">
+                  <div className="pt-2 border-t">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground font-mono flex-1 truncate">
+                        {payment.transactionId}
+                      </span>
                       <Button
-                        variant="outline"
-                        onClick={() => setShowValidation(false)}
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 w-7 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          copyTransactionId(payment.transactionId)
+                        }}
                       >
-                        Back
-                      </Button>
-                      <Button
-                        onClick={handleProceedToRRR}
-                        disabled={!allChecksPassed}
-                      >
-                        Proceed to Generate RRR
+                        <Copy className="w-3 h-3" />
                       </Button>
                     </div>
                   </div>
-                )}
+                </div>
+
+                <Button 
+                  className="w-full group-hover:bg-primary group-hover:text-primary-foreground transition-colors"
+                  onClick={() => handleViewReceipt(payment)}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  View Receipt
+                </Button>
               </CardContent>
             </Card>
+          ))}
+        </div>
+      ) : (
+        /* Table View */
+        <Card className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="text-left p-4 font-semibold">Duration</th>
+                  <th className="text-left p-4 font-semibold">Amount</th>
+                  <th className="text-left p-4 font-semibold">Period</th>
+                  <th className="text-left p-4 font-semibold">Method</th>
+                  <th className="text-left p-4 font-semibold">Status</th>
+                  <th className="text-left p-4 font-semibold">Transaction ID</th>
+                  <th className="text-right p-4 font-semibold">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredPayments.map((payment, index) => (
+                  <tr 
+                    key={payment.id} 
+                    className="border-t hover:bg-muted/30 transition-colors animate-in fade-in slide-in-from-left-4"
+                    style={{ animationDelay: `${index * 30}ms` }}
+                  >
+                    <td className="p-4 font-medium">{payment.taxDuration}</td>
+                    <td className="p-4 font-bold">{formatCurrency(payment.amount)}</td>
+                    <td className="p-4 capitalize">{payment.period}</td>
+                    <td className="p-4 capitalize">{payment.paymentMethod}</td>
+                    <td className="p-4">{getStatusBadge(payment.status)}</td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-2">
+                        <code className="text-xs font-mono">{payment.transactionId}</code>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={() => copyTransactionId(payment.transactionId)}
+                        >
+                          <Copy className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex justify-end">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewReceipt(payment)}
+                          className="gap-2"
+                        >
+                          <Download className="w-4 h-4" />
+                          Receipt
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        ) : (
-          <div className="space-y-6">
-            <Card className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-3xl font-bold mb-2">Pay Your Tax</h1>
-                  <p className="text-muted-foreground">
-                    Select your payment period and we'll calculate the amount based on your transactions, or enter it manually.
-                  </p>
-                </div>
-                <Button 
-                  variant="outline"
-                  onClick={() => router.push("/dashboard/payment/history")}
-                >
-                  View Payment History
-                </Button>
-              </div>
-            </Card>
-            
-            <SimplifiedPaymentForm onContinue={handlePaymentFormContinue} />
-          </div>
-        )}
-      </div>
+        </Card>
+      )}
+    </div>
     </>
   )
 }
-

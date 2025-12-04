@@ -18,6 +18,7 @@ import { useAuth } from "@/lib/hooks/useAuth"
 import { transactionService, taxPaymentService } from "@/lib/services"
 import { toast } from "sonner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { getCurrentPeriodTax } from "@/lib/utils/tax-period-calculation"
 
 type DashboardBusinessType = "freelancer" | "creator" | "small-business"
 type TrendDirection = "up" | "down" | "neutral"
@@ -146,6 +147,88 @@ const buildCategoryBreakdown = (
   }))
 }
 
+// Helper function to extract year from taxDuration
+const extractYear = (taxDuration: string): number | null => {
+  const yearMatch = taxDuration.match(/\b(20\d{2})\b/)
+  return yearMatch ? parseInt(yearMatch[1]) : null
+}
+
+// Helper function to extract month index (0-11) from taxDuration
+const extractMonthIndex = (taxDuration: string): number | null => {
+  const monthNames = ['january', 'february', 'march', 'april', 'may', 'june',
+                      'july', 'august', 'september', 'october', 'november', 'december']
+  const lower = taxDuration.toLowerCase()
+  for (let i = 0; i < monthNames.length; i++) {
+    if (lower.includes(monthNames[i])) {
+      return i
+    }
+  }
+  return null
+}
+
+// Helper function to extract quarter number (1-4) from taxDuration
+const extractQuarter = (taxDuration: string): number | null => {
+  // Try "Q1", "Q2", etc.
+  const qMatch = taxDuration.match(/Q(\d+)/i)
+  if (qMatch) {
+    return parseInt(qMatch[1])
+  }
+  // Try "Jan-Mar", "Apr-Jun", etc.
+  if (taxDuration.includes('Jan-Mar')) return 1
+  if (taxDuration.includes('Apr-Jun')) return 2
+  if (taxDuration.includes('Jul-Sep')) return 3
+  if (taxDuration.includes('Oct-Dec')) return 4
+  return null
+}
+
+// Helper function to check if a payment matches a tax period
+// Yearly payments apply to all quarters and months within that year
+const paymentMatchesPeriod = (
+  payment: any,
+  calculatedTaxDuration: string,
+  calculatedPeriod: 'monthly' | 'quarterly' | 'yearly'
+): boolean => {
+  const paymentDuration = payment.taxDuration || ''
+  const calculatedDuration = calculatedTaxDuration || ''
+  
+  // Extract year from both
+  const paymentYear = extractYear(paymentDuration)
+  const calculatedYear = extractYear(calculatedDuration)
+  
+  if (!paymentYear || !calculatedYear || paymentYear !== calculatedYear) {
+    return false
+  }
+  
+  // If payment is yearly, it applies to all periods (monthly, quarterly, yearly) in that year
+  if (payment.period === 'yearly') {
+    return true // Yearly payment covers all periods in that year
+  }
+  
+  // For exact period matches, check the specific period
+  if (payment.period === calculatedPeriod) {
+    // Try exact match first (case-insensitive, trimmed)
+    if (paymentDuration.trim().toLowerCase() === calculatedDuration.trim().toLowerCase()) {
+      return true
+    }
+    
+    // For monthly: match by month name and year
+    if (calculatedPeriod === 'monthly') {
+      const paymentMonth = extractMonthIndex(paymentDuration)
+      const calculatedMonth = extractMonthIndex(calculatedDuration)
+      return paymentMonth !== null && calculatedMonth !== null && paymentMonth === calculatedMonth
+    }
+    
+    // For quarterly: match by quarter number and year
+    if (calculatedPeriod === 'quarterly') {
+      const paymentQ = extractQuarter(paymentDuration)
+      const calculatedQ = extractQuarter(calculatedDuration)
+      return paymentQ !== null && calculatedQ !== null && paymentQ === calculatedQ
+    }
+  }
+  
+  return false
+}
+
 const buildStatsFromSummary = (
   periodSummary: TransactionSummary,
   monthSummary: TransactionSummary | null,
@@ -154,7 +237,9 @@ const buildStatsFromSummary = (
   formatCurrency: (amount: number) => string,
   labels: PeriodLabels,
   periodType: PeriodType,
-  taxPaymentsTotal: number = 0 // Total tax payments made in the year
+  taxPaymentsTotal: number = 0, // Total tax payments made in the year
+  periodPayments: any[] = [], // Payments for the specific period
+  periodTaxInfo: { amount: number; taxDuration: string; period: 'monthly' | 'quarterly' | 'yearly' } | null = null // Tax info for the specific period
 ): StatDefinition[] => {
   // Use period summary for display (income/expenses)
   const totalIncome = periodSummary?.totalIncome ?? 0
@@ -240,16 +325,55 @@ const buildStatsFromSummary = (
     : undefined
 
   const isSmallBusinessExempt = businessType === "small-business" && !taxCalculationRaw
-  // Calculate net tax payable after deducting payments
-  const grossTaxPayable = taxCalculationRaw ? taxCalculationRaw.totalTax : 0
-  const netTaxPayable = Math.max(0, grossTaxPayable - taxPaymentsTotal)
-  // Tax payable is calculated from the selected period's income
-  const taxCardValue = taxCalculationRaw 
-    ? formatCurrency(Math.round(netTaxPayable))
+  
+  // Use period-specific tax info if available, otherwise fall back to calculated tax
+  let periodTaxAmount = 0
+  let periodTaxDuration = ''
+  let periodTypeForTax: 'monthly' | 'quarterly' | 'yearly' = periodType === 'year' ? 'yearly' : 'quarterly'
+  
+  if (periodTaxInfo) {
+    periodTaxAmount = periodTaxInfo.amount
+    periodTaxDuration = periodTaxInfo.taxDuration
+    periodTypeForTax = periodTaxInfo.period
+  } else if (taxCalculationRaw) {
+    periodTaxAmount = taxCalculationRaw.totalTax
+    periodTaxDuration = periodType === "year" ? `${labels.year}` : labels.quarterLabel
+  }
+  
+  // Calculate payments for this specific period
+  // Include yearly payments when viewing quarterly/monthly (yearly covers all periods)
+  let periodPaymentsTotal = 0
+  if (periodPayments.length > 0 && periodTaxDuration) {
+    periodPaymentsTotal = periodPayments
+      .filter(p => paymentMatchesPeriod(p, periodTaxDuration, periodTypeForTax))
+      .reduce((sum, p) => sum + (p.amount || 0), 0)
+  }
+  
+  // Show the gross tax payable (don't subtract payments)
+  const grossTaxPayable = periodTaxAmount
+  
+  // Tax payable is the calculated tax amount (not net after payments)
+  const taxCardValue = periodTaxAmount > 0
+    ? formatCurrency(Math.round(grossTaxPayable))
     : formatCurrency(0)
+  
   const monthDisplay = `${labels.monthShortLabel} ${labels.year}`
   const periodDisplay = periodType === "year" ? `${labels.year}` : labels.quarterLabel
-  const taxPeriodDisplay = periodType === "year" ? `${labels.year}` : labels.quarterLabel
+  
+  // Build tax period display with paid amount and balance if applicable
+  let taxPeriodDisplay = periodTaxDuration || (periodType === "year" ? `${labels.year}` : labels.quarterLabel)
+  if (periodPaymentsTotal > 0) {
+    taxPeriodDisplay = `${taxPeriodDisplay} • Paid: ${formatCurrency(periodPaymentsTotal)}`
+    // Show balance if payment doesn't equal tax payable
+    if (periodTaxAmount > 0 && periodPaymentsTotal !== periodTaxAmount) {
+      const balance = periodTaxAmount - periodPaymentsTotal
+      if (balance > 0) {
+        taxPeriodDisplay += ` • Balance: ${formatCurrency(balance)}`
+      } else if (balance < 0) {
+        taxPeriodDisplay += ` • Overpaid: ${formatCurrency(Math.abs(balance))}`
+      }
+    }
+  }
 
   return [
     {
@@ -291,8 +415,6 @@ const buildStatsFromSummary = (
       value: taxCardValue,
       change: isSmallBusinessExempt 
         ? "Small company exempt" 
-        : taxPaymentsTotal > 0
-        ? `${taxPeriodDisplay} • Paid: ${formatCurrency(taxPaymentsTotal)}`
         : taxPeriodDisplay,
       trend: "neutral",
       icon: isSmallBusinessExempt ? CheckCircle2 : Calculator,
@@ -706,16 +828,91 @@ export function StatsCards({
         transactionService.getTransactionSummary(user.uid, yearStartIso, yearEndIso), // Full year for tax
         taxPaymentService.getUserPaymentsSimple(user.uid), // Tax payments
       ])
-        .then(([periodSummary, monthSummary, yearSummary, taxPayments]) => {
+        .then(async ([periodSummary, monthSummary, yearSummary, taxPayments]) => {
           if (!isMounted) return
-          // Filter payments for the selected year
+          
+          // Filter completed payments for the selected year
           const yearPayments = taxPayments.filter(payment => {
             if (payment.status !== 'completed') return false
             const paymentDate = new Date(payment.createdAt || payment.paymentDate || '')
             return paymentDate >= yearInfo.start && paymentDate <= yearInfo.end
           })
           const totalPayments = yearPayments.reduce((sum, payment) => sum + (payment.amount || 0), 0)
-          setStats(buildStatsFromSummary(periodSummary, monthSummary, yearSummary, businessType, formatCurrencyValue, labels, periodType, totalPayments))
+          
+          // Intelligently determine which period to show tax for
+          // If viewing a quarter, show quarterly tax; if viewing year, show yearly tax
+          // Also consider showing monthly tax for current month if it's more relevant
+          let periodTaxInfo: { amount: number; taxDuration: string; period: 'monthly' | 'quarterly' | 'yearly' } | null = null
+          const calculatedBusinessType = businessType === 'small-business' ? 'sme' : businessType
+          
+          if (periodType === 'year') {
+            // For yearly view, calculate yearly tax
+            try {
+              const yearTax = await getCurrentPeriodTax(user.uid, 'yearly', calculatedBusinessType)
+              if (yearTax && yearTax.amount > 0) {
+                periodTaxInfo = {
+                  amount: yearTax.amount,
+                  taxDuration: yearTax.taxDuration,
+                  period: 'yearly'
+                }
+              }
+            } catch (error) {
+              console.error('Error calculating yearly tax:', error)
+            }
+          } else {
+            // For quarter view, calculate quarterly tax for the selected quarter
+            try {
+              // Calculate tax for the selected quarter
+              const quarterStartMonth = (selectedQuarter - 1) * 3
+              const qStart = new Date(selectedYear, quarterStartMonth, 1)
+              const qEnd = new Date(selectedYear, quarterStartMonth + 3, 0, 23, 59, 59, 999)
+              const quarterSummary = await transactionService.getTransactionSummary(
+                user.uid,
+                qStart.toISOString(),
+                qEnd.toISOString()
+              )
+              
+              if (quarterSummary && quarterSummary.totalIncome > 0) {
+                const quarterTaxCalc = calculateNigerianTax({
+                  businessType: calculatedBusinessType,
+                  period: 'yearly',
+                  income: quarterSummary.totalIncome,
+                  businessExpenses: quarterSummary.totalExpenses || 0,
+                  rentPaid: 0,
+                  pensionContribution: 0,
+                  healthInsurance: 0,
+                  housingFund: 0,
+                  lifeInsurance: 0,
+                  charitableDonations: 0,
+                  dependents: 0,
+                })
+                
+                const months = ['Jan-Mar', 'Apr-Jun', 'Jul-Sep', 'Oct-Dec']
+                const quarterTaxDuration = `Q${selectedQuarter} ${selectedYear} (${months[selectedQuarter - 1]})`
+                
+                periodTaxInfo = {
+                  amount: quarterTaxCalc.totalTax,
+                  taxDuration: quarterTaxDuration,
+                  period: 'quarterly'
+                }
+              }
+            } catch (error) {
+              console.error('Error calculating quarterly tax:', error)
+            }
+          }
+          
+          setStats(buildStatsFromSummary(
+            periodSummary, 
+            monthSummary, 
+            yearSummary, 
+            businessType, 
+            formatCurrencyValue, 
+            labels, 
+            periodType, 
+            totalPayments,
+            yearPayments, // Pass all year payments for matching
+            periodTaxInfo // Pass period-specific tax info
+          ))
         })
         .catch((error) => {
           console.error("Error loading transaction summary:", error)

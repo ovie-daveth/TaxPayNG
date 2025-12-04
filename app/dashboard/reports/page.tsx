@@ -45,11 +45,36 @@ export default function ReportsPage() {
         return reportDate >= startOfMonth
       }).length
       
-      // Submitted filings (status === 'submitted')
-      const submittedFilings = reports.filter(report => report.status === 'submitted').length
+      // Submitted filings (status === 'submitted' or 'completed', or filingStatus indicates it was filed)
+      // Use Set to deduplicate by report ID to avoid counting the same filing twice
+      const submittedReportIds = new Set<string>()
+      reports.forEach(report => {
+        if (
+          report.status === 'submitted' || 
+          report.status === 'completed' ||
+          report.filingStatus === 'submitted' ||
+          report.filingStatus === 'acknowledged' ||
+          report.filingStatus === 'filed'
+        ) {
+          submittedReportIds.add(report.id)
+        }
+      })
+      const submittedFilings = submittedReportIds.size
       
-      // Pending review (submitted but not yet processed - for now, we'll use submitted as pending)
-      const pendingReview = submittedFilings
+      // Pending review (submitted but not yet completed - only count unique report IDs)
+      const pendingReportIds = new Set<string>()
+      reports.forEach(report => {
+        // Count as pending if submitted but not completed
+        if (
+          (report.status === 'submitted' || report.filingStatus === 'submitted') &&
+          report.status !== 'completed' &&
+          report.filingStatus !== 'acknowledged' &&
+          report.filingStatus !== 'filed'
+        ) {
+          pendingReportIds.add(report.id)
+        }
+      })
+      const pendingReview = pendingReportIds.size
 
       setStats({
         totalReports,

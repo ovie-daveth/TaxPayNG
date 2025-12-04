@@ -141,6 +141,14 @@ export function DashboardHeader() {
           buttonIcon: BarChart3,
           buttonAction: () => {}
         }
+      case "/dashboard/payment":
+        return {
+          title: "Payment",
+          subtitle: "Manage your tax payments and receipts",
+          buttonText: "New Payment",
+          buttonIcon: Plus,
+          buttonAction: () => router.push("/dashboard/payment/add")
+        }
       case "/dashboard/settings":
         return {
           title: "Settings",

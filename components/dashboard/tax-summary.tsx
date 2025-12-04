@@ -53,6 +53,7 @@ interface SummaryState {
   deductions: number
   grossIncome: number
   taxPayable: number
+  totalPayments: number // Amount paid for this year
   monthlySetAside: number
   isSmallBusinessExempt: boolean
   taxBrackets?: TaxBracket[]
@@ -75,6 +76,7 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
       deductions: 50_000,
       grossIncome: 1_610_000,
       taxPayable: 234_000,
+      totalPayments: 0,
       monthlySetAside: 234_000 / 12,
       isSmallBusinessExempt: false,
       taxBrackets: [
@@ -166,12 +168,10 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
         const calculatedReliefs = (taxCalculation ? taxCalculation.totalReliefs : 0) + manualReliefs
 
         const rawTaxPayable = taxCalculation ? taxCalculation.totalTax : 0
-        // Deduct both manual reliefs and tax payments from gross tax payable
-        const adjustedTaxPayable = Math.max(rawTaxPayable - manualReliefs - totalPayments, 0)
-        const adjustedMonthlySetAside = Math.max(
-          (taxCalculation?.monthlySetAside ?? rawTaxPayable / 12) - (manualReliefs + totalPayments) / 12,
-          0
-        )
+        // Show gross tax payable (don't subtract payments)
+        // Only subtract manual reliefs if they're tax reliefs, not payments
+        const grossTaxPayable = rawTaxPayable
+        const monthlySetAside = taxCalculation?.monthlySetAside ?? rawTaxPayable / 12
 
         if (!isMounted) return
 
@@ -182,8 +182,9 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
           manualReliefs,
           deductions: totalExpenses,
           grossIncome: totalIncome, // Store gross income for display
-          taxPayable: adjustedTaxPayable,
-          monthlySetAside: adjustedMonthlySetAside,
+          taxPayable: grossTaxPayable, // Show gross tax, not net after payments
+          totalPayments: totalPayments, // Store total payments separately
+          monthlySetAside: monthlySetAside,
           isSmallBusinessExempt,
           taxBrackets: taxCalculation?.taxBrackets || [],
         })
@@ -275,7 +276,22 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
             <span className="font-semibold text-xs sm:text-sm">{formatCurrency(displaySummary.taxableIncome)}</span>
           </div>
           <div className="flex items-center justify-between py-2.5 sm:py-3">
-            <span className="text-xs sm:text-sm font-medium">Tax Payable</span>
+            <div className="flex flex-col">
+              <span className="text-xs sm:text-sm font-medium">Tax Payable</span>
+              {!displaySummary.isSmallBusinessExempt && displaySummary.totalPayments > 0 && (
+                <span className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
+                  Paid: {formatCurrency(displaySummary.totalPayments)}
+                </span>
+              )}
+              {!displaySummary.isSmallBusinessExempt && displaySummary.taxPayable > 0 && displaySummary.totalPayments > 0 && displaySummary.taxPayable !== displaySummary.totalPayments && (
+                <span className={`text-[10px] sm:text-xs mt-0.5 ${displaySummary.taxPayable > displaySummary.totalPayments ? 'text-destructive' : 'text-green-600'}`}>
+                  {displaySummary.taxPayable > displaySummary.totalPayments 
+                    ? `Balance: ${formatCurrency(displaySummary.taxPayable - displaySummary.totalPayments)}`
+                    : `Overpaid: ${formatCurrency(displaySummary.totalPayments - displaySummary.taxPayable)}`
+                  }
+                </span>
+              )}
+            </div>
             <span className="text-lg sm:text-xl font-bold text-primary">
               {displaySummary.isSmallBusinessExempt ? "Exempt" : formatCurrency(displaySummary.taxPayable)}
             </span>

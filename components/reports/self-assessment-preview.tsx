@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ReportData } from "@/lib/services/reportService"
 import { formatCurrencyAmount } from "@/lib/utils/currency"
 import { format } from "date-fns"
-import { Printer, ArrowLeft, Plus, Trash2, X, Upload, Loader2, FileCheck, Clock, Mail, CheckCircle2 } from "lucide-react"
+import { Printer, ArrowLeft, Plus, Trash2, X, Upload, Loader2, FileCheck, Clock, Mail, CheckCircle2, ExternalLink, Download } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
@@ -1107,11 +1107,20 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
               
               if (isFiled) {
                 if (filingMethod === 'agent') {
-                  // Agent filing: show "Awaiting Agent" for submitted/pending, or completed status
-                  buttonText = "Awaiting Agent"
-                  ButtonIcon = Clock
-                  buttonVariant = "outline"
-                  isDisabled = true
+                  // Agent filing: check if completed (acknowledged) or still pending
+                  if (filingStatus === 'acknowledged') {
+                    // Agent has completed the filing
+                    buttonText = "Filed and Completed"
+                    ButtonIcon = CheckCircle2
+                    buttonVariant = "outline"
+                    isDisabled = true
+                  } else {
+                    // Still awaiting agent (submitted but not yet acknowledged)
+                    buttonText = "Awaiting Agent"
+                    ButtonIcon = Clock
+                    buttonVariant = "outline"
+                    isDisabled = true
+                  }
                 } else if (filingMethod === 'direct') {
                   // Direct filing: show "Filed and Completed" when acknowledged or filed
                   buttonText = "Filed and Completed"

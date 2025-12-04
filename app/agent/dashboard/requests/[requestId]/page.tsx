@@ -22,7 +22,8 @@ import {
   Clock,
   ExternalLink,
   MessageSquare,
-  Edit
+  Edit,
+  Upload
 } from "lucide-react"
 import { FilingRequest, SavedReport, Document, FilingRequestStatus } from "@/lib/types"
 import { reportService } from "@/lib/services"
@@ -30,6 +31,9 @@ import { documentService } from "@/lib/services"
 import { SelfAssessmentPreview } from "@/components/reports/self-assessment-preview"
 import { StatusUpdateDialog } from "@/components/agent/status-update-dialog"
 import { MessagePanel } from "@/components/agent/message-panel"
+import { uploadToImageKit, ImageUploadResult } from "@/lib/utils/imagekit"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 export default function AgentRequestDetailPage() {
   const router = useRouter()
@@ -42,6 +46,8 @@ export default function AgentRequestDetailPage() {
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
   const [showStatusDialog, setShowStatusDialog] = useState(false)
+  const [uploadingCompletedDoc, setUploadingCompletedDoc] = useState(false)
+  const [completedDocFile, setCompletedDocFile] = useState<File | null>(null)
 
   useEffect(() => {
     if (!authLoading && !profileLoading) {
@@ -236,6 +242,61 @@ export default function AgentRequestDetailPage() {
     }
   }
 
+  const handleCompletedDocUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !requestId || !user?.uid || !request) return
+
+    setCompletedDocFile(file)
+    setUploadingCompletedDoc(true)
+
+    try {
+      // Upload to ImageKit
+      const uploadResult = await uploadToImageKit(file, 'filing-completed')
+      
+      // Save as document in the client's documents
+      const docResult = await documentService.uploadDocument(request.userId, {
+        file,
+        name: `Completed Filing - ${request.rrr}`,
+        type: 'proof',
+        imageKitUrl: uploadResult.url,
+        fileSize: uploadResult.size,
+        notes: `Completed and stamped tax return document for RRR: ${request.rrr}`
+      })
+
+      // Upload completed document to filing request
+      const response = await fetch(`/api/admin/filing-requests/${requestId}/upload-completed`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          documentUrl: uploadResult.url,
+          documentName: file.name,
+          documentId: docResult.data?.id
+        })
+      })
+
+      const result = await response.json()
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to upload completed document')
+      }
+
+      // Reload request details
+      await loadRequestDetails()
+      
+      toast.success('Completed document uploaded successfully')
+      setCompletedDocFile(null)
+    } catch (error) {
+      console.error("Error uploading completed document:", error)
+      toast.error(error instanceof Error ? error.message : 'Failed to upload completed document')
+    } finally {
+      setUploadingCompletedDoc(false)
+      // Reset input
+      e.target.value = ''
+    }
+  }
+
   const getStatusBadge = (status: FilingRequest['status']) => {
     const variants: Record<string, { variant: "default" | "secondary" | "destructive" | "outline", icon: any }> = {
       pending: { variant: "secondary", icon: Clock },
@@ -418,6 +479,110 @@ export default function AgentRequestDetailPage() {
         </Card>
       )}
 
+      {/* Upload Completed Document - Show when status is completed or in_progress */}
+      {(request.status === 'completed' || request.status === 'in_progress') && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5" />
+              {request.status === 'completed' && request.completedDocumentUrl 
+                ? 'Completed Document' 
+                : 'Upload Completed Document'}
+            </CardTitle>
+            <CardDescription>
+              {request.status === 'completed' && request.completedDocumentUrl
+                ? 'The signed and stamped document has been uploaded'
+                : 'Upload the signed and stamped document from the tax authorities'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {request.completedDocumentUrl ? (
+              <div className="space-y-4">
+                <div className="border rounded-lg p-4 flex items-center justify-between bg-muted/30">
+                  <div className="flex items-center gap-4 flex-1">
+                    <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                      <FileText className="w-5 h-5 text-primary" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-medium">{request.completedDocumentName || 'Completed Document'}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        Uploaded on {request.completedAt ? format(new Date(request.completedAt), 'MMM dd, yyyy hh:mm a') : 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(request.completedDocumentUrl, '_blank')}
+                    >
+                      <ExternalLink className="w-4 h-4 mr-2" />
+                      View
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={async () => {
+                        try {
+                          // Fetch the file as a blob
+                          const response = await fetch(request.completedDocumentUrl!)
+                          if (!response.ok) {
+                            throw new Error('Failed to fetch document')
+                          }
+                          const blob = await response.blob()
+                          
+                          // Create a blob URL and trigger download
+                          const blobUrl = window.URL.createObjectURL(blob)
+                          const link = document.createElement('a')
+                          link.href = blobUrl
+                          link.download = request.completedDocumentName || 'completed-document'
+                          document.body.appendChild(link)
+                          link.click()
+                          document.body.removeChild(link)
+                          
+                          // Clean up the blob URL
+                          window.URL.revokeObjectURL(blobUrl)
+                          toast.success('Download started')
+                        } catch (error) {
+                          console.error('Error downloading document:', error)
+                          toast.error('Failed to download document. Please try viewing it instead.')
+                        }
+                      }}
+                    >
+                      <Download className="w-4 h-4 mr-2" />
+                      Download
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="completed-doc-upload">Upload Signed & Stamped Document</Label>
+                  <Input
+                    id="completed-doc-upload"
+                    type="file"
+                    accept=".pdf,image/*"
+                    onChange={handleCompletedDocUpload}
+                    disabled={uploadingCompletedDoc}
+                    className="mt-2"
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Upload the document that has been signed and stamped by the tax authorities (PDF or Image)
+                  </p>
+                </div>
+                {uploadingCompletedDoc && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Uploading document...
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Supporting Documents */}
       <Card className="mb-6">
         <CardHeader>
@@ -469,13 +634,31 @@ export default function AgentRequestDetailPage() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => {
-                        const link = document.createElement('a')
-                        link.href = doc.url
-                        link.download = doc.name || doc.originalName || 'document'
-                        document.body.appendChild(link)
-                        link.click()
-                        document.body.removeChild(link)
+                      onClick={async () => {
+                        try {
+                          // Fetch the file as a blob
+                          const response = await fetch(doc.url)
+                          if (!response.ok) {
+                            throw new Error('Failed to fetch document')
+                          }
+                          const blob = await response.blob()
+                          
+                          // Create a blob URL and trigger download
+                          const blobUrl = window.URL.createObjectURL(blob)
+                          const link = document.createElement('a')
+                          link.href = blobUrl
+                          link.download = doc.name || doc.originalName || 'document'
+                          document.body.appendChild(link)
+                          link.click()
+                          document.body.removeChild(link)
+                          
+                          // Clean up the blob URL
+                          window.URL.revokeObjectURL(blobUrl)
+                          toast.success('Download started')
+                        } catch (error) {
+                          console.error('Error downloading document:', error)
+                          toast.error('Failed to download document. Please try viewing it instead.')
+                        }
                       }}
                     >
                       <Download className="w-4 h-4 mr-2" />

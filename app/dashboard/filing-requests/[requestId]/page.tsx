@@ -19,7 +19,9 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
-  User
+  User,
+  ExternalLink,
+  Download
 } from "lucide-react"
 import { FilingRequest } from "@/lib/types"
 import { MessagePanel } from "@/components/agent/message-panel"
@@ -199,9 +201,21 @@ export default function ClientFilingRequestPage() {
     <div className="min-h-screen bg-background">
         <main className="mx-auto px-4 py-6">
           <div className="space-y-6">
+
       {/* Status Card */}
       <Card>
         <CardHeader>
+          <div className="ml-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.back()}
+            className="h-9 w-9"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </Button>
+          </div>
           <CardTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5" />
             Current Status
@@ -247,6 +261,64 @@ export default function ClientFilingRequestPage() {
               <p className="text-sm text-muted-foreground">
                 {format(new Date(request.completedAt), 'MMM dd, yyyy hh:mm a')}
               </p>
+            </div>
+          )}
+
+          {request.completedDocumentUrl && (
+            <div className="pt-4 border-t">
+              <p className="text-sm font-medium mb-2">Completed Document</p>
+              <div className="border rounded-lg p-3 bg-muted/30 flex items-center justify-between">
+                <div className="flex items-center gap-3 flex-1">
+                  <FileText className="w-5 h-5 text-primary" />
+                  <div>
+                    <p className="text-sm font-medium">{request.completedDocumentName || 'Completed Document'}</p>
+                    <p className="text-xs text-muted-foreground">Signed and stamped by tax authorities</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(request.completedDocumentUrl, '_blank')}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    View
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        // Fetch the file as a blob
+                        const response = await fetch(request.completedDocumentUrl!)
+                        if (!response.ok) {
+                          throw new Error('Failed to fetch document')
+                        }
+                        const blob = await response.blob()
+                        
+                        // Create a blob URL and trigger download
+                        const blobUrl = window.URL.createObjectURL(blob)
+                        const link = document.createElement('a')
+                        link.href = blobUrl
+                        link.download = request.completedDocumentName || 'completed-document'
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                        
+                        // Clean up the blob URL
+                        window.URL.revokeObjectURL(blobUrl)
+                        toast.success('Download started')
+                      } catch (error) {
+                        console.error('Error downloading document:', error)
+                        toast.error('Failed to download document. Please try viewing it instead.')
+                      }
+                    }}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
         </CardContent>
