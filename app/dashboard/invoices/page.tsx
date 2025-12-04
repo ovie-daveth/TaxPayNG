@@ -39,7 +39,7 @@ export default function InvoicesPage() {
   const [showCreditNoteDialog, setShowCreditNoteDialog] = useState(false)
   const [isSavingCreditNote, setIsSavingCreditNote] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
-  const [viewMode, setViewMode] = useState<"card" | "table">("card")
+  const [viewMode, setViewMode] = useState<"card" | "table">("table")
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,

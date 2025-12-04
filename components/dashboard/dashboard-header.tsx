@@ -24,8 +24,8 @@ export function DashboardHeader() {
   const { user } = useAuth()
   const { uploadDocument } = useDocumentsFirebase()
   const { createTransaction } = useTransactions(user?.uid || null)
-  // Only load reminders hook when not on reminders page to avoid duplicate state
-  const { createReminder } = useReminders(pathname !== "/dashboard/reminders" ? (user?.uid || null) : null)
+  // Load reminders hook for header actions
+  const { createReminder } = useReminders(user?.uid || null)
 
   const getPageInfo = (path: string) => {
     // Handle dynamic routes first
@@ -205,8 +205,8 @@ export function DashboardHeader() {
                 <Bell className="w-4 h-4" />
               </Button>
             )}
-            {/* Show main action button except on reminders page and report generation pages */}
-            {pathname !== "/dashboard/reminders" && pageInfo.buttonText && (
+            {/* Show main action button except on report generation pages */}
+            {pageInfo.buttonText && (
               <Button 
                 onClick={pageInfo.buttonAction}
                 size="sm"
@@ -231,14 +231,12 @@ export function DashboardHeader() {
         onSubmit={createTransaction}
         transaction={null}
       />
-      {/* Always render AddReminderDialog except on reminders page to avoid duplicate state */}
-      {pathname !== "/dashboard/reminders" && (
-        <AddReminderDialog 
-          open={isAddReminderDialogOpen} 
-          onOpenChange={setIsAddReminderDialogOpen}
-          onSubmit={createReminder}
-        />
-      )}
+      {/* Render AddReminderDialog for all pages */}
+      <AddReminderDialog 
+        open={isAddReminderDialogOpen} 
+        onOpenChange={setIsAddReminderDialogOpen}
+        onSubmit={createReminder}
+      />
     </div>
   )
 }

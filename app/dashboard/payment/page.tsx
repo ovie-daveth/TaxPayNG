@@ -55,7 +55,7 @@ export default function PaymentHistoryPage() {
   const [showReceipt, setShowReceipt] = useState(false)
   
   // View mode
-  const [viewMode, setViewMode] = useState<ViewMode>("grid")
+  const [viewMode, setViewMode] = useState<ViewMode>("table")
   
   // Filters
   const [searchTerm, setSearchTerm] = useState("")

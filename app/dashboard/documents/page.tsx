@@ -18,7 +18,7 @@ import { DocumentViewerModal } from "@/components/ui/document-viewer-modal"
 export default function DocumentsPage() {
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [isUploadOpen, setIsUploadOpen] = useState(false)
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid")
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list")
   const [searchQuery, setSearchQuery] = useState("")
   const [filters, setFilters] = useState<FilterType>({})
   const [viewerOpen, setViewerOpen] = useState(false)
