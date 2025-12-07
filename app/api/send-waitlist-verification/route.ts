@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     const normalizedUserType = userType.toString().toLowerCase().trim()
-    const allowedUserTypes = ['freelancer', 'creator', 'sme']
+    const allowedUserTypes = ['freelancer', 'creator', 'sme', 'agent']
     if (!allowedUserTypes.includes(normalizedUserType)) {
       return NextResponse.json(
         { error: 'Invalid user type selection' },

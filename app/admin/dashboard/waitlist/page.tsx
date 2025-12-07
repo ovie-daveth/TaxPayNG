@@ -44,7 +44,7 @@ export default function AdminWaitlistPage() {
   const [bulkEditableSubject, setBulkEditableSubject] = useState("")
   const [bulkEditableBody, setBulkEditableBody] = useState("")
   const [bulkSending, setBulkSending] = useState(false)
-  const [bulkUserTypeFilter, setBulkUserTypeFilter] = useState<"all" | "sme" | "freelancer" | "creator">("all")
+  const [bulkUserTypeFilter, setBulkUserTypeFilter] = useState<"all" | "sme" | "freelancer" | "creator" | "agent">("all")
   const [markingId, setMarkingId] = useState<string | null>(null)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [pendingAction, setPendingAction] = useState<null | { type: "sendEmail" | "markNotified"; payload: any }>(null)
@@ -113,6 +113,8 @@ export default function AdminWaitlistPage() {
         return "SME"
       case "freelancer":
         return "Freelancer"
+      case "agent":
+        return "Agent"
       default:
         return "Freelancer"
     }
@@ -710,7 +712,7 @@ export default function AdminWaitlistPage() {
               <Label htmlFor="bulk-user-type">Send To</Label>
               <Select 
                 value={bulkUserTypeFilter} 
-                onValueChange={(value: "all" | "sme" | "freelancer" | "creator") => {
+                onValueChange={(value: "all" | "sme" | "freelancer" | "creator" | "agent") => {
                   setBulkUserTypeFilter(value)
                 }}
               >
@@ -722,6 +724,7 @@ export default function AdminWaitlistPage() {
                   <SelectItem value="sme">SMEs Only</SelectItem>
                   <SelectItem value="freelancer">Freelancers Only</SelectItem>
                   <SelectItem value="creator">Creators Only</SelectItem>
+                  <SelectItem value="agent">Agents Only</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -812,7 +815,9 @@ export default function AdminWaitlistPage() {
                     ? "SMEs" 
                     : bulkUserTypeFilter === "freelancer" 
                       ? "Freelancers" 
-                      : "Creators"
+                      : bulkUserTypeFilter === "creator"
+                        ? "Creators"
+                        : "Agents"
                 return (
                   <p>
                     {count} {typeLabel} {count === 1 ? "has" : "have"} valid {count === 1 ? "email" : "emails"} and will receive this message.

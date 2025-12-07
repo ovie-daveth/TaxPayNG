@@ -486,6 +486,7 @@ export default function HomePage() {
                         <SelectItem value="freelancer">Freelancer</SelectItem>
                         <SelectItem value="creator">Creator</SelectItem>
                         <SelectItem value="sme">SME</SelectItem>
+                        <SelectItem value="agent">Agent</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
