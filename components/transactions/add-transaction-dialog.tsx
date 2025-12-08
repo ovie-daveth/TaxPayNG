@@ -17,6 +17,8 @@ import { TagsInput } from "@/components/ui/tags-input"
 import { ocrService, ReceiptData } from "@/lib/services"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { SUPPORTED_CURRENCIES, CurrencyCode, fetchExchangeRate, convertCurrency, getCurrencySymbol, formatCurrencyInput, parseCurrencyInput, handleCurrencyInputChange } from "@/lib/utils/currency"
+import { useSubscription } from "@/lib/hooks/useSubscription"
+import { SubscriptionAlert } from "@/components/subscription/subscription-restriction"
 
 interface AddTransactionDialogProps {
   open: boolean
@@ -63,6 +65,7 @@ export function AddTransactionDialog({
   const [ocrResult, setOcrResult] = useState<ReceiptData | null>(null)
   const [ocrProgress, setOcrProgress] = useState(0)
   const [showFormFields, setShowFormFields] = useState(false) // Track if form fields should be shown
+  const { isSubscribed } = useSubscription()
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -374,6 +377,9 @@ export function AddTransactionDialog({
           <DialogTitle>{transaction ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+          {!isSubscribed && !transaction && (
+            <SubscriptionAlert message="You need an active subscription to add transactions. Subscribe to unlock this feature." />
+          )}
           {/* Step 1: File Upload (shown first for new transactions) */}
           {!showFormFields && !transaction && (
             <div className="space-y-4">

@@ -19,15 +19,22 @@ import { userService } from "@/lib/services"
 import { toast } from "sonner"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { User, Building2, CreditCard, Bell, Shield, Upload, X, CheckCircle2 } from "lucide-react"
+import { User, Building2, CreditCard, Bell, Shield, Upload, X, CheckCircle2, Loader2, ExternalLink } from "lucide-react"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
+import { useSubscription } from "@/lib/hooks/useSubscription"
+import { subscriptionService } from "@/lib/services/subscriptionService"
+import { getAuth } from "firebase/auth"
+import { auth } from "@/firebase/firebase"
 
 export default function SettingsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, loading: authLoading } = useAuth()
   const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
+  const { isSubscribed, subscriptionType } = useSubscription()
   const [isSaving, setIsSaving] = useState(false)
+  const [processingSubscription, setProcessingSubscription] = useState<string | null>(null)
+  const [showChangePlanModal, setShowChangePlanModal] = useState(false)
   const kycSectionRef = useRef<HTMLDivElement>(null)
   const [kycDocuments, setKycDocuments] = useState({
     id: '',
@@ -69,6 +76,83 @@ export default function SettingsPage() {
       isSubscribe: profile.isSubscribe ?? false,
       subscriptionType: profile.subscriptionType || null,
     })
+  }, [profile, profileLoading])
+
+  // Handle subscription payment success/error from URL params
+  useEffect(() => {
+    const success = searchParams.get('success')
+    const error = searchParams.get('error')
+    const plan = searchParams.get('plan')
+    const message = searchParams.get('message')
+
+    if (success === 'true' && plan) {
+      toast.success(`Successfully subscribed to ${plan} plan!`)
+      refetchProfile()
+      // Clean URL
+      router.replace('/dashboard/settings?tab=subscription', { scroll: false })
+    }
+
+    if (error) {
+      toast.error(message || 'Subscription payment failed. Please try again.')
+      // Clean URL
+      router.replace('/dashboard/settings?tab=subscription', { scroll: false })
+    }
+  }, [searchParams, router, refetchProfile])
+
+  const handleSubscribe = async (planType: string) => {
+    if (!user?.uid) {
+      toast.error("User not authenticated")
+      return
+    }
+
+    setProcessingSubscription(planType)
+    try {
+      // Get auth token
+      const currentUser = auth.currentUser
+      if (!currentUser) {
+        toast.error("Please log in to subscribe")
+        return
+      }
+
+      const token = await currentUser.getIdToken()
+
+      // Initialize subscription payment
+      const response = await fetch("/api/subscription/initialize", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          subscriptionType: planType
+        })
+      })
+
+      const data = await response.json()
+
+      if (!data.success) {
+        toast.error(data.error || "Failed to initialize payment")
+        return
+      }
+
+      // Redirect to Paystack payment page
+      if (data.data?.authorizationUrl) {
+        window.location.href = data.data.authorizationUrl
+      } else {
+        toast.error("Payment initialization failed")
+      }
+    } catch (error) {
+      console.error("Error subscribing:", error)
+      toast.error("An error occurred. Please try again.")
+    } finally {
+      setProcessingSubscription(null)
+    }
+  }
+
+  useEffect(() => {
+    if (profileLoading || !profile) {
+      return
+    }
     
     // Parse firstName and lastName - explicitly check for truthy values
     let firstName = (profile.firstName && String(profile.firstName).trim()) || ''
@@ -612,45 +696,78 @@ export default function SettingsPage() {
                           Manage your subscription plan and view usage limits
                         </p>
                       </div>
-                      <Badge variant={subscriptionData.isSubscribe ? "default" : "secondary"} className="text-sm px-4 py-2">
-                        {subscriptionData.isSubscribe ? "Subscribed" : "Not Subscribed"}
+                      <Badge variant={isSubscribed ? "default" : "secondary"} className="text-sm px-4 py-2">
+                        {isSubscribed ? `Subscribed - ${subscriptionType}` : "Not Subscribed"}
                       </Badge>
                     </div>
                   </div>
                   <div className="space-y-6">
-                    <div className="grid md:grid-cols-2 gap-6">
-                      <div className="space-y-2">
-                        <Label htmlFor="subscription-type">Subscription Type</Label>
-                        <Select 
-                          value={subscriptionData.subscriptionType || "none"} 
-                          onValueChange={(value) => setSubscriptionData(prev => ({ ...prev, subscriptionType: value === "none" ? null : value }))}
-                          disabled={isSaving}
-                        >
-                          <SelectTrigger id="subscription-type">
-                            <SelectValue placeholder="Select subscription type" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="none">No Subscription</SelectItem>
-                            <SelectItem value="PRO">PRO - Freelancers</SelectItem>
-                            <SelectItem value="GOLD">GOLD - Creators</SelectItem>
-                            <SelectItem value="PLATINUM">PLATINUM - Advanced Creators</SelectItem>
-                            <SelectItem value="Small Business">Small Business</SelectItem>
-                            <SelectItem value="Big Business">Big Business</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex items-center justify-between p-4 border rounded-lg">
-                        <div className="space-y-0.5">
-                          <Label>Subscription Status</Label>
-                          <p className="text-sm text-muted-foreground">Toggle subscription status</p>
+                    {!isSubscribed ? (
+                      <div className="space-y-4">
+                        <div className="p-6 border rounded-lg bg-muted/50">
+                          <h3 className="text-lg font-semibold mb-2">Choose a Subscription Plan</h3>
+                          <p className="text-sm text-muted-foreground mb-4">
+                            Select a plan to unlock all features and start managing your taxes efficiently.
+                          </p>
+                          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {(() => {
+                              // Get plans based on business type
+                              const availablePlans = profile?.businessType === 'sme' 
+                                ? (['Small Business', 'Big Business'] as const)
+                                : (['PRO', 'GOLD', 'PLATINUM'] as const)
+                              
+                              return availablePlans.map((planType) => {
+                                const plan = subscriptionService.getPlan(planType)
+                                if (!plan) return null
+                                return (
+                                  <Card key={planType} className="p-4">
+                                    <div className="space-y-2">
+                                      <h4 className="font-semibold">{plan.name}</h4>
+                                      <p className="text-2xl font-bold">{plan.priceDisplay}</p>
+                                      <p className="text-xs text-muted-foreground">per month</p>
+                                      <Button
+                                        className="w-full mt-4"
+                                        onClick={() => handleSubscribe(planType)}
+                                        disabled={processingSubscription === planType}
+                                      >
+                                        {processingSubscription === planType ? (
+                                          <>
+                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            Processing...
+                                          </>
+                                        ) : (
+                                          "Subscribe"
+                                        )}
+                                      </Button>
+                                    </div>
+                                  </Card>
+                                )
+                              })
+                            })()}
+                          </div>
                         </div>
-                        <Switch 
-                          checked={subscriptionData.isSubscribe} 
-                          onCheckedChange={(checked) => setSubscriptionData(prev => ({ ...prev, isSubscribe: checked }))}
-                          disabled={isSaving}
-                        />
                       </div>
-                    </div>
+                    ) : (
+                      <div className="space-y-4">
+                        <div className="p-6 border rounded-lg bg-muted/50">
+                          <div className="flex items-center justify-between mb-4">
+                            <div>
+                              <h3 className="text-lg font-semibold">Current Plan</h3>
+                              <p className="text-sm text-muted-foreground">
+                                {subscriptionType} - {subscriptionService.getPlan(subscriptionType)?.priceDisplay}/month
+                              </p>
+                            </div>
+                            <Badge variant="default">Active</Badge>
+                          </div>
+                          <Button
+                            variant="outline"
+                            onClick={() => setShowChangePlanModal(true)}
+                          >
+                            Change Plan
+                          </Button>
+                        </div>
+                      </div>
+                    )}
 
                     {profile && (
                       <>
@@ -697,39 +814,6 @@ export default function SettingsPage() {
                         </div>
                       </>
                     )}
-                    
-                    <div className="flex justify-end pt-4">
-                      <Button 
-                        size="lg"
-                        onClick={async () => {
-                          if (!user?.uid) {
-                            toast.error("User not authenticated")
-                            return
-                          }
-                          setIsSaving(true)
-                          try {
-                            const result = await userService.upsertProfile(user.uid, {
-                              isSubscribe: subscriptionData.isSubscribe,
-                              subscriptionType: subscriptionData.subscriptionType as any,
-                            })
-                            if (result.success) {
-                              toast.success("Subscription updated successfully")
-                              await refetchProfile()
-                            } else {
-                              toast.error(result.error || "Failed to update subscription")
-                            }
-                          } catch (error) {
-                            toast.error("Failed to update subscription")
-                            console.error(error)
-                          } finally {
-                            setIsSaving(false)
-                          }
-                        }}
-                        disabled={isSaving}
-                      >
-                        {isSaving ? "Saving..." : "Save Subscription Changes"}
-                      </Button>
-                    </div>
                   </div>
                 </Card>
               </TabsContent>
@@ -815,5 +899,15 @@ export default function SettingsPage() {
           </div>
         </main>
       </div>
+
+      {/* Change Plan Modal */}
+      <ChangePlanModal
+        open={showChangePlanModal}
+        onOpenChange={setShowChangePlanModal}
+        currentPlan={subscriptionType}
+        businessType={profile?.businessType || 'freelancer'}
+        onSelectPlan={handleSubscribe}
+        processingPlan={processingSubscription}
+      />
   )
 }

@@ -20,10 +20,17 @@ import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { TokenInputDialog } from "@/components/waitlist/token-input-dialog"
 import { sendWaitlistVerification } from "@/lib/utils/emailVerification"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { useRouter } from "next/navigation"
+import { getAuth } from "firebase/auth"
+import { auth } from "@/firebase/firebase"
 
 export default function PricingPage() {
+  const { user, loading: authLoading } = useAuth()
+  const router = useRouter()
   const [showWaitlistModal, setShowWaitlistModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<string | null>(null)
+  const [processingSubscription, setProcessingSubscription] = useState<string | null>(null)
   const [waitlistForm, setWaitlistForm] = useState({
     name: "",
     email: "",
@@ -121,6 +128,58 @@ export default function PricingPage() {
     setIsWaitlistSubmitted(true)
     setPendingEmail("")
     setWaitlistForm({ name: "", email: "", phone: "", userType: "", platformExpectations: "" })
+  }
+
+  const handleSubscribe = async (planType: string) => {
+    if (!user) {
+      toast.error("Please log in to subscribe")
+      router.push("/login?redirect=/pricing")
+      return
+    }
+
+    setProcessingSubscription(planType)
+    try {
+      // Get auth token
+      const currentUser = auth.currentUser
+      if (!currentUser) {
+        toast.error("Please log in to subscribe")
+        router.push("/login?redirect=/pricing")
+        return
+      }
+
+      const token = await currentUser.getIdToken()
+
+      // Initialize subscription payment
+      const response = await fetch("/api/subscription/initialize", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          subscriptionType: planType
+        })
+      })
+
+      const data = await response.json()
+
+      if (!data.success) {
+        toast.error(data.error || "Failed to initialize payment")
+        return
+      }
+
+      // Redirect to Paystack payment page
+      if (data.data?.authorizationUrl) {
+        window.location.href = data.data.authorizationUrl
+      } else {
+        toast.error("Payment initialization failed")
+      }
+    } catch (error) {
+      console.error("Error subscribing:", error)
+      toast.error("An error occurred. Please try again.")
+    } finally {
+      setProcessingSubscription(null)
+    }
   }
 
   return (
@@ -222,14 +281,33 @@ export default function PricingPage() {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Button
-                  type="button"
-                  className="w-full bg-transparent hover:bg-muted hover:text-foreground transition-all duration-200 hover:scale-105 hover:shadow-lg"
-                  variant="outline"
-                  onClick={() => handleOpenWaitlist("PRO")}
-                >
-                  Start Free Trial
-                </Button>
+                {user ? (
+                  <Button
+                    type="button"
+                    className="w-full bg-transparent hover:bg-muted hover:text-foreground transition-all duration-200 hover:scale-105 hover:shadow-lg"
+                    variant="outline"
+                    onClick={() => handleSubscribe("PRO")}
+                    disabled={processingSubscription === "PRO"}
+                  >
+                    {processingSubscription === "PRO" ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      "Subscribe Now"
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    className="w-full bg-transparent hover:bg-muted hover:text-foreground transition-all duration-200 hover:scale-105 hover:shadow-lg"
+                    variant="outline"
+                    onClick={() => handleOpenWaitlist("PRO")}
+                  >
+                    Start Free Trial
+                  </Button>
+                )}
               </CardFooter>
             </Card>
 
@@ -276,13 +354,31 @@ export default function PricingPage() {
                       </ul>
                     </CardContent>
                     <CardFooter>
-                      <Button
-                        type="button"
-                        className="w-full hover:bg-primary/90 hover:scale-105 transition-all duration-200 hover:shadow-lg"
-                        onClick={() => handleOpenWaitlist("GOLD")}
-                      >
-                        Start Free Trial
-                      </Button>
+                      {user ? (
+                        <Button
+                          type="button"
+                          className="w-full hover:bg-primary/90 hover:scale-105 transition-all duration-200 hover:shadow-lg"
+                          onClick={() => handleSubscribe("GOLD")}
+                          disabled={processingSubscription === "GOLD"}
+                        >
+                          {processingSubscription === "GOLD" ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Processing...
+                            </>
+                          ) : (
+                            "Subscribe Now"
+                          )}
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          className="w-full hover:bg-primary/90 hover:scale-105 transition-all duration-200 hover:shadow-lg"
+                          onClick={() => handleOpenWaitlist("GOLD")}
+                        >
+                          Start Free Trial
+                        </Button>
+                      )}
                     </CardFooter>
                   </Card>
 
@@ -327,14 +423,33 @@ export default function PricingPage() {
                       </ul>
                     </CardContent>
                     <CardFooter>
-                      <Button
-                        type="button"
-                        className="w-full bg-transparent hover:bg-muted hover:text-foreground transition-all duration-200 hover:scale-105 hover:shadow-lg"
-                        variant="outline"
-                        onClick={() => handleOpenWaitlist("PLATINUM")}
-                      >
-                        Start Free Trial
-                      </Button>
+                      {user ? (
+                        <Button
+                          type="button"
+                          className="w-full bg-transparent hover:bg-muted hover:text-foreground transition-all duration-200 hover:scale-105 hover:shadow-lg"
+                          variant="outline"
+                          onClick={() => handleSubscribe("PLATINUM")}
+                          disabled={processingSubscription === "PLATINUM"}
+                        >
+                          {processingSubscription === "PLATINUM" ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Processing...
+                            </>
+                          ) : (
+                            "Subscribe Now"
+                          )}
+                        </Button>
+                      ) : (
+                        <Button
+                          type="button"
+                          className="w-full bg-transparent hover:bg-muted hover:text-foreground transition-all duration-200 hover:scale-105 hover:shadow-lg"
+                          variant="outline"
+                          onClick={() => handleOpenWaitlist("PLATINUM")}
+                        >
+                          Start Free Trial
+                        </Button>
+                      )}
                     </CardFooter>
                   </Card>
                 </div>
@@ -409,13 +524,31 @@ export default function PricingPage() {
                 </ul>
               </CardContent>
               <CardFooter>
-                <Button
-                  type="button"
-                  className="w-full hover:bg-primary/90 hover:scale-105 transition-all duration-200 hover:shadow-lg"
-                  onClick={() => handleOpenWaitlist("Small Business")}
-                >
-                  Start Free Trial
-                </Button>
+                {user ? (
+                  <Button
+                    type="button"
+                    className="w-full hover:bg-primary/90 hover:scale-105 transition-all duration-200 hover:shadow-lg"
+                    onClick={() => handleSubscribe("Small Business")}
+                    disabled={processingSubscription === "Small Business"}
+                  >
+                    {processingSubscription === "Small Business" ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      "Subscribe Now"
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    type="button"
+                    className="w-full hover:bg-primary/90 hover:scale-105 transition-all duration-200 hover:shadow-lg"
+                    onClick={() => handleOpenWaitlist("Small Business")}
+                  >
+                    Start Free Trial
+                  </Button>
+                )}
               </CardFooter>
             </Card>
 
