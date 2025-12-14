@@ -13,6 +13,10 @@ import { ImageViewerModal } from "@/components/ui/image-viewer-modal"
 import { formatDate } from "@/lib/utils/date"
 import { useTransactions } from "@/lib/hooks/useTransactions"
 import { useAuth } from "@/lib/hooks/useAuth"
+import { useSubscription } from "@/lib/hooks/useSubscription"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
+import { toast } from "sonner"
 
 
 interface TransactionListProps {
@@ -41,7 +45,10 @@ export function TransactionList({
   const [highlightedTransactionId, setHighlightedTransactionId] = useState<string | null>(null)
 
   const { user } = useAuth()
+  const { profile } = useUserProfile()
+  const { isSubscribed, loading: subscriptionLoading } = useSubscription()
   const { createTransaction } = useTransactions(user?.uid || null)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
 
   // Listen for newly created transactions to highlight them
   useEffect(() => {
@@ -215,6 +222,11 @@ export function TransactionList({
           onOpenChange={setIsAddDialogOpen}
           onSubmit={handleSubmit}
           transaction={editingTransaction}
+        />
+        <SubscriptionRequiredModal
+          open={showSubscriptionModal && (profile?.businessType !== 'agent' || !profile)}
+          onOpenChange={setShowSubscriptionModal}
+          businessType={profile?.businessType || 'freelancer'}
         />
       </>
     )
@@ -438,6 +450,11 @@ export function TransactionList({
         isDeleting={isDeleting}
         title="Delete Transaction"
         description="Are you sure you want to delete this transaction? This action cannot be undone."
+      />
+      <SubscriptionRequiredModal
+        open={showSubscriptionModal && (profile?.businessType !== 'agent' || !profile)}
+        onOpenChange={setShowSubscriptionModal}
+        businessType={profile?.businessType || 'freelancer'}
       />
     </Card>
   )

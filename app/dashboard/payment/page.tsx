@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PaymentReceipt } from "@/components/tax-payment/payment-receipt"
 import { useAuth } from "@/lib/hooks/useAuth"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useSubscription } from "@/lib/hooks/useSubscription"
+import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { taxPaymentService } from "@/lib/services"
 import { TaxPayment } from "@/lib/types"
 import { 
@@ -48,11 +51,14 @@ type FilterCategory = "period" | "method" | "status"
 export default function PaymentHistoryPage() {
   const router = useRouter()
   const { user } = useAuth()
+  const { profile } = useUserProfile()
+  const { isSubscribed, loading: subscriptionLoading } = useSubscription()
   const [payments, setPayments] = useState<TaxPayment[]>([])
   const [filteredPayments, setFilteredPayments] = useState<TaxPayment[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedPayment, setSelectedPayment] = useState<PaymentData | null>(null)
   const [showReceipt, setShowReceipt] = useState(false)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   
   // View mode
   const [viewMode, setViewMode] = useState<ViewMode>("table")
@@ -63,6 +69,14 @@ export default function PaymentHistoryPage() {
   const [activePeriod, setActivePeriod] = useState<string | null>(null)
   const [activeMethod, setActiveMethod] = useState<string | null>(null)
   const [activeStatus, setActiveStatus] = useState<string | null>(null)
+
+  // Check subscription on mount
+  useEffect(() => {
+    if (subscriptionLoading) return
+    if (!isSubscribed && profile && profile.businessType !== 'agent') {
+      setShowSubscriptionModal(true)
+    }
+  }, [isSubscribed, subscriptionLoading, profile])
 
   useEffect(() => {
     if (user?.uid) {
@@ -399,7 +413,7 @@ export default function PaymentHistoryPage() {
                 : "Try adjusting your filters to see more results."}
             </p>
             {payments.length === 0 && (
-              <Button onClick={() => router.push("/dashboard/payment")} size="lg">
+              <Button onClick={() => router.push("/dashboard/payment/add")} size="lg">
                 Make Payment
               </Button>
             )}
@@ -533,6 +547,13 @@ export default function PaymentHistoryPage() {
         </Card>
       )}
     </div>
+    {profile && profile.businessType !== 'agent' && (
+      <SubscriptionRequiredModal
+        open={showSubscriptionModal}
+        onOpenChange={setShowSubscriptionModal}
+        businessType={profile.businessType || 'freelancer'}
+      />
+    )}
     </>
   )
 }

@@ -17,9 +17,11 @@ import { toast } from "sonner"
 export default function GenerateExpenseReportPage() {
   const { user } = useAuth()
   const { profile } = useUserProfile()
+  const { isSubscribed } = useSubscription()
   const [showPreview, setShowPreview] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [reportData, setReportData] = useState<ReportData | null>(null)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [formData, setFormData] = useState({
     taxYear: new Date().getFullYear().toString(),
     period: 'annual' as 'annual' | 'q1' | 'q2' | 'q3' | 'q4',
@@ -68,6 +70,12 @@ export default function GenerateExpenseReportPage() {
     e.preventDefault()
     if (!user?.uid || !profile?.userId) {
       toast.error("Please log in to generate reports")
+      return
+    }
+
+    // Check subscription
+    if (!isSubscribed) {
+      setShowSubscriptionModal(true)
       return
     }
 
@@ -259,6 +267,13 @@ export default function GenerateExpenseReportPage() {
           </div>
         ) : null}
       </main>
+      {profile && profile.businessType !== 'agent' && (
+        <SubscriptionRequiredModal
+          open={showSubscriptionModal}
+          onOpenChange={setShowSubscriptionModal}
+          businessType={profile.businessType || 'freelancer'}
+        />
+      )}
     </div>
   )
 }

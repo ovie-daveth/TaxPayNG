@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useSubscription } from "@/lib/hooks/useSubscription"
+import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Plus, Search, Filter, Download, FileText, Eye, Edit, Trash2, Send, CheckCircle2, Clock, AlertCircle, LayoutGrid, Table2, Receipt, Info, Save, Loader2 } from "lucide-react"
@@ -28,9 +30,11 @@ export default function InvoicesPage() {
   const searchParams = useSearchParams()
   const { user } = useAuth()
   const { profile } = useUserProfile()
+  const { isSubscribed } = useSubscription()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
   const [searchTerm, setSearchTerm] = useState("")
@@ -83,11 +87,15 @@ export default function InvoicesPage() {
   // Listen for create invoice event from header
   useEffect(() => {
     const handleCreateInvoice = () => {
+      if (!isSubscribed) {
+        setShowSubscriptionModal(true)
+        return
+      }
       setIsAddDialogOpen(true)
     }
     window.addEventListener('createInvoice', handleCreateInvoice)
     return () => window.removeEventListener('createInvoice', handleCreateInvoice)
-  }, [])
+  }, [isSubscribed])
 
   // Handle invoiceId query parameter to open specific invoice
   useEffect(() => {
@@ -957,6 +965,13 @@ console.log("invoices", invoices)
           )}
         </DialogContent>
       </Dialog>
+      {profile && profile.businessType !== 'agent' && (
+        <SubscriptionRequiredModal
+          open={showSubscriptionModal}
+          onOpenChange={setShowSubscriptionModal}
+          businessType={profile.businessType || 'freelancer'}
+        />
+      )}
     </div>
   )
 }

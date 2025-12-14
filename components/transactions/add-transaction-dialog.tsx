@@ -18,7 +18,9 @@ import { ocrService, ReceiptData } from "@/lib/services"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { SUPPORTED_CURRENCIES, CurrencyCode, fetchExchangeRate, convertCurrency, getCurrencySymbol, formatCurrencyInput, parseCurrencyInput, handleCurrencyInputChange } from "@/lib/utils/currency"
 import { useSubscription } from "@/lib/hooks/useSubscription"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { SubscriptionAlert } from "@/components/subscription/subscription-restriction"
+import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 
 interface AddTransactionDialogProps {
   open: boolean
@@ -66,6 +68,8 @@ export function AddTransactionDialog({
   const [ocrProgress, setOcrProgress] = useState(0)
   const [showFormFields, setShowFormFields] = useState(false) // Track if form fields should be shown
   const { isSubscribed } = useSubscription()
+  const { profile } = useUserProfile()
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -307,6 +311,12 @@ export function AddTransactionDialog({
     e.preventDefault()
     if (!formData.description || !formData.amount || !formData.category) return
 
+    // Check subscription before submitting
+    if (!isSubscribed && !transaction) {
+      toast.error("Please subscribe to add transactions")
+      return
+    }
+
     console.log("Before submission:", formData)
     setIsSubmitting(true)
     try {
@@ -378,7 +388,10 @@ export function AddTransactionDialog({
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4 mt-4">
           {!isSubscribed && !transaction && (
-            <SubscriptionAlert message="You need an active subscription to add transactions. Subscribe to unlock this feature." />
+            <SubscriptionAlert 
+              message="You need an active subscription to add transactions. Subscribe to unlock this feature."
+              onUpgrade={() => setShowSubscriptionModal(true)}
+            />
           )}
           {/* Step 1: File Upload (shown first for new transactions) */}
           {!showFormFields && !transaction && (
@@ -842,6 +855,13 @@ export function AddTransactionDialog({
           )}
         </form>
       </DialogContent>
+      {profile && profile.businessType !== 'agent' && (
+        <SubscriptionRequiredModal
+          open={showSubscriptionModal}
+          onOpenChange={setShowSubscriptionModal}
+          businessType={profile.businessType || 'freelancer'}
+        />
+      )}
     </Dialog>
   )
 }

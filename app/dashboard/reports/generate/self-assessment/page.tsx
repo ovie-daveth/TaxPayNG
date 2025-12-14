@@ -16,6 +16,8 @@ import { ArrowLeft, FileText, Download, Loader2, Info, Calculator, Shield } from
 import { SelfAssessmentPreview } from "@/components/reports/self-assessment-preview"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useSubscription } from "@/lib/hooks/useSubscription"
+import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { reportService, ReportData } from "@/lib/services"
 import { toast } from "sonner"
 
@@ -23,12 +25,14 @@ export default function GenerateSelfAssessmentPage() {
   const router = useRouter()
   const { user } = useAuth()
   const { profile } = useUserProfile()
+  const { isSubscribed } = useSubscription()
   const [showPreview, setShowPreview] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [reportId, setReportId] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(true) // Start in edit mode by default
   const [isSaving, setIsSaving] = useState(false)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [formData, setFormData] = useState({
     taxYear: new Date().getFullYear().toString(),
     period: 'annual' as 'annual' | 'q1' | 'q2' | 'q3' | 'q4',
@@ -125,6 +129,12 @@ export default function GenerateSelfAssessmentPage() {
     e.preventDefault()
     if (!user?.uid || !profile?.userId) {
       toast.error("Please log in to generate reports")
+      return
+    }
+
+    // Check subscription
+    if (!isSubscribed) {
+      setShowSubscriptionModal(true)
       return
     }
 
@@ -241,7 +251,7 @@ export default function GenerateSelfAssessmentPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* <DashboardNav /> */}
-        <main className="px-4 py-6">
+      <main className="px-4 py-6">
           {!showPreview ? (
             <div className="space-y-6">
               {/* Back Button */}
@@ -471,7 +481,14 @@ export default function GenerateSelfAssessmentPage() {
               )}
             </div>
           )}
-        </main>
+      </main>
+      {profile && profile.businessType !== 'agent' && (
+        <SubscriptionRequiredModal
+          open={showSubscriptionModal}
+          onOpenChange={setShowSubscriptionModal}
+          businessType={profile.businessType || 'freelancer'}
+        />
+      )}
     </div>
   )
 }

@@ -11,15 +11,19 @@ import { Loader2, ArrowLeft, Info, FileText, Calculator } from "lucide-react"
 import { TaxSummaryPreview } from "@/components/reports/tax-summary-preview"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useSubscription } from "@/lib/hooks/useSubscription"
+import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { reportService, ReportData } from "@/lib/services"
 import { toast } from "sonner"
 
 export default function GenerateTaxSummaryPage() {
   const { user } = useAuth()
   const { profile } = useUserProfile()
+  const { isSubscribed } = useSubscription()
   const [showPreview, setShowPreview] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [reportData, setReportData] = useState<ReportData | null>(null)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [formData, setFormData] = useState({
     taxYear: new Date().getFullYear().toString(),
     period: 'annual' as 'annual' | 'q1' | 'q2' | 'q3' | 'q4',
@@ -68,6 +72,12 @@ export default function GenerateTaxSummaryPage() {
     e.preventDefault()
     if (!user?.uid || !profile?.userId) {
       toast.error("Please log in to generate reports")
+      return
+    }
+
+    // Check subscription
+    if (!isSubscribed) {
+      setShowSubscriptionModal(true)
       return
     }
 
@@ -259,6 +269,13 @@ export default function GenerateTaxSummaryPage() {
           </div>
         ) : null}
       </main>
+      {profile && profile.businessType !== 'agent' && (
+        <SubscriptionRequiredModal
+          open={showSubscriptionModal}
+          onOpenChange={setShowSubscriptionModal}
+          businessType={profile.businessType || 'freelancer'}
+        />
+      )}
     </div>
   )
 }

@@ -1,9 +1,13 @@
 "use client"
 
+import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { FileText, Calculator, BarChart3, FileCheck, Plus } from "lucide-react"
-import Link from "next/link"
+import { useSubscription } from "@/lib/hooks/useSubscription"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 
 const templates = [
   {
@@ -41,19 +45,42 @@ const templates = [
 ]
 
 export function ReportTemplates() {
-  return (
-    <Card className="p-6">
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold">Generate New Report</h2>
-        <p className="text-sm text-muted-foreground mt-1">Choose a report template to get started</p>
-      </div>
+  const router = useRouter()
+  const { profile } = useUserProfile()
+  const { isSubscribed, loading: subscriptionLoading } = useSubscription()
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
 
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {templates.map((template) => {
-          const Icon = template.icon
-          return (
-            <Link key={template.id} href={template.href}>
-              <div className="border border-border rounded-lg p-4 hover:shadow-lg hover:border-primary transition-all cursor-pointer h-full">
+  const handleGenerateClick = (href: string) => {
+    // Wait for subscription status to load
+    if (subscriptionLoading) {
+      return
+    }
+    // Check if user is subscribed - if not, show modal
+    if (!isSubscribed) {
+      setShowSubscriptionModal(true)
+      return
+    }
+    // User is subscribed, navigate to report generation page
+    router.push(href)
+  }
+
+  return (
+    <>
+      <Card className="p-6">
+        <div className="mb-6">
+          <h2 className="text-xl font-semibold">Generate New Report</h2>
+          <p className="text-sm text-muted-foreground mt-1">Choose a report template to get started</p>
+        </div>
+
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {templates.map((template) => {
+            const Icon = template.icon
+            return (
+              <div
+                key={template.id}
+                className="border border-border rounded-lg p-4 hover:shadow-lg hover:border-primary transition-all cursor-pointer h-full"
+                onClick={() => handleGenerateClick(template.href)}
+              >
                 <div className={`w-12 h-12 rounded-lg flex items-center justify-center mb-4 ${template.color}`}>
                   <Icon className="w-6 h-6" />
                 </div>
@@ -64,10 +91,17 @@ export function ReportTemplates() {
                   Generate
                 </Button>
               </div>
-            </Link>
-          )
-        })}
-      </div>
-    </Card>
+            )
+          })}
+        </div>
+      </Card>
+      {profile && profile.businessType !== 'agent' && (
+        <SubscriptionRequiredModal
+          open={showSubscriptionModal}
+          onOpenChange={setShowSubscriptionModal}
+          businessType={profile.businessType || 'freelancer'}
+        />
+      )}
+    </>
   )
 }

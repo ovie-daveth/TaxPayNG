@@ -15,6 +15,8 @@ import { invoiceService, userService } from "@/lib/services"
 import { toast } from "sonner"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useSubscription } from "@/lib/hooks/useSubscription"
+import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { INVOICE_TEMPLATES, getDefaultTemplate } from "@/lib/utils/invoiceTemplates"
 import { formatDateForInput } from "@/lib/utils/date"
 import { SUPPORTED_CURRENCIES, CurrencyCode, getCurrencySymbol, formatCurrencyInput, parseCurrencyInput, formatCurrencyAmount, fetchExchangeRate, convertCurrency } from "@/lib/utils/currency"
@@ -35,7 +37,9 @@ export function AddInvoiceDialog({
 }: AddInvoiceDialogProps) {
   const { user } = useAuth()
   const { profile } = useUserProfile()
+  const { isSubscribed } = useSubscription()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [isSearchingUser, setIsSearchingUser] = useState(false)
   const [userSearchMessage, setUserSearchMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
   // Store unitPriceDisplay for each item (formatted string)
@@ -517,6 +521,11 @@ export function AddInvoiceDialog({
   const totals = calculateTotals()
 
   const handleSubmit = async () => {
+    // Check subscription before submitting (only for new invoices, not edits)
+    if (!invoice && !isSubscribed) {
+      setShowSubscriptionModal(true)
+      return
+    }
     if (!user?.uid) {
       toast.error("User not authenticated")
       return
@@ -1350,6 +1359,13 @@ export function AddInvoiceDialog({
 </Button>          </div>
         </form>
       </DialogContent>
+      {profile && profile.businessType !== 'agent' && (
+        <SubscriptionRequiredModal
+          open={showSubscriptionModal}
+          onOpenChange={setShowSubscriptionModal}
+          businessType={profile.businessType || 'freelancer'}
+        />
+      )}
     </Dialog>
   )
 }

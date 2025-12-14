@@ -25,6 +25,7 @@ function LayoutContent({
     }
   }, [user, loading, router])
 
+
   useEffect(() => {
     if (!profile || profileLoading) return
 

@@ -13,6 +13,9 @@ import { useDocumentsFirebase } from "@/lib/hooks/use-documents-firebase"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useTransactions } from "@/lib/hooks/useTransactions"
 import { useReminders } from "@/lib/hooks/useReminders"
+import { useSubscription } from "@/lib/hooks/useSubscription"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { SubscriptionRequiredModal } from "../subscription/subscription-required-modal"
 
 export function DashboardHeader() {
   const pathname = usePathname()
@@ -20,12 +23,29 @@ export function DashboardHeader() {
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isAddReminderDialogOpen, setIsAddReminderDialogOpen] = useState(false)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   
   const { user } = useAuth()
+  const { profile } = useUserProfile()
+  const { isSubscribed, loading: subscriptionLoading } = useSubscription()
   const { uploadDocument } = useDocumentsFirebase()
   const { createTransaction } = useTransactions(user?.uid || null)
   // Load reminders hook for header actions
   const { createReminder } = useReminders(user?.uid || null)
+
+  const checkSubscription = (action: () => void) => {
+    // Wait for subscription status to load
+    if (subscriptionLoading) {
+      return
+    }
+    // Check if user is subscribed - if not, show modal
+    if (!isSubscribed) {
+      setShowSubscriptionModal(true)
+      return
+    }
+    // User is subscribed, proceed with action
+    action()
+  }
 
   const getPageInfo = (path: string) => {
     // Handle dynamic routes first
@@ -54,7 +74,7 @@ export function DashboardHeader() {
           subtitle: "Track and manage your income and expenses",
           buttonText: "Add Transaction",
           buttonIcon: Plus,
-          buttonAction: () => setIsAddDialogOpen(true),
+          buttonAction: () => checkSubscription(() => setIsAddDialogOpen(true)),
           showExportButton: true
         }
       case "/dashboard/invoices":
@@ -63,11 +83,11 @@ export function DashboardHeader() {
           subtitle: "Create, manage, and track your invoices",
           buttonText: "Create Invoice",
           buttonIcon: Plus,
-          buttonAction: () => {
+          buttonAction: () => checkSubscription(() => {
             // Trigger invoice creation - will be handled by the invoices page
             const event = new CustomEvent('createInvoice')
             window.dispatchEvent(event)
-          }
+          })
         }
       case "/dashboard/tax-calculator":
         return {
@@ -75,7 +95,7 @@ export function DashboardHeader() {
           subtitle: "Calculate your tax obligations based on Nigerian tax laws (LIRS/FIRS)",
           buttonText: "New Calculation",
           buttonIcon: Calculator,
-          buttonAction: () => console.log("New calculation")
+          buttonAction: () => console.log("New calculation") // No subscription check - this is the exemption
         }
       case "/dashboard/documents":
         return {
@@ -83,7 +103,7 @@ export function DashboardHeader() {
           subtitle: "Store and manage receipts, invoices, and proofs",
           buttonText: "Upload Document",
           buttonIcon: FileText,
-          buttonAction: () => setIsUploadDialogOpen(true)
+          buttonAction: () => checkSubscription(() => setIsUploadDialogOpen(true))
         }
       case "/dashboard/reminders":
         return {
@@ -91,7 +111,7 @@ export function DashboardHeader() {
           subtitle: "Stay on top of important tax deadlines",
           buttonText: "Add Reminder",
           buttonIcon: Bell,
-          buttonAction: () => setIsAddReminderDialogOpen(true)
+          buttonAction: () => checkSubscription(() => setIsAddReminderDialogOpen(true))
         }
       case "/dashboard/reports":
         return {
@@ -99,7 +119,7 @@ export function DashboardHeader() {
           subtitle: "Generate tax reports and self-assessment filings for LIRS/FIRS",
           buttonText: "New Report",
           buttonIcon: BarChart3,
-          buttonAction: () => router.push("/dashboard/reports/generate/self-assessment")
+          buttonAction: () => checkSubscription(() => router.push("/dashboard/reports/generate/self-assessment"))
         }
       case "/dashboard/filing-requests":
         return {
@@ -199,7 +219,7 @@ export function DashboardHeader() {
                 variant="outline" 
                 size="icon"
                 className="h-9 w-9 sm:h-10 sm:w-10"
-                onClick={() => setIsAddReminderDialogOpen(true)}
+                onClick={() => checkSubscription(() => setIsAddReminderDialogOpen(true))}
                 title="Add Reminder"
               >
                 <Bell className="w-4 h-4" />
@@ -237,6 +257,13 @@ export function DashboardHeader() {
         onOpenChange={setIsAddReminderDialogOpen}
         onSubmit={createReminder}
       />
+      {(profile?.businessType !== 'agent' || !profile) && (
+        <SubscriptionRequiredModal
+          open={showSubscriptionModal}
+          onOpenChange={setShowSubscriptionModal}
+          businessType={profile?.businessType || 'freelancer'}
+        />
+      )}
     </div>
   )
 }

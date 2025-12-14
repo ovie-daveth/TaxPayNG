@@ -11,15 +11,19 @@ import { Loader2, ArrowLeft, Info, FileText, TrendingUp } from "lucide-react"
 import { IncomeStatementPreview } from "@/components/reports/income-statement-preview"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useSubscription } from "@/lib/hooks/useSubscription"
+import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { reportService, ReportData } from "@/lib/services"
 import { toast } from "sonner"
 
 export default function GenerateIncomeStatementPage() {
   const { user } = useAuth()
   const { profile } = useUserProfile()
+  const { isSubscribed } = useSubscription()
   const [showPreview, setShowPreview] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [reportData, setReportData] = useState<ReportData | null>(null)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [formData, setFormData] = useState({
     taxYear: new Date().getFullYear().toString(),
     period: 'annual' as 'annual' | 'q1' | 'q2' | 'q3' | 'q4',
@@ -70,6 +74,12 @@ export default function GenerateIncomeStatementPage() {
     e.preventDefault()
     if (!user?.uid || !profile?.userId) {
       toast.error("Please log in to generate reports")
+      return
+    }
+
+    // Check subscription
+    if (!isSubscribed) {
+      setShowSubscriptionModal(true)
       return
     }
 
@@ -277,6 +287,13 @@ export default function GenerateIncomeStatementPage() {
           />
         ) : null}
       </main>
+      {profile && profile.businessType !== 'agent' && (
+        <SubscriptionRequiredModal
+          open={showSubscriptionModal}
+          onOpenChange={setShowSubscriptionModal}
+          businessType={profile.businessType || 'freelancer'}
+        />
+      )}
     </div>
   )
 }
