@@ -221,25 +221,25 @@ export default function PaymentHistoryPage() {
       )}
       
       {/* Main Content */}
-    <div className="container mx-auto px-4 py-6 animate-in fade-in duration-300">
+    <div className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 animate-in fade-in duration-300">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6 md:mb-8">
         <Button 
           variant="ghost" 
           onClick={() => router.back()}
-          className="mb-0"
+          className="mb-0 h-8 sm:h-9 text-xs sm:text-sm"
         >
-          <ArrowLeft className="w-4 h-4 mr-2" />
+          <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
           Back
         </Button>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <Button
             variant={showFilters ? "default" : "outline"}
             onClick={() => setShowFilters(!showFilters)}
-            className="gap-2"
+            className="gap-1.5 sm:gap-2 h-8 sm:h-9 text-xs sm:text-sm flex-1 sm:flex-initial"
           >
-            <Filter className="w-4 h-4" />
+            <Filter className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             Filters
           </Button>
           
@@ -248,24 +248,24 @@ export default function PaymentHistoryPage() {
               variant={viewMode === "grid" ? "default" : "ghost"}
               size="sm"
               onClick={() => setViewMode("grid")}
-              className="gap-2"
+              className="gap-1.5 sm:gap-2 h-7 sm:h-8 w-9 sm:w-auto"
             >
-              <LayoutGrid className="w-4 h-4" />
+              <LayoutGrid className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </Button>
             <Button
               variant={viewMode === "table" ? "default" : "ghost"}
               size="sm"
               onClick={() => setViewMode("table")}
-              className="gap-2"
+              className="gap-1.5 sm:gap-2 h-7 sm:h-8 w-9 sm:w-auto"
             >
-              <Table2 className="w-4 h-4" />
+              <Table2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </Button>
           </div>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mb-4 sm:mb-6 md:mb-8">
         <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300">
           <CardContent className="p-6">
             <div className="flex items-center justify-between">

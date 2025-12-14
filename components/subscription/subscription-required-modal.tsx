@@ -10,6 +10,7 @@ import { Check, Lock } from "lucide-react"
 import { subscriptionService } from "@/lib/services/subscriptionService"
 import { SubscriptionType, BusinessType } from "@/lib/types"
 import { auth } from "@/firebase/firebase"
+import { toast } from "sonner"
 
 interface SubscriptionRequiredModalProps {
   open: boolean
@@ -44,6 +45,7 @@ export function SubscriptionRequiredModal({
       const currentUser = auth.currentUser
       if (!currentUser) {
         router.push("/login")
+        setProcessingSubscription(null)
         return
       }
 
@@ -63,15 +65,20 @@ export function SubscriptionRequiredModal({
 
       const data = await response.json()
 
-      if (!response.ok) {
+      if (!response.ok || !data.success) {
         throw new Error(data.error || "Failed to initialize subscription")
       }
 
-      if (data.authorizationUrl) {
-        window.location.href = data.authorizationUrl
+      // Redirect to Paystack payment page
+      if (data.data?.authorizationUrl) {
+        window.location.href = data.data.authorizationUrl
+      } else {
+        throw new Error("Payment initialization failed - no authorization URL received")
       }
     } catch (error) {
       console.error("Subscription error:", error)
+      toast.error(error instanceof Error ? error.message : "Failed to initialize subscription")
+    } finally {
       setProcessingSubscription(null)
     }
   }

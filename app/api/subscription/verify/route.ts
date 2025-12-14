@@ -18,9 +18,11 @@ export async function GET(request: NextRequest) {
       )
     }
     const searchParams = request.nextUrl.searchParams
-    const reference = searchParams.get('reference')
+    // Paystack sends both 'reference' and 'trxref' - use either one
+    const reference = searchParams.get('reference') || searchParams.get('trxref')
 
     if (!reference) {
+      console.error('Missing reference parameter in callback URL')
       return NextResponse.redirect(
         new URL('/dashboard/settings?tab=subscription&error=missing_reference', request.url)
       )
@@ -131,12 +133,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Redirect to success page
+    // Redirect to dashboard with success message
+    const baseUrl = new URL(request.url).origin
     return NextResponse.redirect(
-      new URL(
-        `/dashboard/settings?tab=subscription&success=true&plan=${encodeURIComponent(subscriptionType)}`,
-        request.url
-      )
+      `${baseUrl}/dashboard?subscription=success&plan=${encodeURIComponent(subscriptionType)}`
     )
   } catch (error) {
     console.error('Error verifying subscription:', error)

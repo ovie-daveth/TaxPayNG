@@ -18,6 +18,9 @@ import { useAuth } from "@/lib/hooks/useAuth"
 import { transactionService, taxPaymentService } from "@/lib/services"
 import { toast } from "sonner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Calendar, Filter } from "lucide-react"
 import { getCurrentPeriodTax } from "@/lib/utils/tax-period-calculation"
 
 type DashboardBusinessType = "freelancer" | "creator" | "small-business"
@@ -693,6 +696,7 @@ export function StatsCards({
   const [isHoverEnabled, setIsHoverEnabled] = useState(false)
   const [showTapHint, setShowTapHint] = useState(false)
   const [loadingSummary, setLoadingSummary] = useState(false)
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false)
   const [stats, setStats] = useState<StatDefinition[]>(() =>
     getMockStats(businessType, formatCurrencyValue)
   )
@@ -963,61 +967,38 @@ export function StatsCards({
   // Generate quarter options for selected year
   const quarterOptions = getAllQuartersForYear(selectedYear)
 
-  return (
-    <div className="space-y-4">
-      {/* Period Selector */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-muted-foreground">View:</label>
-          <Select value={periodType} onValueChange={(value) => handlePeriodTypeChange(value as PeriodType)}>
-            <SelectTrigger className="w-[120px]">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="quarter">Quarter</SelectItem>
-              <SelectItem value="year">Year</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+  // Get display text for current filter selection
+  const getFilterDisplayText = () => {
+    if (periodType === "quarter") {
+      const selectedQuarterLabel = quarterOptions.find(q => q.value === selectedQuarter)?.label || `Q${selectedQuarter}`
+      return `${selectedQuarterLabel} ${selectedYear}`
+    } else {
+      return selectedYear.toString()
+    }
+  }
 
-        {periodType === "quarter" ? (
-          <>
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-muted-foreground">Year:</label>
-              <Select value={selectedYear.toString()} onValueChange={(value) => handleYearChange(parseInt(value))}>
-                <SelectTrigger className="w-[100px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {yearOptions.map((year) => (
-                    <SelectItem key={year} value={year.toString()}>
-                      {year}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-muted-foreground">Quarter:</label>
-              <Select value={selectedQuarter.toString()} onValueChange={(value) => handleQuarterChange(parseInt(value))}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {quarterOptions.map((q) => (
-                    <SelectItem key={q.value} value={q.value.toString()}>
-                      {q.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </>
-        ) : (
+  // Period selector component (reusable)
+  const PeriodSelector = () => (
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center gap-2">
+        <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">View:</label>
+        <Select value={periodType} onValueChange={(value) => handlePeriodTypeChange(value as PeriodType)}>
+          <SelectTrigger className="w-full h-10">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="quarter">Quarter</SelectItem>
+            <SelectItem value="year">Year</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {periodType === "quarter" ? (
+        <>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-muted-foreground">Year:</label>
+            <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Year:</label>
             <Select value={selectedYear.toString()} onValueChange={(value) => handleYearChange(parseInt(value))}>
-              <SelectTrigger className="w-[100px]">
+              <SelectTrigger className="w-full h-10">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -1029,13 +1010,140 @@ export function StatsCards({
               </SelectContent>
             </Select>
           </div>
-        )}
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Quarter:</label>
+            <Select value={selectedQuarter.toString()} onValueChange={(value) => handleQuarterChange(parseInt(value))}>
+              <SelectTrigger className="w-full h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {quarterOptions.map((q) => (
+                  <SelectItem key={q.value} value={q.value.toString()}>
+                    {q.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </>
+      ) : (
+        <div className="flex items-center gap-2">
+          <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Year:</label>
+          <Select value={selectedYear.toString()} onValueChange={(value) => handleYearChange(parseInt(value))}>
+            <SelectTrigger className="w-full h-10">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {yearOptions.map((year) => (
+                <SelectItem key={year} value={year.toString()}>
+                  {year}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+    </div>
+  )
+
+  return (
+    <div className="space-y-3 sm:space-y-4">
+      {/* Period Selector - Mobile: Button with Modal, Desktop: Inline */}
+      <div className="flex items-center justify-between sm:justify-start">
+        {/* Mobile: Filter Button */}
+        <Dialog open={isFilterModalOpen} onOpenChange={setIsFilterModalOpen}>
+          <DialogTrigger asChild>
+            <Button 
+              variant="outline" 
+              className="sm:hidden h-9 w-full justify-between"
+            >
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4" />
+                <span className="text-sm font-medium">{getFilterDisplayText()}</span>
+              </div>
+              <Calendar className="w-4 h-4 text-muted-foreground" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="sm:hidden">
+            <DialogHeader>
+              <DialogTitle>Filter Period</DialogTitle>
+            </DialogHeader>
+            <PeriodSelector />
+          </DialogContent>
+        </Dialog>
+
+        {/* Desktop: Inline Period Selector */}
+        <div className="hidden sm:flex flex-row flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">View:</label>
+            <Select value={periodType} onValueChange={(value) => handlePeriodTypeChange(value as PeriodType)}>
+              <SelectTrigger className="w-[120px] h-10 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="quarter">Quarter</SelectItem>
+                <SelectItem value="year">Year</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {periodType === "quarter" ? (
+            <>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Year:</label>
+                <Select value={selectedYear.toString()} onValueChange={(value) => handleYearChange(parseInt(value))}>
+                  <SelectTrigger className="w-[100px] h-10 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {yearOptions.map((year) => (
+                      <SelectItem key={year} value={year.toString()}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Quarter:</label>
+                <Select value={selectedQuarter.toString()} onValueChange={(value) => handleQuarterChange(parseInt(value))}>
+                  <SelectTrigger className="w-[120px] h-10 text-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {quarterOptions.map((q) => (
+                      <SelectItem key={q.value} value={q.value.toString()}>
+                        {q.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </>
+          ) : (
+            <div className="flex items-center gap-2">
+              <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Year:</label>
+              <Select value={selectedYear.toString()} onValueChange={(value) => handleYearChange(parseInt(value))}>
+                <SelectTrigger className="w-[100px] h-10 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map((year) => (
+                    <SelectItem key={year} value={year.toString()}>
+                      {year}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Stats Cards Grid */}
       <div
         ref={containerRef}
-        className={`grid grid-cols-1 sm:grid-cols-2 ${sidebarCollapsed ? "lg:grid-cols-4" : "lg:grid-cols-2 xl:grid-cols-4"} gap-3 sm:gap-4`}
+        className={`grid grid-cols-1 sm:grid-cols-2 ${sidebarCollapsed ? "lg:grid-cols-4" : "lg:grid-cols-2 xl:grid-cols-4"} gap-2 sm:gap-3 md:gap-4`}
       >
       {stats.map((stat, index) => {
         const Icon = stat.icon

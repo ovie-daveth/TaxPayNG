@@ -224,36 +224,36 @@ export default function SettingsPage() {
     <>
       <div className="h-screen flex flex-col overflow-hidden">
         <main className="flex-1 overflow-hidden">
-          <div className="container mx-auto px-6 py-8 max-w-7xl h-full overflow-y-auto hide-scrollbar">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
-            <p className="text-muted-foreground mt-2">
+          <div className="container mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 max-w-7xl h-full overflow-y-auto hide-scrollbar">
+          <div className="mb-4 sm:mb-6 md:mb-8">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Settings</h1>
+            <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
               Manage your account settings and preferences
             </p>
           </div>
 
           <Tabs defaultValue={searchParams.get('tab') || 'profile'} className="w-full">
-            <TabsList className={`grid w-full mb-6 ${profile?.businessType === 'freelancer' ? 'grid-cols-4' : 'grid-cols-5'}`}>
-              <TabsTrigger value="profile" className="flex items-center gap-2">
-                <User className="w-4 h-4" />
+            <TabsList className={`grid w-full mb-4 sm:mb-6 ${profile?.businessType === 'freelancer' ? 'grid-cols-4' : 'grid-cols-5'} gap-1 sm:gap-2`}>
+              <TabsTrigger value="profile" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Profile</span>
               </TabsTrigger>
               {profile?.businessType !== 'freelancer' && (
-                <TabsTrigger value="business" className="flex items-center gap-2">
-                  <Building2 className="w-4 h-4" />
+                <TabsTrigger value="business" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                  <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span className="hidden sm:inline">Business</span>
                 </TabsTrigger>
               )}
-              <TabsTrigger value="subscription" className="flex items-center gap-2">
-                <CreditCard className="w-4 h-4" />
+              <TabsTrigger value="subscription" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                <CreditCard className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Subscription</span>
               </TabsTrigger>
-              <TabsTrigger value="notifications" className="flex items-center gap-2">
-                <Bell className="w-4 h-4" />
+              <TabsTrigger value="notifications" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Notifications</span>
               </TabsTrigger>
-              <TabsTrigger value="security" className="flex items-center gap-2">
-                <Shield className="w-4 h-4" />
+              <TabsTrigger value="security" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Security</span>
               </TabsTrigger>
             </TabsList>
@@ -261,10 +261,10 @@ export default function SettingsPage() {
             <div className="space-y-6">
               {/* Profile Tab */}
               <TabsContent value="profile" className="mt-0">
-                <Card className="p-8">
-                  <div className="mb-6">
-                    <h2 className="text-2xl font-semibold">Profile Information</h2>
-                    <p className="text-sm text-muted-foreground mt-1">
+                <Card className="p-4 sm:p-6 md:p-8">
+                  <div className="mb-4 sm:mb-6">
+                    <h2 className="text-lg sm:text-xl md:text-2xl font-semibold">Profile Information</h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                       Update your personal information and contact details
                     </p>
                   </div>
@@ -655,10 +655,10 @@ export default function SettingsPage() {
               {/* Business Tab - Only show if not freelancer */}
               {profile?.businessType !== 'freelancer' && (
                 <TabsContent value="business" className="mt-0">
-                  <Card className="p-8">
-                    <div className="mb-6">
-                      <h2 className="text-2xl font-semibold">Business Information</h2>
-                      <p className="text-sm text-muted-foreground mt-1">
+                  <Card className="p-4 sm:p-6 md:p-8">
+                    <div className="mb-4 sm:mb-6">
+                      <h2 className="text-lg sm:text-xl md:text-2xl font-semibold">Business Information</h2>
+                      <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                         Manage your business details and type
                       </p>
                     </div>
@@ -695,29 +695,29 @@ export default function SettingsPage() {
 
               {/* Subscription Tab */}
               <TabsContent value="subscription" className="mt-0">
-                <Card className="p-8">
-                  <div className="mb-6">
-                    <div className="flex items-center justify-between">
+                <Card className="p-4 sm:p-6 md:p-8">
+                  <div className="mb-4 sm:mb-6">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
                       <div>
-                        <h2 className="text-2xl font-semibold">Subscription & Limits</h2>
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <h2 className="text-lg sm:text-xl md:text-2xl font-semibold">Subscription & Limits</h2>
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                           Manage your subscription plan and view usage limits
                         </p>
                       </div>
-                      <Badge variant={isSubscribed ? "default" : "secondary"} className="text-sm px-4 py-2">
+                      <Badge variant={isSubscribed ? "default" : "secondary"} className="text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 w-fit">
                         {isSubscribed ? `Subscribed - ${subscriptionType}` : "Not Subscribed"}
                       </Badge>
                     </div>
                   </div>
                   <div className="space-y-6">
                     {!isSubscribed ? (
-                      <div className="space-y-4">
-                        <div className="p-6 border rounded-lg bg-muted/50">
-                          <h3 className="text-lg font-semibold mb-2">Choose a Subscription Plan</h3>
-                          <p className="text-sm text-muted-foreground mb-4">
+                      <div className="space-y-3 sm:space-y-4">
+                        <div className="p-4 sm:p-5 md:p-6 border rounded-lg bg-muted/50">
+                          <h3 className="text-base sm:text-lg font-semibold mb-2">Choose a Subscription Plan</h3>
+                          <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
                             Select a plan to unlock all features and start managing your taxes efficiently.
                           </p>
-                          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                             {(() => {
                               // Get plans based on business type
                               const availablePlans = profile?.businessType === 'sme' 
@@ -728,19 +728,19 @@ export default function SettingsPage() {
                                 const plan = subscriptionService.getPlan(planType)
                                 if (!plan) return null
                                 return (
-                                  <Card key={planType} className="p-4">
+                                  <Card key={planType} className="p-3 sm:p-4">
                                     <div className="space-y-2">
-                                      <h4 className="font-semibold">{plan.name}</h4>
-                                      <p className="text-2xl font-bold">{plan.priceDisplay}</p>
+                                      <h4 className="text-sm sm:text-base font-semibold">{plan.name}</h4>
+                                      <p className="text-xl sm:text-2xl font-bold">{plan.priceDisplay}</p>
                                       <p className="text-xs text-muted-foreground">per month</p>
                                       <Button
-                                        className="w-full mt-4"
+                                        className="w-full mt-3 sm:mt-4 text-xs sm:text-sm h-9 sm:h-10"
                                         onClick={() => handleSubscribe(planType)}
                                         disabled={processingSubscription === planType}
                                       >
                                         {processingSubscription === planType ? (
                                           <>
-                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                            <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-2 animate-spin" />
                                             Processing...
                                           </>
                                         ) : (
@@ -756,20 +756,21 @@ export default function SettingsPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-4">
-                        <div className="p-6 border rounded-lg bg-muted/50">
-                          <div className="flex items-center justify-between mb-4">
+                      <div className="space-y-3 sm:space-y-4">
+                        <div className="p-4 sm:p-5 md:p-6 border rounded-lg bg-muted/50">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-3 sm:mb-4">
                             <div>
-                              <h3 className="text-lg font-semibold">Current Plan</h3>
-                              <p className="text-sm text-muted-foreground">
+                              <h3 className="text-base sm:text-lg font-semibold">Current Plan</h3>
+                              <p className="text-xs sm:text-sm text-muted-foreground">
                                 {subscriptionType} - {subscriptionService.getPlan(subscriptionType)?.priceDisplay}/month
                               </p>
                             </div>
-                            <Badge variant="default">Active</Badge>
+                            <Badge variant="default" className="w-fit">Active</Badge>
                           </div>
                           <Button
                             variant="outline"
                             onClick={() => setShowChangePlanModal(true)}
+                            className="w-full sm:w-auto text-xs sm:text-sm h-9 sm:h-10"
                           >
                             Change Plan
                           </Button>
@@ -782,17 +783,17 @@ export default function SettingsPage() {
                         <Separator />
                         
                         {/* Transaction Count */}
-                        <div className="space-y-3">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-base">Monthly Transactions</Label>
-                            <span className="text-sm font-semibold">
+                        <div className="space-y-2 sm:space-y-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
+                            <Label className="text-sm sm:text-base">Monthly Transactions</Label>
+                            <span className="text-xs sm:text-sm font-semibold">
                               {profile.transactionCount || 0} / {userService.getTransactionLimit(profile.subscriptionType || null) === Infinity ? '∞' : userService.getTransactionLimit(profile.subscriptionType || null)}
                             </span>
                           </div>
                           {userService.getTransactionLimit(profile.subscriptionType || null) !== Infinity && (
                             <Progress 
                               value={((profile.transactionCount || 0) / userService.getTransactionLimit(profile.subscriptionType || null)) * 100} 
-                              className="h-3"
+                              className="h-2 sm:h-3"
                             />
                           )}
                           <p className="text-xs text-muted-foreground">
@@ -803,16 +804,16 @@ export default function SettingsPage() {
                         <Separator />
                         
                         {/* Storage Usage */}
-                        <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                            <Label className="text-base">Storage Usage</Label>
-                            <span className="text-sm font-semibold">
+                        <div className="space-y-2 sm:space-y-3">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
+                            <Label className="text-sm sm:text-base">Storage Usage</Label>
+                            <span className="text-xs sm:text-sm font-semibold">
                               {((profile.storageUsed || 0) / (1024 * 1024)).toFixed(2)} MB / {((profile.storageLimit || 500 * 1024 * 1024) / (1024 * 1024)).toFixed(0)} MB
                             </span>
                           </div>
                           <Progress 
                             value={((profile.storageUsed || 0) / (profile.storageLimit || 500 * 1024 * 1024)) * 100} 
-                            className="h-3"
+                            className="h-2 sm:h-3"
                           />
                           <p className="text-xs text-muted-foreground">
                             {((profile.storageLimit || 500 * 1024 * 1024) - (profile.storageUsed || 0)) / (1024 * 1024) > 0 
@@ -828,10 +829,10 @@ export default function SettingsPage() {
 
               {/* Notifications Tab */}
               <TabsContent value="notifications" className="mt-0">
-                <Card className="p-8">
-                  <div className="mb-6">
-                    <h2 className="text-2xl font-semibold">Notification Preferences</h2>
-                    <p className="text-sm text-muted-foreground mt-1">
+                <Card className="p-4 sm:p-6 md:p-8">
+                  <div className="mb-4 sm:mb-6">
+                    <h2 className="text-lg sm:text-xl md:text-2xl font-semibold">Notification Preferences</h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                       Configure how and when you receive notifications
                     </p>
                   </div>
@@ -876,10 +877,10 @@ export default function SettingsPage() {
 
               {/* Security Tab */}
               <TabsContent value="security" className="mt-0">
-                <Card className="p-8">
-                  <div className="mb-6">
-                    <h2 className="text-2xl font-semibold">Security</h2>
-                    <p className="text-sm text-muted-foreground mt-1">
+                <Card className="p-4 sm:p-6 md:p-8">
+                  <div className="mb-4 sm:mb-6">
+                    <h2 className="text-lg sm:text-xl md:text-2xl font-semibold">Security</h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                       Update your password and manage security settings
                     </p>
                   </div>

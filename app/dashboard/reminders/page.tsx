@@ -44,19 +44,16 @@ export default function RemindersPage() {
 
   if (loading && reminders.length === 0) {
     return (
-      <main className="container mx-auto px-4 py-6 max-w-7xl">
+      <main className="container mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 max-w-7xl">
         <RemindersSkeleton />
       </main>
     )
   }
 
-
-  console.log('reminders', reminders)
-
   return (
     <div className="">
-        <main className="container mx-auto px-4 py-6 max-w-7xl">
-          <div className="space-y-6">
+        <main className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 max-w-7xl">
+          <div className="space-y-4 sm:space-y-6">
             {/* Error Message */}
             {error && (
               <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">

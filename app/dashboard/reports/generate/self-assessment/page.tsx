@@ -251,35 +251,35 @@ export default function GenerateSelfAssessmentPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* <DashboardNav /> */}
-      <main className="px-4 py-6">
+      <main className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
           {!showPreview ? (
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Back Button */}
               <Link href="/dashboard/reports">
-                <Button variant="ghost" className="mb-4">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
+                <Button variant="ghost" className="mb-3 sm:mb-4 h-8 sm:h-9 text-xs sm:text-sm">
+                  <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
                   Back to Reports
                 </Button>
               </Link>
 
               {/* Header Section */}
-              <Card className="p-6">
-                <div className="flex items-start gap-4 mb-4">
-                  <div className="p-3 bg-primary/10 rounded-lg">
-                    <Shield className="w-6 h-6 text-primary" />
+              <Card className="p-4 sm:p-5 md:p-6">
+                <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4 mb-3 sm:mb-4">
+                  <div className="p-2.5 sm:p-3 bg-primary/10 rounded-lg">
+                    <Shield className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                   </div>
                   <div className="flex-1">
-                    <h1 className="text-2xl font-semibold mb-2">Generate Self-Assessment Tax Return</h1>
-                    <p className="text-muted-foreground">
+                    <h1 className="text-lg sm:text-xl md:text-2xl font-semibold mb-2">Generate Self-Assessment Tax Return</h1>
+                    <p className="text-xs sm:text-sm text-muted-foreground">
                       Create a comprehensive self-assessment tax return report for filing with the Federal Inland Revenue Service (FIRS) 
                       or Lagos Internal Revenue Service (LIRS). This report includes your income, expenses, reliefs, and calculated tax liability.
                     </p>
                   </div>
                 </div>
 
-                <Alert className="mt-4">
-                  <Info className="w-4 h-4" />
-                  <AlertDescription>
+                <Alert className="mt-3 sm:mt-4">
+                  <Info className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <AlertDescription className="text-xs sm:text-sm">
                     <strong>What is a Self-Assessment Tax Return?</strong> A self-assessment tax return is a document that taxpayers use to 
                     report their income, claim deductions and reliefs, and calculate their tax liability for a given tax year. 
                     In Nigeria, self-employed individuals, freelancers, and small business owners are required to file self-assessment returns 
@@ -289,13 +289,13 @@ export default function GenerateSelfAssessmentPage() {
               </Card>
 
               {/* Configuration Form */}
-              <Card className="p-6">
-                <div className="mb-6">
-                  <h2 className="text-xl font-semibold flex items-center gap-2">
-                    <Calculator className="w-5 h-5" />
+              <Card className="p-4 sm:p-5 md:p-6">
+                <div className="mb-4 sm:mb-6">
+                  <h2 className="text-base sm:text-lg md:text-xl font-semibold flex items-center gap-2">
+                    <Calculator className="w-4 h-4 sm:w-5 sm:h-5" />
                     Report Configuration
                   </h2>
-                  <p className="text-sm text-muted-foreground mt-1">
+                  <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                     Configure your self-assessment filing details and select what to include in the report
                   </p>
                 </div>

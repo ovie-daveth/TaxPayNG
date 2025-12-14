@@ -104,26 +104,26 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4">
+    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-3 sm:px-4 py-4 sm:py-6">
       <div className="w-full max-w-md">
-        <div className="bg-card border border-border rounded-xl p-8 shadow-lg">
+        <div className="bg-card border border-border rounded-xl p-4 sm:p-6 md:p-8 shadow-lg">
           {/* Logo */}
-          <div className="flex items-center justify-center gap-2 mb-8">
+          <div className="flex items-center justify-center gap-2 mb-6 sm:mb-8">
             {/* <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
               <Calculator className="w-6 h-6 text-primary-foreground" />
             </div> */}
-             <div className="w-8 h-8 bg-primary text-primary-foreground font-bold rounded-lg flex items-center justify-center">
+             <div className="w-7 h-7 sm:w-8 sm:h-8 bg-primary text-primary-foreground font-bold rounded-lg flex items-center justify-center text-sm sm:text-base">
               O
             </div>
-            <span className="font-semibold text-2xl">OTax</span>
+            <span className="font-semibold text-xl sm:text-2xl">OTax</span>
           </div>
 
-          <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold mb-2">Welcome back</h1>
-            <p className="text-sm text-muted-foreground">Log in to your account to continue</p>
+          <div className="text-center mb-6 sm:mb-8">
+            <h1 className="text-xl sm:text-2xl font-bold mb-2">Welcome back</h1>
+            <p className="text-xs sm:text-sm text-muted-foreground">Log in to your account to continue</p>
           </div>
 
-          <form className="space-y-4" onSubmit={handleSubmit}>
+          <form className="space-y-3 sm:space-y-4" onSubmit={handleSubmit}>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input 
@@ -164,12 +164,12 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
+            <Button type="submit" className="w-full h-10 sm:h-11 text-sm sm:text-base" disabled={isLoading}>
               {isLoading ? "Logging in..." : "Log in"}
             </Button>
           </form>
 
-          <div className="mt-6 text-center text-sm">
+          <div className="mt-4 sm:mt-6 text-center text-xs sm:text-sm">
             <span className="text-muted-foreground">Don't have an account? </span>
             <Link href="/signup" className="text-primary font-medium hover:underline">
               Sign up
@@ -177,7 +177,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-8">
+        <p className="text-center text-xs text-muted-foreground mt-4 sm:mt-6 md:mt-8 px-4">
           By continuing, you agree to our Terms of Service and Privacy Policy
         </p>
       </div>

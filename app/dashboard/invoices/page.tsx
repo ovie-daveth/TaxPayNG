@@ -413,21 +413,21 @@ export default function InvoicesPage() {
   }
 console.log("invoices", invoices)
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
-      <div className="mb-8">
-        <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between mb-4">
-          <div className="flex-1 relative w-full sm:w-auto">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+    <div className="container mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 max-w-7xl">
+      <div className="mb-4 sm:mb-6 md:mb-8">
+        <div className="flex flex-col gap-3 sm:gap-4">
+          <div className="relative w-full">
+            <Search className="absolute left-2.5 sm:left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <Input
-              placeholder="Search invoices by number, client name, or email..."
+              placeholder="Search invoices..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-8 sm:pl-10 h-9 sm:h-10 text-sm"
             />
           </div>
-          <div className="flex gap-2 items-center w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-2">
           <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as "all" | "outgoing" | "incoming")}>
-              <SelectTrigger className="w-full sm:w-[200px]">
+              <SelectTrigger className="w-full sm:w-[160px] md:w-[200px] h-9 sm:h-10 text-xs sm:text-sm">
               <SelectValue placeholder="Filter by type" />
             </SelectTrigger>
             <SelectContent>
@@ -437,7 +437,7 @@ console.log("invoices", invoices)
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as InvoiceStatus | "all")}>
-              <SelectTrigger className="w-full sm:w-[180px]">
+              <SelectTrigger className="w-full sm:w-[140px] md:w-[180px] h-9 sm:h-10 text-xs sm:text-sm">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
@@ -449,22 +449,22 @@ console.log("invoices", invoices)
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
-            <div className="flex border rounded-md">
+            <div className="flex border rounded-md w-full sm:w-auto">
               <Button
                 variant={viewMode === "card" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setViewMode("card")}
-                className="rounded-r-none"
+                className="rounded-r-none flex-1 sm:flex-initial h-9 sm:h-10"
               >
-                <LayoutGrid className="w-4 h-4" />
+                <LayoutGrid className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </Button>
               <Button
                 variant={viewMode === "table" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setViewMode("table")}
-                className="rounded-l-none"
+                className="rounded-l-none flex-1 sm:flex-initial h-9 sm:h-10"
               >
-                <Table2 className="w-4 h-4" />
+                <Table2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </Button>
             </div>
           </div>
@@ -472,17 +472,17 @@ console.log("invoices", invoices)
       </div>
 
       {invoices.length === 0 ? (
-        <Card className="p-12 text-center px-[20rem]">
-          <FileText className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-          <h3 className="text-lg font-semibold mb-2">No invoices found</h3>
-          <p className="text-muted-foreground mb-4">
+        <Card className="p-6 sm:p-8 md:p-12 text-center">
+          <FileText className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-muted-foreground mb-3 sm:mb-4" />
+          <h3 className="text-base sm:text-lg font-semibold mb-2">No invoices found</h3>
+          <p className="text-sm sm:text-base text-muted-foreground mb-3 sm:mb-4">
             {searchTerm || statusFilter !== "all" 
               ? "Try adjusting your filters" 
               : "Get started by creating your first invoice"}
           </p>
           {!searchTerm && statusFilter === "all" && (
-            <Button onClick={() => setIsAddDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
+            <Button onClick={() => setIsAddDialogOpen(true)} className="h-9 sm:h-10 text-xs sm:text-sm">
+              <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
               Create Invoice
             </Button>
           )}
@@ -496,11 +496,11 @@ console.log("invoices", invoices)
               : (invoice.supplierPaymentStatus || 'Pending')
             
             return (
-            <Card key={invoice.id} className="p-6 hover:shadow-md transition-shadow">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
+            <Card key={invoice.id} className="p-4 sm:p-5 md:p-6 hover:shadow-md transition-shadow">
+                <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-3 sm:gap-4">
+                  <div className="flex-1 min-w-0 w-full">
                     {/* Header with document type, ID, and badges */}
-                    <div className="flex items-center gap-3 mb-4 flex-wrap">
+                    <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 flex-wrap">
                       {invoice.whtCreditNote && (
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -543,7 +543,7 @@ console.log("invoices", invoices)
                     </div>
                     
                     {/* Content grid */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
                       {/* Client/From */}
                     <div>
                         <p className="text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
@@ -588,7 +588,7 @@ console.log("invoices", invoices)
                 </div>
                   
                   {/* Action buttons */}
-                  <div className="flex gap-2 flex-shrink-0">
+                  <div className="flex gap-2 flex-shrink-0 w-full sm:w-auto justify-end sm:justify-start">
                   <Tooltip>
                     <TooltipTrigger asChild>
                       <Button 
@@ -647,18 +647,18 @@ console.log("invoices", invoices)
         </div>
       ) : (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
+          <div className="overflow-x-auto -mx-3 sm:mx-0">
+            <table className="w-full min-w-[800px]">
               <thead className="bg-muted/50 border-b border-border">
                 <tr>
-                  <th className="text-left p-4 text-sm font-semibold">Document</th>
-                  <th className="text-left p-4 text-sm font-semibold">Type</th>
-                  <th className="text-left p-4 text-sm font-semibold">{typeFilter === "incoming" ? "From" : typeFilter === "outgoing" ? "Client" : "Client/From"}</th>
-                  <th className="text-left p-4 text-sm font-semibold">Issue Date</th>
-                  <th className="text-left p-4 text-sm font-semibold">Due Date</th>
-                  <th className="text-left p-4 text-sm font-semibold">Status</th>
-                  <th className="text-right p-4 text-sm font-semibold">Amount</th>
-                  <th className="text-center p-4 text-sm font-semibold">Actions</th>
+                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-semibold">Document</th>
+                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-semibold">Type</th>
+                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-semibold">{typeFilter === "incoming" ? "From" : typeFilter === "outgoing" ? "Client" : "Client/From"}</th>
+                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-semibold hidden md:table-cell">Issue Date</th>
+                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-semibold hidden md:table-cell">Due Date</th>
+                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-semibold">Status</th>
+                  <th className="text-right p-3 sm:p-4 text-xs sm:text-sm font-semibold">Amount</th>
+                  <th className="text-center p-3 sm:p-4 text-xs sm:text-sm font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -804,15 +804,15 @@ console.log("invoices", invoices)
       )}
 
       {pagination.totalPages > 1 && (
-        <div className="flex items-center justify-between mt-6">
-          <p className="text-sm text-muted-foreground">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mt-4 sm:mt-6">
+          <p className="text-xs sm:text-sm text-muted-foreground">
             Showing {((currentPage - 1) * pagination.limit) + 1} to {Math.min(currentPage * pagination.limit, pagination.total)} of {pagination.total} invoices
           </p>
-          <div className="flex gap-2">
-            <Button variant="outline" disabled={!pagination.hasPrev} onClick={() => setCurrentPage(p => p - 1)}>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button variant="outline" disabled={!pagination.hasPrev} onClick={() => setCurrentPage(p => p - 1)} className="flex-1 sm:flex-initial h-8 sm:h-9 text-xs sm:text-sm">
               Previous
             </Button>
-            <Button variant="outline" disabled={!pagination.hasNext} onClick={() => setCurrentPage(p => p + 1)}>
+            <Button variant="outline" disabled={!pagination.hasNext} onClick={() => setCurrentPage(p => p + 1)} className="flex-1 sm:flex-initial h-8 sm:h-9 text-xs sm:text-sm">
               Next
             </Button>
           </div>

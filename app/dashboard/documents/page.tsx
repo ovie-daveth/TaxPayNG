@@ -106,15 +106,15 @@ export default function DocumentsPage() {
 
   return (
     <div className="">
-        <main className="container mx-auto px-4 py-6 max-w-7xl">
-          <div className="space-y-6">
+        <main className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 max-w-7xl">
+          <div className="space-y-4 sm:space-y-6">
             {/* Search and Filter Bar */}
-            <div className="flex flex-col sm:flex-row gap-3">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
                 <Input 
                   placeholder="Search documents..." 
-                  className="pl-9" 
+                  className="pl-8 sm:pl-9 h-9 sm:h-10 text-sm" 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -124,17 +124,17 @@ export default function DocumentsPage() {
                   <Plus className="w-4 h-4 mr-2" />
                   Upload
                 </Button> */}
-                <Button variant="outline" onClick={() => setIsFilterOpen(!isFilterOpen)}>
-                  <Filter className="w-4 h-4 mr-2" />
+                <Button variant="outline" onClick={() => setIsFilterOpen(!isFilterOpen)} className="h-9 sm:h-10 text-xs sm:text-sm">
+                  <Filter className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
                   Filters
                 </Button>
                 <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "list")}>
-                  <TabsList>
-                    <TabsTrigger value="grid" className="px-3">
-                      <Grid className="w-4 h-4" />
+                  <TabsList className="h-9 sm:h-10">
+                    <TabsTrigger value="grid" className="px-2 sm:px-3">
+                      <Grid className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </TabsTrigger>
-                    <TabsTrigger value="list" className="px-3">
-                      <List className="w-4 h-4" />
+                    <TabsTrigger value="list" className="px-2 sm:px-3">
+                      <List className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </TabsTrigger>
                   </TabsList>
                 </Tabs>
@@ -159,7 +159,7 @@ export default function DocumentsPage() {
             {/* Document Display */}
             <div>
               {filteredDocuments.length > 0 && (
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
                   Showing {filteredDocuments.length} documents
                 </p>
               )}

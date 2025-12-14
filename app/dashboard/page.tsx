@@ -37,8 +37,8 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5 md:py-6 max-w-7xl">
-      <div className="space-y-4 sm:space-y-5 md:space-y-6">
+    <main className="container mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-5 lg:py-6 max-w-7xl">
+      <div className="space-y-3 sm:space-y-4 md:space-y-5 lg:space-y-6">
         {/* Stats Overview */}
         <StatsCards 
           businessType="freelancer" 
@@ -53,7 +53,7 @@ export default function DashboardPage() {
         />
 
         {/* Charts and Summary */}
-        <div className="grid md:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
+        <div className="grid md:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
           <div className="md:col-span-2">
             <IncomeExpenseChart 
               periodType={periodType}
@@ -61,24 +61,32 @@ export default function DashboardPage() {
               selectedQuarter={selectedQuarter}
             />
           </div>
-          <div>
+          <div className="hidden md:block">
             <TaxSummary businessType="freelancer" />
           </div>
         </div>
 
-        <AnalyticsInsights 
-          businessType="freelancer"
-          periodType={periodType}
-          selectedYear={selectedYear}
-          selectedQuarter={selectedQuarter}
-        />
+        {/* Tax Summary for mobile - shown below chart */}
+        <div className="md:hidden">
+          <TaxSummary businessType="freelancer" />
+        </div>
+
+        {/* Analytics Insights - Hidden on mobile to reduce clutter */}
+        <div className="hidden sm:block">
+          <AnalyticsInsights 
+            businessType="freelancer"
+            periodType={periodType}
+            selectedYear={selectedYear}
+            selectedQuarter={selectedQuarter}
+          />
+        </div>
 
         {/* Recent Activity */}
-        <div className="grid md:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
+        <div className="grid md:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
           <div className="md:col-span-2">
             <RecentTransactions />
           </div>
-          <div className="space-y-4 sm:space-y-5 md:space-y-6">
+          <div className="space-y-3 sm:space-y-4 md:space-y-5 lg:space-y-6">
             <UpcomingReminders />
             <IncompleteInvoices />
           </div>

@@ -242,11 +242,11 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-3 sm:px-4 py-6 sm:py-8 md:py-12">
       <div className="w-full max-w-md">
-        <div className="bg-card border border-border rounded-xl p-8 shadow-lg">
+        <div className="bg-card border border-border rounded-xl p-4 sm:p-6 md:p-8 shadow-lg">
           {/* Logo */}
-          <div className="flex items-center justify-center gap-2 mb-8">
+          <div className="flex items-center justify-center gap-2 mb-6 sm:mb-8">
             {/* <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
               <Calculator className="w-6 h-6 text-primary-foreground" />
             </div> */}

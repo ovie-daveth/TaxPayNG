@@ -92,53 +92,53 @@ export default function ReportsPage() {
   return (
     <div className="min-h-screen bg-background">
       <DashboardNav />
-        <main className="container mx-auto px-4 py-6 max-w-7xl">
-          <div className="space-y-6">
+        <main className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 max-w-7xl">
+          <div className="space-y-4 sm:space-y-6">
             {/* Quick Stats */}
-            <div className="grid sm:grid-cols-2 gap-4">
-              <Card className="p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <Card className="p-4 sm:p-5 md:p-6">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">Reports Generated</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-1">Reports Generated</p>
                     {stats.loading ? (
                       <div className="flex items-center gap-2">
-                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                        <span className="text-muted-foreground">Loading...</span>
+                        <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin text-muted-foreground" />
+                        <span className="text-xs sm:text-sm text-muted-foreground">Loading...</span>
                       </div>
                     ) : (
                       <>
-                        <p className="text-3xl font-bold">{stats.totalReports}</p>
+                        <p className="text-2xl sm:text-3xl font-bold">{stats.totalReports}</p>
                         {stats.reportsThisMonth > 0 && (
                           <p className="text-xs text-green-600 mt-2">+{stats.reportsThisMonth} this month</p>
                         )}
                       </>
                     )}
                   </div>
-                  <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <FileText className="w-6 h-6 text-primary" />
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                    <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                   </div>
                 </div>
               </Card>
-              <Card className="p-6">
+              <Card className="p-4 sm:p-5 md:p-6">
                 <div className="flex items-start justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">Filings Submitted</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-1">Filings Submitted</p>
                     {stats.loading ? (
                       <div className="flex items-center gap-2">
-                        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                        <span className="text-muted-foreground">Loading...</span>
+                        <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin text-muted-foreground" />
+                        <span className="text-xs sm:text-sm text-muted-foreground">Loading...</span>
                       </div>
                     ) : (
                       <>
-                        <p className="text-3xl font-bold">{stats.submittedFilings}</p>
+                        <p className="text-2xl sm:text-3xl font-bold">{stats.submittedFilings}</p>
                         {stats.pendingReview > 0 && (
                           <p className="text-xs text-blue-600 mt-2">{stats.pendingReview} pending review</p>
                         )}
                       </>
                     )}
                   </div>
-                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="w-6 h-6 text-blue-600" />
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
                   </div>
                 </div>
               </Card>

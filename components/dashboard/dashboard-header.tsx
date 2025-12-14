@@ -193,13 +193,16 @@ export function DashboardHeader() {
 
   return (
     <div className="border-b border-border bg-card">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-3 sm:py-4 max-w-7xl">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+      <div className="container mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-2.5 sm:py-3 md:py-4 max-w-7xl">
+        <div className="flex items-center justify-between gap-2 sm:gap-3 md:gap-4">
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-2xl font-bold">{pageInfo.title}</h1>
-            <p className="text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 line-clamp-2">{pageInfo.subtitle}</p>
+            <div className="flex items-center gap-2 sm:block">
+              <h1 className="text-lg sm:text-xl md:text-2xl font-bold">{pageInfo.title}</h1>
+              <p className="hidden sm:block text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 line-clamp-1 sm:line-clamp-2">{pageInfo.subtitle}</p>
+            </div>
+            <p className="sm:hidden text-xs text-muted-foreground mt-0.5 line-clamp-1">{pageInfo.subtitle}</p>
           </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             <NotificationBell />
             <ThemeToggle />
             {pageInfo.showExportButton && (
@@ -207,22 +210,10 @@ export function DashboardHeader() {
                 variant="outline" 
                 size="sm"
                 onClick={() => console.log("Export transactions")}
-                className="h-9 sm:h-10 text-xs sm:text-sm px-3"
+                className="h-8 sm:h-9 md:h-10 text-xs sm:text-sm px-2 sm:px-3"
               >
-                <Download className="w-4 h-4 sm:mr-2" />
+                <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Export</span>
-              </Button>
-            )}
-            {/* Show Add Reminder button on non-reminder pages */}
-            {pathname !== "/dashboard/reminders" && pathname !== "/dashboard/settings" && (
-              <Button 
-                variant="outline" 
-                size="icon"
-                className="h-9 w-9 sm:h-10 sm:w-10"
-                onClick={() => checkSubscription(() => setIsAddReminderDialogOpen(true))}
-                title="Add Reminder"
-              >
-                <Bell className="w-4 h-4" />
               </Button>
             )}
             {/* Show main action button except on report generation pages */}
@@ -230,9 +221,9 @@ export function DashboardHeader() {
               <Button 
                 onClick={pageInfo.buttonAction}
                 size="sm"
-                className="h-9 sm:h-10 text-xs sm:text-sm whitespace-nowrap px-3"
+                className="h-8 sm:h-9 md:h-10 text-xs sm:text-sm whitespace-nowrap px-2 sm:px-3"
               >
-                <ButtonIcon className="w-4 h-4 sm:mr-2" />
+                <ButtonIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-2" />
                 <span className="hidden sm:inline">{pageInfo.buttonText}</span>
                 <span className="sm:hidden">{pageInfo.buttonText.split(' ')[0]}</span>
               </Button>

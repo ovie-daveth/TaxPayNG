@@ -95,9 +95,9 @@ export default function FilingRequestsPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
-          <main className="mx-auto px-4 py-6">
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          <main className="mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6">
+            <div className="flex items-center justify-center py-8 sm:py-12">
+              <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin text-muted-foreground" />
             </div>
           </main>
       </div>
@@ -106,26 +106,26 @@ export default function FilingRequestsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-        <main className="mx-auto px-4 py-6">
-          <div className="space-y-6">
+        <main className="mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Header */}
             <div>
-              <h1 className="text-3xl font-bold">Filing Requests</h1>
-              <p className="text-sm text-muted-foreground mt-1">
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold">Filing Requests</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                 Track the status of your tax filing requests submitted to agents
               </p>
             </div>
 
       {/* Search */}
       <Card>
-        <CardContent className="pt-6">
+        <CardContent className="pt-4 sm:pt-5 md:pt-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <Search className="absolute left-2.5 sm:left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <Input
-              placeholder="Search by request ID, state, RRR, agent name, or status..."
+              placeholder="Search by request ID, state, RRR..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-8 sm:pl-10 h-9 sm:h-10 text-sm"
             />
           </div>
         </CardContent>
@@ -134,13 +134,13 @@ export default function FilingRequestsPage() {
       {/* Requests List */}
       {filteredRequests.length === 0 ? (
         <Card>
-          <CardContent className="py-12">
+          <CardContent className="py-8 sm:py-10 md:py-12">
             <div className="text-center">
-              <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-              <h3 className="text-lg font-medium mb-2">
+              <FileText className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 sm:mb-4 text-muted-foreground opacity-50" />
+              <h3 className="text-base sm:text-lg font-medium mb-2">
                 {searchTerm ? "No matching requests found" : "No filing requests yet"}
               </h3>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs sm:text-sm text-muted-foreground">
                 {searchTerm 
                   ? "Try adjusting your search terms"
                   : "When you file a tax return via an agent, your requests will appear here"}
@@ -149,37 +149,37 @@ export default function FilingRequestsPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3 sm:space-y-4">
           {filteredRequests.map((request) => (
             <Card key={request.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 space-y-4">
-                    <div className="flex items-center gap-4">
+              <CardContent className="p-4 sm:p-5 md:p-6">
+                <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-3 sm:gap-4">
+                  <div className="flex-1 space-y-3 sm:space-y-4 w-full">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                       {getStatusBadge(request.status)}
                       <code className="text-xs font-mono text-muted-foreground">
                         {request.id.substring(0, 12)}...
                       </code>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                       <div className="flex items-center gap-2">
-                        <MapPin className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">
+                        <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-xs sm:text-sm">
                           <span className="text-muted-foreground">State: </span>
                           {request.state}
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <FileText className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">
+                        <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-xs sm:text-sm">
                           <span className="text-muted-foreground">RRR: </span>
-                          <code className="font-mono">{request.rrr}</code>
+                          <code className="font-mono text-xs">{request.rrr}</code>
                         </span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm text-muted-foreground">
+                        <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-xs sm:text-sm text-muted-foreground">
                           {format(new Date(request.createdAt), 'MMM dd, yyyy')}
                         </span>
                       </div>
@@ -187,8 +187,8 @@ export default function FilingRequestsPage() {
 
                     {request.assignedAgentName && (
                       <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-muted-foreground" />
-                        <span className="text-sm">
+                        <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-xs sm:text-sm">
                           <span className="text-muted-foreground">Agent: </span>
                           {request.assignedAgentName}
                         </span>
@@ -198,7 +198,7 @@ export default function FilingRequestsPage() {
                     {request.notes && (
                       <div className="pt-2 border-t">
                         <p className="text-xs text-muted-foreground mb-1">Latest Note:</p>
-                        <p className="text-sm line-clamp-2">{request.notes}</p>
+                        <p className="text-xs sm:text-sm line-clamp-2">{request.notes}</p>
                       </div>
                     )}
                   </div>
@@ -206,10 +206,10 @@ export default function FilingRequestsPage() {
                   <Button
                     variant="outline"
                     onClick={() => router.push(`/dashboard/filing-requests/${request.id}`)}
-                    className="ml-4"
+                    className="ml-0 sm:ml-4 w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
                   >
                     View Details
-                    <ArrowRight className="w-4 h-4 ml-2" />
+                    <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-1.5 sm:ml-2" />
                   </Button>
                 </div>
               </CardContent>
