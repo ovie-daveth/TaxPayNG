@@ -692,12 +692,12 @@ export function AddInvoiceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto hide-scrollbar">
-        <DialogHeader>
-          <DialogTitle>{invoice ? "Edit Invoice" : "Create New Invoice"}</DialogTitle>
+      <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-5xl max-h-[90vh] sm:max-h-[95vh] overflow-y-auto p-3 sm:p-4 md:p-6 hide-scrollbar">
+        <DialogHeader className="pb-2 sm:pb-4">
+          <DialogTitle className="text-base sm:text-lg md:text-xl">{invoice ? "Edit Invoice" : "Create New Invoice"}</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleFormSubmit} className="space-y-6">
+        <form onSubmit={handleFormSubmit} className="space-y-4 sm:space-y-5 md:space-y-6">
           {/* Send to OTax User Option */}
           {formData.invoiceType === 'outgoing' && (
             <div className="space-y-2 p-4 border rounded-lg bg-muted/30">
@@ -800,9 +800,9 @@ export function AddInvoiceDialog({
 
           {/* Supplier/Business Information - Only show for outgoing invoices */}
           {formData.invoiceType === 'outgoing' && (
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold">Your Business Information</h3>
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="space-y-3 sm:space-y-4">
+              <h3 className="text-base sm:text-lg font-semibold">Your Business Information</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
                   <Label htmlFor="supplier-name">Business/Contact Name *</Label>
                 <Input
@@ -826,9 +826,9 @@ export function AddInvoiceDialog({
                 />
               </div>
             </div>
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
-                  <Label htmlFor="supplier-email">Email *</Label>
+                  <Label htmlFor="supplier-email" className="text-xs sm:text-sm">Email *</Label>
                 <Input
                   id="supplier-email"
                   type="email"
@@ -862,9 +862,9 @@ export function AddInvoiceDialog({
                 placeholder="Street address"
               />
             </div>
-            <div className="grid md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
               <div className="space-y-2">
-                <Label htmlFor="supplier-city">City</Label>
+                <Label htmlFor="supplier-city" className="text-xs sm:text-sm">City</Label>
                   <Input
                   id="supplier-city"
                   value={formData.supplier?.address?.city || ""}
@@ -897,7 +897,7 @@ export function AddInvoiceDialog({
                 />
               </div>
             </div>
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
                 <Label htmlFor="supplier-tin">Tax Identification Number (TIN)</Label>
                 <Input
@@ -931,7 +931,7 @@ export function AddInvoiceDialog({
             <p className="text-sm text-muted-foreground">
               The client who will receive this invoice
             </p>
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
                 <Label htmlFor="client-name">Client Name *</Label>
                 <Input
@@ -955,7 +955,7 @@ export function AddInvoiceDialog({
                 />
               </div>
             </div>
-            <div className="grid md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
                 <Label htmlFor="client-email">Email</Label>
                 <Input

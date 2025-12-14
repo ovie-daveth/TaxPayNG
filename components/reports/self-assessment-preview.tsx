@@ -1082,9 +1082,9 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
   }
 
   return (
-    <Card className="p-8">
+    <Card className="p-3 sm:p-4 md:p-6 lg:p-8">
       {/* Action Buttons */}
-      <div className="flex gap-3 mb-6 justify-between">
+      <div className="flex flex-col sm:flex-row gap-3 mb-4 sm:mb-6 justify-between">
         {onBack && (
           <Button
             variant="outline"
@@ -1162,12 +1162,12 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
         </div>
       </div>
 
-      <div className="space-y-8">
+      <div className="space-y-4 sm:space-y-6 md:space-y-8">
         {/* Cover Page Preview */}
-        <div className="text-center border-2 border-border p-8 rounded-lg bg-muted/20">
-          <h1 className="text-2xl font-bold mb-4 uppercase">Personal Income Tax Return</h1>
-          <h2 className="text-lg font-semibold mb-6">Year of Assessment: {reportData.period.year}</h2>
-          <div className="grid grid-cols-2 gap-4 text-sm text-left">
+        <div className="text-center border-2 border-border p-4 sm:p-6 md:p-8 rounded-lg bg-muted/20">
+          <h1 className="text-lg sm:text-xl md:text-2xl font-bold mb-3 sm:mb-4 uppercase">Personal Income Tax Return</h1>
+          <h2 className="text-base sm:text-lg font-semibold mb-4 sm:mb-6">Year of Assessment: {reportData.period.year}</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm text-left">
             <div className="font-semibold">Taxpayer Name:</div>
             <div>{reportData.userInfo.name}</div>
             <div className="font-semibold">TIN / NIN:</div>
@@ -1183,8 +1183,8 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
 
         {/* Part A: Personal & Employment Information */}
         <div>
-          <h2 className="text-lg font-semibold mb-4 border-b-2 border-border pb-2 uppercase">Part A – Personal & Employment Information</h2>
-          <div className="grid grid-cols-2 gap-4 text-sm">
+          <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 border-b-2 border-border pb-2 uppercase">Part A – Personal & Employment Information</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm">
             <div>
               <Label className="text-muted-foreground font-semibold">Full Name</Label>
               {isEditing ? (
@@ -1268,7 +1268,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
             <div>
               <Label className="text-muted-foreground font-semibold">State / LGA of Residence</Label>
               {isEditing ? (
-                <div className="grid grid-cols-2 gap-2 mt-1">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
                   <Input 
                     value={personalInfo.state}
                     onChange={(e) => setPersonalInfo(prev => ({ ...prev, state: e.target.value }))}
@@ -1331,12 +1331,12 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
 
         {/* Part B: Statement of Income */}
         <div>
-          <h2 className="text-lg font-semibold mb-4 border-b-2 border-border pb-2 uppercase">Part B – Statement of Income (All Sources)</h2>
+          <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 border-b-2 border-border pb-2 uppercase">Part B – Statement of Income (All Sources)</h2>
           
           {!isFreelancer && (
             <div className="mb-6">
               <h3 className="font-semibold mb-3">1. Employment Income (if any)</h3>
-          <div className="space-y-2 text-sm">
+          <div className="space-y-2 text-xs sm:text-sm">
                 <div className="flex justify-between py-2 border-b border-border">
                   <span className="text-muted-foreground">Basic Salary</span>
                   <span className="font-medium">{formatCurrency(employmentIncome * 0.7)}</span>
@@ -1359,7 +1359,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
 
           <div className="mb-6">
             <h3 className="font-semibold mb-3">{isFreelancer ? '1.' : '2.'} Business / Self-Employment Income</h3>
-          <div className="space-y-2 text-sm">
+          <div className="space-y-2 text-xs sm:text-sm">
               {businessIncomeCategories.length > 0 ? (
                 <>
                   {businessIncomeCategories.map((item, index) => (
@@ -1391,7 +1391,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           {(isCreator || !isFreelancer) && (
             <div className="mb-6">
               <h3 className="font-semibold mb-3">{isFreelancer ? '2.' : '3.'} Other Income Sources</h3>
-              <div className="space-y-2 text-sm">
+              <div className="space-y-2 text-xs sm:text-sm">
                 <div className="flex justify-between py-2 border-b border-border">
                   <span className="text-muted-foreground">Rental income</span>
                   <span className="font-medium">{formatCurrency(reportData.income.incomeByCategory['Rental'] || 0)}</span>
@@ -1433,23 +1433,23 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
 
         {/* Part C: Deductible Expenses & Reliefs */}
         <div>
-          <h2 className="text-lg font-semibold mb-4 border-b-2 border-border pb-2 uppercase">Part C – Deductible Expenses & Reliefs</h2>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-border text-sm">
+          <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 border-b-2 border-border pb-2 uppercase">Part C – Deductible Expenses & Reliefs</h2>
+          <div className="overflow-x-auto -mx-3 sm:mx-0">
+            <table className="w-full min-w-[600px] border-collapse border border-border text-xs sm:text-sm">
               <thead>
                 <tr className="bg-muted">
-                  <th className="border border-border p-2 text-left" style={{ width: '50%' }}>Deduction / Relief Type</th>
-                  <th className="border border-border p-2 text-right" style={{ width: '25%' }}>Amount (₦)</th>
-                  <th className="border border-border p-2 text-center" style={{ width: '12%' }}>Evidence Attached? (Y/N)</th>
-                  <th className="border border-border p-2 text-left" style={{ width: '13%' }}>Notes</th>
+                  <th className="border border-border p-1.5 sm:p-2 text-left" style={{ width: '50%' }}>Deduction / Relief Type</th>
+                  <th className="border border-border p-1.5 sm:p-2 text-right" style={{ width: '25%' }}>Amount (₦)</th>
+                  <th className="border border-border p-1.5 sm:p-2 text-center" style={{ width: '12%' }}>Evidence Attached? (Y/N)</th>
+                  <th className="border border-border p-1.5 sm:p-2 text-left" style={{ width: '13%' }}>Notes</th>
                 </tr>
               </thead>
               <tbody>
                 {reportData.tax.reliefs.pensionContribution > 0 && (
                   <tr>
-                    <td className="border border-border p-2">Pension contribution / Retirement savings</td>
-                    <td className="border border-border p-2 text-right font-medium">{formatCurrency(reportData.tax.reliefs.pensionContribution)}</td>
-                    <td className="border border-border p-2 text-center">
+                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">Pension contribution / Retirement savings</td>
+                    <td className="border border-border p-1.5 sm:p-2 text-right font-medium text-xs sm:text-sm">{formatCurrency(reportData.tax.reliefs.pensionContribution)}</td>
+                    <td className="border border-border p-1.5 sm:p-2 text-center">
                       {isEditing ? (
                         <Checkbox 
                           checked={reliefEvidence.pensionContribution}
@@ -1459,7 +1459,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                         reliefEvidence.pensionContribution ? '☑' : '☐'
                       )}
                     </td>
-                    <td className="border border-border p-2">
+                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">
                       {isEditing ? (
                         <Input 
                           value={reliefNotes.pensionContribution}
@@ -1475,7 +1475,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                 )}
                 {reportData.tax.reliefs.nhfContribution > 0 && (
                   <tr>
-                    <td className="border border-border p-2">National Housing Fund (NHF) contribution</td>
+                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">National Housing Fund (NHF) contribution</td>
                     <td className="border border-border p-2 text-right font-medium">{formatCurrency(reportData.tax.reliefs.nhfContribution)}</td>
                     <td className="border border-border p-2 text-center">
                       {isEditing ? (
@@ -1487,7 +1487,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                         reliefEvidence.nhfContribution ? '☑' : '☐'
                       )}
                     </td>
-                    <td className="border border-border p-2">
+                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">
                       {isEditing ? (
                         <Input 
                           value={reliefNotes.nhfContribution}
@@ -1503,7 +1503,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                 )}
                 {reportData.tax.reliefs.lifeInsurance > 0 && (
                   <tr>
-                    <td className="border border-border p-2">Life Insurance Premiums</td>
+                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">Life Insurance Premiums</td>
                     <td className="border border-border p-2 text-right font-medium">{formatCurrency(reportData.tax.reliefs.lifeInsurance)}</td>
                     <td className="border border-border p-2 text-center">
                       {isEditing ? (
@@ -1515,7 +1515,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                         reliefEvidence.lifeInsurance ? '☑' : '☐'
                       )}
                     </td>
-                    <td className="border border-border p-2">
+                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">
                       {isEditing ? (
                         <Input 
                           value={reliefNotes.lifeInsurance}
@@ -1531,7 +1531,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                 )}
                 {reportData.tax.reliefs.healthInsurance > 0 && (
                   <tr>
-                    <td className="border border-border p-2">Health Insurance / Medical contributions</td>
+                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">Health Insurance / Medical contributions</td>
                     <td className="border border-border p-2 text-right font-medium">{formatCurrency(reportData.tax.reliefs.healthInsurance)}</td>
                     <td className="border border-border p-2 text-center">
                       {isEditing ? (
@@ -1543,7 +1543,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                         reliefEvidence.healthInsurance ? '☑' : '☐'
                       )}
                     </td>
-                    <td className="border border-border p-2">
+                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">
                       {isEditing ? (
                         <Input 
                           value={reliefNotes.healthInsurance}
@@ -1559,7 +1559,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                 )}
                 {reportData.expenses.totalExpenses > 0 && (
                   <tr>
-                    <td className="border border-border p-2">Business expenses (if self-employed) – rent, utilities, materials, fuel, services, etc.</td>
+                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">Business expenses (if self-employed) – rent, utilities, materials, fuel, services, etc.</td>
                     <td className="border border-border p-2 text-right font-medium">{formatCurrency(reportData.expenses.totalExpenses)}</td>
                     <td className="border border-border p-2 text-center">
                       {isEditing ? (
@@ -1571,7 +1571,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                         reliefEvidence.businessExpenses ? '☑' : '☐'
                       )}
                     </td>
-                    <td className="border border-border p-2">
+                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">
                       {isEditing ? (
                         <Input 
                           value={reliefNotes.businessExpenses}
@@ -1613,7 +1613,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                 </tr>
                 {reportData.tax.reliefs.charitableDonations > 0 && (
                   <tr>
-                    <td className="border border-border p-2">Charitable Donations</td>
+                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">Charitable Donations</td>
                     <td className="border border-border p-2 text-right font-medium">{formatCurrency(reportData.tax.reliefs.charitableDonations)}</td>
                     <td className="border border-border p-2 text-center">
                       {isEditing ? (
@@ -1625,7 +1625,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                         reliefEvidence.charitableDonations ? '☑' : '☐'
                       )}
                     </td>
-                    <td className="border border-border p-2">
+                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">
                       {isEditing ? (
                         <Input 
                           value={reliefNotes.charitableDonations}
@@ -1722,7 +1722,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                   <>
                     {allTaxCredits.map((credit) => (
                       <tr key={credit.id}>
-                        <td className="border border-border p-2">
+                        <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">
                           {isEditing && credit.source === 'manual' ? (
                             <Input
                               value={credit.type}
@@ -1793,7 +1793,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                             credit.evidenceAttached ? '☑' : '☐'
                           )}
                         </td>
-                        <td className="border border-border p-2">
+                        <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">
                           {isEditing ? (
                             <Input
                               value={credit.notes}
@@ -2077,7 +2077,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
             <p className="text-sm mb-4 text-muted-foreground">
               Please tick (✓) the documents attached with this return:
             </p>
-            <div className="space-y-2 text-sm">
+            <div className="space-y-2 text-xs sm:text-sm">
               <div className="flex items-start gap-2">
                 <Checkbox 
                   checked={attachments.receipts}
