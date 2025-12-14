@@ -14,7 +14,7 @@ interface ChangePlanModalProps {
   onOpenChange: (open: boolean) => void
   currentPlan: SubscriptionType | null
   businessType: BusinessType
-  onSelectPlan: (planType: SubscriptionType) => void
+  onSelectPlan: (planType: SubscriptionType) => void | Promise<void>
   processingPlan?: string | null
 }
 
@@ -43,7 +43,8 @@ export function ChangePlanModal({
   }
 
   const getPlanHierarchy = (planType: SubscriptionType): number => {
-    const hierarchy: Record<SubscriptionType, number> = {
+    if (!planType) return 0
+    const hierarchy: Record<Exclude<SubscriptionType, null>, number> = {
       'PRO': 1,
       'GOLD': 2,
       'PLATINUM': 3,

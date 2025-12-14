@@ -12,7 +12,7 @@ export interface SubscriptionPlan {
   features: string[]
 }
 
-export const SUBSCRIPTION_PLANS: Record<SubscriptionType, SubscriptionPlan> = {
+export const SUBSCRIPTION_PLANS: Record<Exclude<SubscriptionType, null>, SubscriptionPlan> = {
   'PRO': {
     id: 'PRO',
     name: 'PRO - Freelancers',
@@ -124,6 +124,7 @@ export class SubscriptionService extends BaseService {
 
   // Get plan details
   getPlan(subscriptionType: SubscriptionType): SubscriptionPlan | null {
+    if (!subscriptionType) return null
     return SUBSCRIPTION_PLANS[subscriptionType] || null
   }
 

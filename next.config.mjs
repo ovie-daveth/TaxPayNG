@@ -1,8 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
   typescript: {
     ignoreBuildErrors: true,
   },
@@ -19,6 +16,9 @@ const nextConfig = {
     }
     return config
   },
+  // Add empty turbopack config to silence warning
+  // The webpack config above will still work when using --webpack flag
+  turbopack: {},
 }
 
 export default nextConfig

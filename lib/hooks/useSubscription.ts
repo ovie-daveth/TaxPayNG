@@ -39,7 +39,7 @@ export function useSubscription() {
     }
 
     // Define plan hierarchy (higher plans have access to lower plan features)
-    const planHierarchy: Record<SubscriptionType, number> = {
+    const planHierarchy: Record<Exclude<SubscriptionType, null>, number> = {
       'PRO': 1,
       'GOLD': 2,
       'PLATINUM': 3,
@@ -47,8 +47,8 @@ export function useSubscription() {
       'Big Business': 4
     }
 
-    const userPlanLevel = planHierarchy[subscriptionType] || 0
-    const requiredPlanLevel = planHierarchy[requiredPlan] || 0
+    const userPlanLevel = subscriptionType ? (planHierarchy[subscriptionType] || 0) : 0
+    const requiredPlanLevel = requiredPlan ? (planHierarchy[requiredPlan] || 0) : 0
 
     return userPlanLevel >= requiredPlanLevel
   }

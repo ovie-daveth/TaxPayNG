@@ -4,9 +4,9 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "backend": "afrihub start --port 3001",
-    "frontend": "next dev",
+    "frontend": "next dev --webpack",
     "lint": "next lint",
     "start": "next start"
   },

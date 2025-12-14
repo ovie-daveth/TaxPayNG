@@ -25,6 +25,8 @@ import { useSubscription } from "@/lib/hooks/useSubscription"
 import { subscriptionService } from "@/lib/services/subscriptionService"
 import { getAuth } from "firebase/auth"
 import { auth } from "@/firebase/firebase"
+import { ChangePlanModal } from "@/components/subscription/change-plan-modal"
+import { SubscriptionType } from "@/lib/types"
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -99,9 +101,14 @@ export default function SettingsPage() {
     }
   }, [searchParams, router, refetchProfile])
 
-  const handleSubscribe = async (planType: string) => {
+  const handleSubscribe = async (planType: SubscriptionType) => {
     if (!user?.uid) {
       toast.error("User not authenticated")
+      return
+    }
+
+    if (!planType) {
+      toast.error("Please select a valid plan")
       return
     }
 
@@ -214,9 +221,10 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden">
-      <main className="flex-1 overflow-hidden">
-        <div className="container mx-auto px-6 py-8 max-w-7xl h-full overflow-y-auto hide-scrollbar">
+    <>
+      <div className="h-screen flex flex-col overflow-hidden">
+        <main className="flex-1 overflow-hidden">
+          <div className="container mx-auto px-6 py-8 max-w-7xl h-full overflow-y-auto hide-scrollbar">
           <div className="mb-8">
             <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
             <p className="text-muted-foreground mt-2">
@@ -909,5 +917,6 @@ export default function SettingsPage() {
         onSelectPlan={handleSubscribe}
         processingPlan={processingSubscription}
       />
+    </>
   )
 }
