@@ -113,9 +113,9 @@ export function RecentReports() {
 
   if (loading) {
     return (
-      <Card className="p-6">
-        <div className="flex items-center justify-center py-8">
-          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      <Card className="p-4 sm:p-5 md:p-6">
+        <div className="flex items-center justify-center py-6 sm:py-8">
+          <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin text-muted-foreground" />
         </div>
       </Card>
     )
@@ -123,14 +123,14 @@ export function RecentReports() {
 
   if (reports.length === 0) {
   return (
-      <Card className="p-6">
-        <div className="mb-6">
-          <h2 className="text-xl font-semibold">Recent Reports</h2>
-          <p className="text-sm text-muted-foreground mt-1">Your previously generated reports</p>
+      <Card className="p-4 sm:p-5 md:p-6">
+        <div className="mb-4 sm:mb-6">
+          <h2 className="text-lg sm:text-xl font-semibold">Recent Reports</h2>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1">Your previously generated reports</p>
         </div>
-        <div className="text-center py-8 text-muted-foreground">
-          <FileText className="w-12 h-12 mx-auto mb-2 opacity-50" />
-          <p>No reports generated yet</p>
+        <div className="text-center py-6 sm:py-8 text-muted-foreground">
+          <FileText className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 opacity-50" />
+          <p className="text-sm sm:text-base">No reports generated yet</p>
         </div>
       </Card>
     )
@@ -138,38 +138,38 @@ export function RecentReports() {
 
   return (
     <>
-    <Card className="p-6">
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold">Recent Reports</h2>
-        <p className="text-sm text-muted-foreground mt-1">Your previously generated reports</p>
+    <Card className="p-4 sm:p-5 md:p-6">
+      <div className="mb-4 sm:mb-6">
+        <h2 className="text-lg sm:text-xl font-semibold">Recent Reports</h2>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">Your previously generated reports</p>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-2 sm:space-y-3">
         {reports.map((report) => (
           <div
             key={report.id}
-            className="flex items-center gap-4 p-4 border border-border rounded-lg hover:bg-muted/30 transition-colors"
+            className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 p-3 sm:p-4 border border-border rounded-lg hover:bg-muted/30 transition-colors"
           >
-            <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-              <FileText className="w-5 h-5 text-primary" />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+              <FileText className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
             </div>
 
-            <div className="flex-1 min-w-0">
-              <h3 className="font-medium text-sm mb-1 truncate">{report.title}</h3>
-              <div className="flex items-center gap-3 flex-wrap">
-                <Badge variant="secondary" className="text-xs">
+            <div className="flex-1 min-w-0 w-full sm:w-auto">
+              <h3 className="font-medium text-xs sm:text-sm mb-1.5 sm:mb-1 truncate">{report.title}</h3>
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 md:gap-3">
+                <Badge variant="secondary" className="text-xs px-1.5 sm:px-2 py-0.5 sm:py-1">
                   {report.type}
                 </Badge>
-                  <span className="text-xs text-muted-foreground">{formatPeriod(report.period)}</span>
-                <span className="text-xs text-muted-foreground">•</span>
-                  <span className="text-xs text-muted-foreground">
-                    Generated {format(new Date(report.generatedAt || report.createdAt), 'MMM dd, yyyy')}
-                  </span>
+                <span className="text-xs text-muted-foreground">{formatPeriod(report.period)}</span>
+                <span className="hidden sm:inline text-xs text-muted-foreground">•</span>
+                <span className="text-xs text-muted-foreground">
+                  Generated {format(new Date(report.generatedAt || report.createdAt), 'MMM dd, yyyy')}
+                </span>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <Badge variant={report.status === "submitted" ? "default" : report.status === "completed" ? "secondary" : "outline"} className="text-xs capitalize">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 w-full sm:w-auto justify-end sm:justify-start">
+              <Badge variant={report.status === "submitted" ? "default" : report.status === "completed" ? "secondary" : "outline"} className="text-xs capitalize px-1.5 sm:px-2 py-0.5 sm:py-1">
                 {report.status}
               </Badge>
               {report.filingMethod === 'agent' && report.filingStatus === 'submitted' && (
@@ -182,8 +182,9 @@ export function RecentReports() {
                     router.push('/dashboard/filing-requests')
                   }}
                   title="View filing request status"
+                  className="h-8 w-8 sm:h-9 sm:w-9"
                 >
-                  <MessageSquare className="w-4 h-4" />
+                  <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </Button>
               )}
               {report.status === 'draft' && (
@@ -192,8 +193,9 @@ export function RecentReports() {
                   size="icon"
                   onClick={() => handleEdit(report)}
                   title="Edit report"
+                  className="h-8 w-8 sm:h-9 sm:w-9"
                 >
-                  <Edit className="w-4 h-4" />
+                  <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </Button>
               )}
               <Button 
@@ -201,16 +203,18 @@ export function RecentReports() {
                 size="icon"
                 onClick={() => handleView(report)}
                 title="View report"
+                className="h-8 w-8 sm:h-9 sm:w-9"
               >
-                <Eye className="w-4 h-4" />
+                <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </Button>
               <Button 
                 variant="ghost" 
                 size="icon"
                 onClick={() => handleDeleteClick(report)}
                 title="Delete report"
+                className="h-8 w-8 sm:h-9 sm:w-9"
               >
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </Button>
             </div>
           </div>
