@@ -24,7 +24,7 @@ export const SUBSCRIPTION_PLANS: Record<Exclude<SubscriptionType, null>, Subscri
       'Income & expense tracking',
       'Tax calculator with reliefs',
       'Basic reports generation',
-      'Document storage (500MB)',
+      'Document storage (500MB total)',
       'Email reminders',
       'Email support'
     ]
@@ -36,12 +36,12 @@ export const SUBSCRIPTION_PLANS: Record<Exclude<SubscriptionType, null>, Subscri
     priceDisplay: '₦6,000',
     interval: 'monthly',
     features: [
-      'Unlimited transactions',
+      'Track up to 500 transactions/month',
       'All PRO features',
       'Multi-platform income tracking',
       'Sponsorship & brand deal management',
       'Advanced tax calculations',
-      'Document storage (2GB)',
+      'Document storage (2GB total)',
       'Receipt scanning & OCR',
       'SMS & email reminders',
       'Priority support'
@@ -58,7 +58,7 @@ export const SUBSCRIPTION_PLANS: Record<Exclude<SubscriptionType, null>, Subscri
       'Multi-entity business management',
       'Advanced analytics & insights',
       'IRS/NRS filing reports',
-      'Document storage (10GB)',
+      'Document storage (10GB total)',
       'Custom report templates',
       'Team collaboration (up to 3 users)',
       'Dedicated tax advisor consultation',
@@ -73,11 +73,11 @@ export const SUBSCRIPTION_PLANS: Record<Exclude<SubscriptionType, null>, Subscri
     priceDisplay: '₦12,500',
     interval: 'monthly',
     features: [
-      'Unlimited transactions',
+      'Track up to 5,000 transactions/month',
       'Advanced tax calculations',
       'Small business tax exemption tracking',
       'IRS/NRS filing reports',
-      'Document storage (5GB)',
+      'Document storage (15GB total)',
       'Receipt scanning & OCR',
       'SMS & email reminders',
       'Multi-user access (up to 3 users)',
@@ -97,7 +97,7 @@ export const SUBSCRIPTION_PLANS: Record<Exclude<SubscriptionType, null>, Subscri
       'Multi-user access (up to 10 users)',
       'Advanced analytics & insights',
       'Custom report templates',
-      'Document storage (50GB)',
+      'Document storage (50GB total)',
       'API access',
       'Dedicated account manager',
       '24/7 priority support'
