@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card } from "@/components/ui/card"
-import { FileText, ExternalLink, CheckCircle, Upload, Building2, Loader2 } from "lucide-react"
+import { FileText, ExternalLink, CheckCircle, Upload, Building2, Loader2, Info } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
@@ -32,6 +32,8 @@ export default function VerifyTINPage() {
   const [uploadingDocuments, setUploadingDocuments] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<{[key: string]: boolean}>({})
   const [showPopupInstructions, setShowPopupInstructions] = useState(false)
+  const [showTinInfoModal, setShowTinInfoModal] = useState(false)
+  const [showTinPortalModal, setShowTinPortalModal] = useState(false)
 
   useEffect(() => {
     console.log("Verify TIN page mounted - user:", user ? "logged in" : "not logged in")
@@ -69,44 +71,58 @@ export default function VerifyTINPage() {
   }
 
   const handleGetTIN = () => {
-    const portalUrl = "https://tinverification.jtb.gov.ng/"
-    const viewportWidth = window.innerWidth || 1024
-    const viewportHeight = window.innerHeight || 768
+    // Determine the correct TIN registration URL based on business type
+    const portalUrl = profile?.businessType === 'sme' 
+      ? "https://tin.jtb.gov.ng/TinRequestExternal"
+      : "https://tin.jtb.gov.ng/TinIndividualRequestExternal"
+    
+    // Check if user is on mobile (viewport width < 768px)
+    const isMobile = window.innerWidth < 768
 
-    const popupWidth = Math.min(1024, Math.floor(viewportWidth * 0.9))
-    const popupHeight = Math.min(768, Math.floor(viewportHeight * 0.9))
-
-    const dualScreenLeft = window.screenLeft !== undefined ? window.screenLeft : window.screenX
-    const dualScreenTop = window.screenTop !== undefined ? window.screenTop : window.screenY
-    const outerWidth = window.outerWidth || viewportWidth
-    const outerHeight = window.outerHeight || viewportHeight
-
-    const left = Math.max(0, Math.floor(dualScreenLeft + (outerWidth - popupWidth) / 2))
-    const top = Math.max(0, Math.floor(dualScreenTop + (outerHeight - popupHeight) / 2))
-
-    const features = [
-      "noopener",
-      "noreferrer",
-      `width=${popupWidth}`,
-      `height=${popupHeight}`,
-      `left=${left}`,
-      `top=${top}`,
-      "scrollbars=yes",
-      "resizable=yes",
-    ].join(",")
-
-    const popup = window.open(
-      portalUrl,
-      "tinVerificationPortal",
-      features
-    )
-
-    if (!popup || popup.closed || typeof popup.closed === "undefined") {
-      setPopupBlocked(true)
-      toast.info("Please allow pop-ups for OTax to open the TIN portal.")
-    } else {
+    if (isMobile) {
+      // On mobile, show modal with iframe
+      setShowTinPortalModal(true)
       setPopupBlocked(false)
-      popup.focus()
+    } else {
+      // On desktop, open popup window
+      const viewportWidth = window.innerWidth || 1024
+      const viewportHeight = window.innerHeight || 768
+
+      const popupWidth = Math.min(1024, Math.floor(viewportWidth * 0.9))
+      const popupHeight = Math.min(768, Math.floor(viewportHeight * 0.9))
+
+      const dualScreenLeft = window.screenLeft !== undefined ? window.screenLeft : window.screenX
+      const dualScreenTop = window.screenTop !== undefined ? window.screenTop : window.screenY
+      const outerWidth = window.outerWidth || viewportWidth
+      const outerHeight = window.outerHeight || viewportHeight
+
+      const left = Math.max(0, Math.floor(dualScreenLeft + (outerWidth - popupWidth) / 2))
+      const top = Math.max(0, Math.floor(dualScreenTop + (outerHeight - popupHeight) / 2))
+
+      const features = [
+        "noopener",
+        "noreferrer",
+        `width=${popupWidth}`,
+        `height=${popupHeight}`,
+        `left=${left}`,
+        `top=${top}`,
+        "scrollbars=yes",
+        "resizable=yes",
+      ].join(",")
+
+      const popup = window.open(
+        portalUrl,
+        "tinVerificationPortal",
+        features
+      )
+
+      if (!popup || popup.closed || typeof popup.closed === "undefined") {
+        setPopupBlocked(true)
+        toast.info("Please allow pop-ups for OTax to open the TIN portal.")
+      } else {
+        setPopupBlocked(false)
+        popup.focus()
+      }
     }
   }
 
@@ -249,22 +265,22 @@ export default function VerifyTINPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4 py-12">
+    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4 py-6 sm:py-12">
       <div className="w-full max-w-2xl">
-        <Card className="p-8">
+        <Card className="p-4 sm:p-6 md:p-8">
           {/* Header - Different for document upload */}
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="text-center mb-6 sm:mb-8">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
               {showDocumentUpload ? (
-                <Building2 className="w-8 h-8 text-primary" />
+                <Building2 className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
               ) : (
-                <FileText className="w-8 h-8 text-primary" />
+                <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
               )}
             </div>
-            <h1 className="text-3xl font-bold mb-2">
+            <h1 className="text-2xl sm:text-3xl font-bold mb-2">
               {showDocumentUpload ? "Verify Your Business" : "Verify Your TIN"}
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-sm sm:text-base text-muted-foreground">
               {showDocumentUpload 
                 ? "Upload business documents to verify your company"
                 : "Tax Identification Number (TIN) is required for tax management in Nigeria"
@@ -274,12 +290,12 @@ export default function VerifyTINPage() {
 
           {showDocumentUpload ? (
             /* Document Upload Section */
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               {/* Success Message */}
-              <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 flex items-start gap-3">
-                <CheckCircle className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
+              <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 sm:p-4 flex items-start gap-2 sm:gap-3">
+                <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0 mt-0.5" />
                 <div>
-                  <p className="text-sm font-medium text-primary">TIN Verified Successfully!</p>
+                  <p className="text-xs sm:text-sm font-medium text-primary">TIN Verified Successfully!</p>
                   <p className="text-xs text-muted-foreground mt-1">
                     Now upload your business documents to complete verification
                   </p>
@@ -287,10 +303,10 @@ export default function VerifyTINPage() {
               </div>
 
               {/* Document Upload Fields */}
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {/* CAC Certificate */}
                 <div className="space-y-2">
-                  <Label htmlFor="cac">CAC Certificate (Company Registration)</Label>
+                  <Label htmlFor="cac" className="text-sm sm:text-base">CAC Certificate (Company Registration)</Label>
                   <div className="flex items-center gap-2">
                     <Input
                       id="cac"
@@ -298,10 +314,10 @@ export default function VerifyTINPage() {
                       accept=".pdf,.jpg,.jpeg,.png"
                       onChange={(e) => handleFileChange('cac', e.target.files?.[0] || null)}
                       disabled={uploadingDocuments}
-                      className="flex-1"
+                      className="flex-1 text-xs sm:text-sm"
                     />
                     {businessDocuments.cac && (
-                      <CheckCircle className="w-5 h-5 text-primary" />
+                      <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -311,7 +327,7 @@ export default function VerifyTINPage() {
 
                 {/* Tax Certificate */}
                 <div className="space-y-2">
-                  <Label htmlFor="taxCertificate">Tax Clearance Certificate</Label>
+                  <Label htmlFor="taxCertificate" className="text-sm sm:text-base">Tax Clearance Certificate</Label>
                   <div className="flex items-center gap-2">
                     <Input
                       id="taxCertificate"
@@ -319,10 +335,10 @@ export default function VerifyTINPage() {
                       accept=".pdf,.jpg,.jpeg,.png"
                       onChange={(e) => handleFileChange('taxCertificate', e.target.files?.[0] || null)}
                       disabled={uploadingDocuments}
-                      className="flex-1"
+                      className="flex-1 text-xs sm:text-sm"
                     />
                     {businessDocuments.taxCertificate && (
-                      <CheckCircle className="w-5 h-5 text-primary" />
+                      <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -332,7 +348,7 @@ export default function VerifyTINPage() {
 
                 {/* Business License */}
                 <div className="space-y-2">
-                  <Label htmlFor="businessLicense">Business License</Label>
+                  <Label htmlFor="businessLicense" className="text-sm sm:text-base">Business License</Label>
                   <div className="flex items-center gap-2">
                     <Input
                       id="businessLicense"
@@ -340,10 +356,10 @@ export default function VerifyTINPage() {
                       accept=".pdf,.jpg,.jpeg,.png"
                       onChange={(e) => handleFileChange('businessLicense', e.target.files?.[0] || null)}
                       disabled={uploadingDocuments}
-                      className="flex-1"
+                      className="flex-1 text-xs sm:text-sm"
                     />
                     {businessDocuments.businessLicense && (
-                      <CheckCircle className="w-5 h-5 text-primary" />
+                      <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
@@ -381,9 +397,19 @@ export default function VerifyTINPage() {
           ) : (
             /* TIN Verification Section */
             <>
-            <form onSubmit={handleVerifyTIN} className="space-y-6">
+            <form onSubmit={handleVerifyTIN} className="space-y-4 sm:space-y-6">
               <div className="space-y-2">
-                <Label htmlFor="tin">Tax Identification Number (TIN)</Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="tin" className="text-sm sm:text-base">Tax Identification Number (TIN)</Label>
+                  <button
+                    type="button"
+                    onClick={() => setShowTinInfoModal(true)}
+                    className="text-muted-foreground hover:text-primary transition-colors"
+                    aria-label="Learn how to get a TIN"
+                  >
+                    <Info className="w-4 h-4 sm:w-5 sm:h-5" />
+                  </button>
+                </div>
                 <Input 
                   id="tin" 
                   type="text" 
@@ -393,6 +419,7 @@ export default function VerifyTINPage() {
                   maxLength={11}
                   required 
                   disabled={isVerifying || isLoading}
+                  className="text-base sm:text-lg"
                 />
                 <p className="text-xs text-muted-foreground">
                   TIN is an 11-digit number issued by FIRS for tax purposes
@@ -410,7 +437,7 @@ export default function VerifyTINPage() {
             </form>
 
             {/* Divider */}
-            <div className="relative my-8">
+            <div className="relative my-6 sm:my-8">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-border" />
               </div>
@@ -420,14 +447,14 @@ export default function VerifyTINPage() {
             </div>
 
             {/* Get TIN Section */}
-            <div className="bg-muted/50 border border-border rounded-lg p-6">
-              <div className="flex items-start gap-4">
+            <div className="bg-muted/50 border border-border rounded-lg p-4 sm:p-6">
+              <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
                 <div className="w-10 h-10 bg-accent/10 rounded-lg flex items-center justify-center flex-shrink-0">
                   <ExternalLink className="w-5 h-5 text-accent" />
                 </div>
-                <div className="flex-1">
-                  <h3 className="font-semibold mb-2">Don't have a TIN yet?</h3>
-                  <p className="text-sm text-muted-foreground mb-4">
+                <div className="flex-1 w-full">
+                  <h3 className="font-semibold mb-2 text-sm sm:text-base">Don't have a TIN yet?</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-4">
                     You need to obtain a TIN from the Federal Inland Revenue Service (FIRS) before proceeding. 
                     Click the button below to visit the FIRS TIN portal.
                   </p>
@@ -436,11 +463,12 @@ export default function VerifyTINPage() {
                     variant="outline" 
                     onClick={handleGetTIN}
                     disabled={isVerifying || isLoading}
+                    className="w-full sm:w-auto"
                   >
                     <ExternalLink className="w-4 h-4 mr-2" />
                     Get TIN from FIRS Portal
                   </Button>
-                  <p className="text-xs text-muted-foreground mt-3 md:hidden">
+                  <p className="text-xs text-muted-foreground mt-3 sm:hidden">
                     Having trouble on mobile? Allow pop-ups for OTax so the FIRS portal can open in a new window.
                   </p>
                   {(popupBlocked) && (
@@ -461,12 +489,13 @@ export default function VerifyTINPage() {
 
             {/* Skip Option - Only show for freelancers */}
             {profile?.businessType !== 'sme' && (
-              <div className="mt-6 text-center">
+              <div className="mt-4 sm:mt-6 text-center">
                 <Button 
                   variant="ghost" 
                   type="button"
                   onClick={() => router.push("/dashboard")}
                   disabled={isVerifying || isLoading}
+                  className="text-sm sm:text-base"
                 >
                   Skip for now
                 </Button>
@@ -479,21 +508,101 @@ export default function VerifyTINPage() {
           )}
         </Card>
       </div>
-      {/* Popup Instructions Modal */}
-      <Dialog open={showPopupInstructions} onOpenChange={setShowPopupInstructions}>
-        <DialogContent className="max-w-lg">
+      {/* TIN Info Modal */}
+      <Dialog open={showTinInfoModal} onOpenChange={setShowTinInfoModal}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>How to Allow Pop-ups for OTax</DialogTitle>
-            <DialogDescription>
-              Enable pop-ups so we can open the official TIN portal in a new window.
+            <DialogTitle className="text-lg sm:text-xl">How to Get a Tax Identification Number (TIN)</DialogTitle>
+            <DialogDescription className="text-sm">
+              Complete guide to registering for a TIN online in Nigeria
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 text-sm text-muted-foreground">
             <div>
+              <p className="mb-3">
+                To register for a Tax Identification Number (TIN) online in Nigeria, visit the Joint Tax Board (JTB) portal, fill out the application form, and submit the required documents.
+              </p>
+            </div>
+
+            <div>
+              <h4 className="font-semibold text-foreground mb-2 text-base">Steps to Register for a TIN Online</h4>
+              <ol className="list-decimal list-inside space-y-3 ml-2">
+                <li>
+                  <span className="font-medium text-foreground">Visit the JTB TIN Registration Portal:</span> Go to the official JTB TIN registration website. This is the primary platform for registering your TIN online.
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">Select Application Type:</span> Choose whether you are registering as an Individual or a Business Entity (Non-Individual).
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">Fill in Required Details:</span> Provide accurate personal or business information, including your Bank Verification Number (BVN) or National Identification Number (NIN), date of birth, and contact information for individuals. For businesses, include the Registration Certificate (RC) number, business name, and details of directors.
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">Upload Necessary Documents:</span> Scan and upload required identification documents, such as a valid ID (National ID, Driver's License, or International Passport) and a utility bill for proof of address. Businesses will need to upload their Certificate of Incorporation and other relevant documents.
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">Submit Application:</span> Review all the information for accuracy and submit the application. You will receive a notification once your TIN is issued, usually within 24 to 48 hours if all documents are correct.
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">Verification:</span> After submission, you can verify your TIN status through the JTB TIN verification portal by entering your details.
+                </li>
+              </ol>
+            </div>
+
+            <div className="border-l-4 border-primary/20 pl-4 space-y-2">
+              <h4 className="font-semibold text-foreground mb-2 text-base">Important Notes</h4>
+              <ul className="list-disc list-inside space-y-2 ml-2">
+                <li>
+                  <span className="font-medium text-foreground">Free Registration:</span> The registration process is completely free of charge. Be cautious of any requests for payment during the application process.
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">Keep Records:</span> Save copies of all submitted documents and confirmation emails for your records.
+                </li>
+                <li>
+                  <span className="font-medium text-foreground">Follow Up:</span> If you do not receive your TIN within the expected timeframe, consider following up with the JTB support team for assistance.
+                </li>
+              </ul>
+            </div>
+
+            <div className="border border-border rounded-lg p-3 sm:p-4 bg-muted/40">
+              <p className="text-xs sm:text-sm">
+                <span className="font-medium text-foreground">Need help?</span> You can visit the official JTB TIN registration portal{" "}
+                <a
+                  href={profile?.businessType === 'sme' 
+                    ? "https://tin.jtb.gov.ng/TinRequestExternal"
+                    : "https://tin.jtb.gov.ng/TinIndividualRequestExternal"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary underline underline-offset-2"
+                >
+                  here
+                </a>{" "}
+                or use the "Get TIN from FIRS Portal" button below to open it directly.
+              </p>
+            </div>
+          </div>
+          <div className="flex justify-end pt-2">
+            <Button type="button" onClick={() => setShowTinInfoModal(false)}>
+              Got it
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Popup Instructions Modal */}
+      <Dialog open={showPopupInstructions} onOpenChange={setShowPopupInstructions}>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-lg sm:text-xl">How to Allow Pop-ups for OTax</DialogTitle>
+            <DialogDescription className="text-sm">
+              Enable pop-ups so we can open the official TIN portal in a new window.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-xs sm:text-sm text-muted-foreground">
+            <div>
               <h4 className="font-semibold text-foreground mb-1">Chrome / Edge (Desktop)</h4>
               <ol className="list-decimal list-inside space-y-1">
                 <li>Click the blocked popup icon in the address bar.</li>
-                <li>Select <span className="font-medium text-foreground">“Always allow pop-ups and redirects”</span> for <span className="font-medium text-foreground">otax.ng</span>.</li>
+                <li>Select <span className="font-medium text-foreground">"Always allow pop-ups and redirects"</span> for <span className="font-medium text-foreground">otax.ng</span>.</li>
                 <li>Click <span className="font-medium text-foreground">Done</span>, then press the button again.</li>
               </ol>
             </div>
@@ -515,14 +624,16 @@ export default function VerifyTINPage() {
             </div>
             <div className="border border-border rounded-lg p-3 bg-muted/40">
               <p>
-                Need more help? You can manually visit{" "}
+                Need more help? You can manually visit the TIN registration portal{" "}
                 <a
-                  href="https://tinverification.jtb.gov.ng/"
+                  href={profile?.businessType === 'sme' 
+                    ? "https://tin.jtb.gov.ng/TinRequestExternal"
+                    : "https://tin.jtb.gov.ng/TinIndividualRequestExternal"}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-primary underline underline-offset-2"
                 >
-                  tinverification.jtb.gov.ng
+                  here
                 </a>{" "}
                 in a new tab.
               </p>
@@ -531,6 +642,33 @@ export default function VerifyTINPage() {
           <div className="flex justify-end">
             <Button type="button" onClick={() => setShowPopupInstructions(false)}>
               Got it
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* TIN Portal Modal (Mobile) */}
+      <Dialog open={showTinPortalModal} onOpenChange={setShowTinPortalModal}>
+        <DialogContent className="max-w-full w-full h-[90vh] p-0 sm:max-w-4xl sm:h-[85vh] flex flex-col">
+          <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 border-b">
+            <DialogTitle className="text-base sm:text-lg">TIN Registration Portal</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
+              Complete your TIN registration in the form below. You can close this window when done.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 relative min-h-0">
+            <iframe
+              src={profile?.businessType === 'sme' 
+                ? "https://tin.jtb.gov.ng/TinRequestExternal"
+                : "https://tin.jtb.gov.ng/TinIndividualRequestExternal"}
+              className="w-full h-full border-0"
+              title="TIN Registration Portal"
+              allow="fullscreen"
+            />
+          </div>
+          <div className="px-4 sm:px-6 py-3 border-t flex justify-end">
+            <Button type="button" onClick={() => setShowTinPortalModal(false)}>
+              Close
             </Button>
           </div>
         </DialogContent>
