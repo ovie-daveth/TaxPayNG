@@ -2,19 +2,29 @@
 
 import type React from "react"
 import Link from "next/link"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ArrowLeft, Mail, CheckCircle2 } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
+import { useTheme } from "next-themes"
+import Image from "next/image"
 import { toast } from "sonner"
 
 export default function ForgotPasswordPage() {
   const { resetPassword } = useAuth()
+  const { theme, resolvedTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
   const [email, setEmail] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
+  
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+  
+  const isDark = mounted && (resolvedTheme === 'dark' || theme === 'dark')
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -41,11 +51,26 @@ export default function ForgotPasswordPage() {
       <div className="w-full max-w-md">
         <div className="bg-card/95 backdrop-blur-sm border border-border/50 rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-10 shadow-2xl shadow-primary/5">
           {/* Logo */}
-          <div className="flex items-center justify-center gap-2.5 mb-8 sm:mb-10">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold rounded-xl sm:rounded-2xl flex items-center justify-center text-lg sm:text-xl shadow-lg shadow-primary/25">
-              O
-            </div>
-            <span className="font-bold text-2xl sm:text-3xl bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">OTax</span>
+          <div className="flex items-center justify-center mb-8 sm:mb-10">
+            {mounted ? (
+              <Image
+                src={isDark ? '/darklogo-bg.png' : '/logootax_bg.png'}
+                alt="OTax Logo"
+                width={120}
+                height={40}
+                className="h-10 sm:h-12 w-auto"
+                priority
+              />
+            ) : (
+              <Image
+                src="/logootax_bg.png"
+                alt="OTax Logo"
+                width={120}
+                height={40}
+                className="h-10 sm:h-12 w-auto"
+                priority
+              />
+            )}
           </div>
 
           {!isSuccess ? (

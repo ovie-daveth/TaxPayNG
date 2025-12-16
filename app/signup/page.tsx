@@ -13,9 +13,46 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Calculator, Eye, EyeOff, MapPin } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { useAuth } from "@/lib/hooks/useAuth"
+import { useTheme } from "next-themes"
+import Image from "next/image"
 import { toast } from "sonner"
 import { TokenInputDialog } from "@/components/waitlist/token-input-dialog"
 import { sendSignupVerification } from "@/lib/utils/emailVerification"
+
+const LogoImage = () => {
+  const { theme, resolvedTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+  
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+  
+  if (!mounted) {
+    return (
+      <Image
+        src="/logootax_bg.png"
+        alt="OTax Logo"
+        width={120}
+        height={40}
+        className="h-10 sm:h-12 w-auto"
+        priority
+      />
+    )
+  }
+  
+  const isDark = resolvedTheme === 'dark' || theme === 'dark'
+  
+  return (
+    <Image
+      src={isDark ? '/darklogo-bg.png' : '/logootax_bg.png'}
+      alt="OTax Logo"
+      width={120}
+      height={40}
+      className="h-10 sm:h-12 w-auto"
+      priority
+    />
+  )
+}
 
 const NIGERIAN_STATES = [
   "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
@@ -246,11 +283,8 @@ export default function SignupPage() {
       <div className="w-full max-w-md">
         <div className="bg-card/95 backdrop-blur-sm border border-border/50 rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-10 shadow-2xl shadow-primary/5">
           {/* Logo */}
-          <div className="flex items-center justify-center gap-2.5 mb-8 sm:mb-10">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold rounded-xl sm:rounded-2xl flex items-center justify-center text-lg sm:text-xl shadow-lg shadow-primary/25">
-              O
-            </div>
-            <span className="font-bold text-2xl sm:text-3xl bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">OTax</span>
+          <div className="flex items-center justify-center mb-8 sm:mb-10">
+            <LogoImage />
           </div>
 
           <div className="text-center mb-8 sm:mb-10">
