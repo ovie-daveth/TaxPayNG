@@ -11,6 +11,7 @@ import { subscriptionService } from "@/lib/services/subscriptionService"
 import { SubscriptionType, BusinessType } from "@/lib/types"
 import { auth } from "@/firebase/firebase"
 import { toast } from "sonner"
+import { MigrateToCreatorModal } from "./migrate-to-creator-modal"
 
 interface SubscriptionRequiredModalProps {
   open: boolean
@@ -25,6 +26,8 @@ export function SubscriptionRequiredModal({
 }: SubscriptionRequiredModalProps) {
   const router = useRouter()
   const [processingSubscription, setProcessingSubscription] = useState<string | null>(null)
+  const [showMigrationModal, setShowMigrationModal] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
 
   const getAvailablePlans = (): SubscriptionType[] => {
     if (businessType === 'sme') {
@@ -36,7 +39,69 @@ export function SubscriptionRequiredModal({
 
   const availablePlans = getAvailablePlans()
 
+  // Check if migration is needed (freelancer trying to subscribe to GOLD or PLATINUM)
+  const needsMigration = (planType: SubscriptionType): boolean => {
+    return businessType === 'freelancer' && (planType === 'GOLD' || planType === 'PLATINUM')
+  }
+
   const handleSubscribe = async (planType: SubscriptionType) => {
+    if (!window) return
+
+    // Check if migration is needed
+    if (needsMigration(planType)) {
+      setSelectedPlan(planType)
+      setShowMigrationModal(true)
+      return
+    }
+
+    // Proceed with subscription
+    await proceedWithSubscription(planType)
+  }
+
+  const handleMigrateAndSubscribe = async () => {
+    if (!selectedPlan) return
+
+    try {
+      // Get auth token
+      const currentUser = auth.currentUser
+      if (!currentUser) {
+        router.push("/login")
+        return
+      }
+
+      const token = await currentUser.getIdToken()
+
+      // Update business type to creator
+      const updateResponse = await fetch("/api/user/update-business-type", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          businessType: 'creator'
+        })
+      })
+
+      const updateData = await updateResponse.json()
+
+      if (!updateResponse.ok || !updateData.success) {
+        throw new Error(updateData.error || "Failed to update business type")
+      }
+
+      toast.success("Account migrated to Creator successfully!")
+      
+      // Close migration modal and proceed with subscription
+      setShowMigrationModal(false)
+      await proceedWithSubscription(selectedPlan)
+    } catch (error) {
+      console.error("Migration error:", error)
+      toast.error(error instanceof Error ? error.message : "Failed to migrate account")
+      throw error
+    }
+  }
+
+  const proceedWithSubscription = async (planType: SubscriptionType) => {
     if (!window) return
 
     setProcessingSubscription(planType)
@@ -90,27 +155,27 @@ export function SubscriptionRequiredModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-              <Lock className="w-6 h-6 text-primary" />
-            </div>
-            <div>
-              <DialogTitle className="text-2xl">Subscription Required</DialogTitle>
-              <DialogDescription className="text-base mt-1">
-                Subscribe to a plan to unlock all features and start managing your taxes effectively.
-              </DialogDescription>
-            </div>
+      <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-5xl max-h-[90vh] overflow-y-auto p-3 sm:p-6">
+        <DialogHeader className="p-0">
+          <div className="flex flex-col items-center text-center">
+            <DialogTitle className="text-base sm:text-xl md:text-2xl flex items-center gap-2 justify-center">
+              Subscription Required
+              <div className="w-6 h-6 sm:w-8 sm:h-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
+                <Lock className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
+              </div>
+            </DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm md:text-base mt-0.5 sm:mt-1">
+              Subscribe to a plan to unlock all features and start managing your taxes effectively.
+            </DialogDescription>
           </div>
         </DialogHeader>
 
-        <div className="mt-6">
-          <div className="bg-muted/50 border border-border rounded-lg p-4 mb-6">
-            <p className="text-sm text-muted-foreground">
+        <div className="mt-4 sm:mt-6">
+          <div className="bg-muted/50 border border-border rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
+            <p className="text-xs sm:text-sm text-muted-foreground">
               <strong className="text-foreground">Why subscribe?</strong> Our subscription plans give you access to:
             </p>
-            <ul className="list-disc list-inside space-y-1 mt-2 text-sm text-muted-foreground">
+            <ul className="list-disc list-inside space-y-0.5 sm:space-y-1 mt-1.5 sm:mt-2 text-xs sm:text-sm text-muted-foreground">
               <li>Transaction tracking and management</li>
               <li>Tax calculations and reports</li>
               <li>Document storage and management</li>
@@ -119,7 +184,7 @@ export function SubscriptionRequiredModal({
             </ul>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
             {availablePlans.map((planType) => {
               const plan = subscriptionService.getPlan(planType)
               if (!plan) return null
@@ -131,9 +196,9 @@ export function SubscriptionRequiredModal({
                   key={planType} 
                   className="relative flex flex-col hover:border-primary transition-all"
                 >
-                  <CardHeader>
-                    <CardTitle className="text-xl">{plan.name}</CardTitle>
-                    <CardDescription>
+                  <CardHeader className="p-3 sm:p-6">
+                    <CardTitle className="text-base sm:text-lg md:text-xl">{plan.name}</CardTitle>
+                    <CardDescription className="text-xs sm:text-sm mt-1 sm:mt-2">
                       {businessType === 'sme' 
                         ? planType === 'Small Business' 
                           ? 'For businesses with annual turnover ≤ ₦50-100 million'
@@ -144,37 +209,37 @@ export function SubscriptionRequiredModal({
                           ? 'Ideal for content creators and influencers'
                           : 'For established creators with complex tax situations'}
                     </CardDescription>
-                    <div className="mt-4">
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-3xl font-bold">{plan.priceDisplay}</span>
-                        <span className="text-sm text-muted-foreground">/month</span>
+                    <div className="mt-3 sm:mt-4">
+                      <div className="flex items-baseline gap-1.5 sm:gap-2">
+                        <span className="text-xl sm:text-2xl md:text-3xl font-bold">{plan.priceDisplay}</span>
+                        <span className="text-xs sm:text-sm text-muted-foreground">/month</span>
                       </div>
                     </div>
                   </CardHeader>
-                  <CardContent className="flex-1">
-                    <ul className="space-y-2">
+                  <CardContent className="flex-1 p-3 sm:p-6 pt-0">
+                    <ul className="space-y-1.5 sm:space-y-2">
                       {plan.features.slice(0, 5).map((feature, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-sm">
-                          <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                        <li key={idx} className="flex items-start gap-1.5 sm:gap-2 text-xs sm:text-sm">
+                          <Check className="w-3 h-3 sm:w-4 sm:h-4 text-primary shrink-0 mt-0.5" />
                           <span>{feature}</span>
                         </li>
                       ))}
                       {plan.features.length > 5 && (
-                        <li className="text-xs text-muted-foreground">
+                        <li className="text-[10px] sm:text-xs text-muted-foreground">
                           +{plan.features.length - 5} more features
                         </li>
                       )}
                     </ul>
                   </CardContent>
-                  <CardFooter>
+                  <CardFooter className="p-3 sm:p-6 pt-0">
                     <Button
-                      className="w-full"
+                      className="w-full h-8 sm:h-10 text-xs sm:text-sm"
                       onClick={() => handleSubscribe(planType)}
                       disabled={isProcessing}
                     >
                       {isProcessing ? (
                         <>
-                          <span className="animate-spin mr-2">⏳</span>
+                          <span className="animate-spin mr-1.5 sm:mr-2">⏳</span>
                           Processing...
                         </>
                       ) : (
@@ -188,12 +253,21 @@ export function SubscriptionRequiredModal({
           </div>
         </div>
 
-        <div className="mt-6 flex justify-center">
-          <Button variant="outline" onClick={handleViewPricing}>
+        <div className="mt-4 sm:mt-6 flex justify-center">
+          <Button variant="outline" onClick={handleViewPricing} className="h-8 sm:h-10 text-xs sm:text-sm">
             View All Plans & Pricing
           </Button>
         </div>
       </DialogContent>
+
+      {selectedPlan && (
+        <MigrateToCreatorModal
+          open={showMigrationModal}
+          onOpenChange={setShowMigrationModal}
+          planType={selectedPlan}
+          onConfirm={handleMigrateAndSubscribe}
+        />
+      )}
     </Dialog>
   )
 }

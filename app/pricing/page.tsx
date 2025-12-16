@@ -14,15 +14,87 @@ import { ThemeToggle } from "@/components/theme-toggle"
 import { Badge } from "@/components/ui/badge"
 import { toast } from "sonner"
 import { useAuth } from "@/lib/hooks/useAuth"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { useRouter } from "next/navigation"
 import { auth } from "@/firebase/firebase"
+import { MigrateToCreatorModal } from "@/components/subscription/migrate-to-creator-modal"
+import { SubscriptionType } from "@/lib/types"
 
 export default function PricingPage() {
   const { user, loading: authLoading } = useAuth()
+  const { profile } = useUserProfile()
   const router = useRouter()
   const [processingSubscription, setProcessingSubscription] = useState<string | null>(null)
+  const [showMigrationModal, setShowMigrationModal] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
+
+  // Check if migration is needed (freelancer trying to subscribe to GOLD or PLATINUM)
+  const needsMigration = (planType: string): boolean => {
+    return profile?.businessType === 'freelancer' && (planType === 'GOLD' || planType === 'PLATINUM')
+  }
 
   const handleSubscribe = async (planType: string) => {
+    if (!user) {
+      toast.error("Please log in to subscribe")
+      router.push("/login?redirect=/pricing")
+      return
+    }
+
+    // Check if migration is needed
+    if (needsMigration(planType)) {
+      setSelectedPlan(planType as SubscriptionType)
+      setShowMigrationModal(true)
+      return
+    }
+
+    // Proceed with subscription
+    await proceedWithSubscription(planType)
+  }
+
+  const handleMigrateAndSubscribe = async () => {
+    if (!selectedPlan) return
+
+    try {
+      // Get auth token
+      const currentUser = auth.currentUser
+      if (!currentUser) {
+        router.push("/login?redirect=/pricing")
+        return
+      }
+
+      const token = await currentUser.getIdToken()
+
+      // Update business type to creator
+      const updateResponse = await fetch("/api/user/update-business-type", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          businessType: 'creator'
+        })
+      })
+
+      const updateData = await updateResponse.json()
+
+      if (!updateResponse.ok || !updateData.success) {
+        throw new Error(updateData.error || "Failed to update business type")
+      }
+
+      toast.success("Account migrated to Creator successfully!")
+      
+      // Close migration modal and proceed with subscription
+      setShowMigrationModal(false)
+      await proceedWithSubscription(selectedPlan)
+    } catch (error) {
+      console.error("Migration error:", error)
+      toast.error(error instanceof Error ? error.message : "Failed to migrate account")
+      throw error
+    }
+  }
+
+  const proceedWithSubscription = async (planType: string) => {
     if (!user) {
       toast.error("Please log in to subscribe")
       router.push("/login?redirect=/pricing")
@@ -763,6 +835,16 @@ export default function PricingPage() {
 
       {/* Footer */}
       <Footer />
+
+      {/* Migration Modal */}
+      {selectedPlan && (
+        <MigrateToCreatorModal
+          open={showMigrationModal}
+          onOpenChange={setShowMigrationModal}
+          planType={selectedPlan}
+          onConfirm={handleMigrateAndSubscribe}
+        />
+      )}
     </div>
   )
 }

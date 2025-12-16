@@ -458,19 +458,15 @@ export default function VerifyTINPage() {
                 size="lg" 
                 disabled={isVerifying || isLoading || !tin}
               >
-                {isVerifying ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Verifying...
-                  </>
-                ) : isLoading ? (
+               
+               isLoading || isVerifying ? (
                   <>
                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     Saving...
                   </>
                 ) : (
                   "Add TIN"
-                )}
+                )
               </Button>
             </form>
 

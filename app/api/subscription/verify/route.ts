@@ -103,6 +103,7 @@ export async function GET(request: NextRequest) {
 
       const profileDoc = userProfilesSnapshot.docs[0]
       const profileData = profileDoc.data()
+      const businessType = profileData?.businessType // Get business type before updating
       
       // Get storage limit based on subscription type
       const getStorageLimit = (type: string): number => {
@@ -123,6 +124,18 @@ export async function GET(request: NextRequest) {
         storageLimit: getStorageLimit(subscriptionType),
         updatedAt: new Date().toISOString()
       })
+
+      // Redirect based on business type
+      const baseUrl = new URL(request.url).origin
+      if (businessType === 'creator') {
+        return NextResponse.redirect(
+          `${baseUrl}/dashboard-creator?subscription=success&plan=${encodeURIComponent(subscriptionType)}`
+        )
+      } else {
+        return NextResponse.redirect(
+          `${baseUrl}/dashboard?subscription=success&plan=${encodeURIComponent(subscriptionType)}`
+        )
+      }
     } catch (error) {
       console.error('Failed to activate subscription:', error)
       return NextResponse.redirect(
@@ -132,12 +145,6 @@ export async function GET(request: NextRequest) {
         )
       )
     }
-
-    // Redirect to dashboard with success message
-    const baseUrl = new URL(request.url).origin
-    return NextResponse.redirect(
-      `${baseUrl}/dashboard?subscription=success&plan=${encodeURIComponent(subscriptionType)}`
-    )
   } catch (error) {
     console.error('Error verifying subscription:', error)
     return NextResponse.redirect(
