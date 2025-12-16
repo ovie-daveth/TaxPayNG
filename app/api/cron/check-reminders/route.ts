@@ -188,6 +188,16 @@ export async function GET(request: NextRequest) {
           continue
         }
 
+        // Check user's notification preferences
+        const emailNotificationsEnabled = profile.preferences?.emailNotifications ?? (profile.preferences?.notifications ?? true)
+        
+        if (!emailNotificationsEnabled) {
+          console.log(`⏭️ Skipping reminder ${reminder.id} - email notifications disabled for user ${reminder.data.userId}`)
+          results.failed++
+          results.errors.push(`Reminder ${reminder.id}: Email notifications disabled by user`)
+          continue
+        }
+
         // Call the send-email function directly (no HTTP request needed)
         const { sendReminderEmail } = await import('@/lib/utils/reminder-email')
         

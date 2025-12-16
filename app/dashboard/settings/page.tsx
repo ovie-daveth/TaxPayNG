@@ -25,6 +25,7 @@ import { useSubscription } from "@/lib/hooks/useSubscription"
 import { subscriptionService } from "@/lib/services/subscriptionService"
 import { getAuth } from "firebase/auth"
 import { auth } from "@/firebase/firebase"
+import { reauthenticateWithCredential, updatePassword, EmailAuthProvider } from "firebase/auth"
 import { ChangePlanModal } from "@/components/subscription/change-plan-modal"
 import { SubscriptionType } from "@/lib/types"
 
@@ -65,6 +66,16 @@ export default function SettingsPage() {
       postalCode: ''
     }
   })
+  const [notificationPreferences, setNotificationPreferences] = useState({
+    emailNotifications: true,
+    smsNotifications: false
+  })
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  })
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
 
   // Loading state: show skeleton while auth or profile is loading
   const isLoading = authLoading || profileLoading
@@ -77,6 +88,19 @@ export default function SettingsPage() {
     setSubscriptionData({
       isSubscribe: profile.isSubscribe ?? false,
       subscriptionType: profile.subscriptionType || null,
+    })
+
+    // Load notification preferences
+    // Check if emailNotifications is explicitly set, otherwise fall back to legacy notifications field, default to true
+    const emailNotifications = profile.preferences?.emailNotifications !== undefined 
+      ? profile.preferences.emailNotifications 
+      : (profile.preferences?.notifications !== undefined ? profile.preferences.notifications : true)
+    
+    const smsNotifications = profile.preferences?.smsNotifications ?? false
+    
+    setNotificationPreferences({
+      emailNotifications,
+      smsNotifications
     })
   }, [profile, profileLoading])
 
@@ -854,40 +878,93 @@ export default function SettingsPage() {
                   </div>
                   <div className="space-y-4 sm:space-y-5 md:space-y-6">
                     <div className="flex items-center justify-between p-3 sm:p-4 border rounded-lg gap-3 sm:gap-4">
-                  <div className="space-y-0.5 min-w-0 flex-1">
+                      <div className="space-y-0.5 min-w-0 flex-1">
                         <Label className="text-sm sm:text-base">Email Notifications</Label>
-                    <p className="text-xs sm:text-sm text-muted-foreground">Receive email alerts for reminders and deadlines</p>
-                  </div>
-                  <Switch defaultChecked className="flex-shrink-0" />
-                </div>
-                <Separator />
-                    <div className="flex items-center justify-between p-3 sm:p-4 border rounded-lg gap-3 sm:gap-4">
-                  <div className="space-y-0.5 min-w-0 flex-1">
-                        <Label className="text-sm sm:text-base">Tax Deadline Reminders</Label>
-                    <p className="text-xs sm:text-sm text-muted-foreground">Get notified about upcoming tax deadlines</p>
-                  </div>
-                  <Switch defaultChecked className="flex-shrink-0" />
-                </div>
-                <Separator />
-                    <div className="flex items-center justify-between p-3 sm:p-4 border rounded-lg gap-3 sm:gap-4">
-                  <div className="space-y-0.5 min-w-0 flex-1">
-                        <Label className="text-sm sm:text-base">Transaction Alerts</Label>
-                    <p className="text-xs sm:text-sm text-muted-foreground">Notifications for new transactions</p>
-                  </div>
-                  <Switch className="flex-shrink-0" />
-                </div>
-                <Separator />
-                    <div className="flex items-center justify-between p-3 sm:p-4 border rounded-lg gap-3 sm:gap-4">
-                  <div className="space-y-0.5 min-w-0 flex-1">
-                        <Label className="text-sm sm:text-base">Weekly Summary</Label>
-                    <p className="text-xs sm:text-sm text-muted-foreground">Receive weekly financial summary reports</p>
-                  </div>
-                  <Switch defaultChecked className="flex-shrink-0" />
-                </div>
-                    <div className="flex justify-end pt-2 sm:pt-4">
-                      <Button size="lg" className="h-9 sm:h-10 md:h-11 text-xs sm:text-sm md:text-base w-full sm:w-auto">Save Preferences</Button>
+                        <p className="text-xs sm:text-sm text-muted-foreground">Receive email alerts for reminders and deadlines</p>
+                      </div>
+                      <Switch 
+                        checked={notificationPreferences.emailNotifications}
+                        onCheckedChange={async (checked) => {
+                          setNotificationPreferences(prev => ({ ...prev, emailNotifications: checked }))
+                          
+                          // Auto-save on toggle
+                          if (!user?.uid) {
+                            toast.error("User not authenticated")
+                            return
+                          }
+                          
+                          try {
+                            const result = await userService.updatePreferences(user.uid, {
+                              currency: profile?.preferences?.currency || 'NGN',
+                              theme: profile?.preferences?.theme || 'system',
+                              notifications: checked || notificationPreferences.smsNotifications, // Legacy field
+                              emailNotifications: checked,
+                              smsNotifications: notificationPreferences.smsNotifications
+                            })
+                            
+                            if (result.success) {
+                              toast.success(`Email notifications ${checked ? 'enabled' : 'disabled'}`)
+                              refetchProfile()
+                            } else {
+                              toast.error(result.error || "Failed to save preferences")
+                              // Revert on error
+                              setNotificationPreferences(prev => ({ ...prev, emailNotifications: !checked }))
+                            }
+                          } catch (error) {
+                            console.error("Error saving preferences:", error)
+                            toast.error("Failed to save notification preferences")
+                            // Revert on error
+                            setNotificationPreferences(prev => ({ ...prev, emailNotifications: !checked }))
+                          }
+                        }}
+                        className="flex-shrink-0" 
+                      />
                     </div>
-              </div>
+                    <Separator />
+                    <div className="flex items-center justify-between p-3 sm:p-4 border rounded-lg gap-3 sm:gap-4">
+                      <div className="space-y-0.5 min-w-0 flex-1">
+                        <Label className="text-sm sm:text-base">SMS Notifications</Label>
+                        <p className="text-xs sm:text-sm text-muted-foreground">Receive SMS alerts for reminders and deadlines</p>
+                      </div>
+                      <Switch 
+                        checked={notificationPreferences.smsNotifications}
+                        onCheckedChange={async (checked) => {
+                          setNotificationPreferences(prev => ({ ...prev, smsNotifications: checked }))
+                          
+                          // Auto-save on toggle
+                          if (!user?.uid) {
+                            toast.error("User not authenticated")
+                            return
+                          }
+                          
+                          try {
+                            const result = await userService.updatePreferences(user.uid, {
+                              currency: profile?.preferences?.currency || 'NGN',
+                              theme: profile?.preferences?.theme || 'system',
+                              notifications: notificationPreferences.emailNotifications || checked, // Legacy field
+                              emailNotifications: notificationPreferences.emailNotifications,
+                              smsNotifications: checked
+                            })
+                            
+                            if (result.success) {
+                              toast.success(`SMS notifications ${checked ? 'enabled' : 'disabled'}`)
+                              refetchProfile()
+                            } else {
+                              toast.error(result.error || "Failed to save preferences")
+                              // Revert on error
+                              setNotificationPreferences(prev => ({ ...prev, smsNotifications: !checked }))
+                            }
+                          } catch (error) {
+                            console.error("Error saving preferences:", error)
+                            toast.error("Failed to save notification preferences")
+                            // Revert on error
+                            setNotificationPreferences(prev => ({ ...prev, smsNotifications: !checked }))
+                          }
+                        }}
+                        className="flex-shrink-0" 
+                      />
+                    </div>
+                  </div>
             </Card>
               </TabsContent>
 
@@ -901,23 +978,141 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   <div className="space-y-4 sm:space-y-5 md:space-y-6 max-w-2xl">
-                <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="current-password" className="text-xs sm:text-sm">Current Password</Label>
-                      <Input id="current-password" type="password" placeholder="Enter your current password" className="h-9 sm:h-10 text-xs sm:text-sm" />
-                </div>
-                <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="new-password" className="text-xs sm:text-sm">New Password</Label>
-                      <Input id="new-password" type="password" placeholder="Enter your new password" className="h-9 sm:h-10 text-xs sm:text-sm" />
-                </div>
-                <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="confirm-password" className="text-xs sm:text-sm">Confirm New Password</Label>
-                      <Input id="confirm-password" type="password" placeholder="Confirm your new password" className="h-9 sm:h-10 text-xs sm:text-sm" />
+                    <div className="space-y-1.5 sm:space-y-2">
+                      <Label htmlFor="current-password" className="text-xs sm:text-sm">Current Password</Label>
+                      <Input 
+                        id="current-password" 
+                        type="password" 
+                        placeholder="Enter your current password" 
+                        className="h-9 sm:h-10 text-xs sm:text-sm"
+                        value={passwordData.currentPassword}
+                        onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                        disabled={isUpdatingPassword}
+                      />
+                    </div>
+                    <div className="space-y-1.5 sm:space-y-2">
+                      <Label htmlFor="new-password" className="text-xs sm:text-sm">New Password</Label>
+                      <Input 
+                        id="new-password" 
+                        type="password" 
+                        placeholder="Enter your new password (min. 6 characters)" 
+                        className="h-9 sm:h-10 text-xs sm:text-sm"
+                        value={passwordData.newPassword}
+                        onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                        disabled={isUpdatingPassword}
+                      />
+                    </div>
+                    <div className="space-y-1.5 sm:space-y-2">
+                      <Label htmlFor="confirm-password" className="text-xs sm:text-sm">Confirm New Password</Label>
+                      <Input 
+                        id="confirm-password" 
+                        type="password" 
+                        placeholder="Confirm your new password" 
+                        className="h-9 sm:h-10 text-xs sm:text-sm"
+                        value={passwordData.confirmPassword}
+                        onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                        disabled={isUpdatingPassword}
+                      />
+                      {passwordData.newPassword && passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword && (
+                        <p className="text-xs text-destructive mt-1">Passwords do not match</p>
+                      )}
                     </div>
                     <div className="flex justify-end pt-2 sm:pt-4">
-                      <Button size="lg" className="h-9 sm:h-10 md:h-11 text-xs sm:text-sm md:text-base w-full sm:w-auto">Update Password</Button>
-                </div>
-              </div>
-            </Card>
+                      <Button 
+                        size="lg" 
+                        className="h-9 sm:h-10 md:h-11 text-xs sm:text-sm md:text-base w-full sm:w-auto"
+                        onClick={async () => {
+                          if (!user?.email) {
+                            toast.error("User not authenticated")
+                            return
+                          }
+
+                          // Validation
+                          if (!passwordData.currentPassword) {
+                            toast.error("Please enter your current password")
+                            return
+                          }
+
+                          if (!passwordData.newPassword) {
+                            toast.error("Please enter a new password")
+                            return
+                          }
+
+                          if (passwordData.newPassword.length < 6) {
+                            toast.error("Password must be at least 6 characters long")
+                            return
+                          }
+
+                          if (passwordData.newPassword !== passwordData.confirmPassword) {
+                            toast.error("Passwords do not match")
+                            return
+                          }
+
+                          if (passwordData.currentPassword === passwordData.newPassword) {
+                            toast.error("New password must be different from current password")
+                            return
+                          }
+
+                          setIsUpdatingPassword(true)
+                          try {
+                            const currentUser = auth.currentUser
+                            if (!currentUser || !currentUser.email) {
+                              toast.error("User not authenticated")
+                              return
+                            }
+
+                            // Reauthenticate user with current password
+                            const credential = EmailAuthProvider.credential(
+                              currentUser.email,
+                              passwordData.currentPassword
+                            )
+                            
+                            await reauthenticateWithCredential(currentUser, credential)
+
+                            // Update password
+                            await updatePassword(currentUser, passwordData.newPassword)
+
+                            toast.success("Password updated successfully!")
+                            
+                            // Clear form
+                            setPasswordData({
+                              currentPassword: '',
+                              newPassword: '',
+                              confirmPassword: ''
+                            })
+                          } catch (error: any) {
+                            console.error("Error updating password:", error)
+                            
+                            let errorMessage = "Failed to update password"
+                            if (error.code === 'auth/wrong-password') {
+                              errorMessage = "Current password is incorrect"
+                            } else if (error.code === 'auth/weak-password') {
+                              errorMessage = "Password is too weak. Please choose a stronger password"
+                            } else if (error.code === 'auth/requires-recent-login') {
+                              errorMessage = "Please log out and log back in before changing your password"
+                            } else if (error.message) {
+                              errorMessage = error.message
+                            }
+                            
+                            toast.error(errorMessage)
+                          } finally {
+                            setIsUpdatingPassword(false)
+                          }
+                        }}
+                        disabled={isUpdatingPassword || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword || passwordData.newPassword !== passwordData.confirmPassword}
+                      >
+                        {isUpdatingPassword ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-2 animate-spin" />
+                            Updating...
+                          </>
+                        ) : (
+                          "Update Password"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </Card>
               </TabsContent>
             </div>
           </Tabs>

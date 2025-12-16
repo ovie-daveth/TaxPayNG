@@ -294,8 +294,10 @@ export class UserService extends BaseService {
       await this.update(profile.id, {
         preferences: {
           ...profile.preferences,
-          ...preferences
-        }
+          ...preferences,
+          updatedAt: new Date().toISOString()
+        },
+        updatedAt: new Date().toISOString()
       })
 
       const updatedProfile = await this.getById(profile.id)

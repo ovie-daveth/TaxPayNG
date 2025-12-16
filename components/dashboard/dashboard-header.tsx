@@ -173,9 +173,9 @@ export function DashboardHeader() {
         return {
           title: "Settings",
           subtitle: "Manage your account and preferences",
-          buttonText: "Save Changes",
+          buttonText: "",
           buttonIcon: Settings,
-          buttonAction: () => console.log("Save settings")
+          buttonAction: () => {}
         }
       default:
         return {

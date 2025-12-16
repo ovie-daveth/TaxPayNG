@@ -36,8 +36,10 @@ export interface UserProfile {
   updatedAt: string
   preferences?: {
     currency: string
-    notifications: boolean
+    notifications: boolean // Legacy field - kept for backward compatibility
     theme: 'light' | 'dark' | 'system'
+    emailNotifications?: boolean // Email notifications for reminders
+    smsNotifications?: boolean // SMS notifications for reminders
   }
   // Subscription fields
   isSubscribe?: boolean
