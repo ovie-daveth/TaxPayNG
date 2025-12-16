@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Calculator, LayoutDashboard, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight } from "lucide-react"
+import OtaxLogo from "../OtaxLogo"
 import { useState } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { useAuth } from "@/lib/hooks/useAuth"
@@ -119,10 +120,8 @@ export function DashboardNavCreator() {
       <header className="md:hidden sticky top-0 z-50 bg-card border-b border-border">
         <div className="flex items-center justify-between p-4">
           <Link href="/dashboard-creator" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Calculator className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <span className="font-semibold text-lg">OTax Creators</span>
+            <OtaxLogo />
+            <span className="text-xs text-muted-foreground ml-1">Creators</span>
           </Link>
           <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}

@@ -6,10 +6,95 @@ import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { Card } from "@/components/ui/card"
 import { ReportTemplates } from "@/components/reports/report-templates"
 import { RecentReports } from "@/components/reports/recent-reports"
-import { FileText, TrendingUp, Loader2 } from "lucide-react"
+import { FileText, TrendingUp, Loader2, Plus, ChevronDown } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useSubscription } from "@/lib/hooks/useSubscription"
 import { reportService } from "@/lib/services"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { useRouter } from "next/navigation"
+import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
+
+const reportTemplates = [
+  {
+    id: "self-assessment",
+    title: "Self-Assessment Filing",
+    href: "/dashboard/reports/generate/self-assessment",
+  },
+  {
+    id: "income-statement",
+    title: "Income Statement",
+    href: "/dashboard/reports/generate/income-statement",
+  },
+  {
+    id: "expense-report",
+    title: "Expense Report",
+    href: "/dashboard/reports/generate/expense-report",
+  },
+  {
+    id: "tax-summary",
+    title: "Tax Summary Report",
+    href: "/dashboard/reports/generate/tax-summary",
+  },
+]
+
+function MobileReportDropdown() {
+  const router = useRouter()
+  const { profile } = useUserProfile()
+  const { isSubscribed, loading: subscriptionLoading } = useSubscription()
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+
+  const handleGenerateClick = (href: string) => {
+    if (subscriptionLoading) {
+      return
+    }
+    if (!isSubscribed) {
+      setShowSubscriptionModal(true)
+      return
+    }
+    router.push(href)
+  }
+
+  return (
+    <>
+      <div className="sm:hidden">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button className="w-full" size="lg">
+              <Plus className="w-4 h-4 mr-2" />
+              Create New Report
+              <ChevronDown className="w-4 h-4 ml-2" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent className="w-[calc(100vw-2rem)]">
+            {reportTemplates.map((template) => (
+              <DropdownMenuItem
+                key={template.id}
+                onClick={() => handleGenerateClick(template.href)}
+                className="p-3"
+              >
+                <span className="text-sm">{template.title}</span>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+      {profile && profile.businessType !== 'agent' && (
+        <SubscriptionRequiredModal
+          open={showSubscriptionModal}
+          onOpenChange={setShowSubscriptionModal}
+          businessType={profile.businessType || 'freelancer'}
+        />
+      )}
+    </>
+  )
+}
 
 export default function ReportsPage() {
   const { user } = useAuth()
@@ -91,61 +176,66 @@ export default function ReportsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <DashboardNav />
-        <main className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 max-w-7xl">
+
+        <main className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 w-full">
           <div className="space-y-4 sm:space-y-6">
             {/* Quick Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <Card className="p-4 sm:p-5 md:p-6">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4">
+              <Card className="p-3 sm:p-4 md:p-5 lg:p-6">
                 <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs sm:text-sm text-muted-foreground mb-1">Reports Generated</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground mb-1">Reports Generated</p>
                     {stats.loading ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin text-muted-foreground" />
-                        <span className="text-xs sm:text-sm text-muted-foreground">Loading...</span>
+                      <div className="flex items-center gap-1.5">
+                        <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">Loading...</span>
                       </div>
                     ) : (
                       <>
-                        <p className="text-2xl sm:text-3xl font-bold">{stats.totalReports}</p>
+                        <p className="text-lg sm:text-2xl md:text-3xl font-bold">{stats.totalReports}</p>
                         {stats.reportsThisMonth > 0 && (
-                          <p className="text-xs text-green-600 mt-2">+{stats.reportsThisMonth} this month</p>
+                          <p className="text-xs text-green-600 mt-1 sm:mt-2">+{stats.reportsThisMonth} this month</p>
                         )}
                       </>
                     )}
                   </div>
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0 ml-1">
+                    <FileText className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-primary" />
                   </div>
                 </div>
               </Card>
-              <Card className="p-4 sm:p-5 md:p-6">
+              <Card className="p-3 sm:p-4 md:p-5 lg:p-6">
                 <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-xs sm:text-sm text-muted-foreground mb-1">Filings Submitted</p>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-muted-foreground mb-1">Filings Submitted</p>
                     {stats.loading ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin text-muted-foreground" />
-                        <span className="text-xs sm:text-sm text-muted-foreground">Loading...</span>
+                      <div className="flex items-center gap-1.5">
+                        <Loader2 className="w-3 h-3 sm:w-4 sm:h-4 animate-spin text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">Loading...</span>
                       </div>
                     ) : (
                       <>
-                        <p className="text-2xl sm:text-3xl font-bold">{stats.submittedFilings}</p>
+                        <p className="text-lg sm:text-2xl md:text-3xl font-bold">{stats.submittedFilings}</p>
                         {stats.pendingReview > 0 && (
-                          <p className="text-xs text-blue-600 mt-2">{stats.pendingReview} pending review</p>
+                          <p className="text-xs text-blue-600 mt-1 sm:mt-2">{stats.pendingReview} pending review</p>
                         )}
                       </>
                     )}
                   </div>
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <TrendingUp className="w-5 h-5 sm:w-6 sm:h-6 text-blue-600" />
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 ml-1">
+                    <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-blue-600" />
                   </div>
                 </div>
               </Card>
             </div>
 
-            {/* Report Templates */}
-            <ReportTemplates />
+            {/* Report Templates - Hidden on mobile, shown on desktop */}
+            <div className="hidden sm:block">
+              <ReportTemplates />
+            </div>
+
+            {/* Mobile: Dropdown button for report templates */}
+            <MobileReportDropdown />
 
             {/* Recent Reports */}
             <RecentReports />

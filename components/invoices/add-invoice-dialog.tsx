@@ -692,26 +692,26 @@ export function AddInvoiceDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-5xl max-h-[90vh] sm:max-h-[95vh] overflow-y-auto p-3 sm:p-4 md:p-6 hide-scrollbar">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-5xl max-h-[90vh] sm:max-h-[95vh] overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 hide-scrollbar">
         <DialogHeader className="pb-2 sm:pb-4">
           <DialogTitle className="text-base sm:text-lg md:text-xl">{invoice ? "Edit Invoice" : "Create New Invoice"}</DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleFormSubmit} className="space-y-4 sm:space-y-5 md:space-y-6">
+        <form onSubmit={handleFormSubmit} className="space-y-4 sm:space-y-5 md:space-y-6 max-w-full overflow-x-hidden">
           {/* Send to OTax User Option */}
           {formData.invoiceType === 'outgoing' && (
-            <div className="space-y-2 p-4 border rounded-lg bg-muted/30">
+            <div className="space-y-2 p-3 sm:p-4 border rounded-lg bg-muted/30">
               <div className="flex items-center gap-2">
                 <Checkbox
                   id="send-to-otax-user"
                   checked={formData.sendToOtaxUser || false}
                   onCheckedChange={(checked) => setFormData(prev => ({ ...prev, sendToOtaxUser: !!checked }))}
                 />
-                <Label htmlFor="send-to-otax-user" className="font-medium cursor-pointer">
+                <Label htmlFor="send-to-otax-user" className="font-medium cursor-pointer text-xs sm:text-sm">
                   Send to OTax User
                 </Label>
               </div>
-              <p className="text-xs text-muted-foreground ml-6">
+              <p className="text-xs text-muted-foreground ml-6 sm:ml-7">
                 If the recipient is an OTax user, they will receive this invoice in their account
               </p>
               {formData.sendToOtaxUser && (
@@ -804,7 +804,7 @@ export function AddInvoiceDialog({
               <h3 className="text-base sm:text-lg font-semibold">Your Business Information</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
-                  <Label htmlFor="supplier-name">Business/Contact Name *</Label>
+                  <Label htmlFor="supplier-name" className="text-xs sm:text-sm">Business/Contact Name *</Label>
                 <Input
                   id="supplier-name"
                   value={formData.supplier?.name || ""}
@@ -812,10 +812,11 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="Your business or name"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
-                  <Label htmlFor="supplier-business-name">Business Name (Optional)</Label>
+                  <Label htmlFor="supplier-business-name" className="text-xs sm:text-sm">Business Name (Optional)</Label>
                 <Input
                   id="supplier-business-name"
                   value={formData.supplier?.businessName || ""}
@@ -823,6 +824,7 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="Registered business name"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
             </div>
@@ -837,10 +839,11 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="your@email.com"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
-                  <Label htmlFor="supplier-phone">Phone</Label>
+                  <Label htmlFor="supplier-phone" className="text-xs sm:text-sm">Phone</Label>
                 <Input
                   id="supplier-phone"
                   value={formData.supplier?.phone || ""}
@@ -848,11 +851,12 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="+234 800 000 0000"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="supplier-address">Address</Label>
+              <Label htmlFor="supplier-address" className="text-xs sm:text-sm">Address</Label>
               <Input
                 id="supplier-address"
                 value={formData.supplier?.address?.street || ""}
@@ -860,6 +864,7 @@ export function AddInvoiceDialog({
                 onKeyDown={handleInputKeyDown}
                 onClick={(e) => e.stopPropagation()}
                 placeholder="Street address"
+                className="h-9 sm:h-10 text-xs sm:text-sm"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
@@ -926,14 +931,14 @@ export function AddInvoiceDialog({
           )}
 
           {/* Client Information */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Client Information</h3>
-            <p className="text-sm text-muted-foreground">
+          <div className="space-y-3 sm:space-y-4">
+            <h3 className="text-base sm:text-lg font-semibold">Client Information</h3>
+            <p className="text-xs sm:text-sm text-muted-foreground">
               The client who will receive this invoice
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
-                <Label htmlFor="client-name">Client Name *</Label>
+                <Label htmlFor="client-name" className="text-xs sm:text-sm">Client Name *</Label>
                 <Input
                   id="client-name"
                   value={formData.client.name}
@@ -941,10 +946,11 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="Enter client name"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="client-business-name">Business Name (Optional)</Label>
+                <Label htmlFor="client-business-name" className="text-xs sm:text-sm">Business Name (Optional)</Label>
                 <Input
                   id="client-business-name"
                   value={formData.client.businessName || ""}
@@ -952,12 +958,13 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="Client's business name"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <div className="space-y-2">
-                <Label htmlFor="client-email">Email</Label>
+                <Label htmlFor="client-email" className="text-xs sm:text-sm">Email</Label>
                 <Input
                   id="client-email"
                   type="email"
@@ -966,10 +973,11 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="client@example.com"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="client-phone">Phone</Label>
+                <Label htmlFor="client-phone" className="text-xs sm:text-sm">Phone</Label>
                 <Input
                   id="client-phone"
                   value={formData.client.phone || ""}
@@ -977,10 +985,11 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="+234 800 000 0000"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="client-tax-id">Tax ID</Label>
+                <Label htmlFor="client-tax-id" className="text-xs sm:text-sm">Tax ID</Label>
                 <Input
                   id="client-tax-id"
                   value={formData.client.taxId || ""}
@@ -988,15 +997,16 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="Optional"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
             </div>
           </div>
 
           {/* Invoice Dates */}
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="space-y-2">
-              <Label htmlFor="issue-date">Issue Date</Label>
+              <Label htmlFor="issue-date" className="text-xs sm:text-sm">Issue Date</Label>
               <Input
                 id="issue-date"
                 type="date"
@@ -1004,10 +1014,11 @@ export function AddInvoiceDialog({
                 onChange={(e) => setFormData(prev => ({ ...prev, issueDate: e.target.value }))}
                 onKeyDown={handleInputKeyDown}
                 onClick={(e) => e.stopPropagation()}
+                className="h-9 sm:h-10 text-xs sm:text-sm"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="due-date">Due Date</Label>
+              <Label htmlFor="due-date" className="text-xs sm:text-sm">Due Date</Label>
               <Input
                 id="due-date"
                 type="date"
@@ -1015,6 +1026,7 @@ export function AddInvoiceDialog({
                 onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
                 onKeyDown={handleInputKeyDown}
                 onClick={(e) => e.stopPropagation()}
+                className="h-9 sm:h-10 text-xs sm:text-sm"
               />
             </div>
           </div>
@@ -1047,40 +1059,42 @@ export function AddInvoiceDialog({
           </div>
 
           {/* Invoice Items */}
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Items</h3>
-              <Button type="button" variant="outline" size="sm" onClick={addItem}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Item
+          <div className="space-y-3 sm:space-y-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+              <h3 className="text-base sm:text-lg font-semibold">Items</h3>
+              <Button type="button" variant="outline" size="sm" onClick={addItem} className="h-8 sm:h-9 text-xs sm:text-sm w-full sm:w-auto">
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                <span className="hidden sm:inline">Add Item</span>
+                <span className="sm:hidden">Add</span>
               </Button>
             </div>
             
             {/* Note about Item Tax (for non-VAT items) */}
             <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
-              <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-              <AlertDescription className="text-sm text-blue-900 dark:text-blue-100">
+              <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
+              <AlertDescription className="text-xs sm:text-sm text-blue-900 dark:text-blue-100">
                 <strong>Note:</strong> Item-level tax is for specific item taxes only. VAT (7.5%) will be calculated at invoice level and added to the subtotal.
               </AlertDescription>
             </Alert>
             
-            <div className="space-y-4">
+            <div className="space-y-3 sm:space-y-4">
               {formData.items.map((item, index) => (
-                <div key={item.id} className="space-y-4 p-4 border rounded-lg flex items-center gap-4">
+                <div key={item.id} className="space-y-3 sm:space-y-4 p-3 sm:p-4 border rounded-lg flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
                   {/* Row 1: Description and Quantity */}
-                  <div className="flex items-center gap-4">
-                    <div className="md:col-span-2 space-y-2">
-                      <Label>Description</Label>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 flex-1">
+                    <div className="flex-1 space-y-2">
+                      <Label className="text-xs sm:text-sm">Description</Label>
                       <Input
                         value={item.description}
                         onChange={(e) => updateItem(item.id, { description: e.target.value })}
                         onKeyDown={handleInputKeyDown}
                         onClick={(e) => e.stopPropagation()}
                         placeholder="Item description"
+                        className="h-9 sm:h-10 text-xs sm:text-sm"
                       />
                     </div>
-                    <div className="space-y-2 w-20">
-                      <Label>Quantity</Label>
+                    <div className="space-y-2 w-full sm:w-20 flex-shrink-0">
+                      <Label className="text-xs sm:text-sm">Quantity</Label>
                       <Input
                         type="number"
                         min="1"
@@ -1088,16 +1102,16 @@ export function AddInvoiceDialog({
                         onChange={(e) => updateItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
                         onKeyDown={handleInputKeyDown}
                         onClick={(e) => e.stopPropagation()}
-                        className="w-full"
+                        className="w-full h-9 sm:h-10 text-xs sm:text-sm"
                       />
                     </div>
                   </div>
 
                   {/* Row 2: Unit Price, Vatable, and Amount */}
-                  <div className="flex items-center gap-4 -mt-3">
-                    <div className="md:col-span-2 space-y-2">
-                       <div className="flex items-center justify-between">
-                         <Label>Unit Price</Label>
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+                    <div className="flex-1 space-y-2 min-w-0">
+                       <div className="flex items-center justify-between gap-2">
+                         <Label className="text-xs sm:text-sm">Unit Price</Label>
                          {(() => {
                            const itemCurrency = itemCurrencies[item.id] || formData.currency
                            const needsConversion = itemCurrency !== formData.currency && item.unitPrice > 0
@@ -1111,7 +1125,7 @@ export function AddInvoiceDialog({
                            return (
                              <Tooltip>
                                <TooltipTrigger asChild>
-                                 <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                                 <Info className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground cursor-help flex-shrink-0" />
                                </TooltipTrigger>
                                <TooltipContent className="bg-blue-600 text-white border-blue-600">
                                  <p className="font-medium mb-1">Exchange Rate</p>
@@ -1128,7 +1142,7 @@ export function AddInvoiceDialog({
                           value={itemCurrencies[item.id] || formData.currency}
                           onValueChange={(value) => handleItemCurrencyChange(item.id, value as CurrencyCode)}
                         >
-                          <SelectTrigger className="w-24">
+                          <SelectTrigger className="w-16 sm:w-20 md:w-24 h-9 sm:h-10 text-xs sm:text-sm flex-shrink-0">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -1146,16 +1160,16 @@ export function AddInvoiceDialog({
                           onChange={(e) => handleUnitPriceChange(item.id, e.target.value)}
                           onKeyDown={handleInputKeyDown}
                           onClick={(e) => e.stopPropagation()}
-                          className="text-lg font-medium flex-1"  
+                          className="text-sm sm:text-lg font-medium flex-1 min-w-0 h-9 sm:h-10"  
                         />
                       </div>
                     </div>
-                    <div className="space-y-2 flex-1 min-w-[140px]">
-                     <div className="flex items-center justify-between">
-                     <Label>Amount ({getCurrencySymbol(formData.currency)})</Label>
+                    <div className="space-y-2 flex-1 min-w-0 sm:min-w-[100px]">
+                     <div className="flex items-center justify-between gap-2">
+                     <Label className="text-xs sm:text-sm">Amount ({getCurrencySymbol(formData.currency)})</Label>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <Info className="w-4 h-4 text-muted-foreground cursor-help" />
+                              <Info className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground cursor-help flex-shrink-0" />
                             </TooltipTrigger>
                             <TooltipContent className="bg-blue-600 text-white border-blue-600">
                               <p>Amount is calculated as Quantity × Unit Price</p>
@@ -1164,7 +1178,7 @@ export function AddInvoiceDialog({
                      </div>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <div className="h-9 px-3 py-2 rounded-md border border-input bg-muted text-base font-semibold flex items-center justify-end cursor-help min-w-0">
+                          <div className="h-9 px-2 sm:px-3 py-2 rounded-md border border-input bg-muted text-xs sm:text-base font-semibold flex items-center justify-end cursor-help min-w-0">
                             <span className="truncate text-right w-full">
                               {getCurrencySymbol(formData.currency)} {calculateItemAmount(item).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </span>
@@ -1178,20 +1192,20 @@ export function AddInvoiceDialog({
                       </Tooltip>
                       {/* <p className="text-xs text-muted-foreground">Qty × Unit Price</p> */}
                     </div>
-                    <div className="space-y-2 flex flex-col justify-end">
-                      <div className="flex items-center space-x-2 pt-6">
+                    <div className="space-y-2 flex flex-col justify-end flex-shrink-0">
+                      <div className="flex items-center space-x-2 sm:pt-0 pt-2">
                         <Checkbox
                           id={`vatable-${item.id}`}
                           checked={item.vatable || false}
                           onCheckedChange={(checked) => updateItem(item.id, { vatable: !!checked })}
                           onClick={(e) => e.stopPropagation()}
                         />
-                        <div className="flex flex-col">
-                          <Label htmlFor={`vatable-${item.id}`} className="text-sm cursor-pointer">
+                        <div className="flex flex-col min-w-0">
+                          <Label htmlFor={`vatable-${item.id}`} className="text-xs sm:text-sm cursor-pointer">
                             Vatable
                           </Label>
                           {item.vatable && (
-                            <p className="text-xs text-muted-foreground mt-1">
+                            <p className="text-xs text-muted-foreground mt-1 break-words">
                               VAT: {getCurrencySymbol(formData.currency)}{(calculateItemAmount(item) * (formData.vatRate || 7.5) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             </p>
                           )}
@@ -1224,9 +1238,9 @@ export function AddInvoiceDialog({
           </div>
 
           {/* VAT Section */}
-          <div className="space-y-4 border-t pt-4">
+          <div className="space-y-3 sm:space-y-4 border-t pt-3 sm:pt-4">
             <div className="space-y-2">
-              <Label htmlFor="vat-rate">VAT Rate (%)</Label>
+              <Label htmlFor="vat-rate" className="text-xs sm:text-sm">VAT Rate (%)</Label>
               <Input
                 id="vat-rate"
                 type="number"
@@ -1237,15 +1251,16 @@ export function AddInvoiceDialog({
                 onChange={(e) => setFormData(prev => ({ ...prev, vatRate: parseFloat(e.target.value) || 7.5 }))}
                 onKeyDown={handleInputKeyDown}
                 onClick={(e) => e.stopPropagation()}
+                className="h-9 sm:h-10 text-xs sm:text-sm"
               />
               <p className="text-xs text-muted-foreground">Default: 7.5% (Nigeria VAT rate)</p>
             </div>
           </div>
 
           {/* Discount Section */}
-          <div className="space-y-4 border-t pt-4">
+          <div className="space-y-3 sm:space-y-4 border-t pt-3 sm:pt-4">
             <div className="space-y-2">
-              <Label htmlFor="discount">Discount %</Label>
+              <Label htmlFor="discount" className="text-xs sm:text-sm">Discount %</Label>
               <Input
                 id="discount"
                 type="number"
@@ -1256,41 +1271,42 @@ export function AddInvoiceDialog({
                 onChange={(e) => setFormData(prev => ({ ...prev, discount: parseFloat(e.target.value) || 0 }))}
                 onKeyDown={handleInputKeyDown}
                 onClick={(e) => e.stopPropagation()}
+                className="h-9 sm:h-10 text-xs sm:text-sm"
               />
             </div>
           </div>
 
           {/* Payment Summary Totals */}
-          <div className="space-y-3 border-t pt-4 bg-muted/30 p-4 rounded-lg">
-            <h4 className="font-semibold text-sm mb-3">Payment Summary</h4>
-            <div className="flex justify-between items-center text-sm">
+          <div className="space-y-2 sm:space-y-3 border-t pt-3 sm:pt-4 bg-muted/30 p-3 sm:p-4 rounded-lg">
+            <h4 className="font-semibold text-xs sm:text-sm mb-2 sm:mb-3">Payment Summary</h4>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-0 text-xs sm:text-sm">
               <span>Subtotal:</span>
-              <span className="font-medium">{getCurrencySymbol(formData.currency)} {totals.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="font-medium whitespace-nowrap">{getCurrencySymbol(formData.currency)} {totals.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
             {formData.discount > 0 && (
-              <div className="flex justify-between items-center text-sm text-destructive">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-0 text-xs sm:text-sm text-destructive">
                 <span>Discount ({formData.discount}%):</span>
-                <span>-{getCurrencySymbol(formData.currency)} {(totals.subtotal * formData.discount / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                <span className="whitespace-nowrap">-{getCurrencySymbol(formData.currency)} {(totals.subtotal * formData.discount / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             )}
-            <div className="flex justify-between items-center text-sm">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-0 text-xs sm:text-sm">
               <span>VAT ({formData.vatRate || 7.5}%):</span>
-              <span className="font-medium">{getCurrencySymbol(formData.currency)} {totals.vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="font-medium whitespace-nowrap">{getCurrencySymbol(formData.currency)} {totals.vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
-            <div className="flex justify-between items-center text-sm font-semibold border-t pt-2 mt-2">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-0 text-xs sm:text-sm font-semibold border-t pt-2 mt-2">
               <span>Invoice Total:</span>
-              <span>{getCurrencySymbol(formData.currency)} {totals.invoiceTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="whitespace-nowrap">{getCurrencySymbol(formData.currency)} {totals.invoiceTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
-            <div className="flex justify-between items-center text-lg font-bold border-t pt-2 mt-2">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-0 text-sm sm:text-lg font-bold border-t pt-2 mt-2">
               <span>Amount Payable:</span>
-              <span className="text-primary">{getCurrencySymbol(formData.currency)} {totals.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              <span className="text-primary whitespace-nowrap">{getCurrencySymbol(formData.currency)} {totals.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
           </div>
 
           {/* Additional Fields */}
-          <div className="grid md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="space-y-2">
-              <Label htmlFor="payment-terms">Payment Terms</Label>
+              <Label htmlFor="payment-terms" className="text-xs sm:text-sm">Payment Terms</Label>
               <Input
                 id="payment-terms"
                 value={formData.paymentTerms}
@@ -1298,12 +1314,13 @@ export function AddInvoiceDialog({
                 onKeyDown={handleInputKeyDown}
                 onClick={(e) => e.stopPropagation()}
                 placeholder="e.g., Net 30"
+                className="h-9 sm:h-10 text-xs sm:text-sm"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="notes">Notes</Label>
+            <Label htmlFor="notes" className="text-xs sm:text-sm">Notes</Label>
             <Textarea
               id="notes"
               value={formData.notes}
@@ -1312,11 +1329,12 @@ export function AddInvoiceDialog({
               onClick={(e) => e.stopPropagation()}
               placeholder="Additional notes or comments"
               rows={3}
+              className="text-xs sm:text-sm"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="terms">Terms & Conditions</Label>
+            <Label htmlFor="terms" className="text-xs sm:text-sm">Terms & Conditions</Label>
             <Textarea
               id="terms"
               value={formData.terms}
@@ -1325,11 +1343,12 @@ export function AddInvoiceDialog({
               onClick={(e) => e.stopPropagation()}
               placeholder="Terms and conditions"
               rows={3}
+              className="text-xs sm:text-sm"
             />
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="payment-instructions">Payment Instructions</Label>
+            <Label htmlFor="payment-instructions" className="text-xs sm:text-sm">Payment Instructions</Label>
             <Textarea
               id="payment-instructions"
               value={formData.paymentInstructions}
@@ -1338,6 +1357,7 @@ export function AddInvoiceDialog({
               onClick={(e) => e.stopPropagation()}
               placeholder="Payment instructions, bank details, payment link, or other payment information"
               rows={3}
+              className="text-xs sm:text-sm"
             />
             <p className="text-xs text-muted-foreground">
               Include bank account details, payment links, or any specific payment instructions for your client.
@@ -1345,18 +1365,15 @@ export function AddInvoiceDialog({
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-2 pt-4 border-t">
-            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <div className="flex flex-col sm:flex-row justify-end gap-2 pt-3 sm:pt-4 border-t">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)} className="h-9 sm:h-10 text-xs sm:text-sm w-full sm:w-auto">
               Cancel
             </Button>
-            {/* <Button type="button" onClick={handleSubmit} disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+            <Button type="button" onClick={handleSubmit} disabled={isSubmitting || isSendingToUser} className="h-9 sm:h-10 text-xs sm:text-sm w-full sm:w-auto">
+              {(isSubmitting || isSendingToUser) && <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />}
               {invoice ? "Update Invoice" : "Create Invoice"}
-            </Button> */}
-<Button type="button" onClick={handleSubmit} disabled={isSubmitting || isSendingToUser}>
-  {(isSubmitting || isSendingToUser) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-  {invoice ? "Update Invoice" : "Create Invoice"}
-</Button>          </div>
+            </Button>
+          </div>
         </form>
       </DialogContent>
       {profile && profile.businessType !== 'agent' && (

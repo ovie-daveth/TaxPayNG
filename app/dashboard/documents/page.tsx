@@ -143,8 +143,8 @@ export default function DocumentsPage() {
 
             {/* Error Message */}
             {error && (
-              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
-                <p className="text-destructive text-sm">{error}</p>
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 sm:p-4">
+                <p className="text-destructive text-xs sm:text-sm">{error}</p>
               </div>
             )}
 
@@ -180,15 +180,15 @@ export default function DocumentsPage() {
               )}
 
               {/* Infinite Scroll Trigger */}
-              <div ref={loadMoreRef} className="h-20 flex items-center justify-center">
+              <div ref={loadMoreRef} className="h-16 sm:h-20 flex items-center justify-center">
                 {loadingMore && (
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    <span className="text-sm">Loading more documents...</span>
+                    <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                    <span className="text-xs sm:text-sm">Loading more documents...</span>
                   </div>
                 )}
                 {!hasMore && documents.length > 0 && (
-                  <p className="text-sm text-muted-foreground">No more documents to load</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">No more documents to load</p>
                 )}
               </div>
             </div>

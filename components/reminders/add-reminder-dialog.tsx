@@ -139,64 +139,68 @@ export function AddReminderDialog({ open, onOpenChange, onSubmit, editingReminde
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
-        <DialogHeader>
-          <DialogTitle>{isEditMode ? 'Edit Reminder' : 'Add Reminder'}</DialogTitle>
+      <DialogContent className="max-w-2xl w-[calc(100vw-2rem)] sm:w-full p-3 sm:p-4 md:p-6">
+        <DialogHeader className="pb-2 sm:pb-3">
+          <DialogTitle className="text-base sm:text-lg md:text-xl">{isEditMode ? 'Edit Reminder' : 'Add Reminder'}</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-          <div className="space-y-2">
-            <Label htmlFor="reminder-title">Title *</Label>
+        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 mt-2 sm:mt-4 overflow-x-hidden">
+          <div className="space-y-1.5 sm:space-y-2">
+            <Label htmlFor="reminder-title" className="text-xs sm:text-sm">Title *</Label>
             <Input 
               id="reminder-title" 
               placeholder="e.g., Q1 Tax Payment Due" 
               value={formData.title}
               onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
               required 
+              className="h-9 sm:h-10 text-xs sm:text-sm"
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="reminder-description">Description (Optional)</Label>
+          <div className="space-y-1.5 sm:space-y-2">
+            <Label htmlFor="reminder-description" className="text-xs sm:text-sm">Description (Optional)</Label>
             <Textarea 
               id="reminder-description" 
               placeholder="Add details about this reminder..." 
               rows={3}
               value={formData.description}
               onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              className="text-xs sm:text-sm resize-none"
             />
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="reminder-date">Due Date *</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label htmlFor="reminder-date" className="text-xs sm:text-sm">Due Date *</Label>
               <Input 
                 id="reminder-date" 
                 type="date" 
                 value={formData.dueDate}
                 onChange={(e) => setFormData(prev => ({ ...prev, dueDate: e.target.value }))}
                 required 
+                className="h-9 sm:h-10 text-xs sm:text-sm"
               />
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="reminder-time">Due Time *</Label>
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label htmlFor="reminder-time" className="text-xs sm:text-sm">Due Time *</Label>
               <Input 
                 id="reminder-time" 
                 type="time" 
                 value={formData.dueTime}
                 onChange={(e) => setFormData(prev => ({ ...prev, dueTime: e.target.value }))}
                 required 
+                className="h-9 sm:h-10 text-xs sm:text-sm"
               />
             </div>
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="reminder-type">Type</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label htmlFor="reminder-type" className="text-xs sm:text-sm">Type</Label>
               <Select 
                 value={formData.type}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, type: value as Reminder['type'] }))}
               >
-                <SelectTrigger id="reminder-type">
+                <SelectTrigger id="reminder-type" className="h-9 sm:h-10 text-xs sm:text-sm">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -207,13 +211,13 @@ export function AddReminderDialog({ open, onOpenChange, onSubmit, editingReminde
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="reminder-priority">Priority</Label>
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label htmlFor="reminder-priority" className="text-xs sm:text-sm">Priority</Label>
               <Select
                 value={formData.priority}
                 onValueChange={(value) => setFormData(prev => ({ ...prev, priority: value as Reminder['priority'] }))}
               >
-                <SelectTrigger id="reminder-priority">
+                <SelectTrigger id="reminder-priority" className="h-9 sm:h-10 text-xs sm:text-sm">
                   <SelectValue placeholder="Select priority" />
                 </SelectTrigger>
                 <SelectContent>
@@ -225,11 +229,11 @@ export function AddReminderDialog({ open, onOpenChange, onSubmit, editingReminde
             </div>
           </div>
 
-          <div className="flex gap-3 pt-4">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2 sm:pt-4">
             <Button
               type="button"
               variant="outline"
-              className="flex-1 bg-transparent"
+              className="flex-1 bg-transparent h-9 sm:h-10 text-xs sm:text-sm"
               onClick={() => onOpenChange(false)}
               disabled={isSubmitting}
             >
@@ -237,12 +241,12 @@ export function AddReminderDialog({ open, onOpenChange, onSubmit, editingReminde
             </Button>
             <Button 
               type="submit" 
-              className="flex-1"
+              className="flex-1 h-9 sm:h-10 text-xs sm:text-sm"
               disabled={!formData.title || !formData.dueDate || !formData.dueTime || isSubmitting}
             >
               {isSubmitting ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
                   {isEditMode ? 'Updating...' : 'Creating...'}
                 </>
               ) : (

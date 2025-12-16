@@ -75,18 +75,18 @@ export function ReminderStats({ getReminderStats }: ReminderStatsProps) {
   }, [getReminderStats])
 
   return (
-    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
       {stats.map((stat) => {
         const Icon = stat.icon
         return (
-          <Card key={stat.label} className="p-6">
+          <Card key={stat.label} className="p-3 sm:p-4 md:p-6">
             <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground mb-1">{stat.label}</p>
-                <p className="text-3xl font-bold">{stat.value}</p>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1 truncate">{stat.label}</p>
+                <p className="text-xl sm:text-2xl md:text-3xl font-bold">{stat.value}</p>
               </div>
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${stat.color}`}>
-                <Icon className="w-6 h-6" />
+              <div className={`w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${stat.color}`}>
+                <Icon className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6" />
               </div>
             </div>
           </Card>

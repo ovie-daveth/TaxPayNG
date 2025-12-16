@@ -13,11 +13,11 @@ import { transactionService } from "@/lib/services"
 function getFileIcon(fileType: string) {
   switch (fileType) {
     case "pdf":
-      return <FileText className="w-5 h-5" />
+      return <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
     case "image":
-      return <ImageIcon className="w-5 h-5" />
+      return <ImageIcon className="w-4 h-4 sm:w-5 sm:h-5" />
     default:
-      return <File className="w-5 h-5" />
+      return <File className="w-4 h-4 sm:w-5 sm:h-5" />
   }
 }
 
@@ -128,10 +128,10 @@ export function DocumentList({ documents, onView, onDownload, onDelete }: Docume
   if (documents.length === 0) {
     return (
       <Card className="overflow-hidden">
-        <div className="text-center py-12">
-          <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-          <h3 className="text-lg font-medium mb-2">No documents yet</h3>
-          <p className="text-muted-foreground">Upload your first document to get started.</p>
+        <div className="text-center py-8 sm:py-10 md:py-12">
+          <FileText className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 sm:mb-4 text-muted-foreground" />
+          <h3 className="text-base sm:text-lg font-medium mb-2">No documents yet</h3>
+          <p className="text-xs sm:text-sm text-muted-foreground px-2">Upload your first document to get started.</p>
         </div>
       </Card>
     )
@@ -141,29 +141,29 @@ export function DocumentList({ documents, onView, onDownload, onDelete }: Docume
     <Card className="overflow-hidden">
       <div className="divide-y divide-border">
         {documents.map((doc) => (
-          <div key={doc.id} className="p-4 hover:bg-muted/30 transition-colors">
-            <div className="flex items-center gap-4">
+          <div key={doc.id} className="p-3 sm:p-4 hover:bg-muted/30 transition-colors">
+            <div className="flex items-start sm:items-center gap-2 sm:gap-3 md:gap-4">
               <div
-                className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${getTypeColor(doc.type)}`}
+                className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${getTypeColor(doc.type)}`}
               >
                 {getFileIcon(doc.fileType)}
               </div>
 
               <div className="flex-1 min-w-0">
-                <h3 className="font-medium text-sm mb-1 truncate">{doc.name}</h3>
-                <div className="flex items-center gap-3 flex-wrap">
+                <h3 className="font-medium text-xs sm:text-sm mb-1 truncate">{doc.name}</h3>
+                <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 flex-wrap">
                   <Badge variant="secondary" className="text-xs capitalize">
                     {doc.type}
                   </Badge>
-                  <span className="text-xs text-muted-foreground">{formatFileSize(doc.size)}</span>
-                  <span className="text-xs text-muted-foreground">•</span>
+                  <span className="text-xs text-muted-foreground hidden sm:inline">{formatFileSize(doc.size)}</span>
+                  <span className="text-xs text-muted-foreground hidden sm:inline">•</span>
                   <span className="text-xs text-muted-foreground">{formatDate(doc.uploadedAt)}</span>
                   {doc.linkedTransaction && (
                     <>
-                      <span className="text-xs text-muted-foreground">•</span>
+                      <span className="text-xs text-muted-foreground hidden sm:inline">•</span>
                       <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <LinkIcon className="w-3 h-3" />
-                        <span className="truncate max-w-[200px]">
+                        <LinkIcon className="w-3 h-3 flex-shrink-0" />
+                        <span className="truncate max-w-[120px] sm:max-w-[200px]">
                           {transactionDescriptions[doc.linkedTransaction] || doc.linkedTransaction}
                         </span>
                       </div>
@@ -171,8 +171,8 @@ export function DocumentList({ documents, onView, onDownload, onDelete }: Docume
                   )}
                   {doc.notes && (
                     <>
-                      <span className="text-xs text-muted-foreground">•</span>
-                      <span className="text-xs text-muted-foreground truncate max-w-[200px]" title={doc.notes}>
+                      <span className="text-xs text-muted-foreground hidden sm:inline">•</span>
+                      <span className="text-xs text-muted-foreground truncate max-w-[120px] sm:max-w-[200px]" title={doc.notes}>
                         {doc.notes}
                       </span>
                     </>
@@ -180,17 +180,17 @@ export function DocumentList({ documents, onView, onDownload, onDelete }: Docume
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <Button variant="ghost" size="icon" onClick={() => onView(doc)}>
-                  <Eye className="w-4 h-4" />
+              <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                <Button variant="ghost" size="icon" onClick={() => onView(doc)} className="h-7 w-7 sm:h-8 sm:w-8">
+                  <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </Button>
-                <Button variant="ghost" size="icon" onClick={() => handleDownload(doc)}>
-                  <Download className="w-4 h-4" />
+                <Button variant="ghost" size="icon" onClick={() => handleDownload(doc)} className="h-7 w-7 sm:h-8 sm:w-8">
+                  <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </Button>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <MoreVertical className="w-4 h-4" />
+                    <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8">
+                      <MoreVertical className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">

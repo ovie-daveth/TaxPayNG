@@ -7,6 +7,7 @@ import { formatCurrencyAmount } from "@/lib/utils/currency"
 import { format } from "date-fns"
 import { Printer, ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
 
 interface IncomeStatementPreviewProps {
   reportData: ReportData
@@ -18,7 +19,10 @@ interface IncomeStatementPreviewProps {
 }
 
 export function IncomeStatementPreview({ reportData, formData, onBack }: IncomeStatementPreviewProps) {
+  const { profile } = useUserProfile()
   const formatCurrency = (amount: number) => formatCurrencyAmount(amount, 'NGN')
+  
+  const userName = profile?.firstName || profile?.lastName || profile?.email?.split('@')[0] || 'there'
   
   const periodLabel = reportData.period.periodType === 'annual' 
     ? `Annual ${reportData.period.year}`
@@ -147,55 +151,57 @@ export function IncomeStatementPreview({ reportData, formData, onBack }: IncomeS
   }
 
   return (
-    <Card className="p-8 max-w-4xl mx-auto">
+    <Card className="p-3 sm:p-4 md:p-6 lg:p-8 max-w-4xl mx-auto">
       {/* Action Buttons */}
-      <div className="flex gap-3 mb-6 justify-between">
+      <div className="flex flex-row gap-2 sm:gap-3 mb-4 sm:mb-6 justify-between items-center">
         {onBack && (
           <Button
             variant="outline"
             onClick={onBack}
+            className="h-8 sm:h-10 text-xs sm:text-sm"
           >
-            <ArrowLeft className="w-4 h-4 mr-2" />
+            <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
             Back
           </Button>
         )}
-        <div className={onBack ? "flex gap-3" : "flex gap-3 ml-auto"}>
-          <Button
-            variant="outline"
-            onClick={handlePrint}
-          >
-            <Printer className="w-4 h-4 mr-2" />
-            Print Statement
-          </Button>
-        </div>
+        <Button
+          variant="outline"
+          onClick={handlePrint}
+          className="h-8 sm:h-10 text-xs sm:text-sm ml-auto"
+        >
+          <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+          <span className="hidden sm:inline">Print Statement</span>
+          <span className="sm:hidden">Print</span>
+        </Button>
       </div>
 
-      <div className="space-y-8">
+      <div className="space-y-4 sm:space-y-6 md:space-y-8">
         {/* Header */}
-        <div className="text-center border-b border-border pb-6">
-          <h1 className="text-2xl font-bold mb-2">INCOME STATEMENT</h1>
-          <p className="text-sm text-muted-foreground">Period: {periodLabel}</p>
+        <div className="text-center border-b border-border pb-3 sm:pb-4 md:pb-6">
+          <p className="text-xs sm:text-sm md:text-base text-muted-foreground mb-1 sm:mb-2">Hey {userName}, your income statement</p>
+          <h1 className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-2">INCOME STATEMENT</h1>
+          <p className="text-xs sm:text-sm text-muted-foreground">Period: {periodLabel}</p>
         </div>
 
         {/* Total Income */}
-        <div className="bg-blue-50 border-l-4 border-blue-500 p-6 rounded">
+        <div className="bg-blue-50 dark:bg-blue-950/20 border-l-4 border-blue-500 dark:border-blue-400 p-3 sm:p-4 md:p-6 rounded">
           <div className="flex justify-between items-center">
-            <span className="text-lg font-semibold">Total Income</span>
-            <span className="text-2xl font-bold text-blue-600">{formatCurrency(incomeData.totalIncome)}</span>
+            <span className="text-sm sm:text-base md:text-lg font-semibold">Total Income</span>
+            <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(incomeData.totalIncome)}</span>
           </div>
         </div>
 
         {/* Income by Category */}
         {Object.keys(incomeData.incomeByCategory).length > 0 && (
           <div>
-            <h2 className="text-lg font-semibold mb-4 border-b border-border pb-2">Income by Category</h2>
+            <h2 className="text-sm sm:text-base md:text-lg font-semibold mb-3 sm:mb-4 border-b border-border pb-2">Income by Category</h2>
             <div className="space-y-2">
               {Object.entries(incomeData.incomeByCategory)
                 .sort(([, a], [, b]) => b - a)
                 .map(([category, amount]) => (
-                  <div key={category} className="flex justify-between py-2 border-b border-border">
-                    <span className="text-muted-foreground">{category}</span>
-                    <span className="font-medium">{formatCurrency(amount)}</span>
+                  <div key={category} className="flex justify-between py-1.5 sm:py-2 border-b border-border">
+                    <span className="text-xs sm:text-sm text-muted-foreground">{category}</span>
+                    <span className="text-xs sm:text-sm font-medium">{formatCurrency(amount)}</span>
                   </div>
                 ))}
             </div>
@@ -205,14 +211,14 @@ export function IncomeStatementPreview({ reportData, formData, onBack }: IncomeS
         {/* Income by Source */}
         {Object.keys(incomeData.incomeBySource).length > 0 && (
           <div>
-            <h2 className="text-lg font-semibold mb-4 border-b border-border pb-2">Income by Source</h2>
+            <h2 className="text-sm sm:text-base md:text-lg font-semibold mb-3 sm:mb-4 border-b border-border pb-2">Income by Source</h2>
             <div className="space-y-2">
               {Object.entries(incomeData.incomeBySource)
                 .sort(([, a], [, b]) => b - a)
                 .map(([source, amount]) => (
-                  <div key={source} className="flex justify-between py-2 border-b border-border">
-                    <span className="text-muted-foreground">{source}</span>
-                    <span className="font-medium">{formatCurrency(amount)}</span>
+                  <div key={source} className="flex justify-between py-1.5 sm:py-2 border-b border-border">
+                    <span className="text-xs sm:text-sm text-muted-foreground">{source}</span>
+                    <span className="text-xs sm:text-sm font-medium">{formatCurrency(amount)}</span>
                   </div>
                 ))}
             </div>
@@ -220,8 +226,8 @@ export function IncomeStatementPreview({ reportData, formData, onBack }: IncomeS
         )}
 
         {/* Summary */}
-        <div className="border-t border-border pt-6">
-          <div className="grid grid-cols-2 gap-4 text-sm">
+        <div className="border-t border-border pt-4 sm:pt-6">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm">
             <div>
               <p className="text-muted-foreground">Total Transactions</p>
               <p className="font-medium">{incomeData.transactionCount}</p>

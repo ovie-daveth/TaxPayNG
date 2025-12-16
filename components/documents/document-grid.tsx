@@ -13,11 +13,11 @@ import { transactionService } from "@/lib/services"
 function getFileIcon(fileType: string) {
   switch (fileType) {
     case "pdf":
-      return <FileText className="w-8 h-8" />
+      return <FileText className="w-6 h-6 sm:w-8 sm:h-8" />
     case "image":
-      return <ImageIcon className="w-8 h-8" />
+      return <ImageIcon className="w-6 h-6 sm:w-8 sm:h-8" />
     default:
-      return <File className="w-8 h-8" />
+      return <File className="w-6 h-6 sm:w-8 sm:h-8" />
   }
 }
 
@@ -135,26 +135,26 @@ export function DocumentGrid({ documents, onView, onDownload, onDelete }: Docume
 
   if (documents.length === 0) {
     return (
-      <div className="text-center py-12">
-        <FileText className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-        <h3 className="text-lg font-medium mb-2">No documents yet</h3>
-        <p className="text-muted-foreground">Upload your first document to get started.</p>
+      <div className="text-center py-8 sm:py-10 md:py-12">
+        <FileText className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-3 sm:mb-4 text-muted-foreground" />
+        <h3 className="text-base sm:text-lg font-medium mb-2">No documents yet</h3>
+        <p className="text-xs sm:text-sm text-muted-foreground px-2">Upload your first document to get started.</p>
       </div>
     )
   }
 
   return (
-    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
       {documents.map((doc) => (
-        <Card key={doc.id} className="p-4 hover:shadow-lg transition-shadow">
-          <div className="flex items-start justify-between mb-3">
-            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${getTypeColor(doc.type)}`}>
+        <Card key={doc.id} className="p-3 sm:p-4 hover:shadow-lg transition-shadow">
+          <div className="flex items-start justify-between mb-2 sm:mb-3">
+            <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center ${getTypeColor(doc.type)}`}>
               {getFileIcon(doc.fileType)}
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon">
-                  <MoreVertical className="w-4 h-4" />
+                <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8">
+                  <MoreVertical className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
@@ -177,9 +177,9 @@ export function DocumentGrid({ documents, onView, onDownload, onDelete }: Docume
             </DropdownMenu>
           </div>
 
-          <h3 className="font-medium text-sm mb-2 line-clamp-2">{doc.name}</h3>
+          <h3 className="font-medium text-xs sm:text-sm mb-2 line-clamp-2">{doc.name}</h3>
 
-          <div className="flex items-center gap-2 mb-3">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-2 sm:mb-3">
             <Badge variant="secondary" className="text-xs capitalize">
               {doc.type}
             </Badge>
@@ -187,7 +187,7 @@ export function DocumentGrid({ documents, onView, onDownload, onDelete }: Docume
           </div>
 
           {doc.linkedTransaction && (
-            <div className="bg-muted/50 rounded p-2 mb-3">
+            <div className="bg-muted/50 rounded p-1.5 sm:p-2 mb-2 sm:mb-3">
               <p className="text-xs text-muted-foreground mb-0.5">Linked to:</p>
               <p className="text-xs font-medium truncate">
                 {transactionDescriptions[doc.linkedTransaction] || doc.linkedTransaction}
@@ -196,8 +196,8 @@ export function DocumentGrid({ documents, onView, onDownload, onDelete }: Docume
           )}
 
           {doc.notes && (
-            <div className="bg-muted/30 rounded p-2 mb-3">
-              <p className="text-xs text-muted-foreground">{doc.notes}</p>
+            <div className="bg-muted/30 rounded p-1.5 sm:p-2 mb-2 sm:mb-3">
+              <p className="text-xs text-muted-foreground line-clamp-2">{doc.notes}</p>
             </div>
           )}
 

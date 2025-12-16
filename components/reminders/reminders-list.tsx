@@ -183,24 +183,25 @@ export function RemindersList({
   return (
     <div className="space-y-6">
       {/* Upcoming Reminders */}
-      <Card className="p-6">
-        <div className="mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-semibold">Upcoming Reminders</h2>
-              <p className="text-sm text-muted-foreground mt-1">Your scheduled reminders and deadlines</p>
+      <Card className="p-3 sm:p-4 md:p-6">
+        <div className="mb-4 sm:mb-5 md:mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base sm:text-lg md:text-xl font-semibold">Upcoming Reminders</h2>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">Your scheduled reminders and deadlines</p>
             </div>
             {upcomingReminders.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 {selectedUpcomingCount > 0 ? (
                   <>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-xs sm:text-sm text-muted-foreground">
                       {selectedUpcomingCount} selected
                     </span>
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={deselectAll}
+                      className="h-7 sm:h-8 text-xs sm:text-sm"
                     >
                       Clear
                     </Button>
@@ -208,14 +209,19 @@ export function RemindersList({
                       size="sm"
                       onClick={handleBulkComplete}
                       disabled={isCompletingBatch}
+                      className="h-7 sm:h-8 text-xs sm:text-sm"
                     >
                       {isCompletingBatch ? (
                         <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Completing...
+                          <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
+                          <span className="hidden sm:inline">Completing...</span>
+                          <span className="sm:hidden">...</span>
                         </>
                       ) : (
-                        `Complete ${selectedUpcomingCount}`
+                        <>
+                          <span className="hidden sm:inline">Complete {selectedUpcomingCount}</span>
+                          <span className="sm:hidden">Complete</span>
+                        </>
                       )}
                     </Button>
                   </>
@@ -224,6 +230,7 @@ export function RemindersList({
                     variant="outline" 
                     size="sm"
                     onClick={() => selectAll(upcomingReminders)}
+                    className="h-7 sm:h-8 text-xs sm:text-sm"
                   >
                     Select All
                   </Button>
@@ -233,11 +240,11 @@ export function RemindersList({
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           {upcomingReminders.length === 0 ? (
-            <div className="text-center py-8">
-              <Bell className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-              <p className="text-muted-foreground">No upcoming reminders</p>
+            <div className="text-center py-6 sm:py-8">
+              <Bell className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 sm:mb-3 text-muted-foreground" />
+              <p className="text-xs sm:text-sm text-muted-foreground">No upcoming reminders</p>
             </div>
           ) : (
             upcomingReminders.map((reminder) => {
@@ -247,43 +254,43 @@ export function RemindersList({
               return (
                 <div
                   key={reminder.id}
-                  className={`flex items-start gap-4 p-4 border border-border rounded-lg hover:bg-muted/30 transition-colors ${
+                  className={`flex items-start gap-2 sm:gap-3 md:gap-4 p-3 sm:p-4 border border-border rounded-lg hover:bg-muted/30 transition-colors ${
                     selectedReminders.has(reminder.id) ? 'bg-muted/50 border-primary' : ''
                   }`}
                 >
                   <Checkbox 
                     id={`reminder-${reminder.id}`} 
-                    className="mt-1" 
+                    className="mt-1 flex-shrink-0" 
                     checked={selectedReminders.has(reminder.id)}
                     onCheckedChange={() => toggleSelection(reminder.id)}
                   />
                   <div
-                    className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${getPriorityColor(reminder.priority)}`}
+                    className={`w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${getPriorityColor(reminder.priority)}`}
                   >
-                    <Icon className="w-5 h-5" />
+                    <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2 mb-1">
-                      <h3 className="font-medium text-sm">{reminder.title}</h3>
+                      <h3 className="font-medium text-xs sm:text-sm truncate">{reminder.title}</h3>
                       <Badge variant="outline" className="text-xs capitalize flex-shrink-0">
                         {reminder.priority}
                       </Badge>
                     </div>
                     {reminder.description && (
-                      <p className="text-sm text-muted-foreground mb-2">{reminder.description}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground mb-1.5 sm:mb-2 line-clamp-2">{reminder.description}</p>
                     )}
-                    <div className="flex items-center gap-3 text-xs">
+                    <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 text-xs flex-wrap">
                       <span className="text-muted-foreground">{new Date(reminder.dueDate).toLocaleDateString()}</span>
-                      <span className="text-muted-foreground">•</span>
+                      <span className="text-muted-foreground hidden sm:inline">•</span>
                       <span className={dateStatus.color}>{dateStatus.text}</span>
                     </div>
                   </div>
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="flex-shrink-0">
-                        <MoreVertical className="w-4 h-4" />
+                      <Button variant="ghost" size="icon" className="flex-shrink-0 h-7 w-7 sm:h-8 sm:w-8">
+                        <MoreVertical className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
@@ -308,24 +315,25 @@ export function RemindersList({
       </Card>
 
       {/* Completed Reminders */}
-      <Card className="p-6">
-        <div className="mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-semibold">Completed Reminders</h2>
-              <p className="text-sm text-muted-foreground mt-1">Your completed tasks and deadlines</p>
+      <Card className="p-3 sm:p-4 md:p-6">
+        <div className="mb-4 sm:mb-5 md:mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-base sm:text-lg md:text-xl font-semibold">Completed Reminders</h2>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1">Your completed tasks and deadlines</p>
             </div>
             {completedReminders.length > 0 && (
-              <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 {selectedCompletedCount > 0 ? (
                   <>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-xs sm:text-sm text-muted-foreground">
                       {selectedCompletedCount} selected
                     </span>
                     <Button 
                       variant="outline" 
                       size="sm"
                       onClick={deselectAll}
+                      className="h-7 sm:h-8 text-xs sm:text-sm"
                     >
                       Clear
                     </Button>
@@ -334,14 +342,19 @@ export function RemindersList({
                       variant="outline"
                       onClick={handleBulkMarkIncomplete}
                       disabled={isCompletingBatch}
+                      className="h-7 sm:h-8 text-xs sm:text-sm"
                     >
                       {isCompletingBatch ? (
                         <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Updating...
+                          <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
+                          <span className="hidden sm:inline">Updating...</span>
+                          <span className="sm:hidden">...</span>
                         </>
                       ) : (
-                        `Reopen ${selectedCompletedCount}`
+                        <>
+                          <span className="hidden sm:inline">Reopen {selectedCompletedCount}</span>
+                          <span className="sm:hidden">Reopen</span>
+                        </>
                       )}
                     </Button>
                   </>
@@ -350,6 +363,7 @@ export function RemindersList({
                     variant="outline" 
                     size="sm"
                     onClick={() => selectAll(completedReminders)}
+                    className="h-7 sm:h-8 text-xs sm:text-sm"
                   >
                     Select All
                   </Button>
@@ -359,11 +373,11 @@ export function RemindersList({
           </div>
         </div>
 
-        <div className="space-y-3">
+        <div className="space-y-2 sm:space-y-3">
           {completedReminders.length === 0 ? (
-            <div className="text-center py-8">
-              <Bell className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-              <p className="text-muted-foreground">No completed reminders</p>
+            <div className="text-center py-6 sm:py-8">
+              <Bell className="w-10 h-10 sm:w-12 sm:h-12 mx-auto mb-2 sm:mb-3 text-muted-foreground" />
+              <p className="text-xs sm:text-sm text-muted-foreground">No completed reminders</p>
             </div>
           ) : (
             completedReminders.map((reminder) => {
@@ -371,36 +385,36 @@ export function RemindersList({
               return (
                 <div 
                   key={reminder.id} 
-                  className={`flex items-start gap-4 p-4 border border-border rounded-lg opacity-60 ${
+                  className={`flex items-start gap-2 sm:gap-3 md:gap-4 p-3 sm:p-4 border border-border rounded-lg opacity-60 ${
                     selectedReminders.has(reminder.id) ? 'bg-muted/50 border-primary opacity-100' : ''
                   }`}
                 >
                   <Checkbox 
                     id={`reminder-${reminder.id}`} 
                     checked={selectedReminders.has(reminder.id)}
-                    className="mt-1"
+                    className="mt-1 flex-shrink-0"
                     onCheckedChange={() => toggleSelection(reminder.id)}
                   />
-                  <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
-                    <Icon className="w-5 h-5" />
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center flex-shrink-0 bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
+                    <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
                   </div>
 
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-medium text-sm line-through">{reminder.title}</h3>
+                    <h3 className="font-medium text-xs sm:text-sm line-through truncate">{reminder.title}</h3>
                     {reminder.description && (
-                      <p className="text-sm text-muted-foreground mb-2">{reminder.description}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground mb-1.5 sm:mb-2 line-clamp-2">{reminder.description}</p>
                     )}
-                    <div className="flex items-center gap-3 text-xs">
+                    <div className="flex items-center gap-1.5 sm:gap-2 md:gap-3 text-xs flex-wrap">
                       <span className="text-muted-foreground">{new Date(reminder.dueDate).toLocaleDateString()}</span>
-                      <span className="text-muted-foreground">•</span>
+                      <span className="text-muted-foreground hidden sm:inline">•</span>
                       <span className="text-green-600 dark:text-green-400">Completed</span>
                     </div>
                   </div>
 
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="flex-shrink-0">
-                        <MoreVertical className="w-4 h-4" />
+                      <Button variant="ghost" size="icon" className="flex-shrink-0 h-7 w-7 sm:h-8 sm:w-8">
+                        <MoreVertical className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">

@@ -242,29 +242,30 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-3 sm:px-4 py-6 sm:py-8 md:py-12">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/20 to-background px-4 py-6 sm:px-6 sm:py-8">
       <div className="w-full max-w-md">
-        <div className="bg-card border border-border rounded-xl p-4 sm:p-6 md:p-8 shadow-lg">
+        <div className="bg-card/95 backdrop-blur-sm border border-border/50 rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-10 shadow-2xl shadow-primary/5">
           {/* Logo */}
-          <div className="flex items-center justify-center gap-2 mb-6 sm:mb-8">
-            {/* <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-              <Calculator className="w-6 h-6 text-primary-foreground" />
-            </div> */}
-             <div className="w-8 h-8 bg-primary text-primary-foreground font-bold rounded-lg flex items-center justify-center">
+          <div className="flex items-center justify-center gap-2.5 mb-8 sm:mb-10">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold rounded-xl sm:rounded-2xl flex items-center justify-center text-lg sm:text-xl shadow-lg shadow-primary/25">
               O
             </div>
-            <span className="font-semibold text-2xl">OTax</span>
+            <span className="font-bold text-2xl sm:text-3xl bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">OTax</span>
           </div>
 
-          <div className="text-center mb-8">
-            <h1 className="text-2xl font-bold mb-2">Create your account</h1>
-            <p className="text-sm text-muted-foreground">Start managing your taxes in minutes</p>
+          <div className="text-center mb-8 sm:mb-10">
+            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-3 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
+              Create your account
+            </h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Start managing your taxes in minutes
+            </p>
           </div>
 
-          <form className="space-y-4" onSubmit={handleSubmit}>
+          <form className="space-y-5 sm:space-y-6" onSubmit={handleSubmit}>
             {/* Business Type - First Field */}
             <div className="space-y-2">
-              <Label htmlFor="businessType">Business Type</Label>
+              <Label htmlFor="businessType" className="text-sm font-medium">Business Type</Label>
               <Select 
                 value={formData.businessType}
                 onValueChange={(value) => {
@@ -277,7 +278,7 @@ export default function SignupPage() {
                   setFormData(prev => ({ ...prev, businessType: value as AllowedBusinessType }))
                 }}
               >
-                <SelectTrigger id="businessType">
+                <SelectTrigger id="businessType" className="h-11 sm:h-12 text-base border-2">
                   <SelectValue placeholder="Select business type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -291,7 +292,7 @@ export default function SignupPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="fullName">
+              <Label htmlFor="fullName" className="text-sm font-medium">
                 {businessNameLabel}
               </Label>
               <Input 
@@ -301,11 +302,12 @@ export default function SignupPage() {
                 value={formData.fullName}
                 onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
                 required 
+                className="h-11 sm:h-12 text-base border-2 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-sm font-medium">Email</Label>
               <Input 
                 id="email" 
                 type="email" 
@@ -313,6 +315,7 @@ export default function SignupPage() {
                 value={formData.email}
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                 required 
+                className="h-11 sm:h-12 text-base border-2 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
             </div>
 
@@ -320,7 +323,7 @@ export default function SignupPage() {
             {isAgent && (
               <>
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number *</Label>
+                  <Label htmlFor="phone" className="text-sm font-medium">Phone Number *</Label>
                   <Input 
                     id="phone" 
                     type="tel" 
@@ -328,6 +331,7 @@ export default function SignupPage() {
                     value={formData.phone}
                     onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                     required 
+                    className="h-11 sm:h-12 text-base border-2 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
                   />
                   <p className="text-xs text-muted-foreground">
                     Required for agent registration
@@ -335,13 +339,13 @@ export default function SignupPage() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label>States You Can Handle *</Label>
-                  <p className="text-xs text-muted-foreground mb-2">
+                  <Label className="text-sm font-medium">States You Can Handle *</Label>
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-3">
                     Select all states where you can provide tax filing services
                   </p>
-                  <div className="border rounded-lg p-4 max-h-48 overflow-y-auto space-y-2">
+                  <div className="border-2 rounded-xl p-4 max-h-48 sm:max-h-56 overflow-y-auto space-y-2.5 bg-muted/30">
                     {NIGERIAN_STATES.map((state) => (
-                      <div key={state} className="flex items-center space-x-2">
+                      <div key={state} className="flex items-center space-x-2.5">
                         <Checkbox
                           id={`state-${state}`}
                           checked={formData.agentStates.includes(state)}
@@ -361,16 +365,16 @@ export default function SignupPage() {
                         />
                         <Label
                           htmlFor={`state-${state}`}
-                          className="text-sm font-normal cursor-pointer flex items-center gap-2"
+                          className="text-sm font-normal cursor-pointer flex items-center gap-2 hover:text-primary transition-colors"
                         >
-                          <MapPin className="w-3 h-3" />
+                          <MapPin className="w-3.5 h-3.5" />
                           {state}
                         </Label>
                       </div>
                     ))}
                   </div>
                   {formData.agentStates.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-2">
                       {formData.agentStates.length} state{formData.agentStates.length !== 1 ? 's' : ''} selected
                     </p>
                   )}
@@ -379,7 +383,7 @@ export default function SignupPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password" className="text-sm font-medium">Password</Label>
               <div className="relative group">
                 <Input 
                   id="password" 
@@ -388,12 +392,12 @@ export default function SignupPage() {
                   value={formData.password}
                   onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
                   required 
-                  className="pr-12 transition-all group-hover:border-primary/60 group-hover:shadow-[0_0_12px_rgba(34,197,94,0.25)]"
+                  className="h-11 sm:h-12 text-base border-2 pr-12 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(prev => !prev)}
-                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-primary transition-colors"
+                  className="absolute inset-y-0 right-0 flex items-center px-4 text-muted-foreground hover:text-primary transition-colors"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -402,7 +406,7 @@ export default function SignupPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
+              <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password</Label>
               <div className="relative group">
                 <Input 
                   id="confirmPassword" 
@@ -411,12 +415,12 @@ export default function SignupPage() {
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
                   required 
-                  className="pr-12 transition-all group-hover:border-primary/60 group-hover:shadow-[0_0_12px_rgba(34,197,94,0.25)]"
+                  className="h-11 sm:h-12 text-base border-2 pr-12 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(prev => !prev)}
-                  className="absolute inset-y-0 right-0 flex items-center px-3 text-muted-foreground hover:text-primary transition-colors"
+                  className="absolute inset-y-0 right-0 flex items-center px-4 text-muted-foreground hover:text-primary transition-colors"
                   aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
                 >
                   {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -424,21 +428,36 @@ export default function SignupPage() {
               </div>
             </div>
 
-            <Button type="submit" className="w-full" size="lg" disabled={isLoading}>
-              {isLoading ? "Creating Account..." : "Create Account"}
+            <Button 
+              type="submit" 
+              className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300" 
+              size="lg" 
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <span className="flex items-center gap-2">
+                  <span className="animate-spin">⏳</span>
+                  Creating Account...
+                </span>
+              ) : (
+                "Create Account"
+              )}
             </Button>
           </form>
 
-          <div className="mt-6 text-center text-sm">
-            <span className="text-muted-foreground">Already have an account? </span>
-            <Link href="/login" className="text-primary font-medium hover:underline">
+          <div className="mt-6 sm:mt-8 text-center">
+            <span className="text-sm sm:text-base text-muted-foreground">Already have an account? </span>
+            <Link href="/login" className="text-sm sm:text-base text-primary font-semibold hover:underline transition-colors">
               Log in
             </Link>
           </div>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-8">
-          By continuing, you agree to our Terms of Service and Privacy Policy
+        <p className="text-center text-xs sm:text-sm text-muted-foreground mt-6 sm:mt-8 px-4">
+          By continuing, you agree to our{" "}
+          <Link href="/terms" className="underline hover:text-foreground transition-colors">Terms of Service</Link>
+          {" "}and{" "}
+          <Link href="/privacy" className="underline hover:text-foreground transition-colors">Privacy Policy</Link>
         </p>
       </div>
 
@@ -453,15 +472,15 @@ export default function SignupPage() {
 
       {/* Coming Soon Modal */}
       <Dialog open={showComingSoonModal} onOpenChange={setShowComingSoonModal}>
-        <DialogContent>
+        <DialogContent className="w-[calc(100vw-2rem)] sm:w-full p-6 sm:p-8">
           <DialogHeader>
-            <DialogTitle>Coming Soon</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-lg sm:text-xl">Coming Soon</DialogTitle>
+            <DialogDescription className="text-sm sm:text-base mt-2">
               Large corporation features are currently under development. For now, we've set your account as a Small Business. You can manage your employees, payroll, and PAYE tax with our Small Business plan.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-end mt-4">
-            <Button onClick={() => setShowComingSoonModal(false)}>
+          <div className="flex justify-end mt-6">
+            <Button onClick={() => setShowComingSoonModal(false)} className="h-10 sm:h-11 text-sm sm:text-base">
               Got it
             </Button>
           </div>

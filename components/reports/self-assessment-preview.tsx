@@ -1082,19 +1082,10 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
   }
 
   return (
-    <Card className="p-3 sm:p-4 md:p-6 lg:p-8">
+    <Card className="p-2 sm:p-3 md:p-4 overflow-x-hidden max-w-full">
       {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-3 mb-4 sm:mb-6 justify-between">
-        {onBack && (
-          <Button
-            variant="outline"
-            onClick={onBack}
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
-        )}
-        <div className={onBack ? "flex gap-3" : "flex gap-3 ml-auto"}>
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-3 sm:mb-4 justify-end">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto sm:ml-auto">
           {showFileButton && reportId && !isEditing && (
             (() => {
               // Determine button text and icon based on filing status and method
@@ -1145,9 +1136,11 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                   }}
                   variant={buttonVariant}
                   disabled={isDisabled}
+                  className="h-9 sm:h-10 text-xs sm:text-sm w-full sm:w-auto"
                 >
-                  <ButtonIcon className="w-4 h-4 mr-2" />
-                  {buttonText}
+                  <ButtonIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                  <span className="hidden sm:inline">{buttonText}</span>
+                  <span className="sm:hidden">{buttonText.length > 15 ? buttonText.split(' ')[0] : buttonText}</span>
                 </Button>
               )
             })()
@@ -1155,18 +1148,20 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           <Button
             variant="outline"
             onClick={handlePrint}
+            className="h-9 sm:h-10 text-xs sm:text-sm w-full sm:w-auto"
           >
-            <Printer className="w-4 h-4 mr-2" />
-            Print Return
+            <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+            <span className="hidden sm:inline">Print Return</span>
+            <span className="sm:hidden">Print</span>
           </Button>
         </div>
       </div>
 
-      <div className="space-y-4 sm:space-y-6 md:space-y-8">
+      <div className="space-y-3 sm:space-y-4 md:space-y-6">
         {/* Cover Page Preview */}
-        <div className="text-center border-2 border-border p-4 sm:p-6 md:p-8 rounded-lg bg-muted/20">
+        <div className="text-center border-2 border-border p-3 sm:p-4 md:p-6 rounded-lg bg-muted/20">
           <h1 className="text-lg sm:text-xl md:text-2xl font-bold mb-3 sm:mb-4 uppercase">Personal Income Tax Return</h1>
-          <h2 className="text-base sm:text-lg font-semibold mb-4 sm:mb-6">Year of Assessment: {reportData.period.year}</h2>
+          <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Year of Assessment: {reportData.period.year}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm text-left">
             <div className="font-semibold">Taxpayer Name:</div>
             <div>{reportData.userInfo.name}</div>
@@ -1183,55 +1178,55 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
 
         {/* Part A: Personal & Employment Information */}
         <div>
-          <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 border-b-2 border-border pb-2 uppercase">Part A – Personal & Employment Information</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm">
+          <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 border-b-2 border-border pb-1.5 sm:pb-2 uppercase">Part A – Personal & Employment Information</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
             <div>
-              <Label className="text-muted-foreground font-semibold">Full Name</Label>
+              <Label className="text-xs sm:text-sm text-muted-foreground font-semibold">Full Name</Label>
               {isEditing ? (
                 <Input 
                   value={reportData.userInfo.name}
                   onChange={(e) => updateReportData({
                     userInfo: { ...reportData.userInfo, name: e.target.value }
                   })}
-                  className="mt-1"
+                  className="mt-1 h-9 sm:h-10 text-xs sm:text-sm"
                 />
               ) : (
-                <p className="font-medium">{reportData.userInfo.name}</p>
+                <p className="font-medium text-xs sm:text-sm mt-1">{reportData.userInfo.name}</p>
               )}
             </div>
             <div>
-              <Label className="text-muted-foreground font-semibold">TIN / NIN</Label>
+              <Label className="text-xs sm:text-sm text-muted-foreground font-semibold">TIN / NIN</Label>
               {isEditing ? (
                 <Input 
                   value={reportData.userInfo.tin || ''}
                   onChange={(e) => updateReportData({
                     userInfo: { ...reportData.userInfo, tin: e.target.value }
                   })}
-                  className="mt-1"
+                  className="mt-1 h-9 sm:h-10 text-xs sm:text-sm"
                   placeholder="Enter TIN/NIN"
                 />
               ) : (
-                <p className="font-medium">{reportData.userInfo.tin || 'N/A'}</p>
+                <p className="font-medium text-xs sm:text-sm mt-1">{reportData.userInfo.tin || 'N/A'}</p>
               )}
             </div>
             <div>
-              <Label className="text-muted-foreground font-semibold">Date of Birth</Label>
+              <Label className="text-xs sm:text-sm text-muted-foreground font-semibold">Date of Birth</Label>
               {isEditing ? (
                 <Input 
                   type="date"
                   value={personalInfo.dateOfBirth}
                   onChange={(e) => setPersonalInfo(prev => ({ ...prev, dateOfBirth: e.target.value }))}
-                  className="mt-1"
+                  className="mt-1 h-9 sm:h-10 text-xs sm:text-sm"
                 />
               ) : (
-                <p className="font-medium text-muted-foreground">{personalInfo.dateOfBirth || '_________________'}</p>
+                <p className="font-medium text-xs sm:text-sm text-muted-foreground mt-1">{personalInfo.dateOfBirth || '_________________'}</p>
               )}
             </div>
             <div>
-              <Label className="text-muted-foreground font-semibold">Gender</Label>
+              <Label className="text-xs sm:text-sm text-muted-foreground font-semibold">Gender</Label>
               {isEditing ? (
                 <Select value={personalInfo.gender} onValueChange={(value) => setPersonalInfo(prev => ({ ...prev, gender: value }))}>
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="mt-1 h-9 sm:h-10 text-xs sm:text-sm">
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1240,14 +1235,14 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                   </SelectContent>
                 </Select>
               ) : (
-                <p className="font-medium">{personalInfo.gender ? (personalInfo.gender === 'male' ? '☑ Male ☐ Female' : '☐ Male ☑ Female') : '☐ Male ☐ Female'}</p>
+                <p className="font-medium text-xs sm:text-sm mt-1">{personalInfo.gender ? (personalInfo.gender === 'male' ? '☑ Male ☐ Female' : '☐ Male ☑ Female') : '☐ Male ☐ Female'}</p>
               )}
             </div>
             <div>
-              <Label className="text-muted-foreground font-semibold">Marital Status</Label>
+              <Label className="text-xs sm:text-sm text-muted-foreground font-semibold">Marital Status</Label>
               {isEditing ? (
                 <Select value={personalInfo.maritalStatus} onValueChange={(value) => setPersonalInfo(prev => ({ ...prev, maritalStatus: value }))}>
-                  <SelectTrigger className="mt-1">
+                  <SelectTrigger className="mt-1 h-9 sm:h-10 text-xs sm:text-sm">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1258,72 +1253,74 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                   </SelectContent>
                 </Select>
               ) : (
-                <p className="font-medium">
+                <p className="font-medium text-xs sm:text-sm mt-1">
                   {personalInfo.maritalStatus 
                     ? `☑ ${personalInfo.maritalStatus.charAt(0).toUpperCase() + personalInfo.maritalStatus.slice(1)}`
                     : '☐ Single ☐ Married ☐ Divorced ☐ Widowed'}
                 </p>
               )}
             </div>
-            <div>
-              <Label className="text-muted-foreground font-semibold">State / LGA of Residence</Label>
+            <div className="sm:col-span-2">
+              <Label className="text-xs sm:text-sm text-muted-foreground font-semibold">State / LGA of Residence</Label>
               {isEditing ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1">
                   <Input 
                     value={personalInfo.state}
                     onChange={(e) => setPersonalInfo(prev => ({ ...prev, state: e.target.value }))}
                     placeholder="State"
+                    className="h-9 sm:h-10 text-xs sm:text-sm"
                   />
                   <Input 
                     value={personalInfo.lga}
                     onChange={(e) => setPersonalInfo(prev => ({ ...prev, lga: e.target.value }))}
                     placeholder="LGA"
+                    className="h-9 sm:h-10 text-xs sm:text-sm"
                   />
                 </div>
               ) : (
-                <p className="font-medium">{personalInfo.state && personalInfo.lga ? `${personalInfo.state} / ${personalInfo.lga}` : (reportData.userInfo.address?.split(',')[1]?.trim() || '_________________')}</p>
+                <p className="font-medium text-xs sm:text-sm mt-1">{personalInfo.state && personalInfo.lga ? `${personalInfo.state} / ${personalInfo.lga}` : (reportData.userInfo.address?.split(',')[1]?.trim() || '_________________')}</p>
               )}
             </div>
-            <div className="col-span-2">
-              <Label className="text-muted-foreground font-semibold">Residential Address</Label>
+            <div className="sm:col-span-2">
+              <Label className="text-xs sm:text-sm text-muted-foreground font-semibold">Residential Address</Label>
               {isEditing ? (
                 <Input 
                   value={reportData.userInfo.address || ''}
                   onChange={(e) => updateReportData({
                     userInfo: { ...reportData.userInfo, address: e.target.value }
                   })}
-                  className="mt-1"
+                  className="mt-1 h-9 sm:h-10 text-xs sm:text-sm"
                   placeholder="Enter full address"
                 />
               ) : (
-                <p className="font-medium">{reportData.userInfo.address || '_________________'}</p>
+                <p className="font-medium text-xs sm:text-sm mt-1">{reportData.userInfo.address || '_________________'}</p>
               )}
             </div>
             <div>
-              <Label className="text-muted-foreground font-semibold">Contact Phone</Label>
+              <Label className="text-xs sm:text-sm text-muted-foreground font-semibold">Contact Phone</Label>
               {isEditing ? (
                 <Input 
                   value={personalInfo.contactPhone}
                   onChange={(e) => setPersonalInfo(prev => ({ ...prev, contactPhone: e.target.value }))}
-                  className="mt-1"
+                  className="mt-1 h-9 sm:h-10 text-xs sm:text-sm"
                   placeholder="Phone number"
                 />
               ) : (
-                <p className="font-medium text-muted-foreground">{personalInfo.contactPhone || '_________________'}</p>
+                <p className="font-medium text-xs sm:text-sm text-muted-foreground mt-1">{personalInfo.contactPhone || '_________________'}</p>
               )}
             </div>
             <div>
-              <Label className="text-muted-foreground font-semibold">Contact Email</Label>
+              <Label className="text-xs sm:text-sm text-muted-foreground font-semibold">Contact Email</Label>
               {isEditing ? (
                 <Input 
                   type="email"
                   value={personalInfo.contactEmail}
                   onChange={(e) => setPersonalInfo(prev => ({ ...prev, contactEmail: e.target.value }))}
-                  className="mt-1"
+                  className="mt-1 h-9 sm:h-10 text-xs sm:text-sm"
                   placeholder="Email address"
                 />
               ) : (
-                <p className="font-medium text-muted-foreground">{personalInfo.contactEmail || '_________________'}</p>
+                <p className="font-medium text-xs sm:text-sm text-muted-foreground mt-1">{personalInfo.contactEmail || '_________________'}</p>
               )}
             </div>
           </div>
@@ -1331,57 +1328,57 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
 
         {/* Part B: Statement of Income */}
         <div>
-          <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 border-b-2 border-border pb-2 uppercase">Part B – Statement of Income (All Sources)</h2>
+          <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 border-b-2 border-border pb-1.5 sm:pb-2 uppercase">Part B – Statement of Income (All Sources)</h2>
           
           {!isFreelancer && (
-            <div className="mb-6">
-              <h3 className="font-semibold mb-3">1. Employment Income (if any)</h3>
+            <div className="mb-3 sm:mb-4">
+              <h3 className="text-sm sm:text-base font-semibold mb-2 sm:mb-3">1. Employment Income (if any)</h3>
           <div className="space-y-2 text-xs sm:text-sm">
-                <div className="flex justify-between py-2 border-b border-border">
-                  <span className="text-muted-foreground">Basic Salary</span>
-                  <span className="font-medium">{formatCurrency(employmentIncome * 0.7)}</span>
+                <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
+                  <span className="text-muted-foreground text-xs sm:text-sm">Basic Salary</span>
+                  <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(employmentIncome * 0.7)}</span>
             </div>
-                <div className="flex justify-between py-2 border-b border-border">
-                  <span className="text-muted-foreground">Allowances (Housing, Transport, Utility, Leave, Overtime, Bonuses, etc.)</span>
-                  <span className="font-medium">{formatCurrency(employmentIncome * 0.3)}</span>
+                <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
+                  <span className="text-muted-foreground text-xs sm:text-sm break-words sm:break-normal">Allowances (Housing, Transport, Utility, Leave, Overtime, Bonuses, etc.)</span>
+                  <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(employmentIncome * 0.3)}</span>
             </div>
-                <div className="flex justify-between py-2 border-b border-border">
-                  <span className="text-muted-foreground">Benefits in Kind (BIK)</span>
-                  <span className="font-medium">₦0.00</span>
+                <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
+                  <span className="text-muted-foreground text-xs sm:text-sm">Benefits in Kind (BIK)</span>
+                  <span className="font-medium text-xs sm:text-sm whitespace-nowrap">₦0.00</span>
             </div>
-                <div className="flex justify-between py-3 border-t-2 border-border font-semibold">
+                <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 sm:py-3 border-t-2 border-border font-semibold text-xs sm:text-sm">
                   <span>Subtotal Employment Income</span>
-                  <span>{formatCurrency(employmentIncome)}</span>
+                  <span className="whitespace-nowrap">{formatCurrency(employmentIncome)}</span>
           </div>
         </div>
             </div>
           )}
 
-          <div className="mb-6">
-            <h3 className="font-semibold mb-3">{isFreelancer ? '1.' : '2.'} Business / Self-Employment Income</h3>
+          <div className="mb-4 sm:mb-6">
+            <h3 className="text-sm sm:text-base font-semibold mb-2 sm:mb-3">{isFreelancer ? '1.' : '2.'} Business / Self-Employment Income</h3>
           <div className="space-y-2 text-xs sm:text-sm">
               {businessIncomeCategories.length > 0 ? (
                 <>
                   {businessIncomeCategories.map((item, index) => (
-                    <div key={index} className="flex justify-between py-2 border-b border-border">
-                      <span className="text-muted-foreground">{item.category}</span>
-                      <span className="font-medium">{formatCurrency(item.amount)}</span>
+                    <div key={index} className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
+                      <span className="text-muted-foreground text-xs sm:text-sm">{item.category}</span>
+                      <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(item.amount)}</span>
             </div>
                   ))}
-                  <div className="flex justify-between py-3 border-t-2 border-border font-semibold">
+                  <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 sm:py-3 border-t-2 border-border font-semibold text-xs sm:text-sm">
                     <span>Subtotal Business Income</span>
-                    <span>{formatCurrency(businessIncome)}</span>
+                    <span className="whitespace-nowrap">{formatCurrency(businessIncome)}</span>
             </div>
                 </>
               ) : (
                 <>
-                  <div className="flex justify-between py-2 border-b border-border">
-                    <span className="text-muted-foreground">Gross receipts / revenue from business, freelance, services, gigs, etc.</span>
-                    <span className="font-medium">{formatCurrency(businessIncome)}</span>
+                  <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
+                    <span className="text-muted-foreground text-xs sm:text-sm break-words sm:break-normal">Gross receipts / revenue from business, freelance, services, gigs, etc.</span>
+                    <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(businessIncome)}</span>
             </div>
-                  <div className="flex justify-between py-3 border-t-2 border-border font-semibold">
+                  <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 sm:py-3 border-t-2 border-border font-semibold text-xs sm:text-sm">
                     <span>Subtotal Business Income</span>
-                    <span>{formatCurrency(businessIncome)}</span>
+                    <span className="whitespace-nowrap">{formatCurrency(businessIncome)}</span>
             </div>
                 </>
               )}
@@ -1389,52 +1386,52 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
         </div>
 
           {(isCreator || !isFreelancer) && (
-            <div className="mb-6">
-              <h3 className="font-semibold mb-3">{isFreelancer ? '2.' : '3.'} Other Income Sources</h3>
+            <div className="mb-3 sm:mb-4">
+              <h3 className="text-sm sm:text-base font-semibold mb-2 sm:mb-3">{isFreelancer ? '2.' : '3.'} Other Income Sources</h3>
               <div className="space-y-2 text-xs sm:text-sm">
-                <div className="flex justify-between py-2 border-b border-border">
-                  <span className="text-muted-foreground">Rental income</span>
-                  <span className="font-medium">{formatCurrency(reportData.income.incomeByCategory['Rental'] || 0)}</span>
+                <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
+                  <span className="text-muted-foreground text-xs sm:text-sm">Rental income</span>
+                  <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(reportData.income.incomeByCategory['Rental'] || 0)}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-border">
-                  <span className="text-muted-foreground">Dividends / Interest / Investment returns</span>
-                  <span className="font-medium">{formatCurrency(reportData.income.incomeByCategory['Investment'] || reportData.income.incomeByCategory['Dividend'] || 0)}</span>
+                <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
+                  <span className="text-muted-foreground text-xs sm:text-sm break-words sm:break-normal">Dividends / Interest / Investment returns</span>
+                  <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(reportData.income.incomeByCategory['Investment'] || reportData.income.incomeByCategory['Dividend'] || 0)}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-border">
-                  <span className="text-muted-foreground">Royalties, commissions, digital earnings, foreign income, etc.</span>
-                  <span className="font-medium">{formatCurrency(otherIncome)}</span>
+                <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
+                  <span className="text-muted-foreground text-xs sm:text-sm break-words sm:break-normal">Royalties, commissions, digital earnings, foreign income, etc.</span>
+                  <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(otherIncome)}</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-border">
-                  <span className="text-muted-foreground">Capital gains (if applicable)</span>
-                  <span className="font-medium">₦0.00</span>
+                <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
+                  <span className="text-muted-foreground text-xs sm:text-sm">Capital gains (if applicable)</span>
+                  <span className="font-medium text-xs sm:text-sm whitespace-nowrap">₦0.00</span>
                 </div>
-                <div className="flex justify-between py-2 border-b border-border">
-                  <span className="text-muted-foreground">Any other income</span>
-                  <span className="font-medium">{formatCurrency(Object.entries(reportData.income.incomeByCategory).reduce((sum, [cat, amt]) => {
+                <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
+                  <span className="text-muted-foreground text-xs sm:text-sm">Any other income</span>
+                  <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(Object.entries(reportData.income.incomeByCategory).reduce((sum, [cat, amt]) => {
                     if (!['Salary', 'Employment', 'Invoice Income', 'Rental', 'Investment', 'Dividend'].includes(cat)) {
                       return sum + amt
                     }
                     return sum
                   }, 0))}</span>
                 </div>
-                <div className="flex justify-between py-3 border-t-2 border-border font-semibold">
+                <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 sm:py-3 border-t-2 border-border font-semibold text-xs sm:text-sm">
                   <span>Subtotal Other Income</span>
-                  <span>{formatCurrency((reportData.income.incomeByCategory['Rental'] || 0) + (reportData.income.incomeByCategory['Investment'] || reportData.income.incomeByCategory['Dividend'] || 0) + otherIncome)}</span>
+                  <span className="whitespace-nowrap">{formatCurrency((reportData.income.incomeByCategory['Rental'] || 0) + (reportData.income.incomeByCategory['Investment'] || reportData.income.incomeByCategory['Dividend'] || 0) + otherIncome)}</span>
                 </div>
               </div>
             </div>
           )}
 
-          <div className="flex justify-between py-4 border-t-4 border-border font-bold text-lg bg-primary/5 rounded-lg p-4">
-            <span>{isFreelancer ? '2.' : '4.'} Total Gross Income (Sum of above)</span>
-            <span>{formatCurrency(reportData.income.totalIncome)}</span>
+          <div className="flex flex-col sm:flex-row justify-between gap-2 sm:gap-0 py-3 sm:py-4 border-t-4 border-border font-bold text-base sm:text-lg bg-primary/5 rounded-lg p-3 sm:p-4">
+            <span className="text-xs sm:text-base">{isFreelancer ? '2.' : '4.'} Total Gross Income (Sum of above)</span>
+            <span className="text-sm sm:text-lg">{formatCurrency(reportData.income.totalIncome)}</span>
           </div>
         </div>
 
         {/* Part C: Deductible Expenses & Reliefs */}
         <div>
-          <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 border-b-2 border-border pb-2 uppercase">Part C – Deductible Expenses & Reliefs</h2>
-          <div className="overflow-x-auto -mx-3 sm:mx-0">
+          <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 border-b-2 border-border pb-1.5 sm:pb-2 uppercase">Part C – Deductible Expenses & Reliefs</h2>
+          <div className="overflow-x-auto -mx-3 sm:-mx-4 md:mx-0 px-3 sm:px-4 md:px-0">
             <table className="w-full min-w-[600px] border-collapse border border-border text-xs sm:text-sm">
               <thead>
                 <tr className="bg-muted">
@@ -1465,7 +1462,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                           value={reliefNotes.pensionContribution}
                           onChange={(e) => setReliefNotes(prev => ({ ...prev, pensionContribution: e.target.value }))}
                           placeholder="Notes"
-                          className="h-8 text-xs"
+                          className="h-8 sm:h-9 text-xs sm:text-sm"
                         />
                       ) : (
                         reliefNotes.pensionContribution || ''
@@ -1493,7 +1490,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                           value={reliefNotes.nhfContribution}
                           onChange={(e) => setReliefNotes(prev => ({ ...prev, nhfContribution: e.target.value }))}
                           placeholder="Notes"
-                          className="h-8 text-xs"
+                          className="h-8 sm:h-9 text-xs sm:text-sm"
                         />
                       ) : (
                         reliefNotes.nhfContribution || ''
@@ -1521,7 +1518,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                           value={reliefNotes.lifeInsurance}
                           onChange={(e) => setReliefNotes(prev => ({ ...prev, lifeInsurance: e.target.value }))}
                           placeholder="Notes"
-                          className="h-8 text-xs"
+                          className="h-8 sm:h-9 text-xs sm:text-sm"
                         />
                       ) : (
                         reliefNotes.lifeInsurance || ''
@@ -1549,7 +1546,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                           value={reliefNotes.healthInsurance}
                           onChange={(e) => setReliefNotes(prev => ({ ...prev, healthInsurance: e.target.value }))}
                           placeholder="Notes"
-                          className="h-8 text-xs"
+                          className="h-8 sm:h-9 text-xs sm:text-sm"
                         />
                       ) : (
                         reliefNotes.healthInsurance || ''
@@ -1577,7 +1574,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                           value={reliefNotes.businessExpenses}
                           onChange={(e) => setReliefNotes(prev => ({ ...prev, businessExpenses: e.target.value }))}
                           placeholder="Notes"
-                          className="h-8 text-xs"
+                          className="h-8 sm:h-9 text-xs sm:text-sm"
                         />
                       ) : (
                         reliefNotes.businessExpenses || ''
@@ -1631,7 +1628,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                           value={reliefNotes.charitableDonations}
                           onChange={(e) => setReliefNotes(prev => ({ ...prev, charitableDonations: e.target.value }))}
                           placeholder="Notes"
-                          className="h-8 text-xs"
+                          className="h-8 sm:h-9 text-xs sm:text-sm"
                         />
                       ) : (
                         reliefNotes.charitableDonations || ''
@@ -1678,43 +1675,45 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
 
         {/* Part D: Tax Already Paid (Credits) */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold border-b-2 border-border pb-2 uppercase">Part D – Tax Already Paid (Credits)</h2>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3 mb-2 sm:mb-3">
+            <h2 className="text-base sm:text-lg font-semibold border-b-2 border-border pb-1.5 sm:pb-2 uppercase">Part D – Tax Already Paid (Credits)</h2>
             {isEditing && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowAddCredit(true)}
+                className="h-8 sm:h-9 text-xs sm:text-sm"
               >
-                <Plus className="w-4 h-4 mr-2" />
-                Add Credit
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                <span className="hidden sm:inline">Add Credit</span>
+                <span className="sm:hidden">Add</span>
               </Button>
             )}
             </div>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse border border-border text-sm">
+          <div className="overflow-x-auto -mx-2 sm:-mx-3 md:mx-0 px-2 sm:px-3 md:px-0">
+            <table className="w-full min-w-[600px] border-collapse border border-border text-xs sm:text-sm">
               <thead>
                 <tr className="bg-muted">
-                  <th className="border border-border p-2 text-left" style={{ width: '35%' }}>Type of Payment</th>
-                  <th className="border border-border p-2 text-right" style={{ width: '20%' }}>Amount (₦)</th>
-                  <th className="border border-border p-2 text-center" style={{ width: '15%' }}>Tax Year</th>
-                  <th className="border border-border p-2 text-center" style={{ width: '10%' }}>Evidence Attached (Y/N)</th>
-                  <th className="border border-border p-2 text-left" style={{ width: '15%' }}>Notes</th>
+                  <th className="border border-border p-1.5 sm:p-2 text-left text-xs sm:text-sm" style={{ width: '35%' }}>Type of Payment</th>
+                  <th className="border border-border p-1.5 sm:p-2 text-right text-xs sm:text-sm" style={{ width: '20%' }}>Amount (₦)</th>
+                  <th className="border border-border p-1.5 sm:p-2 text-center text-xs sm:text-sm" style={{ width: '15%' }}>Tax Year</th>
+                  <th className="border border-border p-1.5 sm:p-2 text-center text-xs sm:text-sm" style={{ width: '10%' }}>Evidence Attached (Y/N)</th>
+                  <th className="border border-border p-1.5 sm:p-2 text-left text-xs sm:text-sm" style={{ width: '15%' }}>Notes</th>
                   {isEditing && (
-                    <th className="border border-border p-2 text-center" style={{ width: '5%' }}>Action</th>
+                    <th className="border border-border p-1.5 sm:p-2 text-center text-xs sm:text-sm" style={{ width: '5%' }}>Action</th>
                   )}
                 </tr>
               </thead>
               <tbody>
                 {loadingCredits ? (
                   <tr>
-                    <td colSpan={isEditing ? 6 : 5} className="border border-border p-4 text-center text-muted-foreground">
+                    <td colSpan={isEditing ? 6 : 5} className="border border-border p-3 sm:p-4 text-center text-muted-foreground text-xs sm:text-sm">
                       Loading tax credits...
                     </td>
                   </tr>
                 ) : allTaxCredits.length === 0 ? (
                   <tr>
-                    <td colSpan={isEditing ? 6 : 5} className="border border-border p-4 text-center text-muted-foreground italic">
+                    <td colSpan={isEditing ? 6 : 5} className="border border-border p-3 sm:p-4 text-center text-muted-foreground italic text-xs sm:text-sm">
                       No tax credits recorded for this period
                     </td>
                   </tr>
@@ -1733,14 +1732,14 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                                 setAllTaxCredits(updated)
                                 updateTaxCreditsTotals(updated)
                               }}
-                              className="h-8 text-xs"
+                              className="h-8 sm:h-9 text-xs sm:text-sm"
                               placeholder="Type of payment"
                             />
                           ) : (
                             credit.type
                           )}
                         </td>
-                        <td className="border border-border p-2 text-right font-medium">
+                        <td className="border border-border p-1.5 sm:p-2 text-right font-medium text-xs sm:text-sm">
                           {isEditing && credit.source === 'manual' ? (
                             <Input
                               type="number"
@@ -1753,14 +1752,14 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                                 setAllTaxCredits(updated)
                                 updateTaxCreditsTotals(updated)
                               }}
-                              className="h-8 text-xs text-right"
+                              className="h-8 sm:h-9 text-xs sm:text-sm text-right"
                               placeholder="0.00"
                             />
                           ) : (
                             formatCurrency(credit.amount)
                           )}
                         </td>
-                        <td className="border border-border p-2 text-center">
+                        <td className="border border-border p-1.5 sm:p-2 text-center text-xs sm:text-sm">
                           {isEditing && credit.source === 'manual' ? (
                             <Input
                               type="number"
@@ -1772,13 +1771,13 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                                 )
                                 setAllTaxCredits(updated)
                               }}
-                              className="h-8 text-xs text-center w-20"
+                              className="h-8 sm:h-9 text-xs sm:text-sm text-center w-20"
                             />
                           ) : (
                             credit.taxYear
                           )}
                         </td>
-                        <td className="border border-border p-2 text-center">
+                        <td className="border border-border p-1.5 sm:p-2 text-center text-xs sm:text-sm">
                           {isEditing ? (
                             <Checkbox
                               checked={credit.evidenceAttached}
@@ -1804,14 +1803,14 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                                 setAllTaxCredits(updated)
                               }}
                               placeholder="Notes"
-                              className="h-8 text-xs"
+                              className="h-8 sm:h-9 text-xs sm:text-sm"
                             />
                           ) : (
                             credit.notes || ''
                           )}
                         </td>
                         {isEditing && (
-                          <td className="border border-border p-2 text-center">
+                          <td className="border border-border p-1.5 sm:p-2 text-center">
                             {credit.source === 'manual' && (
                               <Button
                                 variant="ghost"
@@ -1821,9 +1820,9 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                                   setAllTaxCredits(updated)
                                   updateTaxCreditsTotals(updated)
                                 }}
-                                className="h-8 w-8 p-0"
+                                className="h-7 w-7 sm:h-8 sm:w-8 p-0"
                               >
-                                <Trash2 className="w-4 h-4 text-destructive" />
+                                <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-destructive" />
                               </Button>
                             )}
                           </td>
@@ -1833,12 +1832,12 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                   </>
                 )}
                 <tr className="bg-muted font-bold">
-                  <td className="border border-border p-2">Total Tax Credits / Prepaid Tax</td>
-                  <td className="border border-border p-2 text-right">{formatCurrency(taxCredits.total)}</td>
-                  <td className="border border-border p-2"></td>
-                  <td className="border border-border p-2"></td>
-                  <td className="border border-border p-2"></td>
-                  {isEditing && <td className="border border-border p-2"></td>}
+                  <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">Total Tax Credits / Prepaid Tax</td>
+                  <td className="border border-border p-1.5 sm:p-2 text-right text-xs sm:text-sm">{formatCurrency(taxCredits.total)}</td>
+                  <td className="border border-border p-1.5 sm:p-2"></td>
+                  <td className="border border-border p-1.5 sm:p-2"></td>
+                  <td className="border border-border p-1.5 sm:p-2"></td>
+                  {isEditing && <td className="border border-border p-1.5 sm:p-2"></td>}
                 </tr>
               </tbody>
             </table>
@@ -1847,46 +1846,46 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
 
         {/* Part E: Tax Computation */}
         <div>
-          <h2 className="text-lg font-semibold mb-4 border-b-2 border-border pb-2 uppercase">Part E – Tax Computation</h2>
-          <div className="space-y-3 text-sm">
-            <div className="flex justify-between py-2 border-b border-border">
-              <span className="text-muted-foreground">1. Total Gross Income (from Part B)</span>
-              <span className="font-medium">{formatCurrency(reportData.tax.grossIncome)}</span>
+          <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 border-b-2 border-border pb-1.5 sm:pb-2 uppercase">Part E – Tax Computation</h2>
+          <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
+            <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
+              <span className="text-muted-foreground text-xs sm:text-sm break-words sm:break-normal">1. Total Gross Income (from Part B)</span>
+              <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(reportData.tax.grossIncome)}</span>
             </div>
-            <div className="flex justify-between py-2 border-b border-border">
-              <span className="text-muted-foreground">2. Less: Total Allowable Deductions & Reliefs (from Part C)</span>
-              <span className="font-medium text-red-600">-{formatCurrency(reportData.tax.totalReliefs + reportData.expenses.taxDeductibleExpenses)}</span>
+            <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
+              <span className="text-muted-foreground text-xs sm:text-sm break-words sm:break-normal">2. Less: Total Allowable Deductions & Reliefs (from Part C)</span>
+              <span className="font-medium text-red-600 text-xs sm:text-sm whitespace-nowrap">-{formatCurrency(reportData.tax.totalReliefs + reportData.expenses.taxDeductibleExpenses)}</span>
           </div>
-            <div className="flex justify-between py-3 border-t-2 border-border font-semibold">
+            <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 sm:py-3 border-t-2 border-border font-semibold text-xs sm:text-sm">
               <span>→ Net Taxable Income</span>
-              <span>{formatCurrency(reportData.tax.taxableIncome)}</span>
+              <span className="whitespace-nowrap">{formatCurrency(reportData.tax.taxableIncome)}</span>
         </div>
 
-            <div className="bg-muted/50 p-4 rounded-lg mt-4">
-              <strong className="block mb-3">3. Computed Tax (based on current PIT rates)</strong>
+            <div className="bg-muted/50 p-3 sm:p-4 rounded-lg mt-3 sm:mt-4">
+              <strong className="block mb-2 sm:mb-3 text-xs sm:text-sm">3. Computed Tax (based on current PIT rates)</strong>
               <div className="space-y-2">
                 {reportData.tax.taxBrackets.map((bracket, index) => (
-                  <div key={index} className="flex justify-between text-sm">
+                  <div key={index} className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 text-xs sm:text-sm">
                     <span className="text-muted-foreground">
                       {formatCurrency(bracket.amount)} @ {bracket.rate}%
                     </span>
-                    <span className="font-medium">{formatCurrency(bracket.tax)}</span>
+                    <span className="font-medium whitespace-nowrap">{formatCurrency(bracket.tax)}</span>
                   </div>
                 ))}
-                <div className="flex justify-between pt-3 border-t border-border font-semibold">
+                <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 pt-2 sm:pt-3 border-t border-border font-semibold text-xs sm:text-sm">
                   <span>→ Gross Tax Due</span>
-                  <span>{formatCurrency(reportData.tax.taxPayable)}</span>
+                  <span className="whitespace-nowrap">{formatCurrency(reportData.tax.taxPayable)}</span>
                 </div>
             </div>
             </div>
 
-            <div className="flex justify-between py-2 border-b border-border">
-              <span className="text-muted-foreground">4. Less: Tax Credits / Prepaid Tax (from Part D)</span>
-              <span className="font-medium text-red-600">-{formatCurrency(taxCredits.total)}</span>
+            <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
+              <span className="text-muted-foreground text-xs sm:text-sm break-words sm:break-normal">4. Less: Tax Credits / Prepaid Tax (from Part D)</span>
+              <span className="font-medium text-red-600 text-xs sm:text-sm whitespace-nowrap">-{formatCurrency(taxCredits.total)}</span>
             </div>
-            <div className="flex justify-between py-4 border-t-4 border-border font-bold text-lg bg-primary/5 rounded-lg p-4">
-              <span>→ Net Tax Payable or Refund Due</span>
-              <span className="text-primary">{formatCurrency(Math.max(0, reportData.tax.taxPayable - taxCredits.total))}</span>
+            <div className="flex flex-col sm:flex-row justify-between gap-2 sm:gap-0 py-3 sm:py-4 border-t-4 border-border font-bold text-base sm:text-lg bg-primary/5 rounded-lg p-3 sm:p-4">
+              <span className="text-xs sm:text-base">→ Net Tax Payable or Refund Due</span>
+              <span className="text-primary text-sm sm:text-lg whitespace-nowrap">{formatCurrency(Math.max(0, reportData.tax.taxPayable - taxCredits.total))}</span>
             </div>
           </div>
         </div>

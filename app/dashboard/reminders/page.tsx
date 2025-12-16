@@ -56,8 +56,8 @@ export default function RemindersPage() {
           <div className="space-y-4 sm:space-y-6">
             {/* Error Message */}
             {error && (
-              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
-                <p className="text-destructive text-sm">{error}</p>
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 sm:p-4">
+                <p className="text-destructive text-xs sm:text-sm">{error}</p>
               </div>
             )}
             

@@ -168,15 +168,15 @@ export function UploadDocumentDialog({ open, onOpenChange, onUpload }: UploadDoc
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Upload Document</DialogTitle>
+      <DialogContent className="max-w-2xl max-h-[90vh] sm:max-h-[90vh] overflow-y-auto w-[calc(100vw-2rem)] sm:w-full p-3 sm:p-4 md:p-6">
+        <DialogHeader className="pb-2 sm:pb-3">
+          <DialogTitle className="text-base sm:text-lg md:text-xl">Upload Document</DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
-          <div className="space-y-2">
-            <Label>Select File</Label>
+        <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 mt-2 sm:mt-4 overflow-x-hidden">
+          <div className="space-y-1.5 sm:space-y-2">
+            <Label className="text-xs sm:text-sm">Select File</Label>
             {!selectedFile ? (
-              <label className={`border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary transition-colors cursor-pointer block ${uploadingImage ? 'opacity-50 cursor-not-allowed' : ''}`}>
+              <label className={`border-2 border-dashed border-border rounded-lg p-4 sm:p-6 md:p-8 text-center hover:border-primary transition-colors cursor-pointer block ${uploadingImage ? 'opacity-50 cursor-not-allowed' : ''}`}>
                 <input 
                   type="file" 
                   className="hidden" 
@@ -184,32 +184,32 @@ export function UploadDocumentDialog({ open, onOpenChange, onUpload }: UploadDoc
                   accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.csv,.txt"
                   disabled={uploadingImage}
                 />
-                <Upload className="w-12 h-12 mx-auto mb-3 text-muted-foreground" />
-                <p className="text-sm text-muted-foreground mb-1">
+                <Upload className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 mx-auto mb-2 sm:mb-3 text-muted-foreground" />
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">
                   {uploadingImage ? 'Uploading...' : 'Click to upload or drag and drop'}
                 </p>
-                <p className="text-xs text-muted-foreground">Images, PDF, Word, Excel, CSV up to 10MB</p>
+                <p className="text-xs text-muted-foreground px-2">Images, PDF, Word, Excel, CSV up to 10MB</p>
               </label>
             ) : uploadingImage ? (
-              <div className="border border-border rounded-lg p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
-                    <Loader2 className="w-5 h-5 text-primary animate-spin" />
+              <div className="border border-border rounded-lg p-3 sm:p-4 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 text-primary animate-spin" />
                   </div>
-                  <div>
-                    <p className="text-sm font-medium">{selectedFile.name}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs sm:text-sm font-medium truncate">{selectedFile.name}</p>
                     <p className="text-xs text-muted-foreground">Uploading to server...</p>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20 rounded-lg p-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center">
-                    <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
+              <div className="border border-green-200 dark:border-green-900 bg-green-50 dark:bg-green-950/20 rounded-lg p-3 sm:p-4 flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 bg-green-100 dark:bg-green-900/30 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Check className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 dark:text-green-400" />
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-green-900 dark:text-green-100">{selectedFile.name}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs sm:text-sm font-medium text-green-900 dark:text-green-100 truncate">{selectedFile.name}</p>
                     <p className="text-xs text-green-600 dark:text-green-400">Uploaded successfully</p>
                   </div>
                 </div>
@@ -221,32 +221,34 @@ export function UploadDocumentDialog({ open, onOpenChange, onUpload }: UploadDoc
                     setSelectedFile(null)
                     setUploadedImage(null)
                   }}
+                  className="h-7 w-7 sm:h-8 sm:w-8 flex-shrink-0"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </Button>
               </div>
             )}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="doc-name">Document Name *</Label>
+          <div className="space-y-1.5 sm:space-y-2">
+            <Label htmlFor="doc-name" className="text-xs sm:text-sm">Document Name *</Label>
             <Input 
               id="doc-name" 
               placeholder="e.g., Office Rent Receipt - January 2025"
               value={formData.name}
               onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
               required
+              className="h-9 sm:h-10 text-xs sm:text-sm"
             />
           </div>
 
-          <div className="grid sm:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="doc-type">Document Type *</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label htmlFor="doc-type" className="text-xs sm:text-sm">Document Type *</Label>
               <Select 
                 value={formData.type} 
                 onValueChange={(value) => setFormData(prev => ({ ...prev, type: value as any }))}
               >
-                <SelectTrigger id="doc-type">
+                <SelectTrigger id="doc-type" className="h-9 sm:h-10 text-xs sm:text-sm">
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -257,38 +259,37 @@ export function UploadDocumentDialog({ open, onOpenChange, onUpload }: UploadDoc
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="upload-date">Date *</Label>
+            <div className="space-y-1.5 sm:space-y-2">
+              <Label htmlFor="upload-date" className="text-xs sm:text-sm">Date *</Label>
               <Input 
                 id="upload-date" 
                 type="date" 
                 value={formData.date}
                 onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
                 required
+                className="h-9 sm:h-10 text-xs sm:text-sm"
               />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="link-transaction">Link to Transaction (Optional)</Label>
+          <div className="space-y-1.5 sm:space-y-2">
+            <Label htmlFor="link-transaction" className="text-xs sm:text-sm">Link to Transaction (Optional)</Label>
             <Select 
               value={formData.linkedTransaction} 
               onValueChange={(value) => setFormData(prev => ({ ...prev, linkedTransaction: value }))}
               disabled={loadingTransactions}
             >
-              <SelectTrigger id="link-transaction">
+              <SelectTrigger id="link-transaction" className="h-9 sm:h-10 text-xs sm:text-sm">
                 <SelectValue placeholder={loadingTransactions ? "Loading transactions..." : "Select transaction"} />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">None</SelectItem>
                 {transactions.map((transaction) => (
                   <SelectItem key={transaction.id} value={transaction.id}>
-                    <div className="flex items-center gap-2">
-                      <span className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>
-                        {transaction.type === 'income' ? '↓' : '↑'}
-                      </span>
-                      <span>{transaction.description}</span>
-                      <span className="text-muted-foreground">-</span>
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                      <span className={transaction.type === 'income' ? 'text-green-600' : 'text-red-600'}>{transaction.type === 'income' ? '↓' : '↑'}</span>
+                      <span className="truncate max-w-[150px] sm:max-w-none">{transaction.description}</span>
+                      <span className="text-muted-foreground hidden sm:inline">-</span>
                       <span className="font-medium">₦{transaction.amount.toLocaleString()}</span>
                     </div>
                   </SelectItem>
@@ -302,22 +303,23 @@ export function UploadDocumentDialog({ open, onOpenChange, onUpload }: UploadDoc
             </Select>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="notes">Notes (Optional)</Label>
+          <div className="space-y-1.5 sm:space-y-2">
+            <Label htmlFor="notes" className="text-xs sm:text-sm">Notes (Optional)</Label>
             <Textarea 
               id="notes" 
               placeholder="Add any additional notes about this document..." 
               rows={3}
               value={formData.notes}
               onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+              className="text-xs sm:text-sm resize-none"
             />
           </div>
 
-          <div className="flex gap-3 pt-4">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-2 sm:pt-4">
             <Button
               type="button"
               variant="outline"
-              className="flex-1 bg-transparent"
+              className="flex-1 bg-transparent h-9 sm:h-10 text-xs sm:text-sm"
               onClick={() => {
                 resetForm()
                 onOpenChange(false)
@@ -328,17 +330,17 @@ export function UploadDocumentDialog({ open, onOpenChange, onUpload }: UploadDoc
             </Button>
             <Button 
               type="submit" 
-              className="flex-1" 
+              className="flex-1 h-9 sm:h-10 text-xs sm:text-sm" 
               disabled={!uploadedImage || !formData.name || !formData.type || !formData.date || isUploading || uploadingImage}
             >
               {isUploading ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
                   Saving...
                 </>
               ) : uploadingImage ? (
                 <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
                   Uploading...
                 </>
               ) : (

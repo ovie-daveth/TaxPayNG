@@ -415,19 +415,19 @@ console.log("invoices", invoices)
   return (
     <div className="container mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 max-w-7xl">
       <div className="mb-4 sm:mb-6 md:mb-8">
-        <div className="flex flex-col gap-3 sm:gap-4">
-          <div className="relative w-full">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+          <div className="relative flex-1 min-w-0">
             <Search className="absolute left-2.5 sm:left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-3.5 h-3.5 sm:w-4 sm:h-4" />
             <Input
               placeholder="Search invoices..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-8 sm:pl-10 h-9 sm:h-10 text-sm"
+              className="pl-8 sm:pl-10 h-9 sm:h-10 text-xs sm:text-sm"
             />
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 sm:gap-2">
+          <div className="flex gap-2 flex-shrink-0">
           <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as "all" | "outgoing" | "incoming")}>
-              <SelectTrigger className="w-full sm:w-[160px] md:w-[200px] h-9 sm:h-10 text-xs sm:text-sm">
+              <SelectTrigger className="w-full sm:w-[140px] md:w-[160px] h-9 sm:h-10 text-xs sm:text-sm">
               <SelectValue placeholder="Filter by type" />
             </SelectTrigger>
             <SelectContent>
@@ -437,7 +437,7 @@ console.log("invoices", invoices)
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as InvoiceStatus | "all")}>
-              <SelectTrigger className="w-full sm:w-[140px] md:w-[180px] h-9 sm:h-10 text-xs sm:text-sm">
+              <SelectTrigger className="w-full sm:w-[130px] md:w-[150px] h-9 sm:h-10 text-xs sm:text-sm">
               <SelectValue placeholder="Filter by status" />
             </SelectTrigger>
             <SelectContent>
@@ -449,12 +449,12 @@ console.log("invoices", invoices)
               <SelectItem value="cancelled">Cancelled</SelectItem>
             </SelectContent>
           </Select>
-            <div className="flex border rounded-md w-full sm:w-auto">
+            <div className="flex border rounded-md flex-shrink-0">
               <Button
                 variant={viewMode === "card" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setViewMode("card")}
-                className="rounded-r-none flex-1 sm:flex-initial h-9 sm:h-10"
+                className="rounded-r-none h-9 sm:h-10 w-10 sm:w-auto px-2 sm:px-3"
               >
                 <LayoutGrid className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </Button>
@@ -462,7 +462,7 @@ console.log("invoices", invoices)
                 variant={viewMode === "table" ? "default" : "ghost"}
                 size="sm"
                 onClick={() => setViewMode("table")}
-                className="rounded-l-none flex-1 sm:flex-initial h-9 sm:h-10"
+                className="rounded-l-none h-9 sm:h-10 w-10 sm:w-auto px-2 sm:px-3"
               >
                 <Table2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               </Button>
@@ -496,11 +496,11 @@ console.log("invoices", invoices)
               : (invoice.supplierPaymentStatus || 'Pending')
             
             return (
-            <Card key={invoice.id} className="p-4 sm:p-5 md:p-6 hover:shadow-md transition-shadow">
+            <Card key={invoice.id} className="p-3 sm:p-4 md:p-6 hover:shadow-md transition-shadow">
                 <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-3 sm:gap-4">
                   <div className="flex-1 min-w-0 w-full">
                     {/* Header with document type, ID, and badges */}
-                    <div className="flex items-center gap-2 sm:gap-3 mb-3 sm:mb-4 flex-wrap">
+                    <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3 md:mb-4 flex-wrap">
                       {invoice.whtCreditNote && (
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -522,7 +522,7 @@ console.log("invoices", invoices)
                           </TooltipContent>
                         </Tooltip>
                       )}
-                    <h3 className="text-lg font-semibold">
+                    <h3 className="text-base sm:text-lg font-semibold break-words">
                         {isIncoming ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
                     </h3>
                       {invoice.status === "sent" && (
@@ -543,7 +543,7 @@ console.log("invoices", invoices)
                     </div>
                     
                     {/* Content grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 md:gap-5">
                       {/* Client/From */}
                     <div>
                         <p className="text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
@@ -580,7 +580,7 @@ console.log("invoices", invoices)
                         <p className="text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
                           Amount
                         </p>
-                        <p className="text-xl font-semibold text-foreground">
+                        <p className="text-lg sm:text-xl font-semibold text-foreground">
                         {invoice.currency} {invoice.total.toLocaleString()}
                       </p>
                     </div>
@@ -594,13 +594,13 @@ console.log("invoices", invoices)
                       <Button 
                         variant="outline" 
                           size="icon"
-                          className="h-9 w-9"
+                          className="h-8 w-8 sm:h-9 sm:w-9"
                         onClick={() => {
                           setSelectedInvoice(invoice)
                           setIsViewDialogOpen(true)
                         }}
                       >
-                        <Eye className="w-4 h-4" />
+                        <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                       </Button>
                     </TooltipTrigger>
                     <TooltipContent>
@@ -647,18 +647,18 @@ console.log("invoices", invoices)
         </div>
       ) : (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto -mx-3 sm:mx-0">
-            <table className="w-full min-w-[800px]">
+          <div className="overflow-x-auto -mx-3 sm:-mx-4 md:mx-0 px-3 sm:px-4 md:px-0">
+            <table className="w-full min-w-[600px] sm:min-w-[800px]">
               <thead className="bg-muted/50 border-b border-border">
                 <tr>
-                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-semibold">Document</th>
-                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-semibold">Type</th>
-                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-semibold">{typeFilter === "incoming" ? "From" : typeFilter === "outgoing" ? "Client" : "Client/From"}</th>
-                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-semibold hidden md:table-cell">Issue Date</th>
-                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-semibold hidden md:table-cell">Due Date</th>
-                  <th className="text-left p-3 sm:p-4 text-xs sm:text-sm font-semibold">Status</th>
-                  <th className="text-right p-3 sm:p-4 text-xs sm:text-sm font-semibold">Amount</th>
-                  <th className="text-center p-3 sm:p-4 text-xs sm:text-sm font-semibold">Actions</th>
+                  <th className="text-left p-2 sm:p-3 md:p-4 text-xs sm:text-sm font-semibold max-w-[120px] sm:max-w-none">Document</th>
+                  <th className="text-left p-2 sm:p-3 md:p-4 text-xs sm:text-sm font-semibold hidden sm:table-cell">Type</th>
+                  <th className="text-left p-2 sm:p-3 md:p-4 text-xs sm:text-sm font-semibold max-w-[120px] sm:max-w-none">{typeFilter === "incoming" ? "From" : typeFilter === "outgoing" ? "Client" : "Client/From"}</th>
+                  <th className="text-left p-2 sm:p-3 md:p-4 text-xs sm:text-sm font-semibold hidden md:table-cell">Issue Date</th>
+                  <th className="text-left p-2 sm:p-3 md:p-4 text-xs sm:text-sm font-semibold hidden md:table-cell">Due Date</th>
+                  <th className="text-left p-2 sm:p-3 md:p-4 text-xs sm:text-sm font-semibold">Status</th>
+                  <th className="text-right p-2 sm:p-3 md:p-4 text-xs sm:text-sm font-semibold">Amount</th>
+                  <th className="text-center p-2 sm:p-3 md:p-4 text-xs sm:text-sm font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -670,40 +670,40 @@ console.log("invoices", invoices)
                   
                   return (
                     <tr key={invoice.id} className="border-b border-border hover:bg-muted/30 transition-colors">
-                      <td className="p-4">
-                        <div className="font-semibold">
+                      <td className="p-2 sm:p-3 md:p-4 max-w-[120px] sm:max-w-none">
+                        <div className="font-semibold text-xs sm:text-sm truncate font-medium" title={`${isIncoming ? 'Bill' : 'Invoice'} ${invoice.invoiceNumber}`}>
                           {isIncoming ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
                         </div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-2 sm:p-3 md:p-4 hidden sm:table-cell">
                         {invoice.status === "sent" && (
                           <Badge variant="outline" className="text-xs">
                             {isIncoming ? 'Incoming' : 'Outgoing'}
                           </Badge>
                         )}
                       </td>
-                      <td className="p-4">
+                      <td className="p-2 sm:p-3 md:p-4 max-w-[120px] sm:max-w-none">
                         <div>
-                          <p className="text-sm font-medium">
+                          <p className="text-xs sm:text-sm font-medium truncate" title={isIncoming ? (invoice.supplier?.name || 'Unknown') : invoice.client.name}>
                             {isIncoming 
                               ? (invoice.supplier?.name || 'Unknown')
                               : invoice.client.name
                             }
                           </p>
                           {(isIncoming ? invoice.supplier?.email : invoice.client.email) && (
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-muted-foreground truncate" title={isIncoming ? invoice.supplier?.email : invoice.client.email}>
                               {isIncoming ? invoice.supplier?.email : invoice.client.email}
                             </p>
                           )}
                         </div>
                       </td>
-                      <td className="p-4 text-sm">
+                      <td className="p-2 sm:p-3 md:p-4 text-xs sm:text-sm hidden md:table-cell">
                         {format(new Date(invoice.issueDate), "MMM dd, yyyy")}
                       </td>
-                      <td className="p-4 text-sm">
+                      <td className="p-2 sm:p-3 md:p-4 text-xs sm:text-sm hidden md:table-cell">
                         {format(new Date(invoice.dueDate), "MMM dd, yyyy")}
                       </td>
-                      <td className="p-4">
+                      <td className="p-2 sm:p-3 md:p-4">
                         <Badge 
                           variant="outline" 
                           className={`text-xs capitalize ${
@@ -715,26 +715,26 @@ console.log("invoices", invoices)
                           {paymentStatus}
                         </Badge>
                       </td>
-                      <td className="p-4 text-right">
-                        <span className="font-semibold">
+                      <td className="p-2 sm:p-3 md:p-4 text-right">
+                        <span className="font-semibold text-xs sm:text-sm whitespace-nowrap">
                           {invoice.currency} {invoice.total.toLocaleString()}
                         </span>
                       </td>
-                      <td className="p-4">
-                        <div className="flex items-center justify-center gap-2">
+                      <td className="p-2 sm:p-3 md:p-4">
+                        <div className="flex items-center justify-center gap-1 sm:gap-2">
                           {invoice.whtCreditNote && (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button 
                                   variant="ghost" 
                                   size="icon"
-                                  className="h-8 w-8"
+                                  className="h-7 w-7 sm:h-8 sm:w-8"
                                   onClick={() => {
                                     setSelectedInvoice(invoice)
                                     setShowCreditNoteDialog(true)
                                   }}
                                 >
-                                  <Receipt className="w-4 h-4" />
+                                  <Receipt className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>
@@ -747,13 +747,13 @@ console.log("invoices", invoices)
                               <Button 
                                 variant="ghost" 
                                 size="icon"
-                                className="h-8 w-8"
+                                className="h-7 w-7 sm:h-8 sm:w-8"
                                 onClick={() => {
                                   setSelectedInvoice(invoice)
                                   setIsViewDialogOpen(true)
                                 }}
                               >
-                                <Eye className="w-4 h-4" />
+                                <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>
@@ -766,10 +766,10 @@ console.log("invoices", invoices)
                                 <Button 
                                   variant="ghost" 
                                   size="icon"
-                                  className="h-8 w-8"
+                                  className="h-7 w-7 sm:h-8 sm:w-8"
                                   onClick={() => handleMarkAsSent(invoice.id)}
                                 >
-                                  <Send className="w-4 h-4" />
+                                  <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>
@@ -782,10 +782,10 @@ console.log("invoices", invoices)
                               <Button 
                                 variant="ghost" 
                                 size="icon"
-                                className="h-8 w-8 text-destructive hover:text-destructive"
+                                className="h-7 w-7 sm:h-8 sm:w-8 text-destructive hover:text-destructive"
                                 onClick={() => handleDelete(invoice.id)}
                               >
-                                <Trash2 className="w-4 h-4" />
+                                <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>

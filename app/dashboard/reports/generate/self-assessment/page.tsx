@@ -249,9 +249,9 @@ export default function GenerateSelfAssessmentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       {/* <DashboardNav /> */}
-      <main className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
+      <main className="px-2 sm:px-3 md:px-4 py-2 sm:py-3 md:py-4 max-w-full overflow-x-hidden">
           {!showPreview ? (
             <div className="space-y-4 sm:space-y-6">
               {/* Back Button */}
@@ -403,16 +403,17 @@ export default function GenerateSelfAssessmentPage() {
                       Cancel
                     </Button>
                   </Link>
-                  <Button type="submit" className="flex-1" disabled={isGenerating}>
+                  <Button type="submit" className="flex-1 text-xs sm:text-sm" disabled={isGenerating}>
                     {isGenerating ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
                         Generating...
                       </>
                     ) : (
                       <>
-                        <FileText className="w-4 h-4 mr-2" />
-                        Generate Self-Assessment
+                        <FileText className="hidden sm:block w-4 h-4 mr-2" />
+                        <span className="hidden sm:inline">Generate Self-Assessment</span>
+                        <span className="sm:hidden">Generate</span>
                       </>
                     )}
                   </Button>
@@ -421,44 +422,40 @@ export default function GenerateSelfAssessmentPage() {
               </Card>
             </div>
           ) : (
-            <div className="space-y-6">
+            <div className="space-y-2 sm:space-y-4">
               {/* Back Button */}
               <Link href="/dashboard/reports">
-                <Button variant="ghost" className="mb-4">
-                  <ArrowLeft className="w-4 h-4 mr-2" />
-                  Back to Reports
+                <Button variant="ghost" className="mb-2 sm:mb-3 h-8 sm:h-9 text-xs sm:text-sm px-2 sm:px-3">
+                  <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Back to Reports</span>
                 </Button>
               </Link>
 
-              <Card className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-semibold">Report Preview</h2>
-                    <p className="text-sm text-muted-foreground mt-1">
+              <Card className="p-2 sm:p-3 md:p-4">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
+                  <div className="flex-1 min-w-0">
+                    <h2 className="text-base sm:text-lg md:text-xl font-semibold">Report Preview</h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                       {reportId ? 'Edit your saved self-assessment filing' : 'Review and edit your self-assessment filing before saving'}
                     </p>
                   </div>
-                  <div className="flex gap-2">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setShowPreview(false)}
-                      disabled={isSaving}
-                    >
-                      Back to Form
-                    </Button>
+                  <div className="flex justify-end w-full sm:w-auto">
                     <Button 
                       onClick={handleSave}
                       disabled={isSaving}
+                      className="h-9 sm:h-10 text-xs sm:text-sm"
                     >
                       {isSaving ? (
                         <>
-                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                          Saving...
+                          <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
+                          <span className="hidden sm:inline">Saving...</span>
+                          <span className="sm:hidden">Saving...</span>
                         </>
                       ) : (
                         <>
-                          <FileText className="w-4 h-4 mr-2" />
-                          {reportId ? 'Save Changes' : 'Save Report'}
+                          <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                          <span className="hidden sm:inline">{reportId ? 'Save Changes' : 'Save Report'}</span>
+                          <span className="sm:hidden">Save</span>
                         </>
                       )}
                     </Button>

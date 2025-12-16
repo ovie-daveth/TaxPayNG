@@ -34,6 +34,7 @@ export default function VerifyTINPage() {
   const [showPopupInstructions, setShowPopupInstructions] = useState(false)
   const [showTinInfoModal, setShowTinInfoModal] = useState(false)
   const [showTinPortalModal, setShowTinPortalModal] = useState(false)
+  const [portalUrl, setPortalUrl] = useState("")
 
   useEffect(() => {
     console.log("Verify TIN page mounted - user:", user ? "logged in" : "not logged in")
@@ -70,17 +71,10 @@ export default function VerifyTINPage() {
     return null
   }
 
-  const handleGetTIN = () => {
-    // Determine the correct TIN registration URL based on business type
-    const portalUrl = profile?.businessType === 'sme' 
-      ? "https://tin.jtb.gov.ng/TinRequestExternal"
-      : "https://tin.jtb.gov.ng/TinIndividualRequestExternal"
-    
-    // Check if user is on mobile (viewport width < 768px)
-    const isMobile = window.innerWidth < 768
-
+  const openPortal = (url: string, isMobile: boolean) => {
     if (isMobile) {
       // On mobile, show modal with iframe
+      setPortalUrl(url)
       setShowTinPortalModal(true)
       setPopupBlocked(false)
     } else {
@@ -111,8 +105,8 @@ export default function VerifyTINPage() {
       ].join(",")
 
       const popup = window.open(
-        portalUrl,
-        "tinVerificationPortal",
+        url,
+        "tinPortal",
         features
       )
 
@@ -124,6 +118,26 @@ export default function VerifyTINPage() {
         popup.focus()
       }
     }
+  }
+
+  const handleGetTIN = () => {
+    // Determine the correct TIN registration URL based on business type
+    const registrationUrl = profile?.businessType === 'sme' 
+      ? "https://tin.jtb.gov.ng/TinRequestExternal"
+      : "https://tin.jtb.gov.ng/TinIndividualRequestExternal"
+    
+    // Check if user is on mobile (viewport width < 768px)
+    const isMobile = window.innerWidth < 768
+    openPortal(registrationUrl, isMobile)
+  }
+
+  const handleVerifyTINPortal = () => {
+    // JTB TIN Verification Portal URL (same for all business types)
+    const verificationUrl = "https://tinverification.jtb.gov.ng/"
+    
+    // Check if user is on mobile (viewport width < 768px)
+    const isMobile = window.innerWidth < 768
+    openPortal(verificationUrl, isMobile)
   }
 
   const handleVerifyTIN = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -410,17 +424,29 @@ export default function VerifyTINPage() {
                     <Info className="w-4 h-4 sm:w-5 sm:h-5" />
                   </button>
                 </div>
-                <Input 
-                  id="tin" 
-                  type="text" 
-                  placeholder="Enter your 11-digit TIN" 
-                  value={tin}
-                  onChange={(e) => setTIN(e.target.value.replace(/\D/g, ''))}
-                  maxLength={11}
-                  required 
-                  disabled={isVerifying || isLoading}
-                  className="text-base sm:text-lg"
-                />
+                <div className="flex items-center gap-2">
+                  <Input 
+                    id="tin" 
+                    type="text" 
+                    placeholder="Enter your 11-digit TIN" 
+                    value={tin}
+                    onChange={(e) => setTIN(e.target.value.replace(/\D/g, ''))}
+                    maxLength={11}
+                    required 
+                    disabled={isVerifying || isLoading}
+                    className="text-base sm:text-lg flex-1"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleVerifyTINPortal}
+                    disabled={isVerifying || isLoading}
+                    className="flex-shrink-0 w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center rounded-lg border-2 border-border hover:border-primary hover:bg-primary/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    aria-label="Verify TIN on JTB portal"
+                    title="Verify TIN on JTB portal"
+                  >
+                    <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground hover:text-primary transition-colors" />
+                  </button>
+                </div>
                 <p className="text-xs text-muted-foreground">
                   TIN is an 11-digit number issued by FIRS for tax purposes
                 </p>
@@ -428,11 +454,23 @@ export default function VerifyTINPage() {
 
               <Button 
                 type="submit" 
-                className="w-full" 
+                className="w-full h-11 sm:h-12 text-sm sm:text-base font-semibold" 
                 size="lg" 
                 disabled={isVerifying || isLoading || !tin}
               >
-                {isVerifying ? "Verifying..." : isLoading ? "Saving..." : "Verify TIN"}
+                {isVerifying ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Verifying...
+                  </>
+                ) : isLoading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Add TIN"
+                )}
               </Button>
             </form>
 
@@ -651,23 +689,23 @@ export default function VerifyTINPage() {
       <Dialog open={showTinPortalModal} onOpenChange={setShowTinPortalModal}>
         <DialogContent className="max-w-full w-full h-[90vh] p-0 sm:max-w-4xl sm:h-[85vh] flex flex-col">
           <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 border-b">
-            <DialogTitle className="text-base sm:text-lg">TIN Registration Portal</DialogTitle>
+            <DialogTitle className="text-base sm:text-lg">JTB TIN Portal</DialogTitle>
             <DialogDescription className="text-xs sm:text-sm">
-              Complete your TIN registration in the form below. You can close this window when done.
+              Complete your TIN registration or verification in the form below. You can close this window when done.
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 relative min-h-0">
             <iframe
-              src={profile?.businessType === 'sme' 
+              src={portalUrl || (profile?.businessType === 'sme' 
                 ? "https://tin.jtb.gov.ng/TinRequestExternal"
-                : "https://tin.jtb.gov.ng/TinIndividualRequestExternal"}
+                : "https://tin.jtb.gov.ng/TinIndividualRequestExternal")}
               className="w-full h-full border-0"
-              title="TIN Registration Portal"
+              title="JTB TIN Portal"
               allow="fullscreen"
             />
           </div>
           <div className="px-4 sm:px-6 py-3 border-t flex justify-end">
-            <Button type="button" onClick={() => setShowTinPortalModal(false)}>
+            <Button type="button" onClick={() => setShowTinPortalModal(false)} className="h-9 sm:h-10 text-xs sm:text-sm">
               Close
             </Button>
           </div>

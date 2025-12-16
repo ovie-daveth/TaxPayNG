@@ -80,9 +80,9 @@ export function IncompleteInvoices() {
   if (loading) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Incomplete Invoices</CardTitle>
-          <CardDescription>Loading...</CardDescription>
+        <CardHeader className="p-3 sm:p-6">
+          <CardTitle className="text-sm sm:text-base">Incomplete Invoices</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">Loading...</CardDescription>
         </CardHeader>
       </Card>
     )
@@ -91,12 +91,12 @@ export function IncompleteInvoices() {
   if (incompleteInvoices.length === 0) {
     return (
       <Card>
-        <CardHeader>
-          <CardTitle>Incomplete Invoices</CardTitle>
-          <CardDescription>All invoices are paid</CardDescription>
+        <CardHeader className="p-3 sm:p-6">
+          <CardTitle className="text-sm sm:text-base">Incomplete Invoices</CardTitle>
+          <CardDescription className="text-xs sm:text-sm">All invoices are paid</CardDescription>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground text-center py-4">
+        <CardContent className="p-3 sm:p-6 pt-0">
+          <p className="text-xs sm:text-sm text-muted-foreground text-center py-3 sm:py-4">
             No pending invoices
           </p>
         </CardContent>
@@ -106,81 +106,83 @@ export function IncompleteInvoices() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <FileText className="w-5 h-5" />
+      <CardHeader className="p-3 sm:p-6">
+        <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+          <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
           Incomplete Invoices
         </CardTitle>
-        <CardDescription>
+        <CardDescription className="text-xs sm:text-sm">
           Pending payments not yet recorded in transactions
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 sm:space-y-4 p-3 sm:p-6 pt-0">
         {/* Stats Summary */}
-        <div className="grid grid-cols-2 gap-4">
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Pending Revenue</p>
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-green-600" />
-              <p className="text-lg font-semibold text-green-600">
-                {stats.pendingRevenue > 0 ? `NGN ${stats.pendingRevenue.toLocaleString()}` : 'NGN 0'}
+        <div className="grid grid-cols-2 gap-2 sm:gap-4">
+          <div className="space-y-0.5 sm:space-y-1">
+            <p className="text-[10px] sm:text-xs text-muted-foreground">Pending Revenue</p>
+            <div className="flex items-center gap-1 sm:gap-2">
+              <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 text-green-600" />
+              <p className="text-xs sm:text-lg font-semibold text-green-600">
+                {stats.pendingRevenue > 0 ? `₦${stats.pendingRevenue.toLocaleString()}` : '₦0'}
               </p>
             </div>
           </div>
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Pending Expenses</p>
-            <div className="flex items-center gap-2">
-              <TrendingDown className="w-4 h-4 text-red-600" />
-              <p className="text-lg font-semibold text-red-600">
-                {stats.pendingExpenses > 0 ? `NGN ${stats.pendingExpenses.toLocaleString()}` : 'NGN 0'}
+          <div className="space-y-0.5 sm:space-y-1">
+            <p className="text-[10px] sm:text-xs text-muted-foreground">Pending Expenses</p>
+            <div className="flex items-center gap-1 sm:gap-2">
+              <TrendingDown className="w-3 h-3 sm:w-4 sm:h-4 text-red-600" />
+              <p className="text-xs sm:text-lg font-semibold text-red-600">
+                {stats.pendingExpenses > 0 ? `₦${stats.pendingExpenses.toLocaleString()}` : '₦0'}
               </p>
             </div>
           </div>
         </div>
 
         {stats.overdueCount > 0 && (
-          <div className="flex items-center gap-2 p-2 bg-destructive/10 rounded-md">
-            <AlertCircle className="w-4 h-4 text-destructive" />
-            <p className="text-sm text-destructive">
+          <div className="flex items-center gap-1.5 sm:gap-2 p-1.5 sm:p-2 bg-destructive/10 rounded-md">
+            <AlertCircle className="w-3 h-3 sm:w-4 sm:h-4 text-destructive" />
+            <p className="text-xs sm:text-sm text-destructive">
               {stats.overdueCount} overdue invoice{stats.overdueCount > 1 ? 's' : ''}
             </p>
           </div>
         )}
 
         {/* Invoice List */}
-        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+        <div className="space-y-1.5 sm:space-y-2 max-h-[300px] overflow-y-auto">
           {incompleteInvoices.slice(0, 5).map((invoice) => {
             const currencySymbol = getCurrencySymbol(invoice.currency as any)
+            // Use naira icon for NGN, otherwise use currency symbol
+            const displaySymbol = invoice.currency === 'NGN' ? '₦' : currencySymbol
             const isOverdue = invoice.status === 'overdue'
             const isOutgoing = invoice.recipientUserId !== user?.uid
             
             return (
               <div
                 key={invoice.id}
-                className={`p-3 rounded-lg border ${
+                className={`p-2 sm:p-3 rounded-lg border ${
                   isOverdue ? 'border-destructive bg-destructive/5' : 'bg-muted/30'
                 }`}
               >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="font-medium text-sm">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 sm:gap-2 mb-0.5 sm:mb-1 flex-wrap">
+                      <p className="font-medium text-xs sm:text-sm truncate">
                         {invoice.invoiceType === 'incoming' ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
                       </p>
-                      <Badge variant={isOverdue ? 'destructive' : 'outline'} className="text-xs">
+                      <Badge variant={isOverdue ? 'destructive' : 'outline'} className="text-[10px] sm:text-xs px-1 sm:px-2 py-0">
                         {isOverdue ? 'Overdue' : invoice.status === 'sent' ? (isOutgoing ? 'Sent' : 'Received') : invoice.status}
                       </Badge>
                     </div>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
                       {isOutgoing ? invoice.client.name : invoice.supplier?.name || 'Unknown'}
                     </p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground">
                       Due: {format(new Date(invoice.dueDate), "MMM dd, yyyy")}
                     </p>
                   </div>
-                  <div className="text-right">
-                    <p className={`font-semibold ${isOutgoing ? 'text-green-600' : 'text-red-600'}`}>
-                      {isOutgoing ? '+' : '-'}{currencySymbol}{invoice.total.toLocaleString()}
+                  <div className="text-right flex-shrink-0">
+                    <p className={`font-semibold text-xs sm:text-sm ${isOutgoing ? 'text-green-600' : 'text-red-600'}`}>
+                      {isOutgoing ? '+' : '-'}{displaySymbol}{invoice.total.toLocaleString()}
                     </p>
                   </div>
                 </div>
@@ -190,7 +192,7 @@ export function IncompleteInvoices() {
         </div>
 
         {incompleteInvoices.length > 5 && (
-          <p className="text-xs text-muted-foreground text-center">
+          <p className="text-[10px] sm:text-xs text-muted-foreground text-center">
             +{incompleteInvoices.length - 5} more invoice{incompleteInvoices.length - 5 > 1 ? 's' : ''}
           </p>
         )}

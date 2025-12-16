@@ -268,55 +268,59 @@ export default function SettingsPage() {
                       Update your personal information and contact details
                     </p>
                   </div>
-          <div className="space-y-6">
-                    <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="firstName">First Name</Label>
+          <div className="space-y-4 sm:space-y-5 md:space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="firstName" className="text-xs sm:text-sm">First Name</Label>
                         <Input 
                           id="firstName" 
                           value={profileData.firstName}
                           onChange={(e) => setProfileData(prev => ({ ...prev, firstName: e.target.value }))}
+                          className="h-9 sm:h-10 text-xs sm:text-sm"
                         />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="lastName">Last Name</Label>
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="lastName" className="text-xs sm:text-sm">Last Name</Label>
                         <Input 
                           id="lastName"
                           value={profileData.lastName}
                           onChange={(e) => setProfileData(prev => ({ ...prev, lastName: e.target.value }))}
+                          className="h-9 sm:h-10 text-xs sm:text-sm"
                         />
                   </div>
                 </div>
-                    <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                        <Input id="email" type="email" defaultValue={profile?.email || ""} disabled />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="email" className="text-xs sm:text-sm">Email</Label>
+                        <Input id="email" type="email" defaultValue={profile?.email || ""} disabled className="h-9 sm:h-10 text-xs sm:text-sm" />
                         <p className="text-xs text-muted-foreground">Email cannot be changed</p>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="phone">Phone Number</Label>
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="phone" className="text-xs sm:text-sm">Phone Number</Label>
                         <Input 
                           id="phone" 
                           value={profileData.phone}
                           onChange={(e) => setProfileData(prev => ({ ...prev, phone: e.target.value }))}
+                          className="h-9 sm:h-10 text-xs sm:text-sm"
                         />
                   </div>
                 </div>
-                    <div className="grid md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="tin">Tax Identification Number</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="tin" className="text-xs sm:text-sm">Tax Identification Number</Label>
                         <Input 
                           id="tin"
                           value={profileData.taxId}
                           onChange={(e) => setProfileData(prev => ({ ...prev, taxId: e.target.value }))}
+                          className="h-9 sm:h-10 text-xs sm:text-sm"
                         />
                   </div>
                 </div>
                     <Separator />
-                    <div className="space-y-4">
-                      <h3 className="text-lg font-semibold">Address</h3>
-                      <div className="space-y-2">
-                        <Label htmlFor="street">Street Address</Label>
+                    <div className="space-y-3 sm:space-y-4">
+                      <h3 className="text-base sm:text-lg font-semibold">Address</h3>
+                      <div className="space-y-1.5 sm:space-y-2">
+                        <Label htmlFor="street" className="text-xs sm:text-sm">Street Address</Label>
                         <Input 
                           id="street"
                           value={profileData.address.street}
@@ -324,11 +328,12 @@ export default function SettingsPage() {
                             ...prev, 
                             address: { ...prev.address, street: e.target.value }
                           }))}
+                          className="h-9 sm:h-10 text-xs sm:text-sm"
                         />
                       </div>
-                      <div className="grid md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <Label htmlFor="city">City</Label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
+                        <div className="space-y-1.5 sm:space-y-2">
+                          <Label htmlFor="city" className="text-xs sm:text-sm">City</Label>
                           <Input 
                             id="city"
                             value={profileData.address.city}
@@ -336,10 +341,11 @@ export default function SettingsPage() {
                               ...prev, 
                               address: { ...prev.address, city: e.target.value }
                             }))}
+                            className="h-9 sm:h-10 text-xs sm:text-sm"
                           />
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="state">State</Label>
+                        <div className="space-y-1.5 sm:space-y-2">
+                          <Label htmlFor="state" className="text-xs sm:text-sm">State</Label>
                           <Input 
                             id="state"
                             value={profileData.address.state}
@@ -347,12 +353,13 @@ export default function SettingsPage() {
                               ...prev, 
                               address: { ...prev.address, state: e.target.value }
                             }))}
+                            className="h-9 sm:h-10 text-xs sm:text-sm"
                           />
                         </div>
                       </div>
-                      <div className="grid md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <Label htmlFor="country">Country</Label>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
+                        <div className="space-y-1.5 sm:space-y-2">
+                          <Label htmlFor="country" className="text-xs sm:text-sm">Country</Label>
                           <Input 
                             id="country"
                             value={profileData.address.country}
@@ -360,10 +367,11 @@ export default function SettingsPage() {
                               ...prev, 
                               address: { ...prev.address, country: e.target.value }
                             }))}
+                            className="h-9 sm:h-10 text-xs sm:text-sm"
                           />
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="postalCode">Postal Code</Label>
+                        <div className="space-y-1.5 sm:space-y-2">
+                          <Label htmlFor="postalCode" className="text-xs sm:text-sm">Postal Code</Label>
                           <Input 
                             id="postalCode"
                             value={profileData.address.postalCode}
@@ -371,32 +379,34 @@ export default function SettingsPage() {
                               ...prev, 
                               address: { ...prev.address, postalCode: e.target.value }
                             }))}
+                            className="h-9 sm:h-10 text-xs sm:text-sm"
                           />
                         </div>
                       </div>
                     </div>
                     <Separator />
-                    <div ref={kycSectionRef} className="space-y-4" id="kyc-section">
+                    <div ref={kycSectionRef} className="space-y-3 sm:space-y-4" id="kyc-section">
                       <div>
-                        <h3 className="text-lg font-semibold">KYC Documents</h3>
-                        <p className="text-sm text-muted-foreground mt-1">
+                        <h3 className="text-base sm:text-lg font-semibold">KYC Documents</h3>
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                           Upload your identity documents for verification (ID, Passport, or Driver's License)
                         </p>
                       </div>
-                      <div className="grid md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
                         {/* National ID */}
-                        <div className="space-y-2">
-                          <Label>National ID / Voter's Card</Label>
-                          <div className="border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center min-h-[120px]">
+                        <div className="space-y-1.5 sm:space-y-2">
+                          <Label className="text-xs sm:text-sm">National ID / Voter's Card</Label>
+                          <div className="border-2 border-dashed rounded-lg p-3 sm:p-4 flex flex-col items-center justify-center min-h-[100px] sm:min-h-[120px]">
                             {kycDocuments.id ? (
-                              <div className="flex flex-col items-center gap-2 w-full">
-                                <CheckCircle2 className="w-8 h-8 text-green-500" />
-                                <p className="text-sm text-muted-foreground text-center">Document uploaded</p>
-                                <div className="flex gap-2 mt-2">
+                              <div className="flex flex-col items-center gap-1.5 sm:gap-2 w-full">
+                                <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
+                                <p className="text-xs sm:text-sm text-muted-foreground text-center">Document uploaded</p>
+                                <div className="flex gap-1.5 sm:gap-2 mt-1.5 sm:mt-2">
                                   <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() => window.open(kycDocuments.id, '_blank')}
+                                    className="h-7 sm:h-8 text-xs sm:text-sm"
                                   >
                                     View
                                   </Button>
@@ -419,15 +429,16 @@ export default function SettingsPage() {
                                         setUploadingKYC(prev => ({ ...prev, id: false }))
                                       }
                                     }}
+                                    className="h-7 sm:h-8 w-7 sm:w-8 p-0"
                                   >
-                                    <X className="w-4 h-4" />
+                                    <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                   </Button>
                                 </div>
                               </div>
                             ) : (
-                              <label className="cursor-pointer flex flex-col items-center gap-2 w-full">
-                                <Upload className="w-6 h-6 text-muted-foreground" />
-                                <span className="text-sm text-muted-foreground">Click to upload</span>
+                              <label className="cursor-pointer flex flex-col items-center gap-1.5 sm:gap-2 w-full">
+                                <Upload className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground" />
+                                <span className="text-xs sm:text-sm text-muted-foreground">Click to upload</span>
                                 <input
                                   type="file"
                                   accept="image/*,.pdf"
@@ -459,18 +470,19 @@ export default function SettingsPage() {
                         </div>
 
                         {/* Passport */}
-                        <div className="space-y-2">
-                          <Label>Passport</Label>
-                          <div className="border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center min-h-[120px]">
+                        <div className="space-y-1.5 sm:space-y-2">
+                          <Label className="text-xs sm:text-sm">Passport</Label>
+                          <div className="border-2 border-dashed rounded-lg p-3 sm:p-4 flex flex-col items-center justify-center min-h-[100px] sm:min-h-[120px]">
                             {kycDocuments.passport ? (
-                              <div className="flex flex-col items-center gap-2 w-full">
-                                <CheckCircle2 className="w-8 h-8 text-green-500" />
-                                <p className="text-sm text-muted-foreground text-center">Document uploaded</p>
-                                <div className="flex gap-2 mt-2">
+                              <div className="flex flex-col items-center gap-1.5 sm:gap-2 w-full">
+                                <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
+                                <p className="text-xs sm:text-sm text-muted-foreground text-center">Document uploaded</p>
+                                <div className="flex gap-1.5 sm:gap-2 mt-1.5 sm:mt-2">
                                   <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() => window.open(kycDocuments.passport, '_blank')}
+                                    className="h-7 sm:h-8 text-xs sm:text-sm"
                                   >
                                     View
                                   </Button>
@@ -493,15 +505,16 @@ export default function SettingsPage() {
                                         setUploadingKYC(prev => ({ ...prev, passport: false }))
                                       }
                                     }}
+                                    className="h-7 sm:h-8 w-7 sm:w-8 p-0"
                                   >
-                                    <X className="w-4 h-4" />
+                                    <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                   </Button>
                                 </div>
                               </div>
                             ) : (
-                              <label className="cursor-pointer flex flex-col items-center gap-2 w-full">
-                                <Upload className="w-6 h-6 text-muted-foreground" />
-                                <span className="text-sm text-muted-foreground">Click to upload</span>
+                              <label className="cursor-pointer flex flex-col items-center gap-1.5 sm:gap-2 w-full">
+                                <Upload className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground" />
+                                <span className="text-xs sm:text-sm text-muted-foreground">Click to upload</span>
                                 <input
                                   type="file"
                                   accept="image/*,.pdf"
@@ -533,18 +546,19 @@ export default function SettingsPage() {
                         </div>
 
                         {/* Driver's License */}
-                        <div className="space-y-2">
-                          <Label>Driver's License</Label>
-                          <div className="border-2 border-dashed rounded-lg p-4 flex flex-col items-center justify-center min-h-[120px]">
+                        <div className="space-y-1.5 sm:space-y-2">
+                          <Label className="text-xs sm:text-sm">Driver's License</Label>
+                          <div className="border-2 border-dashed rounded-lg p-3 sm:p-4 flex flex-col items-center justify-center min-h-[100px] sm:min-h-[120px]">
                             {kycDocuments.driverLicense ? (
-                              <div className="flex flex-col items-center gap-2 w-full">
-                                <CheckCircle2 className="w-8 h-8 text-green-500" />
-                                <p className="text-sm text-muted-foreground text-center">Document uploaded</p>
-                                <div className="flex gap-2 mt-2">
+                              <div className="flex flex-col items-center gap-1.5 sm:gap-2 w-full">
+                                <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
+                                <p className="text-xs sm:text-sm text-muted-foreground text-center">Document uploaded</p>
+                                <div className="flex gap-1.5 sm:gap-2 mt-1.5 sm:mt-2">
                                   <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={() => window.open(kycDocuments.driverLicense, '_blank')}
+                                    className="h-7 sm:h-8 text-xs sm:text-sm"
                                   >
                                     View
                                   </Button>
@@ -567,15 +581,16 @@ export default function SettingsPage() {
                                         setUploadingKYC(prev => ({ ...prev, driverLicense: false }))
                                       }
                                     }}
+                                    className="h-7 sm:h-8 w-7 sm:w-8 p-0"
                                   >
-                                    <X className="w-4 h-4" />
+                                    <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                   </Button>
                                 </div>
                               </div>
                             ) : (
-                              <label className="cursor-pointer flex flex-col items-center gap-2 w-full">
-                                <Upload className="w-6 h-6 text-muted-foreground" />
-                                <span className="text-sm text-muted-foreground">Click to upload</span>
+                              <label className="cursor-pointer flex flex-col items-center gap-1.5 sm:gap-2 w-full">
+                                <Upload className="w-5 h-5 sm:w-6 sm:h-6 text-muted-foreground" />
+                                <span className="text-xs sm:text-sm text-muted-foreground">Click to upload</span>
                                 <input
                                   type="file"
                                   accept="image/*,.pdf"
@@ -644,6 +659,7 @@ export default function SettingsPage() {
                           }
                         }}
                         disabled={isSaving}
+                        className="h-9 sm:h-10 md:h-11 text-xs sm:text-sm md:text-base w-full sm:w-auto"
                       >
                         {isSaving ? "Saving..." : "Save Changes"}
                       </Button>
@@ -662,15 +678,15 @@ export default function SettingsPage() {
                         Manage your business details and type
                       </p>
                     </div>
-                    <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="business-name">Business Name</Label>
-                        <Input id="business-name" placeholder="Enter your business name" />
+                    <div className="space-y-4 sm:space-y-5 md:space-y-6">
+                <div className="space-y-1.5 sm:space-y-2">
+                  <Label htmlFor="business-name" className="text-xs sm:text-sm">Business Name</Label>
+                        <Input id="business-name" placeholder="Enter your business name" className="h-9 sm:h-10 text-xs sm:text-sm" />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="business-type">Business Type</Label>
+                <div className="space-y-1.5 sm:space-y-2">
+                  <Label htmlFor="business-type" className="text-xs sm:text-sm">Business Type</Label>
                         <Select defaultValue={profile?.businessType || "freelancer"}>
-                    <SelectTrigger id="business-type">
+                    <SelectTrigger id="business-type" className="h-9 sm:h-10 text-xs sm:text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -681,12 +697,12 @@ export default function SettingsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="business-address">Business Address</Label>
-                        <Input id="business-address" placeholder="Enter your business address" />
+                <div className="space-y-1.5 sm:space-y-2">
+                  <Label htmlFor="business-address" className="text-xs sm:text-sm">Business Address</Label>
+                        <Input id="business-address" placeholder="Enter your business address" className="h-9 sm:h-10 text-xs sm:text-sm" />
                       </div>
                       <div className="flex justify-end">
-                        <Button size="lg">Save Changes</Button>
+                        <Button size="lg" className="h-9 sm:h-10 md:h-11 text-xs sm:text-sm md:text-base w-full sm:w-auto">Save Changes</Button>
                 </div>
               </div>
             </Card>
@@ -836,40 +852,40 @@ export default function SettingsPage() {
                       Configure how and when you receive notifications
                     </p>
                   </div>
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="space-y-0.5">
-                        <Label className="text-base">Email Notifications</Label>
-                    <p className="text-sm text-muted-foreground">Receive email alerts for reminders and deadlines</p>
+                  <div className="space-y-4 sm:space-y-5 md:space-y-6">
+                    <div className="flex items-center justify-between p-3 sm:p-4 border rounded-lg gap-3 sm:gap-4">
+                  <div className="space-y-0.5 min-w-0 flex-1">
+                        <Label className="text-sm sm:text-base">Email Notifications</Label>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Receive email alerts for reminders and deadlines</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch defaultChecked className="flex-shrink-0" />
                 </div>
                 <Separator />
-                    <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="space-y-0.5">
-                        <Label className="text-base">Tax Deadline Reminders</Label>
-                    <p className="text-sm text-muted-foreground">Get notified about upcoming tax deadlines</p>
+                    <div className="flex items-center justify-between p-3 sm:p-4 border rounded-lg gap-3 sm:gap-4">
+                  <div className="space-y-0.5 min-w-0 flex-1">
+                        <Label className="text-sm sm:text-base">Tax Deadline Reminders</Label>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Get notified about upcoming tax deadlines</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch defaultChecked className="flex-shrink-0" />
                 </div>
                 <Separator />
-                    <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="space-y-0.5">
-                        <Label className="text-base">Transaction Alerts</Label>
-                    <p className="text-sm text-muted-foreground">Notifications for new transactions</p>
+                    <div className="flex items-center justify-between p-3 sm:p-4 border rounded-lg gap-3 sm:gap-4">
+                  <div className="space-y-0.5 min-w-0 flex-1">
+                        <Label className="text-sm sm:text-base">Transaction Alerts</Label>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Notifications for new transactions</p>
                   </div>
-                  <Switch />
+                  <Switch className="flex-shrink-0" />
                 </div>
                 <Separator />
-                    <div className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="space-y-0.5">
-                        <Label className="text-base">Weekly Summary</Label>
-                    <p className="text-sm text-muted-foreground">Receive weekly financial summary reports</p>
+                    <div className="flex items-center justify-between p-3 sm:p-4 border rounded-lg gap-3 sm:gap-4">
+                  <div className="space-y-0.5 min-w-0 flex-1">
+                        <Label className="text-sm sm:text-base">Weekly Summary</Label>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Receive weekly financial summary reports</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch defaultChecked className="flex-shrink-0" />
                 </div>
-                    <div className="flex justify-end pt-4">
-                      <Button size="lg">Save Preferences</Button>
+                    <div className="flex justify-end pt-2 sm:pt-4">
+                      <Button size="lg" className="h-9 sm:h-10 md:h-11 text-xs sm:text-sm md:text-base w-full sm:w-auto">Save Preferences</Button>
                     </div>
               </div>
             </Card>
@@ -884,21 +900,21 @@ export default function SettingsPage() {
                       Update your password and manage security settings
                     </p>
                   </div>
-                  <div className="space-y-6 max-w-2xl">
-                <div className="space-y-2">
-                  <Label htmlFor="current-password">Current Password</Label>
-                      <Input id="current-password" type="password" placeholder="Enter your current password" />
+                  <div className="space-y-4 sm:space-y-5 md:space-y-6 max-w-2xl">
+                <div className="space-y-1.5 sm:space-y-2">
+                  <Label htmlFor="current-password" className="text-xs sm:text-sm">Current Password</Label>
+                      <Input id="current-password" type="password" placeholder="Enter your current password" className="h-9 sm:h-10 text-xs sm:text-sm" />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="new-password">New Password</Label>
-                      <Input id="new-password" type="password" placeholder="Enter your new password" />
+                <div className="space-y-1.5 sm:space-y-2">
+                  <Label htmlFor="new-password" className="text-xs sm:text-sm">New Password</Label>
+                      <Input id="new-password" type="password" placeholder="Enter your new password" className="h-9 sm:h-10 text-xs sm:text-sm" />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="confirm-password">Confirm New Password</Label>
-                      <Input id="confirm-password" type="password" placeholder="Confirm your new password" />
+                <div className="space-y-1.5 sm:space-y-2">
+                  <Label htmlFor="confirm-password" className="text-xs sm:text-sm">Confirm New Password</Label>
+                      <Input id="confirm-password" type="password" placeholder="Confirm your new password" className="h-9 sm:h-10 text-xs sm:text-sm" />
                     </div>
-                    <div className="flex justify-end pt-4">
-                      <Button size="lg">Update Password</Button>
+                    <div className="flex justify-end pt-2 sm:pt-4">
+                      <Button size="lg" className="h-9 sm:h-10 md:h-11 text-xs sm:text-sm md:text-base w-full sm:w-auto">Update Password</Button>
                 </div>
               </div>
             </Card>

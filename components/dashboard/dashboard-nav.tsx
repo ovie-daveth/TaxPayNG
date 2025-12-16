@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Calculator, LayoutDashboard, Receipt, FileText, Bell, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, IdCardIcon, FileCheck, BarChart3, MessageSquare } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
@@ -33,6 +33,31 @@ export function DashboardNav() {
   const { sidebarCollapsed, toggleSidebar } = useSidebar()
   const { logout, user } = useAuth()
   const { profile } = useUserProfile()
+  const [hasFilingRequests, setHasFilingRequests] = useState(false)
+
+  useEffect(() => {
+    const checkFilingRequests = async () => {
+      if (!user?.uid) {
+        setHasFilingRequests(false)
+        return
+      }
+
+      try {
+        const response = await fetch(`/api/filing-requests?userId=${user.uid}`)
+        const result = await response.json()
+        if (result.success && result.data && result.data.length > 0) {
+          setHasFilingRequests(true)
+        } else {
+          setHasFilingRequests(false)
+        }
+      } catch (error) {
+        console.error("Error checking filing requests:", error)
+        setHasFilingRequests(false)
+      }
+    }
+
+    checkFilingRequests()
+  }, [user?.uid])
 
   const handleLogout = async () => {
     const result = await logout()
@@ -43,6 +68,14 @@ export function DashboardNav() {
       toast.error(result.error || 'Failed to log out')
     }
   }
+
+  // Filter nav items based on whether user has filing requests
+  const filteredNavItems = navItems.filter(item => {
+    if (item.href === "/dashboard/filing-requests") {
+      return hasFilingRequests
+    }
+    return true
+  })
 
   return (
     <>
@@ -75,7 +108,7 @@ export function DashboardNav() {
         </div>
 
         <nav className="flex-1 p-4 space-y-8">
-          {navItems.map((item) => {
+          {filteredNavItems.map((item) => {
             const Icon = item.icon
             // For Dashboard, only match exact path (not sub-routes)
             // For other routes, match exact path or sub-routes
@@ -165,20 +198,7 @@ export function DashboardNav() {
       <header className="md:hidden sticky top-0 z-50 bg-card border-b border-border">
         <div className="flex items-center justify-between p-4">
           <Link href="/dashboard" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-              <Calculator className="w-5 h-5 text-primary-foreground" />
-            </div>
-            <div className="flex flex-col">
-              <span className="font-semibold text-lg">OTax</span>
-              {profile && (
-                <span className="text-xs text-muted-foreground">
-                  {profile.firstName && profile.lastName 
-                    ? `${profile.firstName} ${profile.lastName}`
-                    : profile.firstName || profile.lastName || profile.email?.split('@')[0] || 'User'
-                  }
-                </span>
-              )}
-            </div>
+            <OtaxLogo />
           </Link>
           <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
@@ -188,7 +208,7 @@ export function DashboardNav() {
         {/* Mobile Menu */}
         {mobileMenuOpen && (
           <nav className="border-t border-border p-4 space-y-1">
-            {navItems.map((item) => {
+            {filteredNavItems.map((item) => {
               const Icon = item.icon
               // For Dashboard, only match exact path (not sub-routes)
               // For other routes, match exact path or sub-routes

@@ -86,116 +86,100 @@ export function ViewInvoiceDialog({
   // Initialize edited invoice when entering edit mode
   useEffect(() => {
     if (invoice && isEditing && !editedInvoice) {
-      const copied = JSON.parse(JSON.stringify(invoice)) // Deep copy
-      setEditedInvoice(copied)
-      
-      // Initialize item currencies and display values
-      const currencies: Record<string, CurrencyCode> = {}
-      const displays: Record<string, string> = {}
-      const converted: Record<string, number> = {}
-      const baseCurrency = copied.currency as CurrencyCode
-      
-      copied.items.forEach((item: InvoiceItem) => {
-        const itemCurrency = (item.currency as CurrencyCode) || baseCurrency || "NGN"
-        currencies[item.id] = itemCurrency
-        displays[item.id] = item.unitPrice.toString()
+      try {
+        const copied = JSON.parse(JSON.stringify(invoice)) // Deep copy
         
-        // If item currency matches base currency, use unitPrice directly
-        // Otherwise, convert it immediately
-        if (itemCurrency === baseCurrency) {
-          converted[item.id] = item.unitPrice
-        } else {
-          // Don't set wrong value - convert immediately
-          // Start with 0, will be updated after conversion
-          converted[item.id] = 0
-          // Convert immediately
-          if (item.unitPrice > 0) {
+        // Initialize item currencies and display values
+        const currencies: Record<string, CurrencyCode> = {}
+        const displays: Record<string, string> = {}
+        const converted: Record<string, number> = {}
+        const baseCurrency = copied.currency as CurrencyCode
+        
+        // First, set the basic state synchronously
+        copied.items.forEach((item: InvoiceItem) => {
+          const itemCurrency = (item.currency as CurrencyCode) || baseCurrency || "NGN"
+          currencies[item.id] = itemCurrency
+          displays[item.id] = item.unitPrice.toString()
+          
+          // If item currency matches base currency, use unitPrice directly
+          if (itemCurrency === baseCurrency) {
+            converted[item.id] = item.unitPrice
+          } else {
+            // Start with unitPrice, will be updated after conversion
+            converted[item.id] = item.unitPrice
+          }
+        })
+        
+        // Set initial state
+        setItemCurrencies(currencies)
+        setItemDisplayValues(displays)
+        setItemConvertedAmounts(converted)
+        setEditedInvoice(copied)
+        
+        // Then do async conversions if needed (but don't block)
+        copied.items.forEach((item: InvoiceItem) => {
+          const itemCurrency = currencies[item.id]
+          if (itemCurrency !== baseCurrency && item.unitPrice > 0) {
             convertCurrency(item.unitPrice, itemCurrency, baseCurrency)
               .then(convertedAmount => {
                 setItemConvertedAmounts(prev => ({
                   ...prev,
                   [item.id]: convertedAmount
                 }))
-                // Recalculate after conversion
+                // Recalculate totals after conversion
                 setEditedInvoice(prev => {
-                  if (prev) {
-                    const itemToUpdate = prev.items.find((i: InvoiceItem) => i.id === item.id)
-                    if (itemToUpdate) {
-                      // Recalculate this item's amount and totals
-                      const updatedItems = prev.items.map((i: InvoiceItem) => {
-                        if (i.id === item.id) {
-                          const ic = itemCurrencies[i.id] || (i.currency as CurrencyCode) || prev.currency
-                          const bc = prev.currency as CurrencyCode
-                          const bp = ic !== bc 
-                            ? (convertedAmount)
-                            : i.unitPrice
-                          const itemSubtotal = i.quantity * bp
-                          return { ...i, amount: itemSubtotal }
-                        }
-                        return i
-                      })
-                      // Recalculate totals using current converted amounts
-                      setItemConvertedAmounts(currentConverted => {
-                        let subtotal = 0
-                        let vatableSubtotal = 0
-                        updatedItems.forEach((i: InvoiceItem) => {
-                          if (i.unitPrice === 0) return
-                          const ic = itemCurrencies[i.id] || (i.currency as CurrencyCode) || prev.currency
-                          const bc = prev.currency as CurrencyCode
-                          // Use the converted amount we just set for this item, or get from current state
-                          const bp = ic !== bc 
-                            ? (i.id === item.id ? convertedAmount : (currentConverted[i.id] || i.unitPrice))
-                            : i.unitPrice
-                          const itemSubtotal = i.quantity * bp
-                          subtotal += itemSubtotal
-                          // Track vatable subtotal for VAT calculation
-                          if (i.vatable) {
-                            vatableSubtotal += itemSubtotal
-                          }
-                        })
-                        const discountAmount = prev.discount ? subtotal * (prev.discount / 100) : 0
-                        const subtotalAfterDiscount = subtotal - discountAmount
-                        // Apply discount proportionally to vatable items
-                        const vatableDiscountAmount = vatableSubtotal > 0 && subtotal > 0 
-                          ? (vatableSubtotal / subtotal) * discountAmount 
-                          : 0
-                        const vatableSubtotalAfterDiscount = vatableSubtotal - vatableDiscountAmount
-                        const vatRate = prev.vatRate || 7.5
-                        const vatAmount = vatableSubtotalAfterDiscount * (vatRate / 100)
-                        const invoiceTotal = subtotalAfterDiscount + vatAmount
-                        const total = invoiceTotal
-                        setEditedInvoice(prevInvoice => prevInvoice ? {
-                          ...prevInvoice,
-                          items: updatedItems,
-                          subtotal,
-                          vatAmount,
-                          taxAmount: vatAmount, // Legacy field
-                          invoiceTotal,
-                          total
-                        } : prevInvoice)
-                        return currentConverted
-                      })
+                  if (!prev) return prev
+                  
+                  // Recalculate subtotal with converted amount
+                  let subtotal = 0
+                  let vatableSubtotal = 0
+                  
+                  prev.items.forEach((i: InvoiceItem) => {
+                    const ic = currencies[i.id] || (i.currency as CurrencyCode) || prev.currency
+                    const bc = prev.currency as CurrencyCode
+                    const bp = ic !== bc 
+                      ? (i.id === item.id ? convertedAmount : (converted[i.id] || i.unitPrice))
+                      : i.unitPrice
+                    const itemSubtotal = i.quantity * bp
+                    subtotal += itemSubtotal
+                    if (i.vatable) {
+                      vatableSubtotal += itemSubtotal
                     }
+                  })
+                  
+                  const discountAmount = prev.discount ? subtotal * (prev.discount / 100) : 0
+                  const subtotalAfterDiscount = subtotal - discountAmount
+                  const vatableDiscountAmount = vatableSubtotal > 0 && subtotal > 0 
+                    ? (vatableSubtotal / subtotal) * discountAmount 
+                    : 0
+                  const vatableSubtotalAfterDiscount = vatableSubtotal - vatableDiscountAmount
+                  const vatRate = prev.vatRate || 7.5
+                  const vatAmount = vatableSubtotalAfterDiscount * (vatRate / 100)
+                  const invoiceTotal = subtotalAfterDiscount + vatAmount
+                  
+                  return {
+                    ...prev,
+                    subtotal,
+                    vatAmount,
+                    taxAmount: vatAmount,
+                    invoiceTotal,
+                    total: invoiceTotal
                   }
-                  return prev
                 })
               })
               .catch(error => {
                 console.error('Error converting currency on init:', error)
-                // On error, use unitPrice (will be incorrect but prevents 0)
-                setItemConvertedAmounts(prev => ({
-                  ...prev,
-                  [item.id]: item.unitPrice
-                }))
+                // On error, keep the original unitPrice
               })
           }
-        }
-      })
-      setItemCurrencies(currencies)
-      setItemDisplayValues(displays)
-      setItemConvertedAmounts(converted)
+        })
+      } catch (error) {
+        console.error('Error initializing edit mode:', error)
+        toast.error('Failed to initialize edit mode')
+        setIsEditing(false)
+      }
     }
-  }, [invoice, isEditing, editedInvoice])
+  }, [invoice, isEditing]) // Removed editedInvoice from dependencies to prevent loops
 
   // Use editedInvoice when editing, otherwise use original invoice
   const currentInvoice = isEditing && editedInvoice ? editedInvoice : invoice
@@ -1286,13 +1270,13 @@ export function ViewInvoiceDialog({
         onOpenChange(isOpen)
       }}
     >
-      <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden p-0 flex flex-col">
-        <DialogHeader className="px-6 pt-6 pb-4 border-b">
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-xl">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-7xl max-h-[95vh] overflow-hidden p-0 flex flex-col">
+        <DialogHeader className="px-3 sm:px-4 md:px-6 pt-3 sm:pt-4 md:pt-6 pb-3 sm:pb-4 border-b">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4">
+            <DialogTitle className="text-base sm:text-lg md:text-xl break-words">
               {displayAsIncoming ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
             </DialogTitle>
-            <div className="flex gap-2 mr-8">
+            <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:mr-8">
               {/* Edit/Save/Cancel buttons - only for issuer when client hasn't paid */}
               {isSender && invoice.clientPaymentStatus !== 'paid' && (
                 <>
@@ -1301,9 +1285,11 @@ export function ViewInvoiceDialog({
                       variant="outline" 
                       size="sm" 
                       onClick={() => setIsEditing(true)}
+                      className="h-8 sm:h-9 text-xs sm:text-sm"
                     >
-                      <Edit className="w-4 h-4 mr-2" />
-                      Edit
+                      <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                      <span className="hidden sm:inline">Edit</span>
+                      <span className="sm:hidden">Edit</span>
                     </Button>
                   ) : (
                     <>
@@ -1312,16 +1298,19 @@ export function ViewInvoiceDialog({
                         size="sm" 
                         onClick={handleSaveEdit}
                         disabled={isSaving}
+                        className="h-8 sm:h-9 text-xs sm:text-sm"
                       >
                         {isSaving ? (
                           <>
-                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                            Saving...
+                            <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
+                            <span className="hidden sm:inline">Saving...</span>
+                            <span className="sm:hidden">Saving...</span>
                           </>
                         ) : (
                           <>
-                            <Save className="w-4 h-4 mr-2" />
-                            Save
+                            <Save className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                            <span className="hidden sm:inline">Save</span>
+                            <span className="sm:hidden">Save</span>
                           </>
                         )}
                       </Button>
@@ -1330,9 +1319,11 @@ export function ViewInvoiceDialog({
                         size="sm" 
                         onClick={handleCancelEdit}
                         disabled={isSaving}
+                        className="h-8 sm:h-9 text-xs sm:text-sm"
                       >
-                        <XCircle className="w-4 h-4 mr-2" />
-                        Cancel
+                        <XCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                        <span className="hidden sm:inline">Cancel</span>
+                        <span className="sm:hidden">Cancel</span>
                       </Button>
                     </>
                   )}
@@ -1340,13 +1331,15 @@ export function ViewInvoiceDialog({
               )}
               {!isEditing && (
                 <>
-                  <Button variant="outline" size="sm" onClick={handlePrint}>
-                    <Printer className="w-4 h-4 mr-2" />
-                    Print
+                  <Button variant="outline" size="sm" onClick={handlePrint} className="h-8 sm:h-9 text-xs sm:text-sm">
+                    <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                    <span className="hidden sm:inline">Print</span>
+                    <span className="sm:hidden">Print</span>
                   </Button>
-                  <Button variant="outline" size="sm" onClick={handleDownload}>
-                    <Download className="w-4 h-4 mr-2" />
-                    Download PDF
+                  <Button variant="outline" size="sm" onClick={handleDownload} className="h-8 sm:h-9 text-xs sm:text-sm">
+                    <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                    <span className="hidden sm:inline">Download PDF</span>
+                    <span className="sm:hidden">Download</span>
                   </Button>
                 </>
               )}
@@ -1354,16 +1347,16 @@ export function ViewInvoiceDialog({
           </div>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto">
-          <div className="p-6 space-y-6">
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
+          <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-5 md:space-y-6">
             {/* Top Section: Invoice Header and Client Info */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
               {/* Left: Invoice Header */}
               <div className="lg:col-span-2">
-                <Card className="p-5">
+                <Card className="p-3 sm:p-4 md:p-5">
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <h2 className="text-lg font-bold mb-1">
+                      <h2 className="text-base sm:text-lg font-bold mb-1 break-words">
                         {isSender 
                           ? (currentInvoice?.supplier?.businessName || currentInvoice?.supplier?.name || "Your Company")
                           : (currentInvoice?.supplier?.businessName || currentInvoice?.supplier?.name || "Supplier")}
@@ -1371,10 +1364,19 @@ export function ViewInvoiceDialog({
                       <p className="text-xs text-muted-foreground mb-1">
                         Invoice #{currentInvoice?.invoiceNumber || invoice.invoiceNumber}
                       </p>
-                      <p className="text-xs text-muted-foreground">
-                        Issue Date: {format(new Date(currentInvoice?.issueDate || invoice.issueDate), "MMM dd, yyyy")}
-                        {currentInvoice?.dueDate && ` • Due: ${format(new Date(currentInvoice.dueDate), "MMM dd, yyyy")}`}
-                      </p>
+                      <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-0">
+                        <p className="text-xs text-muted-foreground">
+                          Issue Date: {format(new Date(currentInvoice?.issueDate || invoice.issueDate), "MMM dd, yyyy")}
+                        </p>
+                        {currentInvoice?.dueDate && (
+                          <>
+                            <span className="hidden sm:inline text-xs text-muted-foreground mx-1">•</span>
+                            <p className="text-xs text-muted-foreground sm:ml-0">
+                              Due: {format(new Date(currentInvoice.dueDate), "MMM dd, yyyy")}
+                            </p>
+                          </>
+                        )}
+                      </div>
                       {(currentInvoice?.supplier?.vatRegistrationNumber || invoice.supplier?.vatRegistrationNumber) && (
                         <p className="text-xs text-muted-foreground mt-1">
                           VAT Reg: {(currentInvoice?.supplier?.vatRegistrationNumber || invoice.supplier?.vatRegistrationNumber)}
@@ -1463,23 +1465,23 @@ export function ViewInvoiceDialog({
                   {isSender ? "Bill To" : displayAsIncoming ? "Bill To (You)" : "Client Information"}
                 </h3>
                 {isEditing && editedInvoice ? (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                    <div className="col-span-1 sm:col-span-2">
                       <Label className="text-xs text-muted-foreground">Business Name (Optional)</Label>
                       <Input
                         value={editedInvoice.client.businessName || ""}
                         onChange={(e) => updateClient({ businessName: e.target.value })}
                         placeholder="Business name"
-                        className="h-9 mt-1"
+                        className="h-9 sm:h-10 mt-1 text-xs sm:text-sm"
                       />
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-1 sm:col-span-2">
                       <Label className="text-xs text-muted-foreground">Name *</Label>
                       <Input
                         value={editedInvoice.client.name}
                         onChange={(e) => updateClient({ name: e.target.value })}
                         placeholder="Client name"
-                        className="h-9 mt-1"
+                        className="h-9 sm:h-10 mt-1 text-xs sm:text-sm"
                       />
                     </div>
                     <div>
@@ -1489,7 +1491,7 @@ export function ViewInvoiceDialog({
                         value={editedInvoice.client.email || ""}
                         onChange={(e) => updateClient({ email: e.target.value })}
                         placeholder="Email"
-                        className="h-9 mt-1"
+                        className="h-9 sm:h-10 mt-1 text-xs sm:text-sm"
                       />
                     </div>
                     <div>
@@ -1498,10 +1500,10 @@ export function ViewInvoiceDialog({
                         value={editedInvoice.client.phone || ""}
                         onChange={(e) => updateClient({ phone: e.target.value })}
                         placeholder="Phone"
-                        className="h-9 mt-1"
+                        className="h-9 sm:h-10 mt-1 text-xs sm:text-sm"
                       />
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-1 sm:col-span-2">
                       <Label className="text-xs text-muted-foreground">Street Address</Label>
                       <Input
                         value={editedInvoice.client.address?.street || ""}
@@ -1509,7 +1511,7 @@ export function ViewInvoiceDialog({
                           address: { ...editedInvoice.client.address, street: e.target.value }
                         })}
                         placeholder="Street address"
-                        className="h-9 mt-1"
+                        className="h-9 sm:h-10 mt-1 text-xs sm:text-sm"
                       />
                     </div>
                     <div>
@@ -1520,7 +1522,7 @@ export function ViewInvoiceDialog({
                           address: { ...editedInvoice.client.address, city: e.target.value }
                         })}
                         placeholder="City"
-                        className="h-9 mt-1"
+                        className="h-9 sm:h-10 mt-1 text-xs sm:text-sm"
                       />
                     </div>
                     <div>
@@ -1531,21 +1533,21 @@ export function ViewInvoiceDialog({
                           address: { ...editedInvoice.client.address, state: e.target.value }
                         })}
                         placeholder="State"
-                        className="h-9 mt-1"
+                        className="h-9 sm:h-10 mt-1 text-xs sm:text-sm"
                       />
                     </div>
-                    <div className="col-span-2">
+                    <div className="col-span-1 sm:col-span-2">
                       <Label className="text-xs text-muted-foreground">Tax ID (TIN)</Label>
                       <Input
                         value={editedInvoice.client.taxId || ""}
                         onChange={(e) => updateClient({ taxId: e.target.value })}
                         placeholder="Tax ID"
-                        className="h-9 mt-1"
+                        className="h-9 sm:h-10 mt-1 text-xs sm:text-sm"
                       />
                     </div>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     {currentInvoice?.client.businessName && (
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">Business Name</p>
@@ -1599,8 +1601,8 @@ export function ViewInvoiceDialog({
 
               {/* Right: Payment Summary */}
               <div className="lg:col-span-1">
-                <Card className="p-5">
-                  <h3 className="text-lg font-semibold mb-5">Payment Summary</h3>
+                <Card className="p-3 sm:p-4 md:p-5">
+                  <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 md:mb-5">Payment Summary</h3>
                 {isEditing && editedInvoice && (
                   <div className="mb-4 space-y-4 p-4 bg-muted/30 rounded-lg border-b pb-4">
                     <div>
@@ -1735,9 +1737,9 @@ export function ViewInvoiceDialog({
                   )}
                   
                   {/* Final Total */}
-                  <div className="flex justify-between items-center text-lg font-bold border-t-2 border-border pt-4 mt-3">
-                    <span>Amount Payable</span>
-                    <span className="text-primary">{formatCurrencyAmount((currentInvoice || invoice).total, (currentInvoice || invoice).currency as any)}</span>
+                  <div className="flex justify-between items-center text-base sm:text-lg font-bold border-t-2 border-border pt-3 sm:pt-4 mt-2 sm:mt-3">
+                    <span className="text-xs sm:text-sm md:text-base">Amount Payable</span>
+                    <span className="text-primary text-sm sm:text-base md:text-lg">{formatCurrencyAmount((currentInvoice || invoice).total, (currentInvoice || invoice).currency as any)}</span>
                   </div>
                 </div>
 
@@ -1983,36 +1985,39 @@ export function ViewInvoiceDialog({
             {/* End of Top Section Grid */}
 
             {/* Items Table - Full Width */}
-            <Card className="p-5">
-                  <h3 className="text-lg font-semibold mb-4">Items</h3>
+            <Card className="p-3 sm:p-4 md:p-5">
+                  <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Items</h3>
                   {isEditing && editedInvoice ? (
                     <div className="space-y-3">
                       {editedInvoice.items.map((item, index) => (
-                        <div key={item.id || index} className="grid grid-cols-12 gap-3 items-center p-3 border rounded-lg">
-                          <div className="col-span-4">
+                        <div key={item.id || index} className="grid grid-cols-1 sm:grid-cols-12 gap-3 sm:items-center p-3 border rounded-lg">
+                          <div className="col-span-1 sm:col-span-4">
+                            <Label className="text-xs text-muted-foreground mb-1 block sm:hidden">Description</Label>
                             <Input
                               value={item.description}
                               onChange={(e) => updateItem(item.id, { description: e.target.value })}
                               placeholder="Description"
-                              className="h-9"
+                              className="h-9 sm:h-9 text-xs sm:text-sm"
                             />
                           </div>
-                          <div className="col-span-2">
+                          <div className="col-span-1 sm:col-span-2">
+                            <Label className="text-xs text-muted-foreground mb-1 block sm:hidden">Quantity</Label>
                             <Input
                               type="number"
                               min="1"
                               value={item.quantity}
                               onChange={(e) => updateItem(item.id, { quantity: parseInt(e.target.value) || 1 })}
                               placeholder="Qty"
-                              className="h-9"
+                              className="h-9 sm:h-9 text-xs sm:text-sm"
                             />
                           </div>
-                          <div className="col-span-2 flex items-center gap-2">
+                          <div className="col-span-1 sm:col-span-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <Label className="text-xs text-muted-foreground mb-1 block sm:hidden">Unit Price</Label>
                             <Select
                               value={itemCurrencies[item.id] || editedInvoice?.currency || invoice.currency}
                               onValueChange={(value) => handleItemCurrencyChange(item.id, value as CurrencyCode)}
                             >
-                              <SelectTrigger className="w-24">
+                              <SelectTrigger className="w-full sm:w-24 h-9 text-xs sm:text-sm">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -2028,20 +2033,20 @@ export function ViewInvoiceDialog({
                               placeholder="0.00"
                               value={itemDisplayValues[item.id] || item.unitPrice.toString()}
                               onChange={(e) => handleUnitPriceChange(item.id, e.target.value)}
-                              className="h-9 flex-1"
+                              className="h-9 flex-1 text-xs sm:text-sm"
                             />
                           </div>
-                          <div className="col-span-2 text-right">
+                          <div className="col-span-1 sm:col-span-2 text-left sm:text-right">
                             <Label className="text-xs text-muted-foreground mb-1 block">Amount</Label>
-                            <p className="font-semibold">{formatCurrencyAmount(calculateItemAmount(item), currentInvoice?.currency as any || invoice?.currency as any)}</p>
+                            <p className="font-semibold text-xs sm:text-sm">{formatCurrencyAmount(calculateItemAmount(item), currentInvoice?.currency as any || invoice?.currency as any)}</p>
                           </div>
-                          <div className="col-span-2 flex items-center gap-2">
+                          <div className="col-span-1 sm:col-span-2 flex items-center gap-2">
                             <Checkbox
                               id={`vatable-${item.id}`}
                               checked={item.vatable || false}
                               onCheckedChange={(checked) => updateItem(item.id, { vatable: !!checked })}
                             />
-                            <Label htmlFor={`vatable-${item.id}`} className="text-sm cursor-pointer">
+                            <Label htmlFor={`vatable-${item.id}`} className="text-xs sm:text-sm cursor-pointer">
                               Vatable
                             </Label>
                           </div>
@@ -2050,41 +2055,43 @@ export function ViewInvoiceDialog({
                     </div>
                   ) : (
                     <div className="border rounded-lg overflow-hidden">
-                      <table className="w-full">
-                        <thead className="bg-muted/50">
-                          <tr>
-                            <th className="text-left p-3 text-sm font-semibold">Description</th>
-                            <th className="text-center p-3 text-sm font-semibold">Quantity</th>
-                            <th className="text-right p-3 text-sm font-semibold">Unit Price</th>
-                            <th className="text-right p-3 text-sm font-semibold">Amount</th>
-                            <th className="text-center p-3 text-sm font-semibold">Vatable</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {(currentInvoice?.items || invoice.items).map((item, index) => (
-                            <tr key={item.id || index} className="border-t hover:bg-muted/30 transition-colors">
-                              <td className="p-3">{item.description}</td>
-                              <td className="p-3 text-center">{item.quantity}</td>
-                              <td className="p-3 text-right">
-                                <span className="text-muted-foreground">
-                                  {item.currency ? getCurrencySymbol(item.currency as any) : currencySymbol}
-                                </span>
-                                {item.unitPrice.toLocaleString()}
-                              </td>
-                              <td className="p-3 text-right font-semibold">
-                                {formatCurrencyAmount(calculateItemAmount(item), currentInvoice?.currency as any || invoice?.currency as any)}
-                              </td>
-                              <td className="p-3 text-center">
-                                {item.vatable ? (
-                                  <Badge variant="default" className="text-xs">Yes</Badge>
-                                ) : (
-                                  <Badge variant="secondary" className="text-xs">No</Badge>
-                                )}
-                              </td>
+                      <div className="overflow-x-auto -mx-2 sm:-mx-3 md:mx-0 px-2 sm:px-3 md:px-0">
+                        <table className="w-full min-w-[500px] sm:min-w-[600px]">
+                          <thead className="bg-muted/50">
+                            <tr>
+                              <th className="text-left p-2 sm:p-3 text-xs sm:text-sm font-semibold">Description</th>
+                              <th className="text-center p-2 sm:p-3 text-xs sm:text-sm font-semibold">Quantity</th>
+                              <th className="text-right p-2 sm:p-3 text-xs sm:text-sm font-semibold">Unit Price</th>
+                              <th className="text-right p-2 sm:p-3 text-xs sm:text-sm font-semibold">Amount</th>
+                              <th className="text-center p-2 sm:p-3 text-xs sm:text-sm font-semibold">Vatable</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                          </thead>
+                          <tbody>
+                            {(currentInvoice?.items || invoice.items).map((item, index) => (
+                              <tr key={item.id || index} className="border-t hover:bg-muted/30 transition-colors">
+                                <td className="p-2 sm:p-3 text-xs sm:text-sm break-words">{item.description}</td>
+                                <td className="p-2 sm:p-3 text-center text-xs sm:text-sm">{item.quantity}</td>
+                                <td className="p-2 sm:p-3 text-right text-xs sm:text-sm">
+                                  <span className="text-muted-foreground">
+                                    {item.currency ? getCurrencySymbol(item.currency as any) : currencySymbol}
+                                  </span>
+                                  {item.unitPrice.toLocaleString()}
+                                </td>
+                                <td className="p-2 sm:p-3 text-right font-semibold text-xs sm:text-sm">
+                                  {formatCurrencyAmount(calculateItemAmount(item), currentInvoice?.currency as any || invoice?.currency as any)}
+                                </td>
+                                <td className="p-2 sm:p-3 text-center">
+                                  {item.vatable ? (
+                                    <Badge variant="default" className="text-xs">Yes</Badge>
+                                  ) : (
+                                    <Badge variant="secondary" className="text-xs">No</Badge>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   )}
               </Card>

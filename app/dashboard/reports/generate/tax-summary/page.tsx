@@ -144,14 +144,14 @@ export default function GenerateTaxSummaryPage() {
             </Link>
 
             {/* Header Section */}
-            <Card className="p-6">
-              <div className="flex items-start gap-4 mb-4">
-                <div className="p-3 bg-primary/10 rounded-lg">
-                  <Calculator className="w-6 h-6 text-primary" />
+            <Card className="p-3 sm:p-4 md:p-6">
+              <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4 mb-3 sm:mb-4">
+                <div className="p-2 sm:p-3 bg-primary/10 rounded-lg flex-shrink-0">
+                  <Calculator className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                 </div>
-                <div className="flex-1">
-                  <h1 className="text-2xl font-semibold mb-2">Generate Tax Summary Report</h1>
-                  <p className="text-muted-foreground">
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-lg sm:text-xl md:text-2xl font-semibold mb-2">Generate Tax Summary Report</h1>
+                  <p className="text-xs sm:text-sm text-muted-foreground">
                     Create a comprehensive tax summary report showing your income, expenses, reliefs, 
                     and calculated tax liability for the selected period. This report provides a clear 
                     overview of your tax obligations and helps with tax planning.
@@ -159,9 +159,9 @@ export default function GenerateTaxSummaryPage() {
                 </div>
               </div>
 
-              <Alert className="mt-4">
-                <Info className="w-4 h-4" />
-                <AlertDescription>
+              <Alert className="mt-3 sm:mt-4">
+                <Info className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <AlertDescription className="text-xs sm:text-sm">
                   <strong>What is a Tax Summary Report?</strong> A tax summary report provides a consolidated 
                   view of your financial data and tax calculations for a specific period. It includes your total 
                   income, total expenses, applicable reliefs and deductions, taxable income, and the calculated 
@@ -172,13 +172,13 @@ export default function GenerateTaxSummaryPage() {
             </Card>
 
             {/* Configuration Form */}
-            <Card className="p-6">
-              <div className="mb-6">
-                <h2 className="text-xl font-semibold flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
+            <Card className="p-3 sm:p-4 md:p-6">
+              <div className="mb-4 sm:mb-6">
+                <h2 className="text-base sm:text-lg md:text-xl font-semibold flex items-center gap-2">
+                  <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
                   Report Configuration
                 </h2>
-                <p className="text-sm text-muted-foreground mt-1">
+                <p className="text-xs sm:text-sm text-muted-foreground mt-1">
                   Select the period for your tax summary report
                 </p>
               </div>
@@ -225,26 +225,28 @@ export default function GenerateTaxSummaryPage() {
                   </div>
                 </div>
 
-                <div className="flex gap-3 pt-4">
+                <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-3 sm:pt-4">
                   <Link href="/dashboard/reports" className="flex-1">
-                    <Button type="button" variant="outline" className="w-full">
+                    <Button type="button" variant="outline" className="w-full h-9 sm:h-10 text-xs sm:text-sm">
                       Cancel
                     </Button>
                   </Link>
                   <Button
                     type="submit"
                     disabled={isGenerating}
-                    className="flex-1"
+                    className="flex-1 h-9 sm:h-10 text-xs sm:text-sm"
                   >
                     {isGenerating ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Generating...
+                        <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
+                        <span className="hidden sm:inline">Generating...</span>
+                        <span className="sm:hidden">Generating</span>
                       </>
                     ) : (
                       <>
-                        <FileText className="w-4 h-4 mr-2" />
-                        Generate Tax Summary
+                        <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                        <span className="hidden sm:inline">Generate Tax Summary</span>
+                        <span className="sm:hidden">Generate</span>
                       </>
                     )}
                   </Button>
@@ -253,15 +255,7 @@ export default function GenerateTaxSummaryPage() {
             </Card>
           </div>
         ) : reportData ? (
-          <div className="space-y-6">
-            {/* Back Button */}
-            <Link href="/dashboard/reports">
-              <Button variant="ghost" className="mb-4">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Reports
-              </Button>
-            </Link>
-
+          <div className="space-y-4 sm:space-y-6">
             <TaxSummaryPreview
               reportData={reportData}
               onBack={() => setShowPreview(false)}
