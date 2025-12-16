@@ -26,20 +26,24 @@ export function MigrateToCreatorModal({
     setIsMigrating(true)
     try {
       await onConfirm()
+      // Close modal silently - migration happens in background
       onOpenChange(false)
     } catch (error) {
       console.error("Migration error:", error)
       toast.error(error instanceof Error ? error.message : "Failed to migrate account")
-    } finally {
       setIsMigrating(false)
     }
+    // Don't reset isMigrating here - let it stay true so button shows loading during redirect
   }
 
   const planName = planType === 'GOLD' ? 'GOLD' : 'PLATINUM'
 
+  console.log('MigrateToCreatorModal render:', { open, planType, shouldRender: open && planType })
+
+  // Always render the Dialog, but control visibility with open prop
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-md p-3 sm:p-6">
+      <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-md p-3 sm:p-6" style={{ zIndex: 60 }}>
         <DialogHeader className="p-0">
           <div className="flex flex-col items-center text-center">
             <DialogTitle className="text-base sm:text-lg md:text-xl flex items-center gap-2 justify-center">
@@ -96,7 +100,7 @@ export function MigrateToCreatorModal({
               {isMigrating ? (
                 <>
                   <span className="animate-spin mr-1.5 sm:mr-2">⏳</span>
-                  Migrating...
+                  Processing...
                 </>
               ) : (
                 <>

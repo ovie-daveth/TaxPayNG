@@ -30,7 +30,9 @@ export default function PricingPage() {
 
   // Check if migration is needed (freelancer trying to subscribe to GOLD or PLATINUM)
   const needsMigration = (planType: string): boolean => {
-    return profile?.businessType === 'freelancer' && (planType === 'GOLD' || planType === 'PLATINUM')
+    const needs = profile?.businessType === 'freelancer' && (planType === 'GOLD' || planType === 'PLATINUM')
+    console.log('Pricing page - needsMigration check:', { businessType: profile?.businessType, planType, needs })
+    return needs
   }
 
   const handleSubscribe = async (planType: string) => {
@@ -42,7 +44,9 @@ export default function PricingPage() {
 
     // Check if migration is needed
     if (needsMigration(planType)) {
+      console.log('Pricing page - Migration needed, showing migration modal')
       setSelectedPlan(planType as SubscriptionType)
+      // Show migration modal immediately
       setShowMigrationModal(true)
       return
     }

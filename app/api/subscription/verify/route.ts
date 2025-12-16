@@ -103,7 +103,13 @@ export async function GET(request: NextRequest) {
 
       const profileDoc = userProfilesSnapshot.docs[0]
       const profileData = profileDoc.data()
-      const businessType = profileData?.businessType // Get business type before updating
+      let businessType = profileData?.businessType // Get business type before updating
+      
+      // If user subscribes to GOLD or PLATINUM, ensure businessType is 'creator'
+      if ((subscriptionType === 'GOLD' || subscriptionType === 'PLATINUM') && businessType !== 'creator') {
+        businessType = 'creator'
+        console.log(`Updating businessType to 'creator' for user ${userId} subscribing to ${subscriptionType}`)
+      }
       
       // Get storage limit based on subscription type
       const getStorageLimit = (type: string): number => {
@@ -117,13 +123,49 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Update user profile with subscription
-      await db.collection('userProfiles').doc(profileDoc.id).update({
+      // Calculate subscription expiry
+      const now = new Date()
+      let expiryDate = new Date(now)
+      
+      // If user has an existing subscription that hasn't expired yet, start new subscription from that expiry date
+      // Otherwise, start from today
+      if (profileData?.subscriptionExpiryDate && profileData.isSubscribe) {
+        const existingExpiry = new Date(profileData.subscriptionExpiryDate)
+        // Only extend from existing expiry if it's in the future
+        if (existingExpiry > now) {
+          expiryDate = new Date(existingExpiry)
+        }
+      }
+      
+      // Add 31 days to the start date
+      expiryDate.setDate(expiryDate.getDate() + 31)
+      
+      // Check if this is a first-time subscription or renewal
+      const isFirstSubscription = !profileData?.subscriptionStartDate
+      const renewalCount = (profileData?.renewalCount || 0) + (isFirstSubscription ? 0 : 1)
+      
+      // Update user profile with subscription and businessType (if changed)
+      const updateData: any = {
         isSubscribe: true,
         subscriptionType: subscriptionType,
+        subscriptionExpiryDate: expiryDate.toISOString(),
+        lastSubscriptionDate: now.toISOString(),
+        renewalCount: renewalCount,
         storageLimit: getStorageLimit(subscriptionType),
-        updatedAt: new Date().toISOString()
-      })
+        updatedAt: now.toISOString()
+      }
+      
+      // Set subscriptionStartDate if this is first subscription
+      if (isFirstSubscription) {
+        updateData.subscriptionStartDate = now.toISOString()
+      }
+      
+      // Update businessType if it changed
+      if ((subscriptionType === 'GOLD' || subscriptionType === 'PLATINUM') && profileData?.businessType !== 'creator') {
+        updateData.businessType = 'creator'
+      }
+      
+      await db.collection('userProfiles').doc(profileDoc.id).update(updateData)
 
       // Redirect based on business type
       const baseUrl = new URL(request.url).origin
@@ -196,6 +238,7 @@ export async function POST(request: NextRequest) {
 
         if (!userProfilesSnapshot.empty) {
           const profileDoc = userProfilesSnapshot.docs[0]
+          const profileData = profileDoc.data()
           const getStorageLimit = (type: string): number => {
             switch (type) {
               case 'PRO': return 500 * 1024 * 1024
@@ -207,12 +250,49 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          await db.collection('userProfiles').doc(profileDoc.id).update({
+          // Calculate subscription expiry
+          const now = new Date()
+          let expiryDate = new Date(now)
+          
+          // If user has an existing subscription that hasn't expired yet, start new subscription from that expiry date
+          // Otherwise, start from today
+          if (profileData?.subscriptionExpiryDate && profileData.isSubscribe) {
+            const existingExpiry = new Date(profileData.subscriptionExpiryDate)
+            // Only extend from existing expiry if it's in the future
+            if (existingExpiry > now) {
+              expiryDate = new Date(existingExpiry)
+            }
+          }
+          
+          // Add 31 days to the start date
+          expiryDate.setDate(expiryDate.getDate() + 31)
+          
+          // Check if this is a first-time subscription or renewal
+          const isFirstSubscription = !profileData?.subscriptionStartDate
+          const renewalCount = (profileData?.renewalCount || 0) + (isFirstSubscription ? 0 : 1)
+          
+          const updateData: any = {
             isSubscribe: true,
             subscriptionType: subscriptionType,
+            subscriptionExpiryDate: expiryDate.toISOString(),
+            lastSubscriptionDate: now.toISOString(),
+            renewalCount: renewalCount,
             storageLimit: getStorageLimit(subscriptionType),
-            updatedAt: new Date().toISOString()
-          })
+            updatedAt: now.toISOString()
+          }
+          
+          // Set subscriptionStartDate if this is first subscription
+          if (isFirstSubscription) {
+            updateData.subscriptionStartDate = now.toISOString()
+          }
+          
+          // If user subscribes to GOLD or PLATINUM, ensure businessType is 'creator'
+          if ((subscriptionType === 'GOLD' || subscriptionType === 'PLATINUM') && profileData?.businessType !== 'creator') {
+            updateData.businessType = 'creator'
+            console.log(`Updating businessType to 'creator' for user ${userId} subscribing to ${subscriptionType} (webhook)`)
+          }
+
+          await db.collection('userProfiles').doc(profileDoc.id).update(updateData)
         }
       }
     }

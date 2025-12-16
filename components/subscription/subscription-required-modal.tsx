@@ -29,6 +29,9 @@ export function SubscriptionRequiredModal({
   const [showMigrationModal, setShowMigrationModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
 
+  // Debug: Log businessType on mount and when it changes
+  console.log('SubscriptionRequiredModal render:', { open, businessType, showMigrationModal, selectedPlan })
+
   const getAvailablePlans = (): SubscriptionType[] => {
     if (businessType === 'sme') {
       return ['Small Business', 'Big Business']
@@ -41,20 +44,47 @@ export function SubscriptionRequiredModal({
 
   // Check if migration is needed (freelancer trying to subscribe to GOLD or PLATINUM)
   const needsMigration = (planType: SubscriptionType): boolean => {
-    return businessType === 'freelancer' && (planType === 'GOLD' || planType === 'PLATINUM')
+    const isFreelancer = businessType === 'freelancer'
+    const isGoldOrPlatinum = planType === 'GOLD' || planType === 'PLATINUM'
+    const needs = isFreelancer && isGoldOrPlatinum
+    console.log('=== needsMigration check ===', { 
+      businessType, 
+      planType, 
+      needs,
+      isFreelancer,
+      isGoldOrPlatinum,
+      'businessType === "freelancer"': businessType === 'freelancer',
+      'planType === "GOLD"': planType === 'GOLD',
+      'planType === "PLATINUM"': planType === 'PLATINUM'
+    })
+    return needs
   }
 
   const handleSubscribe = async (planType: SubscriptionType) => {
-    if (!window) return
-
-    // Check if migration is needed
-    if (needsMigration(planType)) {
-      setSelectedPlan(planType)
-      setShowMigrationModal(true)
+    console.log('=== handleSubscribe START ===', { planType, businessType, window: typeof window })
+    
+    if (typeof window === 'undefined') {
+      console.log('Window is undefined, returning')
       return
     }
 
-    // Proceed with subscription
+    console.log('handleSubscribe called:', { planType, businessType, needsMigration: needsMigration(planType) })
+
+    // Check if migration is needed
+    if (needsMigration(planType)) {
+      console.log('Migration needed - showing migration modal')
+      console.log('Setting selectedPlan to:', planType)
+      setSelectedPlan(planType)
+      // Use setTimeout to ensure state updates properly
+      setTimeout(() => {
+        console.log('Setting showMigrationModal to true')
+        setShowMigrationModal(true)
+      }, 0)
+      return
+    }
+
+    // Proceed with subscription only if no migration needed
+    console.log('No migration needed - proceeding with subscription')
     await proceedWithSubscription(planType)
   }
 
@@ -89,11 +119,15 @@ export function SubscriptionRequiredModal({
         throw new Error(updateData.error || "Failed to update business type")
       }
 
-      toast.success("Account migrated to Creator successfully!")
-      
-      // Close migration modal and proceed with subscription
+      // Migration successful - proceed silently to payment
+      // Close migration modal first
       setShowMigrationModal(false)
-      await proceedWithSubscription(selectedPlan)
+      // Close subscription modal
+      onOpenChange(false)
+      // Small delay to ensure modals close, then proceed with subscription
+      setTimeout(() => {
+        proceedWithSubscription(selectedPlan)
+      }, 300)
     } catch (error) {
       console.error("Migration error:", error)
       toast.error(error instanceof Error ? error.message : "Failed to migrate account")
@@ -154,7 +188,14 @@ export function SubscriptionRequiredModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      // Don't allow closing if migration modal is showing
+      if (!isOpen && showMigrationModal) {
+        return
+      }
+      onOpenChange(isOpen)
+    }}>
       <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-5xl max-h-[90vh] overflow-y-auto p-3 sm:p-6">
         <DialogHeader className="p-0">
           <div className="flex flex-col items-center text-center">
@@ -234,7 +275,15 @@ export function SubscriptionRequiredModal({
                   <CardFooter className="p-3 sm:p-6 pt-0">
                     <Button
                       className="w-full h-8 sm:h-10 text-xs sm:text-sm"
-                      onClick={() => handleSubscribe(planType)}
+                      onClick={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        console.log('=== BUTTON CLICKED ===', planType)
+                        alert(`Button clicked for ${planType}`)
+                        handleSubscribe(planType).catch(err => {
+                          console.error('Error in handleSubscribe:', err)
+                        })
+                      }}
                       disabled={isProcessing}
                     >
                       {isProcessing ? (
@@ -259,16 +308,28 @@ export function SubscriptionRequiredModal({
           </Button>
         </div>
       </DialogContent>
+    </Dialog>
 
-      {selectedPlan && (
+    {/* Migration modal - always render when selectedPlan exists, show when needed */}
+    {selectedPlan && (
+      <>
         <MigrateToCreatorModal
           open={showMigrationModal}
-          onOpenChange={setShowMigrationModal}
+          onOpenChange={(isOpen) => {
+            console.log('Migration modal onOpenChange:', isOpen, 'selectedPlan:', selectedPlan)
+            setShowMigrationModal(isOpen)
+            if (!isOpen) {
+              // If migration modal is cancelled, clear selected plan
+              // Subscription modal will reopen automatically because open prop is still true
+              setSelectedPlan(null)
+            }
+          }}
           planType={selectedPlan}
           onConfirm={handleMigrateAndSubscribe}
         />
-      )}
-    </Dialog>
+      </>
+    )}
+    </>
   )
 }
 

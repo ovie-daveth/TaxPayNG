@@ -7,6 +7,7 @@ import { DashboardNavCreator } from "@/components/dashboard/dashboard-nav-creato
 import { SidebarProvider, useSidebar } from "@/lib/contexts/sidebar-context"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { SubscriptionExpiryChecker } from "@/components/subscription/subscription-expiry-checker"
 import { cn } from "@/lib/utils"
 
 function LayoutContent({
@@ -64,6 +65,7 @@ function LayoutContent({
       )}>
         <DashboardHeader />
         <div>{children}</div>
+        <SubscriptionExpiryChecker />
       </div>
     </div>
   )

@@ -44,6 +44,10 @@ export interface UserProfile {
   // Subscription fields
   isSubscribe?: boolean
   subscriptionType?: SubscriptionType
+  subscriptionExpiryDate?: string // ISO string - when subscription expires (31 days from payment)
+  subscriptionStartDate?: string // ISO string - when user first subscribed (for tracking loyal customers)
+  lastSubscriptionDate?: string // ISO string - when user last renewed subscription
+  renewalCount?: number // Number of times user has renewed (for tracking loyal customers)
   transactionCount?: number // Current month's transaction count
   transactionCountResetDate?: string // Date when transaction count was last reset
   storageLimit?: number // Storage limit in bytes (e.g., 500MB = 500 * 1024 * 1024)

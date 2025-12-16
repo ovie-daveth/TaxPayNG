@@ -8,6 +8,10 @@ import { Badge } from "@/components/ui/badge"
 import { Check, Loader2 } from "lucide-react"
 import { subscriptionService } from "@/lib/services/subscriptionService"
 import { SubscriptionType, BusinessType } from "@/lib/types"
+import { MigrateToCreatorModal } from "./migrate-to-creator-modal"
+import { auth } from "@/firebase/firebase"
+import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
 interface ChangePlanModalProps {
   open: boolean
@@ -26,6 +30,10 @@ export function ChangePlanModal({
   onSelectPlan,
   processingPlan
 }: ChangePlanModalProps) {
+  const router = useRouter()
+  const [showMigrationModal, setShowMigrationModal] = useState(false)
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
+
   // Get plans based on business type
   const getAvailablePlans = (): SubscriptionType[] => {
     if (businessType === 'sme') {
@@ -37,6 +45,69 @@ export function ChangePlanModal({
   }
 
   const availablePlans = getAvailablePlans()
+
+  // Check if migration is needed (freelancer trying to subscribe to GOLD or PLATINUM)
+  const needsMigration = (planType: SubscriptionType): boolean => {
+    return businessType === 'freelancer' && (planType === 'GOLD' || planType === 'PLATINUM')
+  }
+
+  const handlePlanSelect = async (planType: SubscriptionType) => {
+    // Check if migration is needed
+    if (needsMigration(planType)) {
+      setSelectedPlan(planType)
+      setShowMigrationModal(true)
+      return
+    }
+
+    // No migration needed, proceed with plan selection
+    await onSelectPlan(planType)
+  }
+
+  const handleMigrateAndSubscribe = async () => {
+    if (!selectedPlan) return
+
+    try {
+      // Get auth token
+      const currentUser = auth.currentUser
+      if (!currentUser) {
+        router.push("/login")
+        return
+      }
+
+      const token = await currentUser.getIdToken()
+
+      // Update business type to creator
+      const updateResponse = await fetch("/api/user/update-business-type", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          businessType: 'creator'
+        })
+      })
+
+      const updateData = await updateResponse.json()
+
+      if (!updateResponse.ok || !updateData.success) {
+        throw new Error(updateData.error || "Failed to update business type")
+      }
+
+      // Migration successful - proceed silently to payment
+      // Close migration modal
+      setShowMigrationModal(false)
+      // Close change plan modal
+      onOpenChange(false)
+      // Small delay to ensure modals close, then proceed with plan selection
+      setTimeout(() => {
+        onSelectPlan(selectedPlan)
+      }, 300)
+    } catch (error) {
+      console.error("Migration error:", error)
+      toast.error(error instanceof Error ? error.message : "Failed to migrate account")
+    }
+  }
 
   const isCurrentPlan = (planType: SubscriptionType) => {
     return currentPlan === planType
@@ -60,6 +131,7 @@ export function ChangePlanModal({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -134,7 +206,7 @@ export function ChangePlanModal({
                     className="w-full"
                     variant={isCurrent ? "outline" : "default"}
                     disabled={isCurrent || isProcessing}
-                    onClick={() => onSelectPlan(planType)}
+                    onClick={() => handlePlanSelect(planType)}
                   >
                     {isProcessing ? (
                       <>
@@ -167,6 +239,22 @@ export function ChangePlanModal({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Migration modal */}
+    {selectedPlan && (
+      <MigrateToCreatorModal
+        open={showMigrationModal}
+        onOpenChange={(isOpen) => {
+          setShowMigrationModal(isOpen)
+          if (!isOpen) {
+            setSelectedPlan(null)
+          }
+        }}
+        planType={selectedPlan}
+        onConfirm={handleMigrateAndSubscribe}
+      />
+    )}
+    </>
   )
 }
 

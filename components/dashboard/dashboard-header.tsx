@@ -27,7 +27,7 @@ export function DashboardHeader() {
   
   const { user } = useAuth()
   const { profile } = useUserProfile()
-  const { isSubscribed, loading: subscriptionLoading } = useSubscription()
+  const { isSubscribed, isExpired, loading: subscriptionLoading } = useSubscription()
   const { uploadDocument } = useDocumentsFirebase()
   const { createTransaction } = useTransactions(user?.uid || null)
   // Load reminders hook for header actions
@@ -38,12 +38,12 @@ export function DashboardHeader() {
     if (subscriptionLoading) {
       return
     }
-    // Check if user is subscribed - if not, show modal
-    if (!isSubscribed) {
+    // Check if user is subscribed or expired - if not, show modal
+    if (!isSubscribed || isExpired) {
       setShowSubscriptionModal(true)
       return
     }
-    // User is subscribed, proceed with action
+    // User is subscribed and not expired, proceed with action
     action()
   }
 

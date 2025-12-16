@@ -4,15 +4,18 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { CheckCircle, Sparkles, ChevronDown, ChevronUp } from "lucide-react"
+import { CheckCircle, Sparkles, ChevronDown, ChevronUp, Heart } from "lucide-react"
 import { subscriptionService } from "@/lib/services/subscriptionService"
 import { SubscriptionType } from "@/lib/types"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
 
 export function SubscriptionSuccessModal() {
   const router = useRouter()
+  const { profile } = useUserProfile()
   const [isOpen, setIsOpen] = useState(false)
   const [plan, setPlan] = useState<ReturnType<typeof subscriptionService.getPlan> | null>(null)
   const [showAllFeatures, setShowAllFeatures] = useState(false)
+  const [isFirstTime, setIsFirstTime] = useState(true)
 
   useEffect(() => {
     // Check URL params on client side
@@ -31,6 +34,16 @@ export function SubscriptionSuccessModal() {
       }
     }
   }, [])
+
+  useEffect(() => {
+    // Check if this is first-time subscription or renewal
+    // If renewalCount exists and is > 0, it's a renewal
+    if (profile?.renewalCount && profile.renewalCount > 0) {
+      setIsFirstTime(false)
+    } else {
+      setIsFirstTime(true)
+    }
+  }, [profile])
 
   const handleClose = () => {
     setIsOpen(false)
@@ -57,13 +70,21 @@ export function SubscriptionSuccessModal() {
               <CheckCircle className="w-8 h-8 sm:w-10 sm:h-10 text-green-600 dark:text-green-400" />
             </div>
             <DialogTitle className="text-base sm:text-lg md:text-xl flex items-center gap-2 justify-center">
-              Subscription Successful!
+              {isFirstTime ? 'Subscription Successful!' : 'Subscription Renewed!'}
               <div className="w-6 h-6 sm:w-8 sm:h-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
-                <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
+                {isFirstTime ? (
+                  <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
+                ) : (
+                  <Heart className="w-3 h-3 sm:w-4 sm:h-4 text-primary fill-primary" />
+                )}
               </div>
             </DialogTitle>
             <DialogDescription className="text-xs sm:text-sm mt-1 sm:mt-2">
-              Welcome to {plan.name}! Your subscription is now active.
+              {isFirstTime 
+                ? `Welcome to ${plan.name}! Your subscription is now active.`
+                : profile?.renewalCount 
+                  ? `Thank you for being a loyal customer! You've renewed ${profile.renewalCount} time${profile.renewalCount !== 1 ? 's' : ''}. Your ${plan.name} subscription is now active.`
+                  : `Your ${plan.name} subscription has been renewed and is now active.`}
             </DialogDescription>
           </div>
         </DialogHeader>
