@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAdminDb } from '@/lib/firebase-admin'
-import { verifyAuthToken } from '@/lib/firebase-admin'
+import { getAdminDb, getAdminAuth } from '@/lib/firebase-admin'
 import { BusinessType } from '@/lib/types'
 
 export async function POST(request: NextRequest) {
@@ -15,7 +14,16 @@ export async function POST(request: NextRequest) {
     }
 
     const token = authHeader.substring(7)
-    const decodedToken = await verifyAuthToken(token)
+    const adminAuth = getAdminAuth()
+    let decodedToken
+    try {
+      decodedToken = await adminAuth.verifyIdToken(token)
+    } catch (error) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid token' },
+        { status: 401 }
+      )
+    }
     const userId = decodedToken.uid
 
     // Get request body
