@@ -108,15 +108,29 @@ export class UserService extends BaseService {
       const existingProfile = await this.getProfile(userId)
       
       if (existingProfile) {
-        // Initialize subscription fields if not present
-        const subscriptionFields = this.initializeSubscriptionFields(profileData)
+        // Preserve subscription-related fields if not explicitly provided in profileData
+        const subscriptionFieldsToPreserve = {
+          isSubscribe: profileData.isSubscribe !== undefined ? profileData.isSubscribe : existingProfile.isSubscribe,
+          subscriptionType: profileData.subscriptionType !== undefined ? profileData.subscriptionType : existingProfile.subscriptionType,
+          subscriptionExpiryDate: profileData.subscriptionExpiryDate !== undefined ? profileData.subscriptionExpiryDate : existingProfile.subscriptionExpiryDate,
+          subscriptionStartDate: profileData.subscriptionStartDate !== undefined ? profileData.subscriptionStartDate : existingProfile.subscriptionStartDate,
+          lastSubscriptionDate: profileData.lastSubscriptionDate !== undefined ? profileData.lastSubscriptionDate : existingProfile.lastSubscriptionDate,
+          renewalCount: profileData.renewalCount !== undefined ? profileData.renewalCount : existingProfile.renewalCount,
+          transactionCount: profileData.transactionCount !== undefined ? profileData.transactionCount : existingProfile.transactionCount,
+          transactionCountResetDate: profileData.transactionCountResetDate !== undefined ? profileData.transactionCountResetDate : existingProfile.transactionCountResetDate,
+          storageLimit: profileData.storageLimit !== undefined ? profileData.storageLimit : existingProfile.storageLimit,
+          storageUsed: profileData.storageUsed !== undefined ? profileData.storageUsed : existingProfile.storageUsed,
+        }
         
         // If subscription type changed, update storage limit
         if (profileData.subscriptionType && profileData.subscriptionType !== existingProfile.subscriptionType) {
-          subscriptionFields.storageLimit = this.getStorageLimit(profileData.subscriptionType)
+          subscriptionFieldsToPreserve.storageLimit = this.getStorageLimit(profileData.subscriptionType)
         }
         
-        // Update existing profile
+        // Initialize any missing subscription fields with defaults
+        const subscriptionFields = this.initializeSubscriptionFields(subscriptionFieldsToPreserve)
+        
+        // Update existing profile - preserve subscription fields
         await this.update(existingProfile.id, {
           ...profileData,
           ...subscriptionFields,

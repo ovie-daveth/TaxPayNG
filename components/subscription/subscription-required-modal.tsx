@@ -279,7 +279,6 @@ export function SubscriptionRequiredModal({
                         e.preventDefault()
                         e.stopPropagation()
                         console.log('=== BUTTON CLICKED ===', planType)
-                        alert(`Button clicked for ${planType}`)
                         handleSubscribe(planType).catch(err => {
                           console.error('Error in handleSubscribe:', err)
                         })
