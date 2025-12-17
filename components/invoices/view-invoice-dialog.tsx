@@ -660,7 +660,7 @@ export function ViewInvoiceDialog({
 
     setIsSavingReceipt(true)
     try {
-      // Get auth token for API request
+      // Get auth token for API requests
       const authToken = await user?.getIdToken()
       
       // Fetch fileId and size from ImageKit using the receipt URL
@@ -699,7 +699,6 @@ export function ViewInvoiceDialog({
         // Explicitly update storage since this file was uploaded by the client, not the sender
         // The documentService assumes storage was already updated, but in this case it wasn't
         try {
-          const authToken = await user?.getIdToken()
           const storageResponse = await fetch('/api/user/update-storage', {
             method: 'POST',
             headers: {
