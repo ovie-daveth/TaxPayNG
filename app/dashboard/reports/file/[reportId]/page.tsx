@@ -339,13 +339,6 @@ export default function FileTaxReturnPage() {
     <div className="min-h-screen bg-background">
         <main className="flex-1 px-4 py-6">
           <div className="space-y-6">
-            {/* Back Button */}
-            <Link href="/dashboard/reports">
-              <Button variant="ghost" className="mb-4">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Reports
-              </Button>
-            </Link>
 
             {/* System Checks Section */}
             {systemChecks.filter(check => !check.status).length > 0 && (

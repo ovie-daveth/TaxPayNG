@@ -136,14 +136,6 @@ export default function GenerateIncomeStatementPage() {
       <main className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 max-w-4xl mx-auto">
         {!showPreview ? (
           <div className="space-y-6">
-            {/* Back Button */}
-            <Link href="/dashboard/reports">
-              <Button variant="ghost" className="mb-3 sm:mb-4 h-8 sm:h-10 text-xs sm:text-sm">
-                <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-                <span className="hidden sm:inline">Back to Reports</span>
-                <span className="sm:hidden">Back</span>
-              </Button>
-            </Link>
 
             {/* Header Section */}
             <Card className="p-3 sm:p-4 md:p-6">

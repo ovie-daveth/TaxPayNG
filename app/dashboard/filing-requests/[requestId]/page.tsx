@@ -205,17 +205,6 @@ export default function ClientFilingRequestPage() {
       {/* Status Card */}
       <Card>
         <CardHeader>
-          <div className="ml-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.back()}
-            className="h-9 w-9"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Button>
-          </div>
           <CardTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5" />
             Current Status

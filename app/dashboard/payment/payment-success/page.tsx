@@ -155,103 +155,94 @@ export default function PaymentSuccessPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6">
-      <Button 
-        variant="ghost" 
-        onClick={() => router.push("/dashboard")}
-        className="mb-6"
-      >
-        <ArrowLeft className="w-4 h-4 mr-2" />
-        Back to Dashboard
-      </Button>
-
-      <div className="max-w-3xl mx-auto space-y-6">
-        <Alert className="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800">
-          <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-400" />
-          <AlertDescription className="text-green-800 dark:text-green-200">
-            <strong>Payment Successful!</strong> Your tax payment has been processed successfully.
+    <div className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
+      <div className="max-w-3xl mx-auto space-y-4 sm:space-y-5 md:space-y-6">
+        <Alert className="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800 p-3 sm:p-4">
+          <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600 dark:text-green-400 shrink-0" />
+          <AlertDescription className="text-xs sm:text-sm text-green-800 dark:text-green-200">
+            <strong className="text-sm sm:text-base">Payment Successful!</strong> Your tax payment has been processed successfully.
           </AlertDescription>
         </Alert>
 
         <Card>
-          <CardHeader>
-            <CardTitle>Payment Confirmation</CardTitle>
-            <CardDescription>
+          <CardHeader className="p-3 sm:p-4 md:p-6">
+            <CardTitle className="text-base sm:text-lg md:text-xl font-semibold">Payment Confirmation</CardTitle>
+            <CardDescription className="text-[11px] sm:text-xs md:text-sm mt-0.5 sm:mt-1">
               Your payment has been processed and recorded
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-4">
-              <div className="flex justify-between items-center pb-3 border-b">
-                <span className="text-muted-foreground">RRR Number:</span>
-                <span className="font-mono font-semibold">{paymentData.rrr}</span>
+          <CardContent className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-5 md:space-y-6">
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 pb-2.5 sm:pb-3 border-b">
+                <span className="text-[11px] sm:text-xs md:text-sm text-muted-foreground">RRR Number:</span>
+                <span className="font-mono font-semibold text-xs sm:text-sm md:text-base break-all sm:break-normal">{paymentData.rrr}</span>
               </div>
-              <div className="flex justify-between items-center pb-3 border-b">
-                <span className="text-muted-foreground">Transaction Reference:</span>
-                <span className="font-semibold">{paymentData.transactionRef}</span>
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 pb-2.5 sm:pb-3 border-b">
+                <span className="text-[11px] sm:text-xs md:text-sm text-muted-foreground">Transaction Reference:</span>
+                <span className="font-semibold text-xs sm:text-sm md:text-base break-all sm:break-normal">{paymentData.transactionRef}</span>
               </div>
-              <div className="flex justify-between items-center pb-3 border-b">
-                <span className="text-muted-foreground">Amount Paid:</span>
-                <span className="text-2xl font-bold text-primary">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 pb-2.5 sm:pb-3 border-b">
+                <span className="text-[11px] sm:text-xs md:text-sm text-muted-foreground">Amount Paid:</span>
+                <span className="text-lg sm:text-xl md:text-2xl font-bold text-primary">
                   ₦{paymentData.amount.toLocaleString()}
                 </span>
               </div>
               {paymentData.taxDuration && (
-                <div className="flex justify-between items-center pb-3 border-b">
-                  <span className="text-muted-foreground">Tax Period:</span>
-                  <span className="font-semibold">{paymentData.taxDuration}</span>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 pb-2.5 sm:pb-3 border-b">
+                  <span className="text-[11px] sm:text-xs md:text-sm text-muted-foreground">Tax Period:</span>
+                  <span className="font-semibold text-xs sm:text-sm md:text-base break-words">{paymentData.taxDuration}</span>
                 </div>
               )}
               {paymentData.period && (
-                <div className="flex justify-between items-center pb-3 border-b">
-                  <span className="text-muted-foreground">Payment Type:</span>
-                  <span className="font-semibold capitalize">{paymentData.period}</span>
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 pb-2.5 sm:pb-3 border-b">
+                  <span className="text-[11px] sm:text-xs md:text-sm text-muted-foreground">Payment Type:</span>
+                  <span className="font-semibold text-xs sm:text-sm md:text-base capitalize">{paymentData.period}</span>
                 </div>
               )}
-              <div className="flex justify-between items-center pt-2">
-                <span className="text-muted-foreground">Payment Date:</span>
-                <span className="font-semibold">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 sm:gap-2 pt-1.5 sm:pt-2">
+                <span className="text-[11px] sm:text-xs md:text-sm text-muted-foreground">Payment Date:</span>
+                <span className="font-semibold text-xs sm:text-sm md:text-base">
                   {format(new Date(paymentData.timestamp), "PPP")}
                 </span>
               </div>
             </div>
 
-            <div className="flex gap-3">
+            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
               <Button
                 onClick={downloadReceipt}
                 variant="outline"
-                className="flex-1"
+                className="flex-1 h-9 sm:h-10 text-xs sm:text-sm"
               >
-                <Download className="w-4 h-4 mr-2" />
+                <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
                 Download Receipt
               </Button>
               <Button
                 onClick={saveReceiptAsDocument}
                 disabled={savingReceipt || receiptSaved}
-                className="flex-1"
+                className="flex-1 h-9 sm:h-10 text-xs sm:text-sm"
               >
                 {savingReceipt ? (
                   <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
                     Saving...
                   </>
                 ) : receiptSaved ? (
                   <>
-                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                    <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
                     Saved
                   </>
                 ) : (
                   <>
-                    <CheckCircle2 className="w-4 h-4 mr-2" />
+                    <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
                     Save to Documents
                   </>
                 )}
               </Button>
             </div>
 
-            <Alert>
-              <AlertDescription>
-                <strong>Important:</strong> Keep this receipt for your records. 
+            <Alert className="p-2.5 sm:p-3 md:p-4">
+              <AlertDescription className="text-[11px] sm:text-xs md:text-sm">
+                <strong className="text-xs sm:text-sm md:text-base">Important:</strong> Keep this receipt for your records. 
                 This payment will be reflected in your tax dashboard and deducted from your tax payable.
               </AlertDescription>
             </Alert>
@@ -262,7 +253,7 @@ export default function PaymentSuccessPage() {
           <Button
             onClick={() => router.push("/dashboard")}
             size="lg"
-            className="w-full max-w-md"
+            className="w-full sm:w-auto max-w-md h-10 sm:h-11 text-xs sm:text-sm md:text-base"
           >
             Back to Dashboard
           </Button>

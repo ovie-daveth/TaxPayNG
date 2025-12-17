@@ -209,73 +209,76 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {currentStep === 'period' && (
         <Card>
-          <CardHeader>
-            <CardTitle>Select Payment Period</CardTitle>
-            <CardDescription>
+          <CardHeader className="p-3 sm:p-4 md:p-6">
+            <CardTitle className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">Select Payment Period</CardTitle>
+            <CardDescription className="text-[11px] sm:text-xs md:text-sm mt-0.5 sm:mt-1">
               Choose how often you want to pay your taxes
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <CardContent className="p-3 sm:p-4 md:p-6 space-y-2.5 sm:space-y-3 md:space-y-4">
+            <div className="grid grid-cols-3 gap-2 sm:gap-2.5 md:gap-3 lg:gap-4">
               <button
                 onClick={() => handlePeriodSelect('monthly')}
-                className={`p-6 border-2 rounded-lg text-left transition-all ${
+                className={`p-3 sm:p-4 md:p-5 lg:p-6 border-2 rounded-lg text-left transition-all ${
                   selectedPeriod === 'monthly'
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
                 }`}
               >
-                <div className="flex items-center gap-3 mb-2">
-                  <Calendar className="w-5 h-5 text-primary" />
-                  <h3 className="font-semibold">Monthly</h3>
+                <div className="flex items-center gap-2 sm:gap-2.5 md:gap-3 mb-1 sm:mb-1.5 md:mb-2">
+                  <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-primary shrink-0" />
+                  <h3 className="font-semibold text-xs sm:text-sm md:text-base">Monthly</h3>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Pay your taxes every month
+                <p className="text-[11px] sm:text-xs md:text-sm text-muted-foreground leading-relaxed">
+                  <span className="sm:hidden">Pay monthly</span>
+                  <span className="hidden sm:inline">Pay your taxes every month</span>
                 </p>
               </button>
 
               <button
                 onClick={() => handlePeriodSelect('quarterly')}
-                className={`p-6 border-2 rounded-lg text-left transition-all ${
+                className={`p-3 sm:p-4 md:p-5 lg:p-6 border-2 rounded-lg text-left transition-all ${
                   selectedPeriod === 'quarterly'
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
                 }`}
               >
-                <div className="flex items-center gap-3 mb-2">
-                  <Calendar className="w-5 h-5 text-primary" />
-                  <h3 className="font-semibold">Quarterly</h3>
+                <div className="flex items-center gap-2 sm:gap-2.5 md:gap-3 mb-1 sm:mb-1.5 md:mb-2">
+                  <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-primary shrink-0" />
+                  <h3 className="font-semibold text-xs sm:text-sm md:text-base">Quarterly</h3>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Pay your taxes every 3 months
+                <p className="text-[11px] sm:text-xs md:text-sm text-muted-foreground leading-relaxed">
+                  <span className="sm:hidden">Pay quarterly</span>
+                  <span className="hidden sm:inline">Pay your taxes every 3 months</span>
                 </p>
               </button>
 
               <button
                 onClick={() => handlePeriodSelect('yearly')}
-                className={`p-6 border-2 rounded-lg text-left transition-all ${
+                className={`p-3 sm:p-4 md:p-5 lg:p-6 border-2 rounded-lg text-left transition-all ${
                   selectedPeriod === 'yearly'
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
                 }`}
               >
-                <div className="flex items-center gap-3 mb-2">
-                  <Calendar className="w-5 h-5 text-primary" />
-                  <h3 className="font-semibold">Yearly</h3>
+                <div className="flex items-center gap-2 sm:gap-2.5 md:gap-3 mb-1 sm:mb-1.5 md:mb-2">
+                  <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-primary shrink-0" />
+                  <h3 className="font-semibold text-xs sm:text-sm md:text-base">Yearly</h3>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  Pay your taxes once a year
+                <p className="text-[11px] sm:text-xs md:text-sm text-muted-foreground leading-relaxed">
+                  <span className="sm:hidden">Pay yearly</span>
+                  <span className="hidden sm:inline">Pay your taxes once a year</span>
                 </p>
               </button>
             </div>
 
-            <div className="flex justify-end pt-4">
-              <Button onClick={handleContinue} disabled={!selectedPeriod}>
+            <div className="flex justify-end pt-2.5 sm:pt-3 md:pt-4">
+              <Button onClick={handleContinue} disabled={!selectedPeriod} className="h-9 sm:h-10 text-xs sm:text-sm">
                 Continue
-                <ArrowRight className="w-4 h-4 ml-2" />
+                <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-1.5 sm:ml-2" />
               </Button>
             </div>
           </CardContent>
@@ -284,34 +287,26 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
 
       {currentStep === 'amount' && (
         <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Payment Amount</CardTitle>
-                <CardDescription>
+          <CardHeader className="p-3 sm:p-4 md:p-6">
+            <div className="flex items-start sm:items-center justify-between gap-2 sm:gap-3">
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">Payment Amount</CardTitle>
+                <CardDescription className="text-[11px] sm:text-xs md:text-sm mt-0.5 sm:mt-1">
                   {selectedPeriod === 'monthly' && 'Your monthly tax payment amount'}
                   {selectedPeriod === 'quarterly' && 'Your quarterly tax payment amount'}
                   {selectedPeriod === 'yearly' && 'Your annual tax payment amount'}
                 </CardDescription>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setCurrentStep('period')}
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
             </div>
           </CardHeader>
-          <CardContent className="space-y-6">
+          <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 md:space-y-6">
             {/* Toggle between auto and manual */}
-            <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-              <div className="space-y-0.5">
-                <Label htmlFor="manual-toggle" className="text-base font-medium">
+            <div className="flex items-center justify-between p-2.5 sm:p-3 md:p-4 bg-muted rounded-lg">
+              <div className="space-y-0.5 flex-1 min-w-0 pr-2 sm:pr-3">
+                <Label htmlFor="manual-toggle" className="text-xs sm:text-sm md:text-base font-medium">
                   {isManual ? 'Manual Entry' : 'Auto-Calculated'}
                 </Label>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-[11px] sm:text-xs md:text-sm text-muted-foreground leading-relaxed">
                   {isManual 
                     ? 'Enter the amount manually' 
                     : 'Amount calculated from your transactions'}
@@ -321,74 +316,75 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
                 id="manual-toggle"
                 checked={isManual}
                 onCheckedChange={setIsManual}
+                className="shrink-0"
               />
             </div>
 
             {loading && !isManual && (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                <span className="ml-2 text-muted-foreground">Calculating amount...</span>
+              <div className="flex items-center justify-center py-4 sm:py-6 md:py-8">
+                <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 animate-spin text-primary" />
+                <span className="ml-2 text-[11px] sm:text-xs md:text-sm text-muted-foreground">Calculating amount...</span>
               </div>
             )}
 
             {!isManual && calculatedAmount !== null && (
-              <div className="space-y-4">
-                <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
+              <div className="space-y-2.5 sm:space-y-3 md:space-y-4">
+                <div className="p-2.5 sm:p-3 md:p-4 bg-primary/5 border border-primary/20 rounded-lg">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">Calculated Amount</p>
-                      <p className="text-2xl font-bold text-primary">
+                    <div className="flex-1 min-w-0 pr-2">
+                      <p className="text-[11px] sm:text-xs md:text-sm text-muted-foreground">Calculated Amount</p>
+                      <p className="text-lg sm:text-xl md:text-2xl font-bold text-primary truncate">
                         {formatCurrencyAmount(calculatedAmount)}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="text-[10px] sm:text-[11px] md:text-xs text-muted-foreground mt-0.5 sm:mt-1">
                         {selectedPeriod === 'monthly' && 'Current month'}
                         {selectedPeriod === 'quarterly' && 'Current quarter'}
                         {selectedPeriod === 'yearly' && 'Current year'}
                       </p>
                     </div>
-                    <Calculator className="w-8 h-8 text-primary" />
+                    <Calculator className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-primary shrink-0" />
                   </div>
                 </div>
 
                 {pendingPeriods.length > 0 && (
-                  <Alert>
-                    <AlertTriangle className="w-4 h-4" />
-                    <AlertDescription>
-                      <div className="space-y-3">
-                        <p className="font-medium">
+                  <Alert className="p-2.5 sm:p-3 md:p-4">
+                    <AlertTriangle className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" />
+                    <AlertDescription className="text-[11px] sm:text-xs md:text-sm">
+                      <div className="space-y-2 sm:space-y-2.5 md:space-y-3">
+                        <p className="font-medium text-[11px] sm:text-xs md:text-sm">
                           You have {pendingPeriods.length} unpaid {selectedPeriod === 'monthly' ? 'month' : selectedPeriod === 'quarterly' ? 'quarter' : 'period'}(s)
                         </p>
-                        <div className="space-y-2">
+                        <div className="space-y-1.5 sm:space-y-2">
                           {pendingPeriods.map((pending, index) => (
                             <label
                               key={index}
-                              className="flex items-center justify-between p-3 border rounded-lg cursor-pointer hover:bg-muted/50"
+                              className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 border rounded-lg cursor-pointer hover:bg-muted/50"
                             >
-                              <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2 sm:gap-2.5 md:gap-3 flex-1 min-w-0">
                                 <input
                                   type="checkbox"
                                   checked={selectedPendingPeriods.has(pending.taxDuration)}
                                   onChange={() => togglePendingPeriod(pending.taxDuration)}
-                                  className="w-4 h-4"
+                                  className="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0"
                                 />
-                                <div>
-                                  <p className="font-medium">{pending.taxDuration}</p>
-                                  <p className="text-sm text-muted-foreground">
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-[11px] sm:text-xs md:text-sm truncate">{pending.taxDuration}</p>
+                                  <p className="text-[10px] sm:text-[11px] md:text-xs text-muted-foreground mt-0.5">
                                     {formatCurrencyAmount(pending.amount)}
                                   </p>
                                 </div>
                               </div>
                               {selectedPendingPeriods.has(pending.taxDuration) && (
-                                <CheckCircle2 className="w-5 h-5 text-primary" />
+                                <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-primary shrink-0 ml-1.5 sm:ml-2" />
                               )}
                             </label>
                           ))}
                         </div>
                         {selectedPendingPeriods.size > 0 && (
-                          <div className="pt-2 border-t">
+                          <div className="pt-1.5 sm:pt-2 border-t">
                             <div className="flex items-center justify-between">
-                              <span className="font-medium">Total with pending:</span>
-                              <span className="text-lg font-bold text-primary">
+                              <span className="font-medium text-[11px] sm:text-xs md:text-sm">Total with pending:</span>
+                              <span className="text-sm sm:text-base md:text-lg font-bold text-primary">
                                 {formatCurrencyAmount(totalWithPending())}
                               </span>
                             </div>
@@ -402,10 +398,10 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
             )}
 
             {isManual && (
-              <div className="space-y-2">
-                <Label htmlFor="manual-amount">Enter Amount (₦)</Label>
+              <div className="space-y-1.5 sm:space-y-2">
+                <Label htmlFor="manual-amount" className="text-[11px] sm:text-xs md:text-sm">Enter Amount (₦)</Label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">₦</span>
+                  <span className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-xs sm:text-sm md:text-base">₦</span>
                   <Input
                     id="manual-amount"
                     type="text"
@@ -447,26 +443,20 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
                       }
                     }}
                     placeholder="Enter tax amount"
-                    className="pl-8"
+                    className="pl-6 sm:pl-7 md:pl-8 h-9 sm:h-10 text-xs sm:text-sm"
                   />
                 </div>
               </div>
             )}
 
-            <div className="flex justify-end gap-3 pt-4">
-              <Button
-                variant="outline"
-                onClick={() => setCurrentStep('period')}
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back
-              </Button>
+            <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-2.5 md:gap-3 pt-2.5 sm:pt-3 md:pt-4">
               <Button 
                 onClick={handleContinue}
                 disabled={loading || (isManual && !manualAmount) || (!isManual && calculatedAmount === null)}
+                className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
               >
                 Continue
-                <ArrowRight className="w-4 h-4 ml-2" />
+                <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-1.5 sm:ml-2" />
               </Button>
             </div>
           </CardContent>

@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Plus, FileText, Calculator, Bell, Settings, Receipt, Download, FileCheck, BarChart3 } from "lucide-react"
+import { Plus, FileText, Calculator, Bell, Settings, Receipt, Download, FileCheck, BarChart3, ArrowLeft } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { UploadDocumentDialog } from "../documents/upload-document-dialog"
 import { useState } from "react"
@@ -190,6 +190,7 @@ export function DashboardHeader() {
 
   const pageInfo = getPageInfo(pathname)
   const ButtonIcon = pageInfo.buttonIcon
+  const showBackButton = pathname !== "/dashboard" && pathname !== "/dashboard/"
 
   return (
     <div className="border-b border-border bg-card">
@@ -197,12 +198,32 @@ export function DashboardHeader() {
         <div className="flex items-center justify-between gap-2 sm:gap-3 md:gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 sm:block">
-              <h1 className="text-lg sm:text-xl md:text-2xl font-bold">{pageInfo.title}</h1>
-              <p className="hidden sm:block text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 line-clamp-1 sm:line-clamp-2">{pageInfo.subtitle}</p>
+              {/* Back button beside title - Mobile only */}
+              {showBackButton && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => router.back()}
+                  className="md:hidden h-7 w-7 p-0 mr-1 shrink-0"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                </Button>
+              )}
+              <div className="flex-1 min-w-0">
+                <h1 className="text-lg sm:text-xl md:text-2xl font-bold">{pageInfo.title}</h1>
+                <p className="hidden sm:block text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 line-clamp-1 sm:line-clamp-2">{pageInfo.subtitle}</p>
+              </div>
             </div>
-            <p className="sm:hidden text-xs text-muted-foreground mt-0.5 line-clamp-1">{pageInfo.subtitle}</p>
+            {showBackButton && (
+              <div className="sm:hidden ml-9">
+                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{pageInfo.subtitle}</p>
+              </div>
+            )}
+            {!showBackButton && (
+              <p className="sm:hidden text-xs text-muted-foreground mt-0.5 line-clamp-1">{pageInfo.subtitle}</p>
+            )}
           </div>
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+          <div className="hidden md:flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             <NotificationBell />
             <ThemeToggle />
             {pageInfo.showExportButton && (

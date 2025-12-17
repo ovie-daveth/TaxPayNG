@@ -11,12 +11,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ArrowLeft, Loader2, Copy, Check, QrCode, CreditCard, Building2, Wallet } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useSubscription } from "@/lib/hooks/useSubscription"
 import { reportService } from "@/lib/services"
 import { SavedReport } from "@/lib/types"
 import { toast } from "sonner"
 import Link from "next/link"
 import { QRCodeSVG } from "qrcode.react"
 import { RemitaPaymentModal } from "@/components/payment/remita-payment-modal"
+import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 
 interface RRRResponse {
   rrr: string
@@ -33,6 +35,7 @@ export default function GenerateRRRPage() {
   const reportId = params?.reportId as string
   const { user } = useAuth()
   const { profile, loading: profileLoading } = useUserProfile()
+  const { isSubscribed, loading: subscriptionLoading } = useSubscription()
   const [report, setReport] = useState<SavedReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
@@ -40,6 +43,7 @@ export default function GenerateRRRPage() {
   const [copied, setCopied] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [paymentReceipt, setPaymentReceipt] = useState<any>(null)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   
   const [formData, setFormData] = useState({
     taxType: "PIT Annual Return",
@@ -111,6 +115,12 @@ export default function GenerateRRRPage() {
   }
 
   const handleGenerateRRR = async () => {
+    // Check subscription first
+    if (!subscriptionLoading && !isSubscribed) {
+      setShowSubscriptionModal(true)
+      return
+    }
+
     if (!user?.uid || !profile || !report) {
       toast.error("Please ensure you're logged in and the report is loaded")
       return
@@ -216,13 +226,6 @@ export default function GenerateRRRPage() {
     <div className="min-h-screen bg-background">
       <main className="container mx-auto px-4 py-6 max-w-4xl">
         <div className="space-y-6">
-          {/* Back Button */}
-          <Link href={`/dashboard/reports/file/${reportId}`}>
-            <Button variant="ghost" className="mb-4">
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
-          </Link>
 
           <Card>
             <CardHeader>
@@ -470,6 +473,11 @@ export default function GenerateRRRPage() {
           userId={user.uid}
         />
       )}
+
+      <SubscriptionRequiredModal
+        open={showSubscriptionModal}
+        onOpenChange={setShowSubscriptionModal}
+      />
     </div>
   )
 }

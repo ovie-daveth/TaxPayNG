@@ -553,47 +553,32 @@ export default function PaymentPage() {
       )}
 
       {/* Main Content */}
-      <div className="container mx-auto px-4 py-6 ">
-        <Button 
-          variant="ghost" 
-          onClick={() => {
-            if (showValidation) {
-              setShowValidation(false)
-            } else {
-              router.back()
-            }
-          }}
-          className="mb-6"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back
-        </Button>
-
+      <div className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
         {showValidation ? (
-          <div className="space-y-6 max-w-3xl mx-auto">
+          <div className="space-y-3 sm:space-y-4 md:space-y-6 max-w-3xl mx-auto">
             <Card>
-              <CardHeader>
-                <CardTitle>System Checks</CardTitle>
-                <CardDescription>
+              <CardHeader className="p-3 sm:p-4 md:p-6">
+                <CardTitle className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">System Checks</CardTitle>
+                <CardDescription className="text-xs sm:text-sm mt-1">
                   Please ensure all requirements are met before generating RRR
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-3 sm:p-4 md:p-6">
                 {checking || profileLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                    <span className="ml-2 text-muted-foreground">Checking requirements...</span>
+                  <div className="flex items-center justify-center py-4 sm:py-6 md:py-8">
+                    <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 animate-spin text-primary" />
+                    <span className="ml-2 text-xs sm:text-sm text-muted-foreground">Checking requirements...</span>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-2.5 sm:space-y-3 md:space-y-4">
                     {systemChecks.filter(check => !check.status).length > 0 ? (
                       <>
-                        <Alert className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20">
-                          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                          <AlertTitle className="text-amber-800 dark:text-amber-200">
+                        <Alert className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20 p-2.5 sm:p-3 md:p-4">
+                          <AlertCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-amber-600 dark:text-amber-400" />
+                          <AlertTitle className="text-xs sm:text-sm md:text-base text-amber-800 dark:text-amber-200 font-medium">
                             Action Required
                           </AlertTitle>
-                          <AlertDescription className="text-amber-700 dark:text-amber-300">
+                          <AlertDescription className="text-[11px] sm:text-xs md:text-sm text-amber-700 dark:text-amber-300 mt-1">
                             Please complete the following requirements before generating RRR
                           </AlertDescription>
                         </Alert>
@@ -603,20 +588,20 @@ export default function PaymentPage() {
                             .filter(check => !check.status)
                             .map((check, index) => (
                               <AccordionItem key={index} value={`check-${index}`}>
-                                <AccordionTrigger className="hover:no-underline">
-                                  <div className="flex items-center gap-3 w-full">
-                                    <XCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
-                                    <span className="font-medium text-amber-800 dark:text-amber-200">
+                                <AccordionTrigger className="hover:no-underline px-2 sm:px-3 md:px-4 py-2.5 sm:py-3">
+                                  <div className="flex items-center gap-2 sm:gap-2.5 md:gap-3 w-full">
+                                    <XCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                                    <span className="font-medium text-xs sm:text-sm text-amber-800 dark:text-amber-200">
                                       {check.name}
                                     </span>
                                   </div>
                                 </AccordionTrigger>
-                                <AccordionContent>
-                                  <div className="pl-8 space-y-3">
-                                    <p className="text-sm text-muted-foreground">{check.message}</p>
+                                <AccordionContent className="px-2 sm:px-3 md:px-4 pb-2.5 sm:pb-3">
+                                  <div className="pl-5 sm:pl-6 md:pl-8 space-y-2 sm:space-y-2.5 md:space-y-3">
+                                    <p className="text-[11px] sm:text-xs md:text-sm text-muted-foreground leading-relaxed">{check.message}</p>
                                     {check.actionUrl && check.actionLabel && (
                                       <Link href={check.actionUrl}>
-                                        <Button variant="outline" size="sm">
+                                        <Button variant="outline" size="sm" className="h-8 sm:h-9 text-[11px] sm:text-xs md:text-sm">
                                           {check.actionLabel}
                                         </Button>
                                       </Link>
@@ -628,27 +613,29 @@ export default function PaymentPage() {
                         </Accordion>
                       </>
                     ) : (
-                      <Alert className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20">
-                        <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
-                        <AlertTitle className="text-green-800 dark:text-green-200">
+                      <Alert className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20 p-2.5 sm:p-3 md:p-4">
+                        <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5 md:h-4 md:w-4 text-green-600 dark:text-green-400" />
+                        <AlertTitle className="text-xs sm:text-sm md:text-base text-green-800 dark:text-green-200 font-medium">
                           All Checks Passed
                         </AlertTitle>
-                        <AlertDescription className="text-green-700 dark:text-green-300">
+                        <AlertDescription className="text-[11px] sm:text-xs md:text-sm text-green-700 dark:text-green-300 mt-1">
                           You're ready to generate RRR and proceed with payment
                         </AlertDescription>
                       </Alert>
                     )}
 
-                    <div className="flex justify-end gap-3 pt-4">
+                    <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-2.5 md:gap-3 pt-2.5 sm:pt-3 md:pt-4">
                       <Button
                         variant="outline"
                         onClick={() => setShowValidation(false)}
+                        className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
                       >
                         Back
                       </Button>
                       <Button
                         onClick={handleProceedToRRR}
                         disabled={!allChecksPassed}
+                        className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
                       >
                         Proceed to Generate RRR
                       </Button>
@@ -659,12 +646,12 @@ export default function PaymentPage() {
             </Card>
           </div>
         ) : (
-          <div className="space-y-6">
-            <Card className="p-6">
+          <div className="space-y-3 sm:space-y-4 md:space-y-6">
+            <Card className="p-3 sm:p-4 md:p-5 lg:p-6">
               <div className="flex items-center justify-between">
-                <div>
-                  <h1 className="text-3xl font-bold mb-2">Pay Your Tax</h1>
-                  <p className="text-muted-foreground">
+                <div className="flex-1 min-w-0">
+                  <h1 className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-bold mb-1 sm:mb-1.5 md:mb-2">Pay Your Tax</h1>
+                  <p className="text-[11px] sm:text-xs md:text-sm text-muted-foreground leading-relaxed">
                     Select your payment period and we'll calculate the amount based on your transactions, or enter it manually.
                   </p>
                 </div>
@@ -674,43 +661,43 @@ export default function PaymentPage() {
             {/* Outstanding Taxes Alert */}
             {loadingOutstanding ? (
               <Card>
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-center py-4">
-                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground mr-2" />
-                    <span className="text-sm text-muted-foreground">Checking outstanding taxes...</span>
+                <CardContent className="pt-3 sm:pt-4 md:pt-6 p-3 sm:p-4 md:p-6">
+                  <div className="flex items-center justify-center py-2.5 sm:py-3 md:py-4">
+                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 animate-spin text-muted-foreground mr-2" />
+                    <span className="text-[11px] sm:text-xs md:text-sm text-muted-foreground">Checking outstanding taxes...</span>
                   </div>
                 </CardContent>
               </Card>
             ) : outstandingTaxes.length > 0 ? (
               <Card className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20">
-                <CardHeader>
+                <CardHeader className="p-3 sm:p-4 md:p-6">
                   <div className="flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                    <CardTitle className="text-amber-800 dark:text-amber-200">
+                    <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <CardTitle className="text-sm sm:text-base md:text-lg text-amber-800 dark:text-amber-200 font-semibold">
                       Outstanding Tax Payments
                     </CardTitle>
                   </div>
-                  <CardDescription className="text-amber-700 dark:text-amber-300">
+                  <CardDescription className="text-[11px] sm:text-xs md:text-sm text-amber-700 dark:text-amber-300 mt-0.5 sm:mt-1">
                     You have {outstandingTaxes.length} outstanding tax payment{outstandingTaxes.length !== 1 ? 's' : ''} to make
                   </CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
+                <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+                  <div className="space-y-2 sm:space-y-2.5 md:space-y-3">
                     {outstandingTaxes.map((outstanding, index) => (
                       <div
                         key={index}
-                        className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-lg border border-amber-200 dark:border-amber-800"
+                        className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-white dark:bg-gray-900 rounded-lg border border-amber-200 dark:border-amber-800"
                       >
-                        <div className="flex-1">
-                          <p className="font-medium text-sm text-foreground">
+                        <div className="flex-1 min-w-0 pr-2">
+                          <p className="font-medium text-[11px] sm:text-xs md:text-sm text-foreground truncate">
                             {outstanding.taxDuration}
                           </p>
-                          <p className="text-xs text-muted-foreground capitalize">
+                          <p className="text-[10px] sm:text-[11px] md:text-xs text-muted-foreground capitalize mt-0.5">
                             {outstanding.periodType} payment
                           </p>
                         </div>
-                        <div className="text-right">
-                          <p className="font-semibold text-amber-600 dark:text-amber-400">
+                        <div className="text-right shrink-0">
+                          <p className="font-semibold text-[11px] sm:text-xs md:text-sm text-amber-600 dark:text-amber-400">
                             {formatCurrencyAmount(outstanding.amount, 'NGN')}
                           </p>
                         </div>
@@ -718,8 +705,8 @@ export default function PaymentPage() {
                     ))}
                     <div className="pt-2 border-t border-amber-200 dark:border-amber-800">
                       <div className="flex items-center justify-between">
-                        <p className="font-semibold text-sm text-foreground">Total Outstanding</p>
-                        <p className="font-bold text-lg text-amber-600 dark:text-amber-400">
+                        <p className="font-semibold text-[11px] sm:text-xs md:text-sm text-foreground">Total Outstanding</p>
+                        <p className="font-bold text-xs sm:text-sm md:text-base lg:text-lg text-amber-600 dark:text-amber-400">
                           {formatCurrencyAmount(
                             outstandingTaxes.reduce((sum, tax) => sum + tax.amount, 0),
                             'NGN'
@@ -732,14 +719,14 @@ export default function PaymentPage() {
               </Card>
             ) : (
               <Card className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20">
-                <CardContent className="pt-6">
-                  <div className="flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
-                    <div>
-                      <p className="font-medium text-green-800 dark:text-green-200">
+                <CardContent className="pt-3 sm:pt-4 md:pt-6 p-3 sm:p-4 md:p-6">
+                  <div className="flex items-center gap-2 sm:gap-2.5 md:gap-3">
+                    <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-green-600 dark:text-green-400 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="font-medium text-xs sm:text-sm md:text-base text-green-800 dark:text-green-200">
                         No Outstanding Taxes
                       </p>
-                      <p className="text-sm text-green-700 dark:text-green-300">
+                      <p className="text-[11px] sm:text-xs md:text-sm text-green-700 dark:text-green-300 mt-0.5">
                         All tax payments for the current year are up to date.
                       </p>
                     </div>

@@ -254,13 +254,6 @@ export default function GenerateSelfAssessmentPage() {
       <main className="px-2 sm:px-3 md:px-4 py-2 sm:py-3 md:py-4 max-w-full overflow-x-hidden">
           {!showPreview ? (
             <div className="space-y-4 sm:space-y-6">
-              {/* Back Button */}
-              <Link href="/dashboard/reports">
-                <Button variant="ghost" className="mb-3 sm:mb-4 h-8 sm:h-9 text-xs sm:text-sm">
-                  <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-                  Back to Reports
-                </Button>
-              </Link>
 
               {/* Header Section */}
               <Card className="p-4 sm:p-5 md:p-6">

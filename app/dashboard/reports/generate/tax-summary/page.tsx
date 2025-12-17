@@ -135,13 +135,6 @@ export default function GenerateTaxSummaryPage() {
       <main className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 max-w-4xl mx-auto">
         {!showPreview ? (
           <div className="space-y-6">
-            {/* Back Button */}
-            <Link href="/dashboard/reports">
-              <Button variant="ghost" className="mb-4">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Reports
-              </Button>
-            </Link>
 
             {/* Header Section */}
             <Card className="p-3 sm:p-4 md:p-6">

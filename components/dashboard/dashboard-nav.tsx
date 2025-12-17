@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Calculator, LayoutDashboard, Receipt, FileText, Bell, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, IdCardIcon, FileCheck, BarChart3, MessageSquare } from "lucide-react"
+import { Calculator, LayoutDashboard, Receipt, FileText, Bell, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, IdCardIcon, FileCheck, BarChart3, MessageSquare, Plus } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { useAuth } from "@/lib/hooks/useAuth"
@@ -12,6 +12,8 @@ import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { toast } from "sonner"
 import OtaxLogo from "../OtaxLogo"
 import { User } from "lucide-react"
+import { ThemeToggle } from "../theme-toggle"
+import { NotificationBell } from "../notifications/notification-bell"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -34,6 +36,34 @@ export function DashboardNav() {
   const { logout, user } = useAuth()
   const { profile } = useUserProfile()
   const [hasFilingRequests, setHasFilingRequests] = useState(false)
+  
+  // Get page info for mobile add button
+  const getMobileAddButton = () => {
+    switch (pathname) {
+      case "/dashboard":
+        return { icon: Plus, action: () => router.push("/dashboard/payment"), show: true }
+      case "/dashboard/transactions":
+        return { icon: Receipt, action: () => {}, show: true }
+      case "/dashboard/invoices":
+        return { icon: FileCheck, action: () => {
+          const event = new CustomEvent('createInvoice')
+          window.dispatchEvent(event)
+        }, show: true }
+      case "/dashboard/documents":
+        return { icon: FileText, action: () => {}, show: true }
+      case "/dashboard/reminders":
+        return { icon: Bell, action: () => {}, show: true }
+      case "/dashboard/reports":
+        return { icon: BarChart3, action: () => router.push("/dashboard/reports/generate/self-assessment"), show: true }
+      case "/dashboard/payment":
+        return { icon: Plus, action: () => router.push("/dashboard/payment/add"), show: true }
+      default:
+        return { icon: Plus, action: () => {}, show: false }
+    }
+  }
+  
+  const mobileAddButton = getMobileAddButton()
+  const AddButtonIcon = mobileAddButton.icon
 
   useEffect(() => {
     const checkFilingRequests = async () => {
@@ -196,13 +226,27 @@ export function DashboardNav() {
 
       {/* Mobile Header */}
       <header className="md:hidden sticky top-0 z-50 bg-card border-b border-border">
-        <div className="flex items-center justify-between p-4">
+        <div className="flex items-center justify-between p-3 sm:p-4">
           <Link href="/dashboard" className="flex items-center gap-2">
             <OtaxLogo />
           </Link>
-          <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <NotificationBell />
+            <ThemeToggle />
+            {mobileAddButton.show && (
+              <Button 
+                variant="default"
+                size="icon"
+                onClick={mobileAddButton.action}
+                className="h-8 w-8 p-0"
+              >
+                <AddButtonIcon className="w-4 h-4" />
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="h-10 w-10">
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </Button>
+          </div>
         </div>
 
         {/* Mobile Menu */}

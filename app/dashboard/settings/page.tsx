@@ -534,7 +534,10 @@ export default function SettingsPage() {
                                   className="hidden"
                                   onChange={async (e) => {
                                     const file = e.target.files?.[0]
-                                    if (!file || !user?.uid) return
+                                    if (!file || !user?.uid) {
+                                      e.target.value = ''
+                                      return
+                                    }
                                     setUploadingKYC(prev => ({ ...prev, id: true }))
                                     try {
                                       const result = await uploadToImageKit(file, 'kyc')
@@ -548,6 +551,8 @@ export default function SettingsPage() {
                                       toast.error("Failed to upload document")
                                     } finally {
                                       setUploadingKYC(prev => ({ ...prev, id: false }))
+                                      // Reset the input so the same file can be selected again if needed
+                                      e.target.value = ''
                                     }
                                   }}
                                   disabled={uploadingKYC.id}
@@ -610,7 +615,10 @@ export default function SettingsPage() {
                                   className="hidden"
                                   onChange={async (e) => {
                                     const file = e.target.files?.[0]
-                                    if (!file || !user?.uid) return
+                                    if (!file || !user?.uid) {
+                                      e.target.value = ''
+                                      return
+                                    }
                                     setUploadingKYC(prev => ({ ...prev, passport: true }))
                                     try {
                                       const result = await uploadToImageKit(file, 'kyc')
@@ -624,6 +632,8 @@ export default function SettingsPage() {
                                       toast.error("Failed to upload document")
                                     } finally {
                                       setUploadingKYC(prev => ({ ...prev, passport: false }))
+                                      // Reset the input so the same file can be selected again if needed
+                                      e.target.value = ''
                                     }
                                   }}
                                   disabled={uploadingKYC.passport}
@@ -686,7 +696,10 @@ export default function SettingsPage() {
                                   className="hidden"
                                   onChange={async (e) => {
                                     const file = e.target.files?.[0]
-                                    if (!file || !user?.uid) return
+                                    if (!file || !user?.uid) {
+                                      e.target.value = ''
+                                      return
+                                    }
                                     setUploadingKYC(prev => ({ ...prev, driverLicense: true }))
                                     try {
                                       const result = await uploadToImageKit(file, 'kyc')
@@ -700,6 +713,8 @@ export default function SettingsPage() {
                                       toast.error("Failed to upload document")
                                     } finally {
                                       setUploadingKYC(prev => ({ ...prev, driverLicense: false }))
+                                      // Reset the input so the same file can be selected again if needed
+                                      e.target.value = ''
                                     }
                                   }}
                                   disabled={uploadingKYC.driverLicense}
