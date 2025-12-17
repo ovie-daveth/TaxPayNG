@@ -39,7 +39,6 @@ function LayoutContent({
     }
     
     const currentPath = window.location.pathname
-    console.log("Dashboard layout - businessType:", profile.businessType, "current path:", currentPath)
     
     // Agent redirects - agents have their own pages, redirect them away from dashboard
     if (profile.businessType === 'agent') {

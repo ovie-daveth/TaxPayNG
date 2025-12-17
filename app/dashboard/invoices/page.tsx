@@ -367,13 +367,13 @@ export default function InvoicesPage() {
       // Create File from blob
       const pdfFile = new File([pdfBlob], `WHT-Credit-Note-${creditNote.creditNoteNumber}.pdf`, { type: 'application/pdf' })
       
-      // Upload to ImageKit
-      const uploadResult = await uploadToImageKit(pdfFile, 'documents/credit-notes')
+      // Upload to ImageKit (this will update storage via the API route)
+      const uploadResult = await uploadToImageKit(pdfFile, 'documents/credit-notes', profile.userId)
       
       // Get the transaction ID from the invoice
       const transactionId = invoice.linkedTransactionId
       
-      // Create document record
+      // Create document record with fileId and fileSize for proper tracking
       const documentData = {
         file: pdfFile,
         name: `WHT Credit Note - ${creditNote.creditNoteNumber}`,
@@ -381,7 +381,9 @@ export default function InvoicesPage() {
         date: creditNote.issuedDate,
         linkedTransaction: transactionId || undefined,
         notes: `WHT Credit Note for Invoice ${creditNote.invoiceNumber}. WHT Rate: ${creditNote.whtRate}%, Amount: ${formatCurrencyAmount(creditNote.whtAmount, invoice.currency as any)}`,
-        imageKitUrl: uploadResult.url
+        imageKitUrl: uploadResult.url,
+        imageKitFileId: uploadResult.fileId, // Store fileId for deletion
+        fileSize: uploadResult.size // Use size from ImageKit upload result
       }
 
       const result = await documentService.uploadDocument(profile.userId, documentData)

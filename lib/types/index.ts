@@ -109,6 +109,7 @@ export interface Document {
   size: number
   url: string
   thumbnailUrl?: string
+  imageKitFileId?: string // ImageKit file ID for deletion
   uploadedAt: string
   linkedTransaction?: string
   notes?: string
@@ -124,6 +125,7 @@ export interface UploadDocumentData {
   linkedTransaction?: string
   notes?: string
   imageKitUrl?: string
+  imageKitFileId?: string // ImageKit file ID for deletion
   fileSize?: number // Optional: size from ImageKit upload result (in bytes)
 }
 

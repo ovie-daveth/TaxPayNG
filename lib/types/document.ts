@@ -32,5 +32,6 @@ export interface UploadDocumentData {
   linkedTransaction?: string
   notes?: string
   imageKitUrl?: string
+  imageKitFileId?: string // ImageKit file ID for deletion
   fileSize?: number // Optional: size from ImageKit upload result (in bytes)
 }

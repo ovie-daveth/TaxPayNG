@@ -63,7 +63,13 @@ export function DeleteConfirmationModal({
             <Button
               type="button"
               className="flex-1 bg-destructive text-white hover:bg-destructive/90 disabled:opacity-50"
-              onClick={onConfirm}
+              onClick={(e) => {
+                console.log('🟢 CONFIRM DELETE BUTTON CLICKED in DeleteConfirmationModal')
+                console.log('🟢 isDeleting:', isDeleting)
+                e.preventDefault()
+                e.stopPropagation()
+                onConfirm()
+              }}
               disabled={isDeleting}
             >
               {isDeleting ? (

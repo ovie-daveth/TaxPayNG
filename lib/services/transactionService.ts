@@ -140,8 +140,9 @@ export class TransactionService extends BaseService {
       // Increment transaction count
       await userService.incrementTransactionCount(userId)
 
-      // If transaction has attachments, create corresponding documents
-      if (transactionData.attachments && transactionData.attachments.length > 0) {
+      // If transaction has attachments but no documentId, create corresponding documents
+      // (documentId means document was already created in the dialog with proper storage tracking)
+      if (transactionData.attachments && transactionData.attachments.length > 0 && !transactionData.documentId) {
         await this.createDocumentsFromAttachments(
           userId,
           transactionId,
@@ -240,8 +241,9 @@ export class TransactionService extends BaseService {
       await this.update(transactionId, updateData)
       const updatedTransaction = await this.getById(transactionId)
 
-      // If attachments were updated, create documents for new attachments
-      if (updateData.attachments && updateData.attachments.length > 0) {
+      // If attachments were updated but documentId is provided, skip creating documents
+      // (documentId means document was already created/updated in the dialog with proper storage tracking)
+      if (updateData.attachments && updateData.attachments.length > 0 && !updateData.documentId) {
         const existingAttachments = existingTransaction.attachments || []
         const newAttachments = updateData.attachments.filter(
           (url: string) => !existingAttachments.includes(url)
@@ -285,18 +287,27 @@ export class TransactionService extends BaseService {
         }
       }
 
-      // Delete linked documents (optional - documents remain even if transaction is deleted)
-      // Uncomment the following lines if you want to delete documents when transaction is deleted:
-      // try {
-      //   const linkedDocs = await documentService.getDocumentsByTransaction(userId, transactionId)
-      //   for (const doc of linkedDocs) {
-      //     await documentService.deleteDocument(doc.id, userId)
-      //   }
-      // } catch (docError) {
-      //   console.warn('Error deleting linked documents:', docError)
-      // }
+      // Delete linked document if documentId exists
+      if (existingTransaction.documentId) {
+        try {
+          const { documentService } = await import('./documentService')
+          await documentService.deleteDocument(existingTransaction.documentId, userId)
+          console.log(`Deleted document ${existingTransaction.documentId} associated with transaction ${transactionId}`)
+        } catch (docError) {
+          console.error('Error deleting linked document:', docError)
+          // Continue with transaction deletion even if document deletion fails
+        }
+      }
 
       await this.delete(transactionId)
+
+      // Decrement transaction count
+      try {
+        await userService.decrementTransactionCount(userId)
+      } catch (countError) {
+        console.error('Error decrementing transaction count:', countError)
+        // Continue even if count decrement fails
+      }
 
       return {
         success: true,

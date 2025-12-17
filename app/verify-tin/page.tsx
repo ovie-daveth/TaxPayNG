@@ -248,7 +248,9 @@ export default function VerifyTINPage() {
               file,
               name: `${docType.toUpperCase()} Document`,
               type: 'proof',
-              imageKitUrl: uploadResult.url
+              imageKitUrl: uploadResult.url,
+              imageKitFileId: uploadResult.fileId, // Store fileId for deletion
+              fileSize: uploadResult.size
             })
           } catch (error) {
             console.error(`Error uploading ${docType}:`, error)

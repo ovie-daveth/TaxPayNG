@@ -21,6 +21,8 @@ import { useSubscription } from "@/lib/hooks/useSubscription"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { SubscriptionAlert } from "@/components/subscription/subscription-restriction"
 import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { documentService } from "@/lib/services"
 
 interface AddTransactionDialogProps {
   open: boolean
@@ -41,6 +43,7 @@ export function AddTransactionDialog({
   defaultCategory,
   defaultDescription
 }: AddTransactionDialogProps) {
+  const { user } = useAuth()
 
   const [formData, setFormData] = useState({
     type: 'income' as Transaction['type'],
@@ -54,7 +57,8 @@ export function AddTransactionDialog({
     notes: '',
     taxDeductible: false,
     tags: [] as string[],
-    attachments: [] as string[]
+    attachments: [] as string[],
+    documentId: undefined as string | undefined
   })
   const [convertedAmountNGN, setConvertedAmountNGN] = useState<number | null>(null)
   const [isConverting, setIsConverting] = useState(false)
@@ -62,6 +66,7 @@ export function AddTransactionDialog({
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadedImage, setUploadedImage] = useState<ImageUploadResult | null>(null)
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null) // Store the original file for document creation
   const [uploadingImages, setUploadingImages] = useState(false)
   const [isScanning, setIsScanning] = useState(false)
   const [ocrResult, setOcrResult] = useState<ReceiptData | null>(null)
@@ -75,9 +80,8 @@ export function AddTransactionDialog({
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0]
       setSelectedFile(file)
-
-      // Auto-upload file to ImageKit
-      await uploadFileToImageKit(file)
+      setUploadedFile(file) // Store file for later upload when saving
+      // Don't upload to ImageKit automatically - wait until transaction is saved
     }
   }
 
@@ -152,13 +156,15 @@ export function AddTransactionDialog({
     setUploadingImages(true)
 
     try {
-      const result = await uploadToImageKit(file, 'transactions')
+      const result = await uploadToImageKit(file, 'transactions', user?.uid)
       setUploadedImage(result)
+      setUploadedFile(file) // Store the file for later document creation
       toast.success('Document uploaded successfully!')
     } catch (error) {
       console.error('Upload error:', error)
       toast.error('Failed to upload document')
       setSelectedFile(null)
+      setUploadedFile(null)
     } finally {
       setUploadingImages(false)
     }
@@ -167,6 +173,9 @@ export function AddTransactionDialog({
   const handleRemoveFile = () => {
     setSelectedFile(null)
     setUploadedImage(null)
+    setUploadedFile(null)
+    // Clear documentId if removing file (will be deleted on save)
+    setFormData(prev => ({ ...prev, documentId: undefined }))
   }
 
   // Handle currency conversion
@@ -252,7 +261,8 @@ export function AddTransactionDialog({
         notes: transaction.notes || '',
         taxDeductible: transaction.taxDeductible,
         tags: transaction.tags || [],
-        attachments: transaction.attachments || []
+        attachments: transaction.attachments || [],
+        documentId: transaction.documentId
       })
 
       // Initialize conversion if currency is not NGN
@@ -320,8 +330,72 @@ export function AddTransactionDialog({
     console.log("Before submission:", formData)
     setIsSubmitting(true)
     try {
-      // Get image URL from uploaded image
-      const imageUrl = uploadedImage ? [uploadedImage.url] : []
+      let documentId: string | undefined = undefined
+      let imageUrl: string[] = []
+
+      // Handle document upload/replacement/deletion
+      if (uploadedFile && user?.uid) {
+        // New file to upload (either new transaction or replacing existing)
+        try {
+          setUploadingImages(true)
+          
+          // If editing and there's an existing document, delete it first
+          if (transaction?.documentId) {
+            try {
+              await documentService.deleteDocument(transaction.documentId, user.uid)
+              console.log(`Deleted old document ${transaction.documentId} before replacing`)
+            } catch (deleteError) {
+              console.error('Error deleting old document:', deleteError)
+              // Continue even if deletion fails
+            }
+          }
+
+          // Upload to ImageKit
+          const uploadResult = await uploadToImageKit(uploadedFile, 'transactions', user.uid)
+          setUploadedImage(uploadResult)
+          imageUrl = [uploadResult.url]
+
+          // Create document record (will link to transaction after transaction is created)
+          const documentType = formData.type === 'income' ? 'invoice' : 'receipt'
+          const docResult = await documentService.uploadDocument(user.uid, {
+            file: uploadedFile,
+            name: `${formData.description} - Receipt`,
+            type: documentType,
+            imageKitUrl: uploadResult.url,
+            imageKitFileId: uploadResult.fileId,
+            fileSize: uploadResult.size,
+            date: formData.date,
+            notes: `Auto-created from transaction: ${formData.description}`
+          })
+
+          if (docResult.success && docResult.data) {
+            documentId = docResult.data.id
+          }
+        } catch (error) {
+          console.error('Error uploading document:', error)
+          toast.error('Failed to upload document. Transaction will be saved without attachment.')
+          // Continue with transaction creation even if document upload fails
+        } finally {
+          setUploadingImages(false)
+        }
+      } else if (transaction?.documentId && !uploadedFile) {
+        // Editing transaction but file was removed - delete the document
+        try {
+          await documentService.deleteDocument(transaction.documentId, user?.uid || '')
+          console.log(`Deleted document ${transaction.documentId} as file was removed`)
+          documentId = undefined
+          imageUrl = []
+        } catch (deleteError) {
+          console.error('Error deleting document:', deleteError)
+          // Keep existing documentId if deletion fails
+          documentId = transaction.documentId
+          imageUrl = transaction.attachments || []
+        }
+      } else if (transaction?.documentId) {
+        // Editing transaction, no file change - keep existing document
+        documentId = transaction.documentId
+        imageUrl = transaction.attachments || []
+      }
 
       // Use converted NGN amount for storage (always store in NGN)
       const amountToStore = formData.currency === 'NGN'
@@ -338,13 +412,28 @@ export function AddTransactionDialog({
         notes: formData.notes,
         taxDeductible: formData.taxDeductible,
         tags: formData.tags,
-        attachments: imageUrl
+        attachments: imageUrl,
+        documentId: documentId
       })
 
       console.log("Result:", result)
 
       if (result.success) {
-        const hasAttachment = uploadedImage !== null
+        const hasAttachment = documentId !== undefined
+
+        // Link document to transaction if document was created
+        if (hasAttachment && result.data?.id && documentId) {
+          try {
+            await documentService.updateDocument(documentId, user?.uid || '', {
+              linkedTransaction: result.data.id
+            })
+            console.log(`Linked document ${documentId} to transaction ${result.data.id}`)
+          } catch (linkError) {
+            console.error('Error linking document to transaction:', linkError)
+            // Don't block success message if linking fails
+          }
+        }
+
         const successMessage = transaction
           ? 'Transaction updated successfully!'
           : hasAttachment
@@ -429,18 +518,15 @@ export function AddTransactionDialog({
                 onChange={async (e) => {
                   if (e.target.files && e.target.files.length > 0) {
                     const file = e.target.files[0]
-                    // Check if it's an image or PDF
+                    setSelectedFile(file)
+                    setUploadedFile(file) // Store file for later upload when saving
+                    // Check if it's an image or PDF for OCR
                     if (file.type.startsWith('image/') || file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-                      // Automatically scan the receipt
+                      // Automatically scan the receipt (but don't upload to ImageKit yet)
                       await handleScanReceipt(file)
-                      // Also upload the file
-                      setSelectedFile(file)
-                      await uploadFileToImageKit(file)
                     } else {
-                      // For other file types, just upload without OCR
-                      setSelectedFile(file)
-                      await uploadFileToImageKit(file)
-                      setShowFormFields(true) // Show form to enter details manually
+                      // For other file types, just show form to enter details manually
+                      setShowFormFields(true)
                     }
                   }
                 }}

@@ -167,14 +167,32 @@ export default function DocumentsPage() {
                 <DocumentGrid 
                   documents={filteredDocuments} 
                   onView={handleView}
-                  onDelete={(id) => deleteDocument(documents.find(d => d.id === id)!)}
+                  onDelete={async (id) => {
+                    console.log('DocumentGrid onDelete called with id:', id)
+                    const doc = documents.find(d => d.id === id)
+                    console.log('Found document:', doc ? { id: doc.id, name: doc.name } : 'NOT FOUND')
+                    if (!doc) {
+                      console.error('Document not found for id:', id)
+                      throw new Error('Document not found')
+                    }
+                    await deleteDocument(doc)
+                  }}
                   onDownload={handleDownload}
                 />
               ) : (
                 <DocumentList 
                   documents={filteredDocuments}
                   onView={handleView}
-                  onDelete={(id) => deleteDocument(documents.find(d => d.id === id)!)}
+                  onDelete={async (id) => {
+                    console.log('DocumentList onDelete called with id:', id)
+                    const doc = documents.find(d => d.id === id)
+                    console.log('Found document:', doc ? { id: doc.id, name: doc.name } : 'NOT FOUND')
+                    if (!doc) {
+                      console.error('Document not found for id:', id)
+                      throw new Error('Document not found')
+                    }
+                    await deleteDocument(doc)
+                  }}
                   onDownload={handleDownload}
                 />
               )}

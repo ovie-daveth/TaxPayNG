@@ -38,8 +38,6 @@ export function MigrateToCreatorModal({
 
   const planName = planType === 'GOLD' ? 'GOLD' : 'PLATINUM'
 
-  console.log('MigrateToCreatorModal render:', { open, planType, shouldRender: open && planType })
-
   // Always render the Dialog, but control visibility with open prop
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

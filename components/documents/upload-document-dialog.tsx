@@ -128,7 +128,8 @@ export function UploadDocumentDialog({ open, onOpenChange, onUpload }: UploadDoc
         date: formData.date || new Date().toISOString(),
         linkedTransaction: formData.linkedTransaction === 'none' ? undefined : formData.linkedTransaction || undefined,
         notes: formData.notes || undefined,
-        imageKitUrl: uploadedImage.url // Pass ImageKit URL
+        imageKitUrl: uploadedImage.url, // Pass ImageKit URL
+        imageKitFileId: uploadedImage.fileId // Pass ImageKit fileId for deletion
       }
 
       const result = await onUpload(uploadData)

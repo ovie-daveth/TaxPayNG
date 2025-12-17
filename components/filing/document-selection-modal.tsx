@@ -78,6 +78,7 @@ export function DocumentSelectionModal({
         name: file.name.replace(/\.[^/.]+$/, ''),
         type: 'proof',
         imageKitUrl: uploadResult.url,
+        imageKitFileId: uploadResult.fileId, // Store fileId for deletion
         fileSize: uploadResult.size,
         notes: 'Supporting document for tax filing'
       })

@@ -50,7 +50,22 @@ export default function SettingsPage() {
     passport: '',
     driverLicense: ''
   })
+  const [kycDocumentFileIds, setKycDocumentFileIds] = useState({
+    id: '',
+    passport: '',
+    driverLicense: ''
+  })
+  const [kycDocumentSizes, setKycDocumentSizes] = useState({
+    id: 0,
+    passport: 0,
+    driverLicense: 0
+  })
   const [uploadingKYC, setUploadingKYC] = useState({
+    id: false,
+    passport: false,
+    driverLicense: false
+  })
+  const [deletingKYC, setDeletingKYC] = useState({
     id: false,
     passport: false,
     driverLicense: false
@@ -283,6 +298,19 @@ export default function SettingsPage() {
       passport: profile.kycDocuments?.passport || '',
       driverLicense: profile.kycDocuments?.driverLicense || ''
     })
+    
+    // Load KYC document fileIds and sizes from profile (if stored)
+    // Note: For existing documents, fileIds might not be stored yet
+    setKycDocumentFileIds({
+      id: (profile.kycDocuments as any)?.idFileId || '',
+      passport: (profile.kycDocuments as any)?.passportFileId || '',
+      driverLicense: (profile.kycDocuments as any)?.driverLicenseFileId || ''
+    })
+    setKycDocumentSizes({
+      id: (profile.kycDocuments as any)?.idSize || 0,
+      passport: (profile.kycDocuments as any)?.passportSize || 0,
+      driverLicense: (profile.kycDocuments as any)?.driverLicenseSize || 0
+    })
   }, [profile, profileLoading, user?.uid, user?.displayName])
 
   // Handle URL params to scroll to KYC section
@@ -505,24 +533,133 @@ export default function SettingsPage() {
                                     variant="outline"
                                     size="sm"
                                     onClick={async () => {
-                                      if (!user?.uid) return
-                                      setUploadingKYC(prev => ({ ...prev, id: true }))
+                                      console.log('🗑️ DELETE KYC ID DOCUMENT CLICKED')
+                                      if (!user?.uid) {
+                                        console.warn('No user ID')
+                                        return
+                                      }
+                                      
+                                      let fileId = kycDocumentFileIds.id
+                                      let fileSize = kycDocumentSizes.id
+                                      const documentUrl = kycDocuments.id
+                                      
+                                      console.log('🗑️ Delete info:', { fileId, fileSize, documentUrl })
+                                      
+                                      // If fileId is missing but we have a URL, try to get fileId from ImageKit
+                                      if (!fileId && documentUrl && documentUrl.includes('imagekit.io')) {
+                                        console.log('🗑️ fileId missing, attempting to get from ImageKit API')
+                                        try {
+                                          const token = await auth.currentUser?.getIdToken()
+                                          if (token) {
+                                            // Try to get fileId from ImageKit using URL
+                                            const getFileResponse = await fetch(`/api/get-image-fileid?url=${encodeURIComponent(documentUrl)}`, {
+                                              method: 'GET',
+                                              headers: { 'Authorization': `Bearer ${token}` }
+                                            })
+                                            
+                                            if (getFileResponse.ok) {
+                                              const fileData = await getFileResponse.json()
+                                              if (fileData.fileId) {
+                                                fileId = fileData.fileId
+                                                fileSize = fileData.size || fileSize
+                                                console.log('🗑️ Retrieved fileId from ImageKit:', { fileId, fileSize })
+                                              }
+                                            }
+                                          }
+                                        } catch (getFileError) {
+                                          console.warn('🗑️ Could not get fileId from ImageKit:', getFileError)
+                                          // Continue with deletion attempt using URL-based approach
+                                        }
+                                      }
+                                      
+                                      setDeletingKYC(prev => ({ ...prev, id: true }))
                                       try {
+                                        // Delete from ImageKit if fileId exists
+                                        if (fileId) {
+                                          console.log('🗑️ Deleting from ImageKit:', fileId)
+                                          try {
+                                            const token = await auth.currentUser?.getIdToken()
+                                            if (token) {
+                                              const deleteResponse = await fetch(`/api/delete-image?fileId=${encodeURIComponent(fileId)}`, {
+                                                method: 'DELETE',
+                                                headers: { 'Authorization': `Bearer ${token}` }
+                                              })
+                                              
+                                              const deleteData = await deleteResponse.json().catch(() => ({ error: 'Unknown error' }))
+                                              
+                                              if (deleteResponse.ok && deleteData.success) {
+                                                console.log('🗑️ ImageKit file deleted successfully')
+                                              } else if (deleteData.networkError) {
+                                                console.warn('🗑️ Network error deleting from ImageKit - file may still exist:', deleteData.error)
+                                                toast.warning('Network error: File may still exist in storage. Please try again later.')
+                                              } else {
+                                                console.error('🗑️ ImageKit delete error:', deleteData.error)
+                                                // Continue with profile update even if ImageKit deletion fails
+                                              }
+                                            }
+                                          } catch (imagekitError) {
+                                            console.error('🗑️ Error deleting from ImageKit:', imagekitError)
+                                            // Continue with profile update even if ImageKit deletion fails
+                                          }
+                                        } else {
+                                          console.warn('🗑️ Cannot delete from ImageKit: fileId is missing')
+                                        }
+                                        
+                                        // Reduce storage if size is known
+                                        if (fileSize > 0) {
+                                          console.log('🗑️ Reducing storage by:', fileSize)
+                                          try {
+                                            const token = await auth.currentUser?.getIdToken()
+                                            if (token) {
+                                              await fetch('/api/user/update-storage', {
+                                                method: 'POST',
+                                                headers: {
+                                                  'Content-Type': 'application/json',
+                                                  'Authorization': `Bearer ${token}`
+                                                },
+                                                body: JSON.stringify({ additionalBytes: -fileSize })
+                                              })
+                                              console.log('🗑️ Storage reduced successfully')
+                                            }
+                                          } catch (storageError) {
+                                            console.error('🗑️ Error reducing storage:', storageError)
+                                            // Continue even if storage update fails
+                                          }
+                                        } else {
+                                          console.warn('🗑️ Cannot reduce storage: fileSize is unknown')
+                                        }
+                                        
+                                        // Update profile to remove document
                                         await userService.upsertProfile(user.uid, {
-                                          kycDocuments: { ...kycDocuments, id: '' }
+                                          kycDocuments: { 
+                                            ...kycDocuments, 
+                                            id: '',
+                                            idFileId: '',
+                                            idSize: 0
+                                          } as any
                                         })
                                         setKycDocuments(prev => ({ ...prev, id: '' }))
+                                        setKycDocumentFileIds(prev => ({ ...prev, id: '' }))
+                                        setKycDocumentSizes(prev => ({ ...prev, id: 0 }))
+                                        
                                         toast.success("Document removed")
                                         await refetchProfile()
+                                        console.log('🗑️ Document removal completed')
                                       } catch (error) {
+                                        console.error('🗑️ Error removing document:', error)
                                         toast.error("Failed to remove document")
                                       } finally {
-                                        setUploadingKYC(prev => ({ ...prev, id: false }))
+                                        setDeletingKYC(prev => ({ ...prev, id: false }))
                                       }
                                     }}
+                                    disabled={deletingKYC.id}
                                     className="h-7 sm:h-8 w-7 sm:w-8 p-0"
                                   >
-                                    <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    {deletingKYC.id ? (
+                                      <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
+                                    ) : (
+                                      <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    )}
                                   </Button>
                                 </div>
                               </div>
@@ -542,11 +679,52 @@ export default function SettingsPage() {
                                     }
                                     setUploadingKYC(prev => ({ ...prev, id: true }))
                                     try {
+                                      // If replacing an existing document, we need to reduce storage for the old one
+                                      // Note: Storage for new document is handled by the upload-image API route
+                                      const oldUrl = kycDocuments.id
+                                      
+                                      // If replacing an existing document, get old fileId and size for deletion
+                                      const oldFileId = kycDocumentFileIds.id
+                                      const oldSize = kycDocumentSizes.id
+                                      
                                       const result = await uploadToImageKit(file, 'kyc', user.uid)
+                                      
+                                      // Update profile with new document URL, fileId, and size
                                       await userService.upsertProfile(user.uid, {
-                                        kycDocuments: { ...kycDocuments, id: result.url }
+                                        kycDocuments: { 
+                                          ...kycDocuments, 
+                                          id: result.url,
+                                          idFileId: result.fileId,
+                                          idSize: result.size
+                                        } as any
                                       })
                                       setKycDocuments(prev => ({ ...prev, id: result.url }))
+                                      setKycDocumentFileIds(prev => ({ ...prev, id: result.fileId || '' }))
+                                      setKycDocumentSizes(prev => ({ ...prev, id: result.size || 0 }))
+                                      
+                                      // If replacing old document, delete it from ImageKit and reduce storage
+                                      if (oldFileId && oldSize > 0) {
+                                        try {
+                                          const token = await auth.currentUser?.getIdToken()
+                                          if (token) {
+                                            await fetch(`/api/delete-image?fileId=${encodeURIComponent(oldFileId)}`, {
+                                              method: 'DELETE',
+                                              headers: { 'Authorization': `Bearer ${token}` }
+                                            })
+                                            await fetch('/api/user/update-storage', {
+                                              method: 'POST',
+                                              headers: {
+                                                'Content-Type': 'application/json',
+                                                'Authorization': `Bearer ${token}`
+                                              },
+                                              body: JSON.stringify({ additionalBytes: -oldSize })
+                                            })
+                                          }
+                                        } catch (deleteError) {
+                                          console.error('Error deleting old document:', deleteError)
+                                        }
+                                      }
+                                      
                                       toast.success("ID document uploaded successfully")
                                       await refetchProfile()
                                     } catch (error) {
@@ -587,24 +765,91 @@ export default function SettingsPage() {
                                     variant="outline"
                                     size="sm"
                                     onClick={async () => {
+                                      console.log('🗑️ DELETE KYC PASSPORT CLICKED')
                                       if (!user?.uid) return
-                                      setUploadingKYC(prev => ({ ...prev, passport: true }))
+                                      
+                                      let fileId = kycDocumentFileIds.passport
+                                      let fileSize = kycDocumentSizes.passport
+                                      const documentUrl = kycDocuments.passport
+                                      
+                                      // If fileId is missing but we have a URL, try to get fileId from ImageKit
+                                      if (!fileId && documentUrl && documentUrl.includes('imagekit.io')) {
+                                        try {
+                                          const token = await auth.currentUser?.getIdToken()
+                                          if (token) {
+                                            const getFileResponse = await fetch(`/api/get-image-fileid?url=${encodeURIComponent(documentUrl)}`, {
+                                              method: 'GET',
+                                              headers: { 'Authorization': `Bearer ${token}` }
+                                            })
+                                            if (getFileResponse.ok) {
+                                              const fileData = await getFileResponse.json()
+                                              if (fileData.fileId) {
+                                                fileId = fileData.fileId
+                                                fileSize = fileData.size || fileSize
+                                              }
+                                            }
+                                          }
+                                        } catch (getFileError) {
+                                          console.warn('Could not get fileId from ImageKit:', getFileError)
+                                        }
+                                      }
+                                      
+                                      setDeletingKYC(prev => ({ ...prev, passport: true }))
                                       try {
+                                        // Delete from ImageKit if fileId exists
+                                        if (fileId) {
+                                          const token = await auth.currentUser?.getIdToken()
+                                          if (token) {
+                                            await fetch(`/api/delete-image?fileId=${encodeURIComponent(fileId)}`, {
+                                              method: 'DELETE',
+                                              headers: { 'Authorization': `Bearer ${token}` }
+                                            })
+                                          }
+                                        }
+                                        
+                                        // Reduce storage if size is known
+                                        if (fileSize > 0) {
+                                          const token = await auth.currentUser?.getIdToken()
+                                          if (token) {
+                                            await fetch('/api/user/update-storage', {
+                                              method: 'POST',
+                                              headers: {
+                                                'Content-Type': 'application/json',
+                                                'Authorization': `Bearer ${token}`
+                                              },
+                                              body: JSON.stringify({ additionalBytes: -fileSize })
+                                            })
+                                          }
+                                        }
+                                        
                                         await userService.upsertProfile(user.uid, {
-                                          kycDocuments: { ...kycDocuments, passport: '' }
+                                          kycDocuments: { 
+                                            ...kycDocuments, 
+                                            passport: '',
+                                            passportFileId: '',
+                                            passportSize: 0
+                                          } as any
                                         })
                                         setKycDocuments(prev => ({ ...prev, passport: '' }))
+                                        setKycDocumentFileIds(prev => ({ ...prev, passport: '' }))
+                                        setKycDocumentSizes(prev => ({ ...prev, passport: 0 }))
                                         toast.success("Document removed")
                                         await refetchProfile()
                                       } catch (error) {
+                                        console.error('Error removing passport:', error)
                                         toast.error("Failed to remove document")
                                       } finally {
-                                        setUploadingKYC(prev => ({ ...prev, passport: false }))
+                                        setDeletingKYC(prev => ({ ...prev, passport: false }))
                                       }
                                     }}
+                                    disabled={deletingKYC.passport}
                                     className="h-7 sm:h-8 w-7 sm:w-8 p-0"
                                   >
-                                    <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    {deletingKYC.passport ? (
+                                      <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
+                                    ) : (
+                                      <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    )}
                                   </Button>
                                 </div>
                               </div>
@@ -624,11 +869,48 @@ export default function SettingsPage() {
                                     }
                                     setUploadingKYC(prev => ({ ...prev, passport: true }))
                                     try {
+                                      // If replacing an existing document, get old fileId and size for deletion
+                                      const oldFileId = kycDocumentFileIds.passport
+                                      const oldSize = kycDocumentSizes.passport
+                                      
                                       const result = await uploadToImageKit(file, 'kyc', user.uid)
+                                      
+                                      // Update profile with new document URL, fileId, and size
                                       await userService.upsertProfile(user.uid, {
-                                        kycDocuments: { ...kycDocuments, passport: result.url }
+                                        kycDocuments: { 
+                                          ...kycDocuments, 
+                                          passport: result.url,
+                                          passportFileId: result.fileId,
+                                          passportSize: result.size
+                                        } as any
                                       })
                                       setKycDocuments(prev => ({ ...prev, passport: result.url }))
+                                      setKycDocumentFileIds(prev => ({ ...prev, passport: result.fileId || '' }))
+                                      setKycDocumentSizes(prev => ({ ...prev, passport: result.size || 0 }))
+                                      
+                                      // If replacing old document, delete it from ImageKit and reduce storage
+                                      if (oldFileId && oldSize > 0) {
+                                        try {
+                                          const token = await auth.currentUser?.getIdToken()
+                                          if (token) {
+                                            await fetch(`/api/delete-image?fileId=${encodeURIComponent(oldFileId)}`, {
+                                              method: 'DELETE',
+                                              headers: { 'Authorization': `Bearer ${token}` }
+                                            })
+                                            await fetch('/api/user/update-storage', {
+                                              method: 'POST',
+                                              headers: {
+                                                'Content-Type': 'application/json',
+                                                'Authorization': `Bearer ${token}`
+                                              },
+                                              body: JSON.stringify({ additionalBytes: -oldSize })
+                                            })
+                                          }
+                                        } catch (deleteError) {
+                                          console.error('Error deleting old document:', deleteError)
+                                        }
+                                      }
+                                      
                                       toast.success("Passport uploaded successfully")
                                       await refetchProfile()
                                     } catch (error) {
@@ -669,24 +951,91 @@ export default function SettingsPage() {
                                     variant="outline"
                                     size="sm"
                                     onClick={async () => {
+                                      console.log('🗑️ DELETE KYC DRIVER LICENSE CLICKED')
                                       if (!user?.uid) return
-                                      setUploadingKYC(prev => ({ ...prev, driverLicense: true }))
+                                      
+                                      let fileId = kycDocumentFileIds.driverLicense
+                                      let fileSize = kycDocumentSizes.driverLicense
+                                      const documentUrl = kycDocuments.driverLicense
+                                      
+                                      // If fileId is missing but we have a URL, try to get fileId from ImageKit
+                                      if (!fileId && documentUrl && documentUrl.includes('imagekit.io')) {
+                                        try {
+                                          const token = await auth.currentUser?.getIdToken()
+                                          if (token) {
+                                            const getFileResponse = await fetch(`/api/get-image-fileid?url=${encodeURIComponent(documentUrl)}`, {
+                                              method: 'GET',
+                                              headers: { 'Authorization': `Bearer ${token}` }
+                                            })
+                                            if (getFileResponse.ok) {
+                                              const fileData = await getFileResponse.json()
+                                              if (fileData.fileId) {
+                                                fileId = fileData.fileId
+                                                fileSize = fileData.size || fileSize
+                                              }
+                                            }
+                                          }
+                                        } catch (getFileError) {
+                                          console.warn('Could not get fileId from ImageKit:', getFileError)
+                                        }
+                                      }
+                                      
+                                      setDeletingKYC(prev => ({ ...prev, driverLicense: true }))
                                       try {
+                                        // Delete from ImageKit if fileId exists
+                                        if (fileId) {
+                                          const token = await auth.currentUser?.getIdToken()
+                                          if (token) {
+                                            await fetch(`/api/delete-image?fileId=${encodeURIComponent(fileId)}`, {
+                                              method: 'DELETE',
+                                              headers: { 'Authorization': `Bearer ${token}` }
+                                            })
+                                          }
+                                        }
+                                        
+                                        // Reduce storage if size is known
+                                        if (fileSize > 0) {
+                                          const token = await auth.currentUser?.getIdToken()
+                                          if (token) {
+                                            await fetch('/api/user/update-storage', {
+                                              method: 'POST',
+                                              headers: {
+                                                'Content-Type': 'application/json',
+                                                'Authorization': `Bearer ${token}`
+                                              },
+                                              body: JSON.stringify({ additionalBytes: -fileSize })
+                                            })
+                                          }
+                                        }
+                                        
                                         await userService.upsertProfile(user.uid, {
-                                          kycDocuments: { ...kycDocuments, driverLicense: '' }
+                                          kycDocuments: { 
+                                            ...kycDocuments, 
+                                            driverLicense: '',
+                                            driverLicenseFileId: '',
+                                            driverLicenseSize: 0
+                                          } as any
                                         })
                                         setKycDocuments(prev => ({ ...prev, driverLicense: '' }))
+                                        setKycDocumentFileIds(prev => ({ ...prev, driverLicense: '' }))
+                                        setKycDocumentSizes(prev => ({ ...prev, driverLicense: 0 }))
                                         toast.success("Document removed")
                                         await refetchProfile()
                                       } catch (error) {
+                                        console.error('Error removing driver license:', error)
                                         toast.error("Failed to remove document")
                                       } finally {
-                                        setUploadingKYC(prev => ({ ...prev, driverLicense: false }))
+                                        setDeletingKYC(prev => ({ ...prev, driverLicense: false }))
                                       }
                                     }}
+                                    disabled={deletingKYC.driverLicense}
                                     className="h-7 sm:h-8 w-7 sm:w-8 p-0"
                                   >
-                                    <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    {deletingKYC.driverLicense ? (
+                                      <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
+                                    ) : (
+                                      <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                    )}
                                   </Button>
                                 </div>
                               </div>
@@ -941,9 +1290,38 @@ export default function SettingsPage() {
                         <div className="space-y-2 sm:space-y-3">
                           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2">
                             <Label className="text-sm sm:text-base">Monthly Transactions</Label>
-                            <span className="text-xs sm:text-sm font-semibold">
-                              {profile.transactionCount || 0} / {userService.getTransactionLimit(profile.subscriptionType || null) === Infinity ? '∞' : userService.getTransactionLimit(profile.subscriptionType || null)}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs sm:text-sm font-semibold">
+                                {profile.transactionCount || 0} / {userService.getTransactionLimit(profile.subscriptionType || null) === Infinity ? '∞' : userService.getTransactionLimit(profile.subscriptionType || null)}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={async () => {
+                                  if (!user?.uid) return
+                                  setIsSaving(true)
+                                  try {
+                                    const result = await userService.syncTransactionCount(user.uid)
+                                    if (result.success) {
+                                      toast.success(result.message || 'Transaction count synced successfully')
+                                      await refetchProfile()
+                                    } else {
+                                      toast.error(result.error || 'Failed to sync transaction count')
+                                    }
+                                  } catch (error) {
+                                    console.error('Error syncing transaction count:', error)
+                                    toast.error('Failed to sync transaction count')
+                                  } finally {
+                                    setIsSaving(false)
+                                  }
+                                }}
+                                disabled={isSaving}
+                                className="h-6 w-6 p-0"
+                                title="Sync transaction count"
+                              >
+                                <Loader2 className={`h-3 w-3 ${isSaving ? 'animate-spin' : ''}`} />
+                              </Button>
+                            </div>
                           </div>
                           {userService.getTransactionLimit(profile.subscriptionType || null) !== Infinity && (
                             <Progress 

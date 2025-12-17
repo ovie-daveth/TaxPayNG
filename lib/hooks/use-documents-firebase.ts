@@ -143,14 +143,22 @@ export function useDocumentsFirebase() {
 
   // Delete a document
   const deleteDocument = useCallback(async (doc: Document) => {
+    console.log('deleteDocument called with:', { docId: doc.id, docName: doc.name, userId: user?.uid })
     try {
       if (user) {
         // Use Firebase service when user is authenticated
+        console.log('Calling documentService.deleteDocument...')
         const result = await documentService.deleteDocument(doc.id, user.uid)
+        console.log('documentService.deleteDocument result:', result)
+        
         if (result.success) {
           setDocuments(prev => prev.filter(d => d.id !== doc.id))
           console.log('Document deleted from Firebase successfully:', doc.id)
+          
+          // Refresh profile to update storage display
+          window.dispatchEvent(new CustomEvent('profileUpdated'))
         } else {
+          console.error('Delete failed:', result.error)
           throw new Error(result.error || 'Delete failed')
         }
       } else {
@@ -167,6 +175,7 @@ export function useDocumentsFirebase() {
     } catch (err) {
       console.error('Error deleting document:', err)
       setError('Failed to delete document')
+      throw err // Re-throw so UI can show error
     }
   }, [user, documents, saveDocuments])
 

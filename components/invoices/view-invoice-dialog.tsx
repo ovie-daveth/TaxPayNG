@@ -41,6 +41,7 @@ export function ViewInvoiceDialog({
   const [isMarkingPaid, setIsMarkingPaid] = useState(false)
   const [showPaymentForm, setShowPaymentForm] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
+  const [showReceiptModal, setShowReceiptModal] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState("")
   const [paymentReference, setPaymentReference] = useState("")
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
@@ -63,6 +64,8 @@ export function ViewInvoiceDialog({
   const [itemCurrencies, setItemCurrencies] = useState<Record<string, CurrencyCode>>({})
   // Store converted amounts in base currency for each item
   const [itemConvertedAmounts, setItemConvertedAmounts] = useState<Record<string, number>>({})
+  const [shouldSaveReceipt, setShouldSaveReceipt] = useState(false)
+  const [isSavingReceipt, setIsSavingReceipt] = useState(false)
 
   // Check if user can view this invoice (must be sender OR recipient)
   const isSender = invoice && profile?.userId && invoice.userId === profile.userId
@@ -537,7 +540,7 @@ export function ViewInvoiceDialog({
       setIsUploadingReceipt(true)
       
       // Upload to ImageKit
-      const result = await uploadToImageKit(file, 'invoices/receipts')
+      const result = await uploadToImageKit(file, 'invoices/receipts', user?.uid)
       
       // Store the upload result (includes size)
       setReceiptUploadResult(result)
@@ -610,6 +613,7 @@ export function ViewInvoiceDialog({
             name: `Invoice Payment Receipt - ${invoice.invoiceNumber}`,
             type: "receipt",
             imageKitUrl: receiptUrl,
+            imageKitFileId: uploadResult.fileId, // Store fileId for deletion
             fileSize: uploadResult.size, // Use size from ImageKit upload result
             date: new Date().toISOString(),
             notes: `Invoice: ${invoice.invoiceNumber}, Payment Method: ${paymentMethod || 'N/A'}, Reference: ${paymentReference || 'N/A'}`,
@@ -651,52 +655,119 @@ export function ViewInvoiceDialog({
     }
   }
 
+  const handleSaveReceiptToDocuments = async () => {
+    if (!invoice?.clientReceiptUrl || !user?.uid) return
+
+    setIsSavingReceipt(true)
+    try {
+      // Get auth token for API request
+      const authToken = await user?.getIdToken()
+      
+      // Fetch fileId and size from ImageKit using the receipt URL
+      const response = await fetch(`/api/get-image-fileid?url=${encodeURIComponent(invoice.clientReceiptUrl)}`, {
+        headers: {
+          ...(authToken && { 'Authorization': `Bearer ${authToken}` })
+        }
+      })
+      if (!response.ok) {
+        throw new Error('Failed to fetch receipt details')
+      }
+
+      const data = await response.json()
+      if (!data.success || !data.fileId || !data.size) {
+        throw new Error('Receipt details not found')
+      }
+
+      // Create a mock file object for documentService
+      const fileName = invoice.clientReceiptUrl.split('/').pop() || `receipt-${invoice.invoiceNumber}.pdf`
+      const mockFile = new File([''], fileName, { type: 'application/pdf' })
+
+      // Save receipt to document database
+      const result = await documentService.uploadDocument(user.uid, {
+        file: mockFile,
+        name: `Invoice Payment Receipt - ${invoice.invoiceNumber}`,
+        type: "receipt",
+        imageKitUrl: invoice.clientReceiptUrl,
+        imageKitFileId: data.fileId,
+        fileSize: data.size,
+        date: invoice.clientPaidAt || new Date().toISOString(),
+        notes: `Invoice: ${invoice.invoiceNumber}, Payment Method: ${invoice.clientPaymentMethod || 'N/A'}, Reference: ${invoice.clientPaymentReference || 'N/A'}`,
+        linkedTransaction: invoice.linkedTransactionId || undefined
+      })
+
+      if (result.success) {
+        // Explicitly update storage since this file was uploaded by the client, not the sender
+        // The documentService assumes storage was already updated, but in this case it wasn't
+        try {
+          const authToken = await user?.getIdToken()
+          const storageResponse = await fetch('/api/user/update-storage', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(authToken && { 'Authorization': `Bearer ${authToken}` })
+            },
+            body: JSON.stringify({
+              additionalBytes: data.size
+            })
+          })
+
+          if (!storageResponse.ok) {
+            console.error('Failed to update storage, but document was saved')
+          }
+        } catch (storageError) {
+          console.error('Error updating storage:', storageError)
+          // Don't fail the whole operation if storage update fails
+        }
+
+        toast.success("Receipt saved to documents")
+        setShouldSaveReceipt(false)
+      } else {
+        toast.error(result.error || "Failed to save receipt")
+      }
+    } catch (error) {
+      console.error("Error saving receipt to documents:", error)
+      toast.error("Failed to save receipt to documents")
+    } finally {
+      setIsSavingReceipt(false)
+    }
+  }
+
   const handleConfirmPaymentReceived = async (e?: React.MouseEvent) => {
     // Prevent default dialog close behavior
     e?.preventDefault()
     e?.stopPropagation()
     
-    console.log("handleConfirmPaymentReceived called", { 
-      hasProfile: !!profile?.userId, 
-      hasInvoice: !!invoice,
-      invoiceUserId: invoice?.userId,
-      profileUserId: profile?.userId,
-      isMarkingPaid 
-    })
-    
     if (!profile?.userId || !invoice) {
-      console.log("Early return: missing profile or invoice")
       return
     }
 
     // This function is only for issuers (senders)
     if (invoice.userId !== profile.userId) {
-      console.log("Early return: user is not the issuer")
       toast.error("Only the issuer can confirm payment received")
       return
     }
 
     // Don't proceed if already processing
     if (isMarkingPaid) {
-      console.log("Early return: already processing")
       return
     }
 
     try {
-      console.log("Setting isMarkingPaid to true")
       setIsMarkingPaid(true)
 
       const result = await invoiceService.confirmPaymentReceived(
         invoice.id,
-        profile.userId,
-        paymentMethod || undefined,
-        paymentReference || undefined
+        profile.userId
       )
 
       if (result.success) {
+        // Save receipt to document database if user chose to save it
+        if (shouldSaveReceipt && invoice.clientReceiptUrl && user?.uid) {
+          await handleSaveReceiptToDocuments()
+        }
+
         toast.success("Payment confirmed and transaction created")
-        setPaymentMethod("")
-        setPaymentReference("")
+        setShouldSaveReceipt(false)
         onInvoiceUpdated?.()
         // Close confirmation modal first
         setShowConfirmDialog(false)
@@ -1890,7 +1961,7 @@ export function ViewInvoiceDialog({
                                     setReceiptFile(file)
                                     setIsUploadingReceipt(true)
                                     try {
-                                      const result = await uploadToImageKit(file, 'invoices/receipts')
+                                      const result = await uploadToImageKit(file, 'invoices/receipts', user?.uid)
                                       ;(file as any).imageKitUrl = result.url
                                       ;(file as any).uploadResult = result
                                       setReceiptUploadResult(result)
@@ -2099,10 +2170,45 @@ export function ViewInvoiceDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Receipt Viewer Modal */}
+    <Dialog open={showReceiptModal} onOpenChange={setShowReceiptModal}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Payment Receipt</DialogTitle>
+        </DialogHeader>
+        {invoice?.clientReceiptUrl && (
+          <div className="flex items-center justify-center p-4">
+            {invoice.clientReceiptUrl.match(/\.(pdf)$/i) ? (
+              <iframe
+                src={invoice.clientReceiptUrl}
+                className="w-full h-[70vh] border rounded-lg"
+                title="Receipt PDF"
+              />
+            ) : (
+              <img
+                src={invoice.clientReceiptUrl}
+                alt="Payment Receipt"
+                className="max-w-full max-h-[70vh] object-contain rounded-lg"
+              />
+            )}
+          </div>
+        )}
+        <div className="flex justify-end pt-4">
+          <Button onClick={() => setShowReceiptModal(false)}>
+            Close
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+
     {/* Confirmation Dialog for Outgoing Invoices */}
     <Dialog open={showConfirmDialog} onOpenChange={(open) => {
       if (!isMarkingPaid) {
         setShowConfirmDialog(open)
+        if (!open) {
+          setShouldSaveReceipt(false)
+        }
       }
     }}>
       <DialogContent className="max-w-md">
@@ -2114,12 +2220,58 @@ export function ViewInvoiceDialog({
             Are you sure you have received payment for this invoice? This will mark the invoice as paid and create a transaction record.
           </p>
           
+          {/* Show existing receipt if available */}
+          {invoice?.clientReceiptUrl && (
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold">Payment Receipt</Label>
+              <div className="border rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Receipt className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-xs text-muted-foreground">Receipt uploaded by client</span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowReceiptModal(true)}
+                    className="h-7 text-xs"
+                  >
+                    <ExternalLink className="h-3 w-3 mr-1" />
+                    View
+                  </Button>
+                </div>
+                {invoice.clientPaymentMethod && (
+                  <p className="text-xs text-muted-foreground">
+                    Method: {invoice.clientPaymentMethod}
+                  </p>
+                )}
+                {invoice.clientPaymentReference && (
+                  <p className="text-xs text-muted-foreground">
+                    Reference: {invoice.clientPaymentReference}
+                  </p>
+                )}
+                <div className="flex items-center gap-2 pt-2 border-t">
+                  <Checkbox
+                    id="save-receipt"
+                    checked={shouldSaveReceipt}
+                    onCheckedChange={(checked) => setShouldSaveReceipt(!!checked)}
+                    disabled={isMarkingPaid || isSavingReceipt}
+                  />
+                  <Label htmlFor="save-receipt" className="text-xs cursor-pointer">
+                    Save receipt to my documents
+                  </Label>
+                </div>
+              </div>
+            </div>
+          )}
+          
           <div className="flex gap-3 justify-end pt-4">
             <Button
               variant="outline"
               onClick={() => {
                 if (!isMarkingPaid) {
                   setShowConfirmDialog(false)
+                  setShouldSaveReceipt(false)
                 }
               }}
               disabled={isMarkingPaid}
@@ -2128,15 +2280,15 @@ export function ViewInvoiceDialog({
             </Button>
             <Button
               onClick={handleConfirmPaymentReceived}
-              disabled={isMarkingPaid}
+              disabled={isMarkingPaid || isSavingReceipt}
             >
-              {isMarkingPaid ? (
+              {isMarkingPaid || isSavingReceipt ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Processing...
                 </>
               ) : (
-                "Yes, Confirm Payment"
+                "Confirm Payment"
               )}
             </Button>
           </div>

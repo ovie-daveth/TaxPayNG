@@ -29,9 +29,6 @@ export function SubscriptionRequiredModal({
   const [showMigrationModal, setShowMigrationModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
 
-  // Debug: Log businessType on mount and when it changes
-  console.log('SubscriptionRequiredModal render:', { open, businessType, showMigrationModal, selectedPlan })
-
   const getAvailablePlans = (): SubscriptionType[] => {
     if (businessType === 'sme') {
       return ['Small Business', 'Big Business']

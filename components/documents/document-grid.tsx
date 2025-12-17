@@ -108,8 +108,10 @@ export function DocumentGrid({ documents, onView, onDownload, onDelete }: Docume
   }
 
   const openDeleteModal = (document: Document) => {
+    console.log('🔵 openDeleteModal called for document:', { id: document.id, name: document.name })
     setDocumentToDelete(document)
     setIsDeleteModalOpen(true)
+    console.log('🔵 Modal state set, isDeleteModalOpen should be true')
   }
 
   const closeDeleteModal = () => {
@@ -120,14 +122,21 @@ export function DocumentGrid({ documents, onView, onDownload, onDelete }: Docume
   }
 
   const handleDeleteConfirm = async () => {
-    if (!documentToDelete) return
+    if (!documentToDelete) {
+      console.warn('handleDeleteConfirm called but documentToDelete is null')
+      return
+    }
     
+    console.log('handleDeleteConfirm called for document:', { id: documentToDelete.id, name: documentToDelete.name })
     setIsDeleting(true)
     try {
+      console.log('Calling onDelete with id:', documentToDelete.id)
       await onDelete(documentToDelete.id)
+      console.log('onDelete completed successfully')
       closeDeleteModal()
     } catch (error) {
       console.error('Failed to delete document:', error)
+      throw error // Re-throw so parent can handle it
     } finally {
       setIsDeleting(false)
     }
@@ -168,7 +177,12 @@ export function DocumentGrid({ documents, onView, onDownload, onDelete }: Docume
                 </DropdownMenuItem>
                 <DropdownMenuItem 
                   className="text-destructive"
-                  onClick={() => openDeleteModal(doc)}
+                  onClick={(e) => {
+                    console.log('🚨 DELETE BUTTON CLICKED in DocumentGrid:', { docId: doc.id, docName: doc.name })
+                    e.preventDefault()
+                    e.stopPropagation()
+                    openDeleteModal(doc)
+                  }}
                 >
                   <Trash2 className="w-4 h-4 mr-2" />
                   Delete

@@ -221,6 +221,121 @@ export class UserService extends BaseService {
     }
   }
 
+  // Decrement transaction count
+  async decrementTransactionCount(userId: string): Promise<ApiResponse<UserProfile>> {
+    try {
+      const profile = await this.getProfile(userId)
+      if (!profile) {
+        return {
+          success: false,
+          error: 'User profile not found'
+        }
+      }
+
+      // Reset count if new month (don't decrement if it's a new month)
+      await this.resetTransactionCountIfNeeded(userId, profile)
+      
+      // Get fresh profile after potential reset
+      const currentProfile = await this.getProfile(userId)
+      if (!currentProfile) {
+        return {
+          success: false,
+          error: 'User profile not found'
+        }
+      }
+
+      const newCount = Math.max(0, (currentProfile.transactionCount || 0) - 1) // Ensure it doesn't go below 0
+      await this.update(currentProfile.id, {
+        transactionCount: newCount,
+        updatedAt: new Date().toISOString()
+      })
+
+      const updatedProfile = await this.getById(currentProfile.id)
+      return {
+        success: true,
+        data: updatedProfile,
+        message: 'Transaction count updated'
+      }
+    } catch (error) {
+      console.error('Error decrementing transaction count:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      }
+    }
+  }
+
+  // Sync transaction count by calculating from actual transactions
+  // This is useful for fixing discrepancies between count and actual transactions
+  async syncTransactionCount(userId: string): Promise<ApiResponse<UserProfile>> {
+    try {
+      const profile = await this.getProfile(userId)
+      if (!profile) {
+        return {
+          success: false,
+          error: 'User profile not found'
+        }
+      }
+
+      // Reset count if new month first
+      await this.resetTransactionCountIfNeeded(userId, profile)
+      
+      // Get fresh profile after potential reset
+      const currentProfile = await this.getProfile(userId)
+      if (!currentProfile) {
+        return {
+          success: false,
+          error: 'User profile not found'
+        }
+      }
+
+      // Import transactionService dynamically to avoid circular dependency
+      const { transactionService } = await import('./transactionService')
+      
+      // Get all transactions for the current month
+      const resetDate = currentProfile.transactionCountResetDate 
+        ? new Date(currentProfile.transactionCountResetDate) 
+        : new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+      
+      const startOfMonth = resetDate.toISOString().split('T')[0]
+      const endOfMonth = new Date(resetDate.getFullYear(), resetDate.getMonth() + 1, 0).toISOString().split('T')[0]
+      
+      // Get all transactions for this user
+      const allTransactions = await transactionService.getAll([
+        { field: 'userId', operator: '==', value: userId }
+      ])
+
+      // Filter transactions for the current month (client-side since Firestore date queries can be tricky)
+      const monthTransactions = allTransactions.filter(txn => {
+        const txnDate = txn.date || txn.createdAt
+        if (!txnDate) return false
+        const dateStr = typeof txnDate === 'string' ? txnDate.split('T')[0] : txnDate
+        return dateStr >= startOfMonth && dateStr <= endOfMonth
+      })
+
+      const actualCount = monthTransactions.length
+
+      // Update profile with actual count
+      await this.update(currentProfile.id, {
+        transactionCount: actualCount,
+        updatedAt: new Date().toISOString()
+      })
+
+      const updatedProfile = await this.getById(currentProfile.id)
+      return {
+        success: true,
+        data: updatedProfile,
+        message: `Transaction count synced: ${actualCount} transactions`
+      }
+    } catch (error) {
+      console.error('Error syncing transaction count:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred'
+      }
+    }
+  }
+
   // Update storage used (can be positive for adding, negative for removing)
   async updateStorageUsed(userId: string, additionalBytes: number): Promise<ApiResponse<UserProfile>> {
     try {

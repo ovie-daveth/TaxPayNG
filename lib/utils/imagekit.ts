@@ -39,6 +39,7 @@ export async function uploadToImageKit(file: File, folder: string = 'transaction
         fileName: file.name,
         folder,
         useUniqueFileName: true,
+        originalFileSize: file.size, // Pass original file size as fallback
         ...(userId && { userId })
       })
     })
