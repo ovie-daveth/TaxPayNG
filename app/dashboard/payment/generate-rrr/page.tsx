@@ -438,7 +438,7 @@ export default function GenerateRRRPage() {
                     </Button>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '200ms' }}>
+                  <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3 md:gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500" style={{ animationDelay: '200ms' }}>
                     <div className="p-3 sm:p-4 bg-muted rounded-lg">
                       <p className="text-xs sm:text-sm text-muted-foreground mb-1">Amount</p>
                       <p className="text-base sm:text-lg md:text-xl font-semibold truncate">₦{rrrData.amount.toLocaleString()}</p>

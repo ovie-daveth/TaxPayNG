@@ -435,7 +435,7 @@ export default function GenerateRRRPage() {
                       </p>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 gap-4 text-sm">
                       <div>
                         <Label className="text-muted-foreground">Validity</Label>
                         <p className="font-medium">{new Date(rrrData.validity).toLocaleDateString()}</p>

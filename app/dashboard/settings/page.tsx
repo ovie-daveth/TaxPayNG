@@ -30,6 +30,7 @@ import { ChangePlanModal } from "@/components/subscription/change-plan-modal"
 import { MigrateToCreatorModal } from "@/components/subscription/migrate-to-creator-modal"
 import { OneTouchResubscribeButton } from "@/components/subscription/one-touch-resubscribe-button"
 import { SubscriptionType } from "@/lib/types"
+import { useSidebar } from "@/lib/contexts/sidebar-context"
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -37,6 +38,7 @@ export default function SettingsPage() {
   const { user, loading: authLoading } = useAuth()
   const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
   const { isSubscribed, subscriptionType, isExpired, isExpiringSoon, subscriptionExpiryDate } = useSubscription()
+  const { sidebarCollapsed } = useSidebar()
   const [isSaving, setIsSaving] = useState(false)
   const [processingSubscription, setProcessingSubscription] = useState<string | null>(null)
   const [showChangePlanModal, setShowChangePlanModal] = useState(false)
@@ -358,7 +360,7 @@ export default function SettingsPage() {
                     </p>
                   </div>
           <div className="space-y-4 sm:space-y-5 md:space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
                   <div className="space-y-1.5 sm:space-y-2">
                     <Label htmlFor="firstName" className="text-xs sm:text-sm">First Name</Label>
                         <Input 
@@ -378,7 +380,7 @@ export default function SettingsPage() {
                         />
                   </div>
                 </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
                   <div className="space-y-1.5 sm:space-y-2">
                     <Label htmlFor="email" className="text-xs sm:text-sm">Email</Label>
                         <Input id="email" type="email" defaultValue={profile?.email || ""} disabled className="h-9 sm:h-10 text-xs sm:text-sm" />
@@ -394,7 +396,7 @@ export default function SettingsPage() {
                         />
                   </div>
                 </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
                   <div className="space-y-1.5 sm:space-y-2">
                     <Label htmlFor="tin" className="text-xs sm:text-sm">Tax Identification Number</Label>
                         <Input 
@@ -420,7 +422,7 @@ export default function SettingsPage() {
                           className="h-9 sm:h-10 text-xs sm:text-sm"
                         />
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
                         <div className="space-y-1.5 sm:space-y-2">
                           <Label htmlFor="city" className="text-xs sm:text-sm">City</Label>
                           <Input 
@@ -446,7 +448,7 @@ export default function SettingsPage() {
                           />
                         </div>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
+                      <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
                         <div className="space-y-1.5 sm:space-y-2">
                           <Label htmlFor="country" className="text-xs sm:text-sm">Country</Label>
                           <Input 
@@ -481,7 +483,7 @@ export default function SettingsPage() {
                           Upload your identity documents for verification (ID, Passport, or Driver's License)
                         </p>
                       </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
                         {/* National ID */}
                         <div className="space-y-1.5 sm:space-y-2">
                           <Label className="text-xs sm:text-sm">National ID / Voter's Card</Label>
@@ -540,7 +542,7 @@ export default function SettingsPage() {
                                     }
                                     setUploadingKYC(prev => ({ ...prev, id: true }))
                                     try {
-                                      const result = await uploadToImageKit(file, 'kyc')
+                                      const result = await uploadToImageKit(file, 'kyc', user.uid)
                                       await userService.upsertProfile(user.uid, {
                                         kycDocuments: { ...kycDocuments, id: result.url }
                                       })
@@ -548,7 +550,8 @@ export default function SettingsPage() {
                                       toast.success("ID document uploaded successfully")
                                       await refetchProfile()
                                     } catch (error) {
-                                      toast.error("Failed to upload document")
+                                      console.error("Upload error:", error)
+                                      toast.error(error instanceof Error ? error.message : "Failed to upload document")
                                     } finally {
                                       setUploadingKYC(prev => ({ ...prev, id: false }))
                                       // Reset the input so the same file can be selected again if needed
@@ -621,7 +624,7 @@ export default function SettingsPage() {
                                     }
                                     setUploadingKYC(prev => ({ ...prev, passport: true }))
                                     try {
-                                      const result = await uploadToImageKit(file, 'kyc')
+                                      const result = await uploadToImageKit(file, 'kyc', user.uid)
                                       await userService.upsertProfile(user.uid, {
                                         kycDocuments: { ...kycDocuments, passport: result.url }
                                       })
@@ -629,7 +632,8 @@ export default function SettingsPage() {
                                       toast.success("Passport uploaded successfully")
                                       await refetchProfile()
                                     } catch (error) {
-                                      toast.error("Failed to upload document")
+                                      console.error("Upload error:", error)
+                                      toast.error(error instanceof Error ? error.message : "Failed to upload document")
                                     } finally {
                                       setUploadingKYC(prev => ({ ...prev, passport: false }))
                                       // Reset the input so the same file can be selected again if needed
@@ -702,7 +706,7 @@ export default function SettingsPage() {
                                     }
                                     setUploadingKYC(prev => ({ ...prev, driverLicense: true }))
                                     try {
-                                      const result = await uploadToImageKit(file, 'kyc')
+                                      const result = await uploadToImageKit(file, 'kyc', user.uid)
                                       await userService.upsertProfile(user.uid, {
                                         kycDocuments: { ...kycDocuments, driverLicense: result.url }
                                       })
@@ -710,7 +714,8 @@ export default function SettingsPage() {
                                       toast.success("Driver's License uploaded successfully")
                                       await refetchProfile()
                                     } catch (error) {
-                                      toast.error("Failed to upload document")
+                                      console.error("Upload error:", error)
+                                      toast.error(error instanceof Error ? error.message : "Failed to upload document")
                                     } finally {
                                       setUploadingKYC(prev => ({ ...prev, driverLicense: false }))
                                       // Reset the input so the same file can be selected again if needed
@@ -817,7 +822,7 @@ export default function SettingsPage() {
               <TabsContent value="subscription" className="mt-0">
                 <Card className="p-4 sm:p-6 md:p-8">
                   <div className="mb-4 sm:mb-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 lg:gap-4">
                       <div>
                         <h2 className="text-lg sm:text-xl md:text-2xl font-semibold">Subscription & Limits</h2>
                         <p className="text-xs sm:text-sm text-muted-foreground mt-1">
@@ -867,7 +872,7 @@ export default function SettingsPage() {
                           <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
                             Select a plan to unlock all features and start managing your taxes efficiently.
                           </p>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+                          <div className={`grid gap-3 sm:gap-4 ${!sidebarCollapsed ? 'grid-cols-1 md:grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
                             {(() => {
                               // Get plans based on business type
                               const availablePlans = profile?.businessType === 'sme' 

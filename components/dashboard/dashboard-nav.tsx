@@ -43,18 +43,18 @@ export function DashboardNav() {
       case "/dashboard":
         return { icon: Plus, action: () => router.push("/dashboard/payment"), show: true }
       case "/dashboard/transactions":
-        return { icon: Receipt, action: () => {}, show: true }
+        return { icon: Plus, action: () => {}, show: true }
       case "/dashboard/invoices":
-        return { icon: FileCheck, action: () => {
+        return { icon: Plus, action: () => {
           const event = new CustomEvent('createInvoice')
           window.dispatchEvent(event)
         }, show: true }
       case "/dashboard/documents":
-        return { icon: FileText, action: () => {}, show: true }
+        return { icon: Plus, action: () => {}, show: true }
       case "/dashboard/reminders":
-        return { icon: Bell, action: () => {}, show: true }
+        return { icon: Plus, action: () => {}, show: true }
       case "/dashboard/reports":
-        return { icon: BarChart3, action: () => router.push("/dashboard/reports/generate/self-assessment"), show: true }
+        return { icon: Plus, action: () => router.push("/dashboard/reports/generate/self-assessment"), show: true }
       case "/dashboard/payment":
         return { icon: Plus, action: () => router.push("/dashboard/payment/add"), show: true }
       default:

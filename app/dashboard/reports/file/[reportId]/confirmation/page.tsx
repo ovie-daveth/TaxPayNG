@@ -179,7 +179,7 @@ Generated: ${new Date().toISOString()}
               <CardDescription>Your tax return filing details</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 gap-4 text-sm">
                 <div>
                   <Label className="text-muted-foreground">Return Year</Label>
                   <p className="font-semibold">{report.reportData?.period?.year || 'N/A'}</p>

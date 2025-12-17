@@ -151,7 +151,7 @@ export default function FilingRequestsPage() {
                       </code>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
                       <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
                         <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
                         <span className="text-xs sm:text-sm truncate">

@@ -15,6 +15,7 @@ import { useTransactions } from "@/lib/hooks/useTransactions"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useSubscription } from "@/lib/hooks/useSubscription"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { toast } from "sonner"
 
@@ -47,6 +48,7 @@ export function TransactionList({
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { isSubscribed, loading: subscriptionLoading } = useSubscription()
+  const { sidebarCollapsed } = useSidebar()
   const { createTransaction } = useTransactions(user?.uid || null)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
 
@@ -235,17 +237,17 @@ export function TransactionList({
   return (
     <Card className="overflow-hidden">
       {/* Desktop View */}
-      <div className="hidden md:block overflow-x-auto">
-        <table className="w-full">
+      <div className="hidden md:block overflow-x-auto w-full">
+        <table className={`w-full min-w-[900px]  ${!sidebarCollapsed ? 'lg:min-w-[1050px] md:min-w-[700px]' : 'lg:min-w-[800px] md:min-w-[580px]'}`}>
           <thead className="bg-muted/50 border-b border-border">
             <tr>
-              <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Date</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Description</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Category</th>
-              <th className="text-left py-3 px-4 text-sm font-medium text-muted-foreground">Payment Method</th>
-              <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Amount</th>
-              <th className="text-center py-3 px-4 text-sm font-medium text-muted-foreground">Status</th>
-              <th className="text-right py-3 px-4 text-sm font-medium text-muted-foreground">Actions</th>
+              <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[140px] md:w-[160px]">Date</th>
+              <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground min-w-[180px] md:min-w-[200px] lg:min-w-[220px]">Description</th>
+              <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[140px] md:w-[160px]">Category</th>
+              <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground hidden lg:table-cell w-[160px]">Payment Method</th>
+              <th className="text-right py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[140px] md:w-[160px]">Amount</th>
+              <th className="text-center py-3 md:py-4 lg:py-4 px-3 md:px-4 lg:px-5 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground hidden lg:table-cell w-[180px] md:w-[200px]">Status</th>
+              <th className="text-right py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[100px]">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -262,62 +264,50 @@ export function TransactionList({
                     animation: 'highlightFade 3s ease-out forwards'
                   } : undefined}
                 >
-                  <td className="py-4 px-4 text-sm">{formatDate(transaction.date)}</td>
-                  <td className="py-4 px-4">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${transaction.type === "income" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"
-                          }`}
-                      >
-                        {transaction.type === "income" ? (
-                          <ArrowUpRight className="w-4 h-4" />
-                        ) : (
-                          <ArrowDownRight className="w-4 h-4" />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-medium">{transaction.description.slice(0, 25)}</span>
-                        {transaction.attachments && transaction.attachments.length > 0 && (
-                          <button
-                            onClick={() => handleViewImages(transaction)}
-                            className="hover:bg-muted rounded p-1 transition-colors cursor-pointer"
-                            title={`View ${transaction.attachments.length} receipt(s)`}
-                          >
-                            <Paperclip className="w-3 h-3 text-muted-foreground hover:text-primary" />
-                          </button>
-                        )}
-                      </div>
+                  <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm align-top">{formatDate(transaction.date)}</td>
+                  <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 align-top">
+                    <div className="flex items-center gap-2 md:gap-2.5 min-w-0">
+                      <span className="text-xs md:text-sm lg:text-sm font-medium truncate">{transaction.description}</span>
+                      {transaction.attachments && transaction.attachments.length > 0 && (
+                        <button
+                          onClick={() => handleViewImages(transaction)}
+                          className="hover:bg-muted rounded p-1 md:p-1.5 transition-colors cursor-pointer flex-shrink-0"
+                          title={`View ${transaction.attachments.length} receipt(s)`}
+                        >
+                          <Paperclip className="w-3.5 h-3.5 md:w-4 md:h-4 text-muted-foreground hover:text-primary" />
+                        </button>
+                      )}
                     </div>
                   </td>
-                  <td className="py-4 px-4">
-                    <Badge variant="secondary" className="text-xs">
+                  <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 align-top">
+                    <Badge variant="secondary" className="text-xs md:text-sm">
                       {transaction.category}
                     </Badge>
                   </td>
-                  <td className="py-4 px-4 text-sm text-muted-foreground">{transaction.paymentMethod}</td>
-                  <td className="py-4 px-4 text-right">
+                  <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm text-muted-foreground hidden lg:table-cell align-top">{transaction.paymentMethod}</td>
+                  <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-right align-top">
                     <span
-                      className={`font-semibold ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}
+                      className={`text-xs md:text-sm lg:text-sm font-semibold whitespace-nowrap ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}
                     >
                       {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
                     </span>
                   </td>
-                  <td className="py-4 px-4 text-center">
+                  <td className="py-3 md:py-4 lg:py-4 px-3 md:px-4 lg:px-5 text-center hidden lg:table-cell align-top">
                     {transaction.taxDeductible ? (
-                      <Badge variant="outline" className="text-xs">
-                        Tax Deductible
+                      <Badge variant="outline" className="text-xs md:text-sm">
+                        Deductible
                       </Badge>
                     ) : (
-                      <Badge variant="outline" className="text-xs">
-                        Tax Non-deductible
+                      <Badge variant="outline" className="text-xs md:text-sm">
+                        Non-deductible
                       </Badge>
                     )}
                   </td>
-                  <td className="py-4 px-4 text-right">
+                  <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreVertical className="w-4 h-4" />
+                        <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8">
+                          <MoreVertical className="w-3.5 h-3.5 md:w-4 md:h-4" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">

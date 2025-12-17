@@ -290,7 +290,7 @@ export default function PaymentSuccessPage() {
               <CardDescription className="text-[11px] sm:text-xs md:text-sm mt-0.5 sm:mt-1">Download and save your payment receipt</CardDescription>
             </CardHeader>
             <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <Label className="text-[11px] sm:text-xs md:text-sm text-muted-foreground">RRR Number</Label>
                   <p className="font-mono font-semibold text-xs sm:text-sm md:text-base break-all sm:break-normal mt-0.5 sm:mt-1">{paymentData.rrr}</p>

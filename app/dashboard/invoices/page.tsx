@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { useSubscription } from "@/lib/hooks/useSubscription"
+import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -31,6 +32,7 @@ export default function InvoicesPage() {
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { isSubscribed } = useSubscription()
+  const { sidebarCollapsed } = useSidebar()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -543,7 +545,7 @@ console.log("invoices", invoices)
                     </div>
                     
                     {/* Content grid */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 md:gap-5">
+                    <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5">
                       {/* Client/From */}
                     <div>
                         <p className="text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
@@ -647,18 +649,18 @@ console.log("invoices", invoices)
         </div>
       ) : (
         <Card className="overflow-hidden">
-          <div className="overflow-x-auto -mx-3 sm:-mx-4 md:mx-0 px-3 sm:px-4 md:px-0">
-            <table className="w-full min-w-[600px] sm:min-w-[800px]">
+          <div className="overflow-x-auto w-full -mx-3 sm:-mx-4 md:mx-0 px-3 sm:px-4 md:px-0">
+            <table className={`w-full min-w-[600px] sm:min-w-[700px] md:min-w-[900px] ${!sidebarCollapsed ? 'lg:min-w-[1050px] md:min-w-[700px]' : 'lg:min-w-[800px] md:min-w-[580px]'}`}>
               <thead className="bg-muted/50 border-b border-border">
                 <tr>
-                  <th className="text-left p-2 sm:p-3 md:p-4 text-xs sm:text-sm font-semibold max-w-[120px] sm:max-w-none">Document</th>
-                  <th className="text-left p-2 sm:p-3 md:p-4 text-xs sm:text-sm font-semibold hidden sm:table-cell">Type</th>
-                  <th className="text-left p-2 sm:p-3 md:p-4 text-xs sm:text-sm font-semibold max-w-[120px] sm:max-w-none">{typeFilter === "incoming" ? "From" : typeFilter === "outgoing" ? "Client" : "Client/From"}</th>
-                  <th className="text-left p-2 sm:p-3 md:p-4 text-xs sm:text-sm font-semibold hidden md:table-cell">Issue Date</th>
-                  <th className="text-left p-2 sm:p-3 md:p-4 text-xs sm:text-sm font-semibold hidden md:table-cell">Due Date</th>
-                  <th className="text-left p-2 sm:p-3 md:p-4 text-xs sm:text-sm font-semibold">Status</th>
-                  <th className="text-right p-2 sm:p-3 md:p-4 text-xs sm:text-sm font-semibold">Amount</th>
-                  <th className="text-center p-2 sm:p-3 md:p-4 text-xs sm:text-sm font-semibold">Actions</th>
+                  <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-[10px] sm:text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[140px] md:w-[160px]">Document</th>
+                  <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-[10px] sm:text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[120px] md:w-[140px]">Type</th>
+                  <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-[10px] sm:text-xs md:text-sm lg:text-sm font-medium text-muted-foreground min-w-[140px] md:min-w-[160px] lg:min-w-[180px]">Client/From</th>
+                  <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-[10px] sm:text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[130px] md:w-[150px]">Issue Date</th>
+                  <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-[10px] sm:text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[130px] md:w-[150px]">Due Date</th>
+                  <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-[10px] sm:text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[100px] md:w-[120px]">Status</th>
+                  <th className="text-right py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-[10px] sm:text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[140px] md:w-[160px]">Amount</th>
+                  <th className="text-center py-3 md:py-4 lg:py-4 px-3 md:px-4 lg:px-5 text-[10px] sm:text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[100px]">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -670,43 +672,41 @@ console.log("invoices", invoices)
                   
                   return (
                     <tr key={invoice.id} className="border-b border-border hover:bg-muted/30 transition-colors">
-                      <td className="p-2 sm:p-3 md:p-4 max-w-[120px] sm:max-w-none">
-                        <div className="font-semibold text-xs sm:text-sm truncate font-medium" title={`${isIncoming ? 'Bill' : 'Invoice'} ${invoice.invoiceNumber}`}>
+                      <td className="p-2 sm:p-3 md:py-3 md:py-4 lg:py-4 px-2 sm:px-3 md:px-4 md:px-5 lg:px-6 align-top max-w-[120px] sm:max-w-none">
+                        <div className="font-semibold text-[10px] sm:text-xs md:text-sm lg:text-sm truncate font-medium" title={`${isIncoming ? 'Bill' : 'Invoice'} ${invoice.invoiceNumber}`}>
                           {isIncoming ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
                         </div>
                       </td>
-                      <td className="p-2 sm:p-3 md:p-4 hidden sm:table-cell">
-                        {invoice.status === "sent" && (
-                          <Badge variant="outline" className="text-xs">
-                            {isIncoming ? 'Incoming' : 'Outgoing'}
-                          </Badge>
-                        )}
+                      <td className="p-2 sm:p-3 md:py-3 md:py-4 lg:py-4 px-2 sm:px-3 md:px-4 md:px-5 lg:px-6 align-top">
+                        <Badge variant="outline" className="text-[10px] sm:text-xs md:text-sm">
+                          {isIncoming ? 'Incoming' : 'Outgoing'}
+                        </Badge>
                       </td>
-                      <td className="p-2 sm:p-3 md:p-4 max-w-[120px] sm:max-w-none">
+                      <td className="p-2 sm:p-3 md:py-3 md:py-4 lg:py-4 px-2 sm:px-3 md:px-4 md:px-5 lg:px-6 align-top max-w-[120px] sm:max-w-none">
                         <div>
-                          <p className="text-xs sm:text-sm font-medium truncate" title={isIncoming ? (invoice.supplier?.name || 'Unknown') : invoice.client.name}>
+                          <p className="text-[10px] sm:text-xs md:text-sm lg:text-sm font-medium truncate" title={isIncoming ? (invoice.supplier?.name || 'Unknown') : invoice.client.name}>
                             {isIncoming 
                               ? (invoice.supplier?.name || 'Unknown')
                               : invoice.client.name
                             }
                           </p>
                           {(isIncoming ? invoice.supplier?.email : invoice.client.email) && (
-                            <p className="text-xs text-muted-foreground truncate" title={isIncoming ? invoice.supplier?.email : invoice.client.email}>
+                            <p className="text-[9px] sm:text-xs md:text-xs lg:text-sm text-muted-foreground truncate mt-0.5" title={isIncoming ? invoice.supplier?.email : invoice.client.email}>
                               {isIncoming ? invoice.supplier?.email : invoice.client.email}
                             </p>
                           )}
                         </div>
                       </td>
-                      <td className="p-2 sm:p-3 md:p-4 text-xs sm:text-sm hidden md:table-cell">
+                      <td className="p-2 sm:p-3 md:py-3 md:py-4 lg:py-4 px-2 sm:px-3 md:px-4 md:px-5 lg:px-6 text-[10px] sm:text-xs md:text-sm lg:text-sm align-top whitespace-nowrap">
                         {format(new Date(invoice.issueDate), "MMM dd, yyyy")}
                       </td>
-                      <td className="p-2 sm:p-3 md:p-4 text-xs sm:text-sm hidden md:table-cell">
+                      <td className="p-2 sm:p-3 md:py-3 md:py-4 lg:py-4 px-2 sm:px-3 md:px-4 md:px-5 lg:px-6 text-[10px] sm:text-xs md:text-sm lg:text-sm align-top whitespace-nowrap">
                         {format(new Date(invoice.dueDate), "MMM dd, yyyy")}
                       </td>
-                      <td className="p-2 sm:p-3 md:p-4">
+                      <td className="p-2 sm:p-3 md:py-3 md:py-4 lg:py-4 px-2 sm:px-3 md:px-4 md:px-5 lg:px-6 align-top">
                         <Badge 
                           variant="outline" 
-                          className={`text-xs capitalize ${
+                          className={`text-[10px] sm:text-xs md:text-sm capitalize ${
                             paymentStatus === 'paid' 
                               ? 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20' 
                               : 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20'
@@ -715,26 +715,26 @@ console.log("invoices", invoices)
                           {paymentStatus}
                         </Badge>
                       </td>
-                      <td className="p-2 sm:p-3 md:p-4 text-right">
-                        <span className="font-semibold text-xs sm:text-sm whitespace-nowrap">
+                      <td className="p-2 sm:p-3 md:py-3 md:py-4 lg:py-4 px-2 sm:px-3 md:px-4 md:px-5 lg:px-6 text-right align-top whitespace-nowrap">
+                        <span className="font-semibold text-[10px] sm:text-xs md:text-sm lg:text-sm">
                           {invoice.currency} {invoice.total.toLocaleString()}
                         </span>
                       </td>
-                      <td className="p-2 sm:p-3 md:p-4">
-                        <div className="flex items-center justify-center gap-1 sm:gap-2">
+                      <td className="p-2 sm:p-3 md:py-3 md:py-4 lg:py-4 px-2 sm:px-3 md:px-3 md:px-4 lg:px-5 align-top">
+                        <div className="flex items-center justify-center gap-1 sm:gap-1.5 md:gap-1.5 lg:gap-2">
                           {invoice.whtCreditNote && (
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <Button 
                                   variant="ghost" 
                                   size="icon"
-                                  className="h-7 w-7 sm:h-8 sm:w-8"
+                                  className="h-7 w-7 sm:h-8 sm:w-8 md:h-8 md:w-8 lg:h-9 lg:w-9"
                                   onClick={() => {
                                     setSelectedInvoice(invoice)
                                     setShowCreditNoteDialog(true)
                                   }}
                                 >
-                                  <Receipt className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                  <Receipt className="w-3.5 h-3.5 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>
@@ -747,13 +747,13 @@ console.log("invoices", invoices)
                               <Button 
                                 variant="ghost" 
                                 size="icon"
-                                className="h-7 w-7 sm:h-8 sm:w-8"
+                                className="h-7 w-7 sm:h-8 sm:w-8 md:h-8 md:w-8 lg:h-9 lg:w-9"
                                 onClick={() => {
                                   setSelectedInvoice(invoice)
                                   setIsViewDialogOpen(true)
                                 }}
                               >
-                                <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                <Eye className="w-3.5 h-3.5 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" />
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>
@@ -766,10 +766,10 @@ console.log("invoices", invoices)
                                 <Button 
                                   variant="ghost" 
                                   size="icon"
-                                  className="h-7 w-7 sm:h-8 sm:w-8"
+                                  className="h-7 w-7 sm:h-8 sm:w-8 md:h-8 md:w-8 lg:h-9 lg:w-9"
                                   onClick={() => handleMarkAsSent(invoice.id)}
                                 >
-                                  <Send className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                  <Send className="w-3.5 h-3.5 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" />
                                 </Button>
                               </TooltipTrigger>
                               <TooltipContent>
@@ -785,7 +785,7 @@ console.log("invoices", invoices)
                                 className="h-7 w-7 sm:h-8 sm:w-8 text-destructive hover:text-destructive"
                                 onClick={() => handleDelete(invoice.id)}
                               >
-                                <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                                <Trash2 className="w-3.5 h-3.5 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" />
                               </Button>
                             </TooltipTrigger>
                             <TooltipContent>
@@ -882,7 +882,7 @@ console.log("invoices", invoices)
                   You can use this credit note to claim the withheld tax as a credit when filing your tax returns, reducing your overall tax liability.
                 </p>
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-xs text-muted-foreground">Credit Note Number</Label>
                   <p className="font-semibold">{selectedInvoice.whtCreditNote.creditNoteNumber}</p>

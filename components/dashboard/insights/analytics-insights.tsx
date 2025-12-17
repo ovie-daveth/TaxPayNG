@@ -25,6 +25,7 @@ interface AnalyticsInsightsProps {
   periodType?: PeriodType
   selectedYear?: number
   selectedQuarter?: number
+  sidebarCollapsed?: boolean
 }
 
 type InsightTone = "positive" | "warning" | "info"
@@ -160,7 +161,8 @@ export function AnalyticsInsights({
   useMockData = false,
   periodType = "year",
   selectedYear,
-  selectedQuarter
+  selectedQuarter,
+  sidebarCollapsed = true
 }: AnalyticsInsightsProps) {
   const { user } = useAuth()
   const now = new Date()
@@ -737,7 +739,7 @@ export function AnalyticsInsights({
         </Badge>
       </div>
 
-      <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
+      <div className={`grid gap-3 sm:gap-4 ${!sidebarCollapsed ? 'md:grid-cols-1' : 'md:grid-cols-2'}`}>
         {loading
           ? Array.from({ length: 4 }).map((_, index) => (
               <div key={index} className="border border-border rounded-xl p-4 space-y-3 animate-pulse">

@@ -57,6 +57,13 @@ export async function POST(request: NextRequest) {
   try {
     const { file, fileName, folder, useUniqueFileName, userId: providedUserId } = await request.json()
 
+    if (!file) {
+      return NextResponse.json(
+        { error: 'No file provided' },
+        { status: 400 }
+      )
+    }
+
     // Get userId from auth (preferred) or from request body (fallback)
     const authUserId = await getUserId(request)
     const userId = providedUserId || authUserId
@@ -64,29 +71,48 @@ export async function POST(request: NextRequest) {
     // Build the final folder path
     const finalFolder = buildFolderPath(userId, folder || 'documents')
 
-    const result = await imagekit.upload({
-      file,
-      fileName,
-      folder: finalFolder,
-      useUniqueFileName: useUniqueFileName !== false, // Default to true
-      overwriteFile: false,
-      overwriteAITags: false,
-      overwriteTags: false,
-      overwriteCustomMetadata: false
-    })
+    try {
+      const result = await imagekit.upload({
+        file,
+        fileName: fileName || 'upload',
+        folder: finalFolder,
+        useUniqueFileName: useUniqueFileName !== false, // Default to true
+        overwriteFile: false,
+        overwriteAITags: false,
+        overwriteTags: false,
+        overwriteCustomMetadata: false
+      })
 
-    return NextResponse.json({
-      url: result.url,
-      fileId: result.fileId,
-      name: result.name,
-      size: result.size,
-      thumbnailUrl: result.thumbnailUrl || result.url,
-      fileType: result.fileType // 'image' or 'video'
-    })
+      return NextResponse.json({
+        url: result.url,
+        fileId: result.fileId,
+        name: result.name,
+        size: result.size,
+        thumbnailUrl: result.thumbnailUrl || result.url,
+        fileType: result.fileType // 'image' or 'video'
+      })
+    } catch (imagekitError) {
+      console.error('ImageKit SDK error:', imagekitError)
+      const errorMessage = imagekitError instanceof Error ? imagekitError.message : 'ImageKit upload failed'
+      
+      // Check for specific ImageKit errors
+      if (errorMessage.includes('getaddrinfo') || errorMessage.includes('EAI_AGAIN')) {
+        return NextResponse.json(
+          { error: 'Network error: Unable to connect to ImageKit. Please check your internet connection and try again.' },
+          { status: 503 }
+        )
+      }
+      
+      return NextResponse.json(
+        { error: errorMessage },
+        { status: 500 }
+      )
+    }
   } catch (error) {
-    console.error('ImageKit upload error:', error)
+    console.error('Upload API error:', error)
+    const errorMessage = error instanceof Error ? error.message : 'Failed to upload file'
     return NextResponse.json(
-      { error: 'Failed to upload file' },
+      { error: errorMessage },
       { status: 500 }
     )
   }

@@ -5,16 +5,22 @@ import { StatsCards } from "@/components/dashboard/stats-cards"
 import { IncomeExpenseChart } from "@/components/dashboard/income-expense-chart"
 import { RecentTransactions } from "@/components/dashboard/recent-transactions"
 import { TaxSummary } from "@/components/dashboard/tax-summary"
+import { TaxSummaryModal } from "@/components/dashboard/tax-summary-modal"
 import { UpcomingReminders } from "@/components/dashboard/upcoming-reminders"
 import { DashboardSkeleton } from "@/components/ui/skeletons"
 import { AnalyticsInsights } from "@/components/dashboard/insights/analytics-insights"
 import { IncompleteInvoices } from "@/components/dashboard/incomplete-invoices"
 import { SubscriptionSuccessModal } from "@/components/subscription/subscription-success-modal"
+import { useSidebar } from "@/lib/contexts/sidebar-context"
+import { Button } from "@/components/ui/button"
+import { Receipt } from "lucide-react"
 
 type PeriodType = "quarter" | "year"
 
 export default function DashboardPage() {
+  const { sidebarCollapsed } = useSidebar()
   const [isLoading, setIsLoading] = useState(true)
+  const [showTaxSummaryModal, setShowTaxSummaryModal] = useState(false)
   const now = new Date()
   const currentYear = now.getFullYear()
   const currentQuarter = Math.floor(now.getMonth() / 3) + 1
@@ -55,16 +61,27 @@ export default function DashboardPage() {
           />
 
           {/* Charts and Summary */}
-          <div className="grid md:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-            <div className="md:col-span-2">
+          <div className="grid md:grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
+            <div className="lg:col-span-2">
               <IncomeExpenseChart 
                 periodType={periodType}
                 selectedYear={selectedYear}
                 selectedQuarter={selectedQuarter}
               />
             </div>
-            <div className="hidden md:block">
+            <div className="hidden lg:block">
               <TaxSummary businessType="freelancer" />
+            </div>
+            <div className="hidden md:flex lg:hidden md:items-start md:justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowTaxSummaryModal(true)}
+                className="h-8 text-xs"
+              >
+                <Receipt className="w-3.5 h-3.5 mr-1.5" />
+                Tax Summary
+              </Button>
             </div>
           </div>
 
@@ -80,12 +97,13 @@ export default function DashboardPage() {
               periodType={periodType}
               selectedYear={selectedYear}
               selectedQuarter={selectedQuarter}
+              sidebarCollapsed={false}
             />
           </div>
 
           {/* Recent Activity */}
-          <div className="grid md:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
-            <div className="md:col-span-2">
+          <div className="grid md:grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6">
+            <div className="lg:col-span-2">
               <RecentTransactions />
             </div>
             <div className="space-y-3 sm:space-y-4 md:space-y-5 lg:space-y-6">
@@ -95,6 +113,11 @@ export default function DashboardPage() {
           </div>
         </div>
       </main>
+      <TaxSummaryModal 
+        open={showTaxSummaryModal}
+        onOpenChange={setShowTaxSummaryModal}
+        businessType="freelancer"
+      />
       <SubscriptionSuccessModal />
     </>
   )

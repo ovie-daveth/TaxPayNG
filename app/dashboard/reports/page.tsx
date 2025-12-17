@@ -180,7 +180,7 @@ export default function ReportsPage() {
         <main className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 w-full">
           <div className="space-y-4 sm:space-y-6">
             {/* Quick Stats */}
-            <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3 md:gap-4">
               <Card className="p-3 sm:p-4 md:p-5 lg:p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">

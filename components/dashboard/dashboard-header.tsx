@@ -54,7 +54,7 @@ export function DashboardHeader() {
         title: "Filing Request Status",
         subtitle: "View status updates and communicate with your agent",
         buttonText: "",
-        buttonIcon: FileText,
+        buttonIcon: Plus,
         buttonAction: () => {}
       }
     }
@@ -94,7 +94,7 @@ export function DashboardHeader() {
           title: "Tax Calculator",
           subtitle: "Calculate your tax obligations based on Nigerian tax laws (LIRS/FIRS)",
           buttonText: "New Calculation",
-          buttonIcon: Calculator,
+          buttonIcon: Plus,
           buttonAction: () => console.log("New calculation") // No subscription check - this is the exemption
         }
       case "/dashboard/documents":
@@ -102,7 +102,7 @@ export function DashboardHeader() {
           title: "Documents",
           subtitle: "Store and manage receipts, invoices, and proofs",
           buttonText: "Upload Document",
-          buttonIcon: FileText,
+          buttonIcon: Plus,
           buttonAction: () => checkSubscription(() => setIsUploadDialogOpen(true))
         }
       case "/dashboard/reminders":
@@ -110,7 +110,7 @@ export function DashboardHeader() {
           title: "Reminders",
           subtitle: "Stay on top of important tax deadlines",
           buttonText: "Add Reminder",
-          buttonIcon: Bell,
+          buttonIcon: Plus,
           buttonAction: () => checkSubscription(() => setIsAddReminderDialogOpen(true))
         }
       case "/dashboard/reports":
@@ -118,7 +118,7 @@ export function DashboardHeader() {
           title: "Reports & Filings",
           subtitle: "Generate tax reports and self-assessment filings for LIRS/FIRS",
           buttonText: "New Report",
-          buttonIcon: BarChart3,
+          buttonIcon: Plus,
           buttonAction: () => checkSubscription(() => router.push("/dashboard/reports/generate/self-assessment"))
         }
       case "/dashboard/filing-requests":
@@ -126,7 +126,7 @@ export function DashboardHeader() {
           title: "Filing Requests",
           subtitle: "Track the status of your tax filing requests submitted to agents",
           buttonText: "",
-          buttonIcon: FileText,
+          buttonIcon: Plus,
           buttonAction: () => {}
         }
       case "/dashboard/reports/generate/self-assessment":
@@ -134,7 +134,7 @@ export function DashboardHeader() {
           title: "Self-Assessment Filing",
           subtitle: "Create LIRS/FIRS-ready self-assessment report",
           buttonText: "",
-          buttonIcon: BarChart3,
+          buttonIcon: Plus,
           buttonAction: () => {}
         }
       case "/dashboard/reports/generate/income-statement":
@@ -142,7 +142,7 @@ export function DashboardHeader() {
           title: "Income Statement",
           subtitle: "Detailed breakdown of all income sources and categories",
           buttonText: "",
-          buttonIcon: BarChart3,
+          buttonIcon: Plus,
           buttonAction: () => {}
         }
       case "/dashboard/reports/generate/expense-report":
@@ -150,7 +150,7 @@ export function DashboardHeader() {
           title: "Expense Report",
           subtitle: "Comprehensive report of business expenses and deductions",
           buttonText: "",
-          buttonIcon: BarChart3,
+          buttonIcon: Plus,
           buttonAction: () => {}
         }
       case "/dashboard/reports/generate/tax-summary":
@@ -158,7 +158,7 @@ export function DashboardHeader() {
           title: "Tax Summary Report",
           subtitle: "Annual or quarterly tax calculation summary with breakdowns",
           buttonText: "",
-          buttonIcon: BarChart3,
+          buttonIcon: Plus,
           buttonAction: () => {}
         }
       case "/dashboard/payment":
@@ -194,8 +194,8 @@ export function DashboardHeader() {
 
   return (
     <div className="border-b border-border bg-card w-full">
-      <div className="w-full px-3 sm:px-4 md:px-6 lg:px-8 py-2.5 sm:py-3 md:py-4">
-        <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
+      <div className="w-full px-3 sm:px-4 md:px-4 lg:px-8 py-2.5 sm:py-3 md:py-3 lg:py-4">
+        <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-2 lg:gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 sm:block">
               {/* Back button beside title - Mobile only */}
@@ -210,8 +210,8 @@ export function DashboardHeader() {
                 </Button>
               )}
               <div className="flex-1 min-w-0">
-                <h1 className="text-lg sm:text-xl md:text-2xl font-bold">{pageInfo.title}</h1>
-                <p className="hidden sm:block text-xs sm:text-sm text-muted-foreground mt-0.5 sm:mt-1 line-clamp-1 sm:line-clamp-2">{pageInfo.subtitle}</p>
+                <h1 className="text-lg sm:text-xl md:text-lg lg:text-2xl font-bold">{pageInfo.title}</h1>
+                <p className="hidden sm:block text-xs sm:text-sm md:text-xs lg:text-sm text-muted-foreground mt-0.5 sm:mt-1 line-clamp-1">{pageInfo.subtitle}</p>
               </div>
             </div>
             {showBackButton && (
@@ -223,18 +223,20 @@ export function DashboardHeader() {
               <p className="sm:hidden text-xs text-muted-foreground mt-0.5 line-clamp-1">{pageInfo.subtitle}</p>
             )}
           </div>
-          <div className="hidden md:flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-            <NotificationBell />
-            <ThemeToggle />
+          <div className="flex md:flex-row items-center gap-1 md:gap-1 lg:gap-2 flex-shrink-0 justify-end md:justify-start">
+            <div className="hidden md:flex items-center gap-1">
+              <NotificationBell />
+              <ThemeToggle />
+            </div>
             {pageInfo.showExportButton && (
               <Button 
                 variant="outline" 
                 size="sm"
                 onClick={() => console.log("Export transactions")}
-                className="h-8 sm:h-9 md:h-10 text-xs sm:text-sm px-2 sm:px-3"
+                className="h-8 md:h-8 lg:h-10 text-xs md:text-xs lg:text-sm px-1.5 md:px-2 lg:px-3"
               >
-                <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-2" />
-                <span className="hidden sm:inline">Export</span>
+                <Download className="w-3.5 h-3.5 md:w-3.5 md:h-3.5 lg:w-4 lg:h-4 md:mr-0 lg:mr-2" />
+                <span className="hidden lg:inline">Export</span>
               </Button>
             )}
             {/* Show main action button except on report generation pages */}
@@ -242,11 +244,11 @@ export function DashboardHeader() {
               <Button 
                 onClick={pageInfo.buttonAction}
                 size="sm"
-                className="h-8 sm:h-9 md:h-10 text-xs sm:text-sm whitespace-nowrap px-2 sm:px-3"
+                className="h-8 md:h-8 lg:h-10 text-xs md:text-xs lg:text-sm whitespace-nowrap px-1.5 md:px-2 lg:px-3"
               >
-                <ButtonIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 sm:mr-2" />
-                <span className="hidden sm:inline">{pageInfo.buttonText}</span>
-                <span className="sm:hidden">{pageInfo.buttonText.split(' ')[0]}</span>
+                <ButtonIcon className="w-3.5 h-3.5 md:w-3.5 md:h-3.5 lg:w-4 lg:h-4 md:mr-0 lg:mr-2" />
+                <span className="hidden lg:inline">{pageInfo.buttonText}</span>
+                <span className="lg:hidden">{pageInfo.buttonText.split(' ')[0]}</span>
               </Button>
             )}
           </div>

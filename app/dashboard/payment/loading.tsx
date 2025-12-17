@@ -24,7 +24,7 @@ export default function Loading() {
         
         <Card className="p-6">
           <Skeleton className="h-6 w-32 mb-4" />
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
             <Skeleton className="h-10 w-full" />
             <Skeleton className="h-10 w-full" />
           </div>
