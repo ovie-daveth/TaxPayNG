@@ -553,9 +553,9 @@ export default function PaymentPage() {
       )}
 
       {/* Main Content */}
-      <div className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
+      <div className=" px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
         {showValidation ? (
-          <div className="space-y-3 sm:space-y-4 md:space-y-6 max-w-3xl mx-auto">
+          <div className="space-y-3 sm:space-y-4 md:space-y-6">
             <Card>
               <CardHeader className="p-3 sm:p-4 md:p-6">
                 <CardTitle className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">System Checks</CardTitle>
@@ -647,6 +647,18 @@ export default function PaymentPage() {
           </div>
         ) : (
           <div className="space-y-3 sm:space-y-4 md:space-y-6">
+            {/* Back Button - Desktop Only */}
+            <div className="hidden md:block mb-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.back()}
+                className="h-8 text-xs sm:text-sm"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back
+              </Button>
+            </div>
             <Card className="p-3 sm:p-4 md:p-5 lg:p-6">
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0">

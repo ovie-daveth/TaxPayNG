@@ -193,9 +193,9 @@ export function DashboardHeader() {
   const showBackButton = pathname !== "/dashboard" && pathname !== "/dashboard/"
 
   return (
-    <div className="border-b border-border bg-card">
-      <div className="container mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-2.5 sm:py-3 md:py-4 max-w-7xl">
-        <div className="flex items-center justify-between gap-2 sm:gap-3 md:gap-4">
+    <div className="border-b border-border bg-card w-full">
+      <div className="w-full px-3 sm:px-4 md:px-6 lg:px-8 py-2.5 sm:py-3 md:py-4">
+        <div className="flex items-center gap-2 sm:gap-3 md:gap-4">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 sm:block">
               {/* Back button beside title - Mobile only */}

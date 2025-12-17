@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ArrowRight, ArrowLeft, Calculator, Calendar, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { transactionService, taxPaymentService } from "@/lib/services"
 import { calculateNigerianTax } from "@/lib/tax-calculator"
 import { toast } from "sonner"
@@ -44,6 +45,7 @@ type Step = 'period' | 'amount'
 export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps) {
   const { user } = useAuth()
   const { profile } = useUserProfile()
+  const { sidebarCollapsed } = useSidebar()
   const [currentStep, setCurrentStep] = useState<Step>('period')
   const [selectedPeriod, setSelectedPeriod] = useState<'monthly' | 'quarterly' | 'yearly' | ''>('')
   const [isManual, setIsManual] = useState(false)
@@ -219,7 +221,7 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
             </CardDescription>
           </CardHeader>
           <CardContent className="p-3 sm:p-4 md:p-6 space-y-2.5 sm:space-y-3 md:space-y-4">
-            <div className="grid grid-cols-3 gap-2 sm:gap-2.5 md:gap-3 lg:gap-4">
+            <div className={`grid gap-2 sm:gap-2.5 md:gap-3 lg:gap-4 ${!sidebarCollapsed ? 'grid-cols-2 lg:grid-cols-3' : 'grid-cols-3'}`}>
               <button
                 onClick={() => handlePeriodSelect('monthly')}
                 className={`p-3 sm:p-4 md:p-5 lg:p-6 border-2 rounded-lg text-left transition-all ${
