@@ -981,7 +981,7 @@ export function StatsCards({
   const PeriodSelector = () => (
     <div className="flex flex-col gap-4">
       <div className="flex items-center gap-2">
-        <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">View:</label>
+        <label className="text-xs sm:text-sm font-medium text-muted-foreground whitespace-nowrap">View:</label>
         <Select value={periodType} onValueChange={(value) => handlePeriodTypeChange(value as PeriodType)}>
           <SelectTrigger className="w-full h-10">
             <SelectValue />
@@ -996,7 +996,7 @@ export function StatsCards({
       {periodType === "quarter" ? (
         <>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Year:</label>
+            <label className="text-xs sm:text-sm font-medium text-muted-foreground whitespace-nowrap">Year:</label>
             <Select value={selectedYear.toString()} onValueChange={(value) => handleYearChange(parseInt(value))}>
               <SelectTrigger className="w-full h-10">
                 <SelectValue />
@@ -1011,7 +1011,7 @@ export function StatsCards({
             </Select>
           </div>
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Quarter:</label>
+            <label className="text-xs sm:text-sm font-medium text-muted-foreground whitespace-nowrap">Quarter:</label>
             <Select value={selectedQuarter.toString()} onValueChange={(value) => handleQuarterChange(parseInt(value))}>
               <SelectTrigger className="w-full h-10">
                 <SelectValue />
@@ -1059,7 +1059,7 @@ export function StatsCards({
             >
               <div className="flex items-center gap-2">
                 <Filter className="w-4 h-4" />
-                <span className="text-sm font-medium">{getFilterDisplayText()}</span>
+                <span className="text-xs sm:text-sm font-medium">{getFilterDisplayText()}</span>
               </div>
               <Calendar className="w-4 h-4 text-muted-foreground" />
             </Button>
@@ -1075,7 +1075,7 @@ export function StatsCards({
         {/* Desktop: Inline Period Selector */}
         <div className="hidden sm:flex flex-row flex-wrap items-center gap-3">
           <div className="flex items-center gap-2">
-            <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">View:</label>
+            <label className="text-xs sm:text-sm font-medium text-muted-foreground whitespace-nowrap">View:</label>
             <Select value={periodType} onValueChange={(value) => handlePeriodTypeChange(value as PeriodType)}>
               <SelectTrigger className="w-[120px] h-10 text-sm">
                 <SelectValue />
@@ -1090,9 +1090,9 @@ export function StatsCards({
           {periodType === "quarter" ? (
             <>
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Year:</label>
+                <label className="text-xs sm:text-sm font-medium text-muted-foreground whitespace-nowrap">Year:</label>
                 <Select value={selectedYear.toString()} onValueChange={(value) => handleYearChange(parseInt(value))}>
-                  <SelectTrigger className="w-[100px] h-10 text-sm">
+                  <SelectTrigger className="w-[100px] h-9 sm:h-10 text-xs sm:text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1105,9 +1105,9 @@ export function StatsCards({
                 </Select>
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Quarter:</label>
+                <label className="text-xs sm:text-sm font-medium text-muted-foreground whitespace-nowrap">Quarter:</label>
                 <Select value={selectedQuarter.toString()} onValueChange={(value) => handleQuarterChange(parseInt(value))}>
-                  <SelectTrigger className="w-[120px] h-10 text-sm">
+                  <SelectTrigger className="w-[120px] h-9 sm:h-10 text-xs sm:text-sm">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -1122,7 +1122,7 @@ export function StatsCards({
             </>
           ) : (
             <div className="flex items-center gap-2">
-              <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Year:</label>
+              <label className="text-xs sm:text-sm font-medium text-muted-foreground whitespace-nowrap">Year:</label>
               <Select value={selectedYear.toString()} onValueChange={(value) => handleYearChange(parseInt(value))}>
                 <SelectTrigger className="w-[100px] h-10 text-sm">
                   <SelectValue />
@@ -1143,7 +1143,7 @@ export function StatsCards({
       {/* Stats Cards Grid */}
       <div
         ref={containerRef}
-        className={`grid grid-cols-1 sm:grid-cols-2 ${sidebarCollapsed ? "lg:grid-cols-4" : "lg:grid-cols-2 xl:grid-cols-4"} gap-2 sm:gap-3 md:gap-4`}
+        className={`grid grid-cols-2 sm:grid-cols-2 ${sidebarCollapsed ? "lg:grid-cols-4" : "lg:grid-cols-2 xl:grid-cols-4"} gap-2 sm:gap-3 md:gap-4`}
       >
       {stats.map((stat, index) => {
         const Icon = stat.icon
@@ -1166,7 +1166,7 @@ export function StatsCards({
             }}
           >
             <Card
-              className={`p-4 sm:p-5 md:p-6 cursor-pointer transition-all relative ${isOpen ? "ring-2 ring-primary" : ""} ${cardLoadingClass}`}
+              className={`p-4 sm:p-5 md:p-6 cursor-pointer transition-all relative h-full flex flex-col ${isOpen ? "ring-2 ring-primary" : ""} ${cardLoadingClass}`}
               onClick={() => handleCardClick(stat.id)}
             >
               {isHovered && !isOpen && isHoverEnabled && (
@@ -1182,18 +1182,18 @@ export function StatsCards({
                   <span>Tap for details</span>
                 </div>
               )}
-            <div className="flex items-start justify-between">
+              <div className="flex items-start justify-between flex-1">
               <div className="flex-1 min-w-0">
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-1">{stat.label}</p>
-                <p className="text-xl sm:text-2xl font-bold mb-1.5 sm:mb-2 truncate">{stat.value}</p>
-                  <p className={`text-xs font-medium ${stat.trend === "up" ? "text-primary" : "text-muted-foreground"}`}>
+                  <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground mb-0.5 sm:mb-1">{stat.label}</p>
+                <p className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-1 sm:mb-1.5 md:mb-2 truncate">{stat.value}</p>
+                  <p className={`text-[10px] sm:text-xs font-medium ${stat.trend === "up" ? "text-primary" : "text-muted-foreground"}`}>
                   {stat.change}
                 </p>
               </div>
                 <div
-                  className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 ml-2 ${stat.color}`}
+                  className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 ml-2 ${stat.color}`}
                 >
-                <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
+                <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5" />
               </div>
             </div>
           </Card>
@@ -1212,24 +1212,24 @@ export function StatsCards({
                   <TaxCalculationBreakdown calculation={stat.taxCalculation} formatCurrency={formatCurrencyValue} />
                 ) : stat.breakdown ? (
                   <>
-                    <h4 className="font-semibold text-sm mb-3">{stat.label} Breakdown</h4>
-                    <div className="space-y-3">
+                    <h4 className="font-semibold text-xs sm:text-sm mb-2 sm:mb-3">{stat.label} Breakdown</h4>
+                    <div className="space-y-2 sm:space-y-3">
                       {stat.breakdown.map((item, itemIndex) => (
-                        <div key={itemIndex} className="space-y-1.5">
-                          <div className="flex items-center justify-between text-sm">
+                        <div key={itemIndex} className="space-y-1 sm:space-y-1.5">
+                          <div className="flex items-center justify-between text-xs sm:text-sm">
                             <span className="text-muted-foreground">{item.label}</span>
                             <span className="font-medium">{item.value}</span>
                           </div>
                           <div className="w-full bg-muted rounded-full h-2">
                             <div className={`h-2 rounded-full ${stat.barColor}`} style={{ width: `${item.percentage}%` }} />
                           </div>
-                          <p className="text-xs text-muted-foreground">{item.percentage}%</p>
+                          <p className="text-[10px] sm:text-xs text-muted-foreground">{item.percentage}%</p>
                         </div>
                       ))}
                     </div>
                   </>
                 ) : (
-                  <p className="text-xs text-muted-foreground">No breakdown data available yet.</p>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">No breakdown data available yet.</p>
                 )}
               </div>
             )}

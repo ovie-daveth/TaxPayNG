@@ -14,6 +14,10 @@ import OtaxLogo from "../OtaxLogo"
 import { User } from "lucide-react"
 import { ThemeToggle } from "../theme-toggle"
 import { NotificationBell } from "../notifications/notification-bell"
+import { AddTransactionDialog } from "../transactions/add-transaction-dialog"
+import { useTransactions } from "@/lib/hooks/useTransactions"
+import { useSubscription } from "@/lib/hooks/useSubscription"
+import { SubscriptionRequiredModal } from "../subscription/subscription-required-modal"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -36,6 +40,11 @@ export function DashboardNav() {
   const { logout, user } = useAuth()
   const { profile } = useUserProfile()
   const [hasFilingRequests, setHasFilingRequests] = useState(false)
+  const [isAddTransactionDialogOpen, setIsAddTransactionDialogOpen] = useState(false)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+  
+  const { isSubscribed, isExpired, loading: subscriptionLoading } = useSubscription()
+  const { createTransaction } = useTransactions(user?.uid || null)
   
   // Get page info for mobile add button
   const getMobileAddButton = () => {
@@ -43,7 +52,7 @@ export function DashboardNav() {
       case "/dashboard":
         return { icon: Plus, action: () => router.push("/dashboard/payment"), show: true }
       case "/dashboard/transactions":
-        return { icon: Plus, action: () => {}, show: true }
+        return { icon: Plus, action: () => checkSubscription(() => setIsAddTransactionDialogOpen(true)), show: true }
       case "/dashboard/invoices":
         return { icon: Plus, action: () => {
           const event = new CustomEvent('createInvoice')
@@ -97,6 +106,20 @@ export function DashboardNav() {
     } else {
       toast.error(result.error || 'Failed to log out')
     }
+  }
+
+  const checkSubscription = (action: () => void) => {
+    // Wait for subscription status to load
+    if (subscriptionLoading) {
+      return
+    }
+    // Check if user is subscribed or expired - if not, show modal
+    if (!isSubscribed || isExpired) {
+      setShowSubscriptionModal(true)
+      return
+    }
+    // User is subscribed and not expired, proceed with action
+    action()
   }
 
   // Filter nav items based on whether user has filing requests
@@ -288,6 +311,22 @@ export function DashboardNav() {
         )}
       </header>
 
+      {/* Add Transaction Dialog */}
+      <AddTransactionDialog 
+        open={isAddTransactionDialogOpen} 
+        onOpenChange={setIsAddTransactionDialogOpen}
+        onSubmit={createTransaction}
+        transaction={null}
+      />
+      
+      {/* Subscription Required Modal */}
+      {(profile?.businessType !== 'agent' || !profile) && (
+        <SubscriptionRequiredModal
+          open={showSubscriptionModal}
+          onOpenChange={setShowSubscriptionModal}
+          businessType={profile?.businessType || 'freelancer'}
+        />
+      )}
     </>
   )
 }

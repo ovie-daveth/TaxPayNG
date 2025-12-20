@@ -280,7 +280,7 @@ export default function PaymentHistoryPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className={`grid gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6 md:mb-8 ${!sidebarCollapsed ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-3'}`}>
+      <div className={`grid gap-2 sm:gap-3 md:gap-4 mb-4 sm:mb-6 md:mb-8 ${!sidebarCollapsed ? 'grid-cols-2 lg:grid-cols-3' : 'grid-cols-2 md:grid-cols-3'}`}>
         <Card className="relative overflow-hidden group hover:shadow-lg transition-all duration-300">
           <CardContent className="p-2.5 sm:p-3 md:p-4 lg:p-6">
             <div className="flex items-center justify-between">

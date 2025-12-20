@@ -223,7 +223,7 @@ export function DashboardHeader() {
               <p className="sm:hidden text-xs text-muted-foreground mt-0.5 line-clamp-1">{pageInfo.subtitle}</p>
             )}
           </div>
-          <div className="flex md:flex-row items-center gap-1 md:gap-1 lg:gap-2 flex-shrink-0 justify-end md:justify-start">
+          <div className="hidden md:flex md:flex-row items-center gap-1 md:gap-1 lg:gap-2 flex-shrink-0 justify-end md:justify-start">
             <div className="hidden md:flex items-center gap-1">
               <NotificationBell />
               <ThemeToggle />
