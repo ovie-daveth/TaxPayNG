@@ -7,6 +7,7 @@ import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { Card } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
@@ -19,7 +20,8 @@ import { userService } from "@/lib/services"
 import { toast } from "sonner"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
-import { User, Building2, CreditCard, Bell, Shield, Upload, X, CheckCircle2, Loader2, ExternalLink } from "lucide-react"
+import { User, Building2, CreditCard, Bell, Shield, Upload, X, CheckCircle2, Loader2, ExternalLink, HelpCircle, MessageSquare, Mail, Send } from "lucide-react"
+import { SupportModal } from "@/components/support/support-modal"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
 import { useSubscription } from "@/lib/hooks/useSubscription"
 import { subscriptionService } from "@/lib/services/subscriptionService"
@@ -97,6 +99,13 @@ export default function SettingsPage() {
     confirmPassword: ''
   })
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false)
+  const [supportForm, setSupportForm] = useState({
+    subject: '',
+    message: '',
+    category: 'general'
+  })
+  const [isSendingSupport, setIsSendingSupport] = useState(false)
+  const [showSupportModal, setShowSupportModal] = useState(false)
 
   // Loading state: show skeleton while auth or profile is loading
   const isLoading = authLoading || profileLoading
@@ -352,7 +361,7 @@ export default function SettingsPage() {
           </div>
 
           <Tabs defaultValue={searchParams.get('tab') || 'profile'} className="w-full">
-            <TabsList className={`grid w-full mb-4 sm:mb-6 ${profile?.businessType === 'freelancer' ? 'grid-cols-4' : 'grid-cols-5'} gap-1 sm:gap-2`}>
+            <TabsList className={`grid w-full mb-4 sm:mb-6 ${profile?.businessType === 'freelancer' ? 'grid-cols-4 md:grid-cols-5' : 'grid-cols-5 md:grid-cols-6'} gap-1 sm:gap-2`}>
               <TabsTrigger value="profile" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
                 <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Profile</span>
@@ -374,6 +383,10 @@ export default function SettingsPage() {
               <TabsTrigger value="security" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
                 <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Security</span>
+              </TabsTrigger>
+              <TabsTrigger value="support" className="hidden md:flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                <HelpCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden sm:inline">Support</span>
               </TabsTrigger>
             </TabsList>
 
@@ -1607,6 +1620,187 @@ export default function SettingsPage() {
                   </div>
                 </Card>
               </TabsContent>
+
+              {/* Support Tab */}
+              <TabsContent value="support" className="mt-0">
+                <Card className="p-4 sm:p-6 md:p-8">
+                  <div className="mb-4 sm:mb-6">
+                    <h2 className="text-lg sm:text-xl md:text-2xl font-semibold">Get Support</h2>
+                    <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                      Contact our support team via email or WhatsApp
+                    </p>
+                  </div>
+
+                  <div className="space-y-6">
+                    {/* Email Support Form */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <Mail className="w-5 h-5 text-primary" />
+                        <h3 className="text-base sm:text-lg font-semibold">Send us an Email</h3>
+                      </div>
+                      
+                      <div className="space-y-4">
+                        <div className="space-y-1.5 sm:space-y-2">
+                          <Label htmlFor="support-category" className="text-xs sm:text-sm">Category</Label>
+                          <Select
+                            value={supportForm.category}
+                            onValueChange={(value) => setSupportForm(prev => ({ ...prev, category: value }))}
+                          >
+                            <SelectTrigger className="h-9 sm:h-10 text-xs sm:text-sm">
+                              <SelectValue placeholder="Select a category" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="general">General Inquiry</SelectItem>
+                              <SelectItem value="technical">Technical Issue</SelectItem>
+                              <SelectItem value="billing">Billing & Subscription</SelectItem>
+                              <SelectItem value="feature">Feature Request</SelectItem>
+                              <SelectItem value="bug">Bug Report</SelectItem>
+                              <SelectItem value="other">Other</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-1.5 sm:space-y-2">
+                          <Label htmlFor="support-subject" className="text-xs sm:text-sm">Subject</Label>
+                          <Input
+                            id="support-subject"
+                            value={supportForm.subject}
+                            onChange={(e) => setSupportForm(prev => ({ ...prev, subject: e.target.value }))}
+                            placeholder="Brief description of your issue"
+                            className="h-9 sm:h-10 text-xs sm:text-sm"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5 sm:space-y-2">
+                          <Label htmlFor="support-message" className="text-xs sm:text-sm">Message</Label>
+                          <Textarea
+                            id="support-message"
+                            value={supportForm.message}
+                            onChange={(e) => setSupportForm(prev => ({ ...prev, message: e.target.value }))}
+                            placeholder="Please provide details about your issue or question..."
+                            rows={6}
+                            className="text-xs sm:text-sm resize-none"
+                          />
+                        </div>
+
+                        <Button
+                          onClick={async () => {
+                            if (!supportForm.subject.trim() || !supportForm.message.trim()) {
+                              toast.error("Please fill in both subject and message")
+                              return
+                            }
+
+                            setIsSendingSupport(true)
+                            try {
+                              const currentUser = auth.currentUser
+                              if (!currentUser) {
+                                toast.error("Please log in to send support request")
+                                return
+                              }
+
+                              const token = await currentUser.getIdToken()
+                              const response = await fetch("/api/support/send-email", {
+                                method: "POST",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                  "Authorization": `Bearer ${token}`
+                                },
+                                body: JSON.stringify({
+                                  subject: supportForm.subject,
+                                  message: supportForm.message,
+                                  category: supportForm.category
+                                })
+                              })
+
+                              const data = await response.json()
+
+                              if (data.success) {
+                                toast.success(data.message || "Support request sent successfully!")
+                                setSupportForm({
+                                  subject: '',
+                                  message: '',
+                                  category: 'general'
+                                })
+                              } else {
+                                toast.error(data.error || "Failed to send support request")
+                              }
+                            } catch (error) {
+                              console.error("Error sending support request:", error)
+                              toast.error("An error occurred. Please try again.")
+                            } finally {
+                              setIsSendingSupport(false)
+                            }
+                          }}
+                          disabled={isSendingSupport || !supportForm.subject.trim() || !supportForm.message.trim()}
+                          className="w-full sm:w-auto"
+                        >
+                          {isSendingSupport ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Sending...
+                            </>
+                          ) : (
+                            <>
+                              <Send className="w-4 h-4 mr-2" />
+                              Send Email
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    {/* WhatsApp Support */}
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <MessageSquare className="w-5 h-5 text-green-600 dark:text-green-400" />
+                        <h3 className="text-base sm:text-lg font-semibold">Chat with us on WhatsApp</h3>
+                      </div>
+                      
+                      <div className="bg-muted/50 border border-border rounded-lg p-4 sm:p-6">
+                        <p className="text-xs sm:text-sm text-muted-foreground mb-4">
+                          Get instant support by messaging us on WhatsApp. Our team typically responds within 24 hours.
+                        </p>
+                        
+                        <Button
+                          onClick={() => {
+                            // Get WhatsApp number from environment or use default
+                            const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '2348128543248'
+                            const whatsappMessage = encodeURIComponent(
+                              `Hello! I need support with OTax.\n\n` +
+                              `My email: ${user?.email || 'N/A'}\n` +
+                              `User ID: ${user?.uid || 'N/A'}\n\n` +
+                              `How can you help me?`
+                            )
+                            const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`
+                            window.open(whatsappUrl, '_blank')
+                          }}
+                          className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          <MessageSquare className="w-4 h-4 mr-2" />
+                          Open WhatsApp
+                          <ExternalLink className="w-4 h-4 ml-2" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Additional Support Info */}
+                    <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-lg p-4 sm:p-6">
+                      <h4 className="text-sm sm:text-base font-semibold mb-2 flex items-center gap-2">
+                        <HelpCircle className="w-4 h-4 sm:w-5 sm:h-5" />
+                        Need Help?
+                      </h4>
+                      <ul className="text-xs sm:text-sm text-muted-foreground space-y-1.5">
+                        <li>• Check our FAQ section for common questions</li>
+                        <li>• Response time: We typically respond within 24-48 hours</li>
+                        <li>• For urgent billing issues, please use WhatsApp for faster response</li>
+                        <li>• Include your User ID when contacting support for faster assistance</li>
+                      </ul>
+                    </div>
+                  </div>
+                </Card>
+              </TabsContent>
             </div>
           </Tabs>
           </div>
@@ -1637,6 +1831,21 @@ export default function SettingsPage() {
           onConfirm={handleMigrateAndSubscribe}
         />
       )}
+
+      {/* Support Modal (Mobile) */}
+      <SupportModal 
+        open={showSupportModal} 
+        onOpenChange={setShowSupportModal} 
+      />
+
+      {/* Floating Support Button (Mobile & Tablet Only) */}
+      <button
+        onClick={() => setShowSupportModal(true)}
+        className="fixed bottom-6 right-6 z-50 md:hidden w-14 h-14 bg-primary text-primary-foreground rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center hover:scale-110 active:scale-95"
+        aria-label="Get Support"
+      >
+        <HelpCircle className="w-6 h-6" />
+      </button>
     </>
   )
 }
