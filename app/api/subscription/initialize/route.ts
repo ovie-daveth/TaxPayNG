@@ -14,7 +14,7 @@ interface InitializeSubscriptionRequest {
 export async function POST(request: NextRequest) {
   try {
     // Validate Paystack keys
-    if (!PAYSTACK_SECRET_KEY || PAYSTACK_SECRET_KEY === 'sk_test_...' || PAYSTACK_SECRET_KEY.startsWith('sk_test_...')) {
+    if (!PAYSTACK_SECRET_KEY || PAYSTACK_SECRET_KEY === 'sk_test_...' || PAYSTACK_SECRET_KEY === 'sk_live_...' || PAYSTACK_SECRET_KEY.trim() === '') {
       console.error('Paystack Secret Key not configured')
       return NextResponse.json(
         { 
