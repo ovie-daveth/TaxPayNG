@@ -20,14 +20,14 @@ export default function CreatorSettingsPage() {
 
   if (isLoading) {
     return (
-      <main className="container mx-auto px-4 py-6 max-w-4xl">
+      <main className="px-4 py-6">
         <SettingsSkeleton />
       </main>
     )
   }
 
   return (
-    <main className="container mx-auto px-4 py-6 max-w-4xl space-y-6">
+    <main className="px-4 py-6 space-y-6">
       <Card className="p-6">
         <h2 className="text-lg font-semibold mb-4">Profile</h2>
         <div className="grid sm:grid-cols-2 gap-4">

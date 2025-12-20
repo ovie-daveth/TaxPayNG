@@ -272,7 +272,7 @@ export default function PaymentSuccessPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 max-w-4xl">
+      <main className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
         <div className="space-y-4 sm:space-y-5 md:space-y-6">
           {/* Payment Success Alert */}
           <Alert className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-3 sm:p-4">

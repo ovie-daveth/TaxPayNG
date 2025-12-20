@@ -224,7 +224,7 @@ export default function PaymentHistoryPage() {
       )}
       
       {/* Main Content */}
-    <div className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 animate-in fade-in duration-300">
+    <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 animate-in fade-in duration-300">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6 md:mb-8">
         <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">

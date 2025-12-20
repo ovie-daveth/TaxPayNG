@@ -21,7 +21,7 @@ export default function CreatorDashboardPage() {
 
   if (isLoading) {
     return (
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-5 md:py-6 max-w-7xl">
+      <main className="px-4 sm:px-6 lg:px-8 py-4 sm:py-5 md:py-6">
         <DashboardSkeleton />
       </main>
     )
@@ -29,7 +29,7 @@ export default function CreatorDashboardPage() {
 
   return (
     <>
-      <main className="container mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-5 lg:py-6 max-w-7xl space-y-4 sm:space-y-5 md:space-y-6">
+      <main className="px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-5 lg:py-6 space-y-4 sm:space-y-5 md:space-y-6">
         <Card className="p-4 sm:p-5 md:p-6 lg:p-8 bg-gradient-to-br from-primary/10 via-transparent to-primary/5 border-primary/20">
           <div className="space-y-2">
             <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Creator Performance Overview</h1>

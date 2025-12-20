@@ -417,7 +417,7 @@ export default function InvoicesPage() {
   }
 console.log("invoices", invoices)
   return (
-    <div className="container mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 max-w-7xl">
+    <div className="px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8">
       <div className="mb-4 sm:mb-6 md:mb-8">
         <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
           <div className="relative flex-1 min-w-0">
@@ -476,7 +476,7 @@ console.log("invoices", invoices)
       </div>
 
       {invoices.length === 0 ? (
-        <Card className="p-6 sm:p-8 md:p-12 text-center">
+        <Card className="p-6 sm:p-8 md:p-12 text-center flex flex-col items-center justify-center">
           <FileText className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-muted-foreground mb-3 sm:mb-4" />
           <h3 className="text-base sm:text-lg font-semibold mb-2">No invoices found</h3>
           <p className="text-sm sm:text-base text-muted-foreground mb-3 sm:mb-4">
@@ -485,7 +485,7 @@ console.log("invoices", invoices)
               : "Get started by creating your first invoice"}
           </p>
           {!searchTerm && statusFilter === "all" && (
-            <Button onClick={() => setIsAddDialogOpen(true)} className="h-9 sm:h-10 text-xs sm:text-sm">
+            <Button onClick={() => setIsAddDialogOpen(true)} className="h-9 lg:w-[20%] md:w-[25%]  w-full sm:h-10 text-xs sm:text-sm ">
               <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
               Create Invoice
             </Button>

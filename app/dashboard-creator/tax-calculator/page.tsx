@@ -26,14 +26,14 @@ export default function CreatorTaxCalculatorPage() {
 
   if (isLoading) {
     return (
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 max-w-7xl">
+      <main className="px-4 sm:px-6 lg:px-8 py-6">
         <TaxCalculatorSkeleton />
       </main>
     )
   }
 
   return (
-    <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 max-w-7xl space-y-6">
+    <main className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
       <Card className="relative overflow-hidden border-primary/10 bg-gradient-to-br from-primary/5 via-transparent to-primary/5 px-6 sm:px-8 py-6 sm:py-8">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-primary/15 flex items-center justify-center text-primary">

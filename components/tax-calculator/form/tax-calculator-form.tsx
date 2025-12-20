@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { Calculator, Info, ChevronDown, ChevronUp } from "lucide-react"
+import { Calculator, Info, ChevronDown, ChevronUp, History } from "lucide-react"
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { TaxRatesInfo } from "../tax-rates-info"
 import { calculateNigerianTax } from "@/lib/tax-calculator"
@@ -39,7 +39,8 @@ interface TaxCalculatorFormProps {
   onInputsSaved?: (inputs: any) => void
   defaultUserType?: SupportedUserType
   lockUserType?: boolean
-}
+  onViewHistory?: () => void
+  }
 
 interface IncomeSource {
   id: string
@@ -171,6 +172,7 @@ export function TaxCalculatorForm({
   onInputsSaved,
   defaultUserType = "freelancer",
   lockUserType = false,
+  onViewHistory,
 }: TaxCalculatorFormProps) {
   const [userType, setUserType] = useState<SupportedUserType>(defaultUserType)
   const [showSMEModal, setShowSMEModal] = useState(false)
@@ -1032,14 +1034,33 @@ export function TaxCalculatorForm({
       <Card className="p-4 sm:p-6">
         <div className="mb-4 sm:mb-6">
           <div className="flex items-start justify-between gap-4">
+            <div className="flex items-center gap-2 justify-between w-full">
             <div className="flex-1 min-w-0">
-              <h2 className="text-lg sm:text-xl font-semibold">Calculate Your Tax</h2>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+              <h2 className="text-lg sm:text-xl font-semibold hidden lg:block">Calculate Your Tax</h2>
+              <h2 className="text-lg sm:text-xl font-semibold block lg:hidden">Calculate</h2>
+              <p className="text-xs sm:text-sm text-muted-foreground mt-1 hidden lg:block">
                 Enter your multiple income streams and expenses - we'll calculate everything automatically
               </p>
+             
             </div>
+            <Button
+            variant="outline"
+            onClick={onViewHistory}
+            className="gap-2 hidden lg:flex items-center"
+          >
+            <History className="w-4 h-4" />
+             Previous Calculations
+          </Button>
+          </div>
             <div className="flex items-center gap-2 shrink-0">
               {/* Calculator icon button - always visible */}
+              <Button
+            variant="outline"
+            onClick={onViewHistory}
+            className="gap-2 block lg:hidden"
+          >
+            <History className="w-4 h-4" />
+          </Button>
               <Button
                 type="button"
                 variant="outline"
@@ -1075,6 +1096,9 @@ export function TaxCalculatorForm({
               </Button>
             </div>
           </div>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1 block lg:image.pnghidden">
+                Enter your multiple income streams and expenses - we'll calculate everything automatically
+              </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">

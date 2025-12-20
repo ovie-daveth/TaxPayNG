@@ -106,7 +106,7 @@ export default function DocumentsPage() {
 
   return (
     <div className="">
-        <main className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 max-w-7xl">
+        <main className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
           <div className="space-y-4 sm:space-y-6">
             {/* Search and Filter Bar */}
             <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">

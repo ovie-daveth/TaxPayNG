@@ -373,12 +373,12 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
     <>
       {/* Monthly Set-Aside Card */}
       {monthlySetAside > 0 && (
-        <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg p-4 border-2 border-primary/30 mb-4">
+        <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg p-3 sm:p-4 border-2 border-primary/30 mb-3 sm:mb-4">
           <div className="flex items-center gap-2 mb-2">
-            <Wallet className="w-4 h-4 text-primary" />
-            <h3 className="font-semibold text-sm">Monthly Set-Aside</h3>
+            <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
+            <h3 className="font-semibold text-xs sm:text-sm">Monthly Set-Aside</h3>
           </div>
-          <p className="text-2xl font-bold text-primary">₦{monthlySetAside.toLocaleString()}</p>
+          <p className="text-xl sm:text-2xl font-bold text-primary">₦{monthlySetAside.toLocaleString()}</p>
           <p className="text-xs text-muted-foreground mt-1">Save this amount each month for tax payments</p>
         </div>
       )}
@@ -387,21 +387,21 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
       {!isBusinessTax && (result.businessType === "freelancer" || result.businessType === "creator" || result.businessType === "employee") && result.grossIncome !== undefined && (
         <>
           {/* Step 1: Income Breakdown */}
-          <div className="mb-4">
-            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 p-4 rounded-lg border-2 border-blue-200 dark:border-blue-800">
-              <h4 className="font-semibold text-sm mb-3 text-blue-900 dark:text-blue-100 flex items-center gap-2">
-                <span className="text-lg">📊</span>
-                Step 1: Add Up All Income for the Year
+          <div className="mb-3 sm:mb-4">
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-950/20 dark:to-indigo-950/20 p-3 sm:p-4 rounded-lg border-2 border-blue-200 dark:border-blue-800">
+              <h4 className="font-semibold text-xs sm:text-sm mb-2 sm:mb-3 text-blue-900 dark:text-blue-100 flex items-center gap-1.5 sm:gap-2">
+                <span className="text-base sm:text-lg">📊</span>
+                <span className="leading-tight">Step 1: Add Up All Income for the Year</span>
               </h4>
-              <p className="text-xs text-blue-800 dark:text-blue-200 mb-3">
+              <p className="text-xs text-blue-800 dark:text-blue-200 mb-2 sm:mb-3 leading-relaxed">
                 As a freelancer/self-employed person, you must include all income from all clients (local or overseas) for the year.
               </p>
               <div className="space-y-2 text-sm">
                 {/* Income Breakdown by Source with Calculation */}
                 {result.incomeBreakdown && result.incomeBreakdown.length > 0 && (
-                  <div className="bg-white/60 dark:bg-gray-800/60 p-3 rounded border border-blue-200 dark:border-blue-700">
+                  <div className="bg-white/60 dark:bg-gray-800/60 p-2 sm:p-3 rounded border border-blue-200 dark:border-blue-700">
                     <p className="text-xs text-gray-700 dark:text-gray-200 mb-2 font-medium">Income Sources Calculation:</p>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5 sm:space-y-2">
                       {result.incomeBreakdown.map((source: any, index: number) => {
                         const allTypes = [
                           { value: "salary", label: "Salary (PAYE)" },
@@ -449,25 +449,25 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
                         const currencySymbol = source.originalCurrency && source.originalCurrency !== "NGN" ? getCurrencySymbol(source.originalCurrency) : "₦"
                         
                         return (
-                          <div key={index} className="pb-2 border-b border-blue-100 dark:border-blue-900/50 last:border-0">
-                            <div className="flex items-center justify-between text-xs mb-1">
-                              <span className="text-gray-700 dark:text-gray-200 font-medium">{typeLabel}:</span>
-                              <span className="font-mono font-semibold text-blue-600 dark:text-blue-400">
+                          <div key={index} className="pb-1.5 sm:pb-2 border-b border-blue-100 dark:border-blue-900/50 last:border-0">
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs mb-1">
+                              <span className="text-gray-700 dark:text-gray-200 font-medium break-words">{typeLabel}:</span>
+                              <span className="font-mono font-semibold text-blue-600 dark:text-blue-400 shrink-0">
                                 ₦{annualizedAmount.toLocaleString()}
                               </span>
                             </div>
                             {needsAnnualization && originalAmount !== annualizedAmount && (
-                              <p className="text-xs text-gray-500 dark:text-gray-400 font-mono ml-2">
+                              <p className="text-xs text-gray-500 dark:text-gray-400 font-mono ml-0 sm:ml-2 break-words">
                                 = {currencySymbol}{originalAmount.toLocaleString()} ({result.period === "monthly" ? "monthly" : "quarterly"}) × {multiplier} = ₦{annualizedAmount.toLocaleString()}
                               </p>
                             )}
                             {!needsAnnualization && (
-                              <p className="text-xs text-gray-500 dark:text-gray-400 font-mono ml-2">
+                              <p className="text-xs text-gray-500 dark:text-gray-400 font-mono ml-0 sm:ml-2 break-words">
                                 = {currencySymbol}{originalAmount.toLocaleString()} (annual)
                               </p>
                             )}
                             {source.originalCurrency && source.originalCurrency !== "NGN" && (
-                              <p className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                              <p className="text-xs text-gray-500 dark:text-gray-400 ml-0 sm:ml-2">
                                 Converted from {source.originalCurrency}
                               </p>
                             )}
@@ -478,14 +478,14 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
                   </div>
                 )}
                 <div className="pt-2 border-t-2 border-blue-300 dark:border-blue-700">
-                  <div className="flex items-center justify-between text-xs">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs">
                     <span className="text-blue-900 dark:text-blue-100 font-semibold">Total Gross Income:</span>
-                    <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
+                    <span className="font-mono font-bold text-blue-600 dark:text-blue-400 shrink-0">
                       ₦{(result.grossIncome || 0).toLocaleString()}
                     </span>
                   </div>
                   {result.incomeBreakdown && result.incomeBreakdown.length > 1 && (
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono break-words">
                       = {result.incomeBreakdown.map((s: any) => `₦${(s.amount || 0).toLocaleString()}`).join(" + ")}
                     </p>
                   )}
@@ -496,19 +496,19 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
 
           {/* Step 2: Business Expenses */}
           {result.businessExpenses > 0 && (
-            <div className="mb-4">
-              <div className="bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 p-4 rounded-lg border-2 border-orange-200 dark:border-orange-800">
-                <h4 className="font-semibold text-sm mb-3 text-orange-900 dark:text-orange-100 flex items-center gap-2">
-                  <span className="text-lg">💼</span>
-                  Step 2: Subtract Allowable Business Expenses
+            <div className="mb-3 sm:mb-4">
+              <div className="bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-950/20 dark:to-amber-950/20 p-3 sm:p-4 rounded-lg border-2 border-orange-200 dark:border-orange-800">
+                <h4 className="font-semibold text-xs sm:text-sm mb-2 sm:mb-3 text-orange-900 dark:text-orange-100 flex items-center gap-1.5 sm:gap-2">
+                  <span className="text-base sm:text-lg">💼</span>
+                  <span className="leading-tight">Step 2: Subtract Allowable Business Expenses</span>
                 </h4>
-                <p className="text-xs text-orange-800 dark:text-orange-200 mb-3">
+                <p className="text-xs text-orange-800 dark:text-orange-200 mb-2 sm:mb-3 leading-relaxed">
                   Allowable expenses are costs that are <strong>wholly, exclusively, and necessarily</strong> incurred in producing your income.
                 </p>
                 <div className="space-y-2 text-sm">
-                  <div className="bg-white/60 dark:bg-gray-800/60 p-3 rounded border border-orange-200 dark:border-orange-700">
+                  <div className="bg-white/60 dark:bg-gray-800/60 p-2 sm:p-3 rounded border border-orange-200 dark:border-orange-700">
                     <p className="text-xs text-gray-700 dark:text-gray-200 mb-2 font-medium">Examples of allowable expenses:</p>
-                    <ul className="text-xs text-gray-600 dark:text-gray-400 list-disc list-inside space-y-1">
+                    <ul className="text-xs text-gray-600 dark:text-gray-400 list-disc list-inside space-y-0.5 sm:space-y-1">
                       <li>Internet/data costs</li>
                       <li>Software subscriptions and licenses</li>
                       <li>Laptop, computer equipment, and tools</li>
@@ -520,22 +520,22 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
                     </ul>
                   </div>
                   <div className="pt-2 border-t border-orange-200 dark:border-orange-700">
-                    <div className="flex items-center justify-between text-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs">
                       <span className="text-gray-600 dark:text-gray-300">Gross Income:</span>
-                      <span className="font-mono">₦{(result.grossIncome || 0).toLocaleString()}</span>
+                      <span className="font-mono shrink-0">₦{(result.grossIncome || 0).toLocaleString()}</span>
                     </div>
-                    <div className="flex items-center justify-between text-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs">
                       <span className="text-gray-600 dark:text-gray-300">Less: Business Expenses:</span>
-                      <span className="font-mono text-red-600 dark:text-red-400">-₦{(result.businessExpenses || 0).toLocaleString()}</span>
+                      <span className="font-mono text-red-600 dark:text-red-400 shrink-0">-₦{(result.businessExpenses || 0).toLocaleString()}</span>
                     </div>
                     <div className="pt-2 border-t-2 border-orange-300 dark:border-orange-700">
-                      <div className="flex items-center justify-between text-xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs">
                         <span className="text-orange-900 dark:text-orange-100 font-semibold">Adjusted Gross Income:</span>
-                        <span className="font-mono font-bold text-orange-600 dark:text-orange-400">
+                        <span className="font-mono font-bold text-orange-600 dark:text-orange-400 shrink-0">
                           ₦{(result.adjustedGrossIncome || 0).toLocaleString()}
                         </span>
                       </div>
-                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono break-words">
                         = ₦{(result.grossIncome || 0).toLocaleString()} - ₦{(result.businessExpenses || 0).toLocaleString()}
                       </p>
                     </div>
@@ -547,21 +547,21 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
 
           {/* Step 3: Reliefs & Deductions */}
           {result.reliefs && result.totalReliefs > 0 && (
-            <div className="mb-4">
-              <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 p-4 rounded-lg border-2 border-green-200 dark:border-green-800">
-                <h4 className="font-semibold text-sm mb-3 text-green-900 dark:text-green-100 flex items-center gap-2">
-                  <span className="text-lg">💰</span>
-                  Step 3: Apply Tax Reliefs & Deductions
+            <div className="mb-3 sm:mb-4">
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/20 dark:to-emerald-950/20 p-3 sm:p-4 rounded-lg border-2 border-green-200 dark:border-green-800">
+                <h4 className="font-semibold text-xs sm:text-sm mb-2 sm:mb-3 text-green-900 dark:text-green-100 flex items-center gap-1.5 sm:gap-2">
+                  <span className="text-base sm:text-lg">💰</span>
+                  <span className="leading-tight">Step 3: Apply Tax Reliefs & Deductions</span>
                 </h4>
-                <p className="text-xs text-green-800 dark:text-green-200 mb-3">
+                <p className="text-xs text-green-800 dark:text-green-200 mb-2 sm:mb-3 leading-relaxed">
                   Even as self-employed, you may claim certain reliefs depending on your status and whether you've opted into certain schemes.
                 </p>
                 <div className="space-y-2 text-sm">
                   {result.reliefs.rentRelief > 0 && (
                     <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
-                      <div className="flex items-center justify-between text-xs mb-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs mb-1">
                         <span className="text-gray-700 dark:text-gray-200 font-medium">Rent Relief:</span>
-                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                        <span className="font-mono font-semibold text-green-600 dark:text-green-400 shrink-0">
                           -₦{(result.reliefs.rentRelief || 0).toLocaleString()}
                         </span>
                       </div>
@@ -570,9 +570,9 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
                   )}
                   {result.reliefs.pension > 0 && (
                     <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
-                      <div className="flex items-center justify-between text-xs mb-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs mb-1">
                         <span className="text-gray-700 dark:text-gray-200 font-medium">Pension Contribution:</span>
-                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                        <span className="font-mono font-semibold text-green-600 dark:text-green-400 shrink-0">
                           -₦{(result.reliefs.pension || 0).toLocaleString()}
                         </span>
                       </div>
@@ -581,9 +581,9 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
                   )}
                   {result.reliefs.healthInsurance > 0 && (
                     <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
-                      <div className="flex items-center justify-between text-xs mb-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs mb-1">
                         <span className="text-gray-700 dark:text-gray-200 font-medium">Health Insurance (NHIS):</span>
-                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                        <span className="font-mono font-semibold text-green-600 dark:text-green-400 shrink-0">
                           -₦{(result.reliefs.healthInsurance || 0).toLocaleString()}
                         </span>
                       </div>
@@ -592,9 +592,9 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
                   )}
                   {result.reliefs.housingFund > 0 && (
                     <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
-                      <div className="flex items-center justify-between text-xs mb-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs mb-1">
                         <span className="text-gray-700 dark:text-gray-200 font-medium">National Housing Fund (NHF):</span>
-                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                        <span className="font-mono font-semibold text-green-600 dark:text-green-400 shrink-0">
                           -₦{(result.reliefs.housingFund || 0).toLocaleString()}
                         </span>
                       </div>
@@ -603,9 +603,9 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
                   )}
                   {result.reliefs.lifeInsurance > 0 && (
                     <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
-                      <div className="flex items-center justify-between text-xs mb-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs mb-1">
                         <span className="text-gray-700 dark:text-gray-200 font-medium">Life Insurance:</span>
-                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                        <span className="font-mono font-semibold text-green-600 dark:text-green-400 shrink-0">
                           -₦{(result.reliefs.lifeInsurance || 0).toLocaleString()}
                         </span>
                       </div>
@@ -614,9 +614,9 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
                   )}
                   {result.reliefs.charitable > 0 && (
                     <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
-                      <div className="flex items-center justify-between text-xs mb-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs mb-1">
                         <span className="text-gray-700 dark:text-gray-200 font-medium">Charitable Donations:</span>
-                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                        <span className="font-mono font-semibold text-green-600 dark:text-green-400 shrink-0">
                           -₦{(result.reliefs.charitable || 0).toLocaleString()}
                         </span>
                       </div>
@@ -625,9 +625,9 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
                   )}
                   {result.reliefs.transportAllowance > 0 && (
                     <div className="bg-white/60 dark:bg-gray-800/60 p-2 rounded border border-green-200 dark:border-green-700">
-                      <div className="flex items-center justify-between text-xs mb-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs mb-1">
                         <span className="text-gray-700 dark:text-gray-200 font-medium">Transport Allowance Exemption:</span>
-                        <span className="font-mono font-semibold text-green-600 dark:text-green-400">
+                        <span className="font-mono font-semibold text-green-600 dark:text-green-400 shrink-0">
                           -₦{(result.reliefs.transportAllowance || 0).toLocaleString()}
                         </span>
                       </div>
@@ -635,9 +635,9 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
                     </div>
                   )}
                   <div className="pt-2 border-t-2 border-green-300 dark:border-green-700">
-                    <div className="flex items-center justify-between text-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs">
                       <span className="text-green-900 dark:text-green-100 font-semibold">Total Reliefs:</span>
-                      <span className="font-mono font-bold text-green-600 dark:text-green-400">
+                      <span className="font-mono font-bold text-green-600 dark:text-green-400 shrink-0">
                         -₦{(result.totalReliefs || 0).toLocaleString()}
                       </span>
                     </div>
@@ -649,11 +649,11 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
 
           {/* Step 4: Calculate Taxable Income */}
           {result.taxableIncome !== undefined && (
-            <div className="mb-4">
-              <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20 p-4 rounded-lg border-2 border-purple-200 dark:border-purple-800">
-                <h4 className="font-semibold text-sm mb-3 text-purple-900 dark:text-purple-100 flex items-center gap-2">
-                  <span className="text-lg">📈</span>
-                  Step 4: Calculate Taxable Income
+            <div className="mb-3 sm:mb-4">
+              <div className="bg-gradient-to-br from-purple-50 to-pink-50 dark:from-purple-950/20 dark:to-pink-950/20 p-3 sm:p-4 rounded-lg border-2 border-purple-200 dark:border-purple-800">
+                <h4 className="font-semibold text-xs sm:text-sm mb-2 sm:mb-3 text-purple-900 dark:text-purple-100 flex items-center gap-1.5 sm:gap-2">
+                  <span className="text-base sm:text-lg">📈</span>
+                  <span className="leading-tight">Step 4: Calculate Taxable Income</span>
                 </h4>
                 <div className="space-y-2 text-sm">
                   <div className="bg-white/60 dark:bg-gray-800/60 p-3 rounded border border-purple-200 dark:border-purple-700">
@@ -662,22 +662,22 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
                       Taxable Income = Adjusted Gross Income - Total Reliefs
                     </p>
                     <div className="pt-2 space-y-1">
-                      <div className="flex items-center justify-between text-xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs">
                         <span className="text-gray-600 dark:text-gray-300">Adjusted Gross Income:</span>
-                        <span className="font-mono">₦{(result.adjustedGrossIncome || result.grossIncome || 0).toLocaleString()}</span>
+                        <span className="font-mono shrink-0">₦{(result.adjustedGrossIncome || result.grossIncome || 0).toLocaleString()}</span>
                       </div>
-                      <div className="flex items-center justify-between text-xs">
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs">
                         <span className="text-gray-600 dark:text-gray-300">Less: Total Reliefs:</span>
-                        <span className="font-mono text-green-600 dark:text-green-400">-₦{(result.totalReliefs || 0).toLocaleString()}</span>
+                        <span className="font-mono text-green-600 dark:text-green-400 shrink-0">-₦{(result.totalReliefs || 0).toLocaleString()}</span>
                       </div>
                       <div className="pt-2 border-t border-purple-200 dark:border-purple-700">
-                        <div className="flex items-center justify-between text-xs">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs">
                           <span className="text-purple-900 dark:text-purple-100 font-semibold">Taxable Income:</span>
-                          <span className="font-mono font-bold text-purple-600 dark:text-purple-400">
+                          <span className="font-mono font-bold text-purple-600 dark:text-purple-400 shrink-0">
                             ₦{(result.taxableIncome || 0).toLocaleString()}
                           </span>
                         </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono">
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 font-mono break-words">
                           = ₦{(result.adjustedGrossIncome || result.grossIncome || 0).toLocaleString()} - ₦{(result.totalReliefs || 0).toLocaleString()}
                         </p>
                       </div>
@@ -690,22 +690,22 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
 
           {/* Step 5: Progressive Tax Brackets */}
           {result.taxBrackets && result.taxBrackets.length > 0 && (
-            <div className="mb-4">
-              <div className="bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-950/20 dark:to-violet-950/20 p-4 rounded-lg border-2 border-indigo-200 dark:border-indigo-800">
-                <h4 className="font-semibold text-sm mb-3 text-indigo-900 dark:text-indigo-100 flex items-center gap-2">
-                  <span className="text-lg">📊</span>
-                  Step 5: Apply Progressive PIT Rate Schedule
+            <div className="mb-3 sm:mb-4">
+              <div className="bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-950/20 dark:to-violet-950/20 p-3 sm:p-4 rounded-lg border-2 border-indigo-200 dark:border-indigo-800">
+                <h4 className="font-semibold text-xs sm:text-sm mb-2 sm:mb-3 text-indigo-900 dark:text-indigo-100 flex items-center gap-1.5 sm:gap-2">
+                  <span className="text-base sm:text-lg">📊</span>
+                  <span className="leading-tight">Step 5: Apply Progressive PIT Rate Schedule</span>
                 </h4>
-                <p className="text-xs text-indigo-800 dark:text-indigo-200 mb-3">
+                <p className="text-xs text-indigo-800 dark:text-indigo-200 mb-2 sm:mb-3 leading-relaxed">
                   Nigerian tax law applies progressive rates to your taxable income. The first ₦800,000 is tax-free, then rates increase progressively.
                 </p>
                 <div className="space-y-3 text-sm">
                   <div className="bg-white/60 dark:bg-gray-800/60 p-3 rounded border border-indigo-200 dark:border-indigo-700">
                     <p className="text-xs text-gray-700 dark:text-gray-200 mb-2 font-medium">Tax Brackets:</p>
-                    <div className="space-y-2">
+                    <div className="space-y-1.5 sm:space-y-2">
                       {result.taxBrackets.map((bracket: any, index: number) => (
-                        <div key={index} className="flex items-center justify-between text-xs py-1 border-b border-indigo-100 dark:border-indigo-900/50 last:border-0">
-                          <span className="text-gray-600 dark:text-gray-300">
+                        <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-2 text-xs py-1 border-b border-indigo-100 dark:border-indigo-900/50 last:border-0">
+                          <span className="text-gray-600 dark:text-gray-300 break-words">
                             {bracket.rate === 0 ? (
                               <span className="text-green-600 dark:text-green-400 font-semibold">Tax-free</span>
                             ) : (
@@ -713,13 +713,13 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
                             )}{" "}
                             ₦{(bracket.amount || 0).toLocaleString()}
                           </span>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 shrink-0">
                             {bracket.rate > 0 && (
-                              <span className="text-gray-500 dark:text-gray-400 text-xs font-mono">
+                              <span className="text-gray-500 dark:text-gray-400 text-xs font-mono break-words">
                                 = ₦{(bracket.amount || 0).toLocaleString()} × {bracket.rate}%
                               </span>
                             )}
-                            <span className={`font-mono font-semibold ${bracket.rate === 0 ? 'text-green-600 dark:text-green-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                            <span className={`font-mono font-semibold shrink-0 ${bracket.rate === 0 ? 'text-green-600 dark:text-green-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
                               {bracket.rate === 0 ? "₦0" : `₦${(bracket.tax || 0).toLocaleString()}`}
                             </span>
                           </div>
@@ -728,9 +728,9 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
                     </div>
                   </div>
                   <div className="pt-2 border-t-2 border-indigo-300 dark:border-indigo-700">
-                    <div className="flex items-center justify-between text-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs">
                       <span className="text-indigo-900 dark:text-indigo-100 font-semibold">Total Tax Payable:</span>
-                      <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-base">
+                      <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 text-sm sm:text-base shrink-0">
                         ₦{(result.totalTax || 0).toLocaleString()}
                       </span>
                     </div>
@@ -749,8 +749,8 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
 
       {/* Legacy Income Section - Only show for non-business tax types that aren't freelancer/creator/employee */}
       {!isBusinessTax && result.businessType !== "freelancer" && result.businessType !== "creator" && result.businessType !== "employee" && result.grossIncome !== undefined && (
-        <div className="bg-muted/50 rounded-lg p-4 mb-4">
-          <h3 className="font-semibold text-sm mb-3">Income</h3>
+        <div className="bg-muted/50 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4">
+          <h3 className="font-semibold text-xs sm:text-sm mb-2 sm:mb-3">Income</h3>
           <div className="space-y-2">
             {/* Income Breakdown by Source */}
             {result.incomeBreakdown && result.incomeBreakdown.length > 0 && (
@@ -783,11 +783,11 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
                     ]
                     const typeLabel = allTypes.find(t => t.value === source.type)?.label || source.type.replace(/_/g, " ")
                     return (
-                      <div key={index} className="flex items-center justify-between text-xs">
-                        <span className="text-muted-foreground">
+                      <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs">
+                        <span className="text-muted-foreground break-words">
                           {typeLabel}
                         </span>
-                        <span className="font-medium">₦{(source.amount || 0).toLocaleString()}</span>
+                        <span className="font-medium shrink-0">₦{(source.amount || 0).toLocaleString()}</span>
                       </div>
                     )
                   })}
@@ -795,21 +795,21 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
               </div>
             )}
             {result.grossIncome !== undefined && (
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs sm:text-sm">
                 <span className="text-muted-foreground">Gross Income</span>
-                <span className="font-medium">₦{(result.grossIncome || 0).toLocaleString()}</span>
+                <span className="font-medium shrink-0">₦{(result.grossIncome || 0).toLocaleString()}</span>
               </div>
             )}
             {result.businessExpenses > 0 && (
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs sm:text-sm">
                 <span className="text-muted-foreground">Business Expenses</span>
-                <span className="font-medium text-red-600">-₦{(result.businessExpenses || 0).toLocaleString()}</span>
+                <span className="font-medium text-red-600 shrink-0">-₦{(result.businessExpenses || 0).toLocaleString()}</span>
               </div>
             )}
             {result.adjustedGrossIncome !== undefined && (
-              <div className="flex items-center justify-between text-sm pt-2 border-t border-border">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs sm:text-sm pt-2 border-t border-border">
                 <span className="font-medium">Adjusted Gross Income</span>
-                <span className="font-semibold">₦{(result.adjustedGrossIncome || 0).toLocaleString()}</span>
+                <span className="font-semibold shrink-0">₦{(result.adjustedGrossIncome || 0).toLocaleString()}</span>
               </div>
             )}
           </div>
@@ -818,49 +818,49 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
 
       {/* Legacy Reliefs & Deductions - Only show for non-business tax types that aren't freelancer/creator/employee */}
       {!isBusinessTax && result.businessType !== "freelancer" && result.businessType !== "creator" && result.businessType !== "employee" && result.reliefs && (
-        <div className="bg-muted/50 rounded-lg p-4 mb-4">
-          <h3 className="font-semibold text-sm mb-3">Tax Reliefs & Deductions</h3>
+        <div className="bg-muted/50 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4">
+          <h3 className="font-semibold text-xs sm:text-sm mb-2 sm:mb-3">Tax Reliefs & Deductions</h3>
           <div className="space-y-2">
             {result.reliefs.rentRelief > 0 && (
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs sm:text-sm">
                 <span className="text-muted-foreground">Rent Relief (20%)</span>
-                <span className="font-medium text-green-600">-₦{(result.reliefs.rentRelief || 0).toLocaleString()}</span>
+                <span className="font-medium text-green-600 shrink-0">-₦{(result.reliefs.rentRelief || 0).toLocaleString()}</span>
               </div>
             )}
             {result.reliefs.pension > 0 && (
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs sm:text-sm">
                 <span className="text-muted-foreground">Pension Contribution</span>
-                <span className="font-medium text-green-600">-₦{(result.reliefs.pension || 0).toLocaleString()}</span>
+                <span className="font-medium text-green-600 shrink-0">-₦{(result.reliefs.pension || 0).toLocaleString()}</span>
               </div>
             )}
             {result.reliefs.healthInsurance > 0 && (
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs sm:text-sm">
                 <span className="text-muted-foreground">Health Insurance</span>
-                <span className="font-medium text-green-600">-₦{(result.reliefs.healthInsurance || 0).toLocaleString()}</span>
+                <span className="font-medium text-green-600 shrink-0">-₦{(result.reliefs.healthInsurance || 0).toLocaleString()}</span>
               </div>
             )}
             {result.reliefs.housingFund > 0 && (
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs sm:text-sm">
                 <span className="text-muted-foreground">National Housing Fund (NHF)</span>
-                <span className="font-medium text-green-600">-₦{(result.reliefs.housingFund || 0).toLocaleString()}</span>
+                <span className="font-medium text-green-600 shrink-0">-₦{(result.reliefs.housingFund || 0).toLocaleString()}</span>
               </div>
             )}
             {result.reliefs.lifeInsurance > 0 && (
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs sm:text-sm">
                 <span className="text-muted-foreground">Life Insurance</span>
-                <span className="font-medium text-green-600">-₦{(result.reliefs.lifeInsurance || 0).toLocaleString()}</span>
+                <span className="font-medium text-green-600 shrink-0">-₦{(result.reliefs.lifeInsurance || 0).toLocaleString()}</span>
               </div>
             )}
             {result.reliefs.charitable > 0 && (
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs sm:text-sm">
                 <span className="text-muted-foreground">Charitable Donations</span>
-                <span className="font-medium text-green-600">-₦{(result.reliefs.charitable || 0).toLocaleString()}</span>
+                <span className="font-medium text-green-600 shrink-0">-₦{(result.reliefs.charitable || 0).toLocaleString()}</span>
               </div>
             )}
             {result.totalReliefs !== undefined && (
-              <div className="flex items-center justify-between text-sm pt-2 border-t border-border">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 text-xs sm:text-sm pt-2 border-t border-border">
                 <span className="font-medium">Total Reliefs</span>
-                <span className="font-semibold text-green-600">-₦{(result.totalReliefs || 0).toLocaleString()}</span>
+                <span className="font-semibold text-green-600 shrink-0">-₦{(result.totalReliefs || 0).toLocaleString()}</span>
               </div>
             )}
           </div>
@@ -868,8 +868,8 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
       )}
 
       {/* Tax Calculation */}
-      <div className="bg-primary/5 rounded-lg p-4 border-2 border-primary/20 mb-4">
-        <h3 className="font-semibold text-sm mb-3">{result.taxType || "Tax Calculation"}</h3>
+      <div className="bg-primary/5 rounded-lg p-3 sm:p-4 border-2 border-primary/20 mb-3 sm:mb-4">
+        <h3 className="font-semibold text-xs sm:text-sm mb-2 sm:mb-3">{result.taxType || "Tax Calculation"}</h3>
         <div className="space-y-2">
           {/* For business taxes, show specific breakdown */}
           {result.calculationType === "cit" && (
@@ -2014,9 +2014,9 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
           {result.businessType !== "freelancer" && 
            result.businessType !== "creator" && 
            result.businessType !== "employee" && (
-            <div className="flex items-center justify-between pt-3 border-t-2 border-primary/20">
-              <span className="font-semibold text-base">Total Tax Payable</span>
-              <span className="font-bold text-xl text-primary">₦{(result.totalTax || 0).toLocaleString()}</span>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 sm:gap-0 pt-3 border-t-2 border-primary/20">
+              <span className="font-semibold text-sm sm:text-base">Total Tax Payable</span>
+              <span className="font-bold text-lg sm:text-xl text-primary shrink-0">₦{(result.totalTax || 0).toLocaleString()}</span>
             </div>
           )}
         </div>
@@ -2024,52 +2024,55 @@ export function TaxBreakdownModalContent({ result, calculationInputs }: TaxBreak
 
       {/* Quarterly Breakdown - Only show if quarterly payments exist */}
       {result.quarterlyPayments && result.quarterlyPayments.length > 0 && (
-        <div className="bg-muted/50 rounded-lg p-4 mb-4">
-          <h3 className="font-semibold text-sm mb-3">Quarterly Payment Schedule</h3>
-          <div className="grid grid-cols-2 gap-3">
+        <div className="bg-muted/50 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4">
+          <h3 className="font-semibold text-xs sm:text-sm mb-2 sm:mb-3">Quarterly Payment Schedule</h3>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             {result.quarterlyPayments.map((payment: any, index: number) => (
-              <div key={index} className="bg-background rounded p-3 text-center">
+              <div key={index} className="bg-background rounded p-2 sm:p-3 text-center">
                 <p className="text-xs text-muted-foreground mb-1">{payment.quarter}</p>
-                <p className="font-semibold">₦{(payment.amount || 0).toLocaleString()}</p>
+                <p className="font-semibold text-xs sm:text-sm">₦{(payment.amount || 0).toLocaleString()}</p>
               </div>
             ))}
           </div>
         </div>
       )}
 
-      <div className="flex gap-3 pt-4 border-t border-border">
+      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-border">
         <Button
           variant="outline"
-          className="flex-1 bg-transparent"
+          className="flex-1 bg-transparent text-xs sm:text-sm h-9 sm:h-10"
           onClick={handlePrint}
           disabled={isPrinting}
         >
           {isPrinting ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Preparing...
+              <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
+              <span className="hidden sm:inline">Preparing...</span>
+              <span className="sm:hidden">Preparing</span>
             </>
           ) : (
             <>
-              <Printer className="w-4 h-4 mr-2" />
+              <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
               Print
             </>
           )}
         </Button>
         <Button
-          className="flex-1"
+          className="flex-1 text-xs sm:text-sm h-9 sm:h-10"
           onClick={handleSaveCalculation}
           disabled={isSaving || !user}
         >
           {isSaving ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Saving...
+              <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
+              <span className="hidden sm:inline">Saving...</span>
+              <span className="sm:hidden">Saving</span>
             </>
           ) : (
             <>
-              <FileText className="w-4 h-4 mr-2" />
-              Save Calculation
+              <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+              <span className="hidden sm:inline">Save Calculation</span>
+              <span className="sm:hidden">Save</span>
             </>
           )}
         </Button>

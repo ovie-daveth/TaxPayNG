@@ -340,7 +340,7 @@ export default function SettingsPage() {
       <div className="h-screen flex flex-col overflow-hidden">
         <DashboardNav />
         <main className="flex-1 overflow-hidden">
-          <div className="container mx-auto px-6 py-8 max-w-7xl h-full overflow-y-auto hide-scrollbar">
+          <div className="px-6 py-8 h-full overflow-y-auto hide-scrollbar">
             <SettingsSkeleton />
           </div>
         </main>
@@ -352,7 +352,7 @@ export default function SettingsPage() {
     <>
       <div className="h-screen flex flex-col overflow-hidden">
         <main className="flex-1 overflow-hidden">
-          <div className="container mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 max-w-7xl h-full overflow-y-auto hide-scrollbar">
+          <div className="px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 h-full overflow-y-auto hide-scrollbar">
           <div className="mb-4 sm:mb-6 md:mb-8">
             <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">Settings</h1>
             <p className="text-sm sm:text-base text-muted-foreground mt-1 sm:mt-2">
@@ -362,25 +362,25 @@ export default function SettingsPage() {
 
           <Tabs defaultValue={searchParams.get('tab') || 'profile'} className="w-full">
             <TabsList className={`grid w-full mb-4 sm:mb-6 ${profile?.businessType === 'freelancer' ? 'grid-cols-4 md:grid-cols-5' : 'grid-cols-5 md:grid-cols-6'} gap-1 sm:gap-2`}>
-              <TabsTrigger value="profile" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <TabsTrigger value="profile" className="flex items-center gap-1 sm:gap-2 cursor-pointer text-xs sm:text-sm">
                 <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Profile</span>
               </TabsTrigger>
               {profile?.businessType !== 'freelancer' && (
-                <TabsTrigger value="business" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+                <TabsTrigger value="business" className="flex items-center gap-1 sm:gap-2 cursor-pointer text-xs sm:text-sm">
                   <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   <span className="hidden sm:inline">Business</span>
                 </TabsTrigger>
               )}
-              <TabsTrigger value="subscription" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <TabsTrigger value="subscription" className="flex items-center gap-1 sm:gap-2 cursor-pointer text-xs sm:text-sm">
                 <CreditCard className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Subscription</span>
               </TabsTrigger>
-              <TabsTrigger value="notifications" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <TabsTrigger value="notifications" className="flex items-center gap-1 sm:gap-2 cursor-pointer text-xs sm:text-sm">
                 <Bell className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Notifications</span>
               </TabsTrigger>
-              <TabsTrigger value="security" className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm">
+              <TabsTrigger value="security" className="flex items-center gap-1 sm:gap-2 cursor-pointer text-xs sm:text-sm">
                 <Shield className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Security</span>
               </TabsTrigger>

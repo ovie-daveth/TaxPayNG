@@ -343,7 +343,7 @@ export default function TaxCalculatorPage() {
 
   if (isLoading) {
     return (
-      <main className="container mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 max-w-7xl">
+      <main className="px-3 sm:px-4 md:px-6 py-4 sm:py-6">
         <TaxCalculatorSkeleton />
       </main>
     )
@@ -351,20 +351,11 @@ export default function TaxCalculatorPage() {
 
   return (
     <div className="">
-      <main className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 max-w-7xl">
-        <div className="flex justify-end mb-4">
-          <Button
-            variant="outline"
-            onClick={handleViewHistory}
-            className="gap-2"
-          >
-            <History className="w-4 h-4" />
-            View Previous Calculations
-          </Button>
-        </div>
-        <div className="md:grid md:grid-cols-1 lg:grid-cols-[minmax(0,1fr)_320px] md:items-start md:gap-4 lg:gap-6">
+      <main className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
+        
+        <div className="md:grid md:grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px] md:items-start md:gap-4 lg:gap-6">
           <div className="max-w-4xl mx-auto lg:mx-0 lg:max-w-none">
-            <TaxCalculatorForm onCalculate={handleCalculate} />
+            <TaxCalculatorForm onCalculate={handleCalculate} onViewHistory={handleViewHistory}  />
           </div>
           <div className="hidden lg:block">
             <TaxRatesInfo />
@@ -382,21 +373,21 @@ export default function TaxCalculatorPage() {
           }
         }}
       >
-        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-2xl md:max-w-4xl max-h-[90vh] overflow-y-auto p-0">
+        <DialogContent className="w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] sm:max-w-2xl md:max-w-4xl max-h-[90vh] overflow-y-auto p-0">
           {(taxResult || selectedCalculation?.result) && (
             <>
-              <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-3 sm:pb-4 border-b border-border">
-                <DialogTitle className="text-xl sm:text-2xl font-bold">Tax Calculation Results</DialogTitle>
+              <DialogHeader className="px-3 sm:px-4 md:px-6 pt-3 sm:pt-4 md:pt-6 pb-2 sm:pb-3 md:pb-4 border-b border-border">
+                <DialogTitle className="text-lg sm:text-xl md:text-2xl font-bold">Tax Calculation Results</DialogTitle>
                 <DialogDescription className="text-xs sm:text-sm">
                   Detailed breakdown of your tax computation for the selected period.
                   {selectedCalculation && (
-                    <span className="block mt-1">
+                    <span className="block mt-1 text-xs">
                       Calculated on: {format(new Date(selectedCalculation.createdAt), "dd MMM yyyy 'at' HH:mm")}
                     </span>
                   )}
                 </DialogDescription>
               </DialogHeader>
-              <div className="px-4 sm:px-6 py-4 sm:py-6">
+              <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
                 <TaxBreakdownModalContent result={taxResult || selectedCalculation?.result} />
               </div>
             </>
@@ -405,45 +396,45 @@ export default function TaxCalculatorPage() {
       </Dialog>
 
       <Dialog open={showHistory} onOpenChange={setShowHistory}>
-        <DialogContent className="w-[calc(100vw-2rem)] sm:max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Previous Tax Calculations</DialogTitle>
-            <DialogDescription>
+        <DialogContent className="w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] sm:max-w-3xl max-h-[90vh] overflow-y-auto p-3 sm:p-6">
+          <DialogHeader className="px-0 sm:px-0">
+            <DialogTitle className="text-base sm:text-lg">Previous Tax Calculations</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
               View and print your previously saved tax calculations
             </DialogDescription>
           </DialogHeader>
-          <div className="mt-4">
+          <div className="mt-3 sm:mt-4">
             {loadingCalculations ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin" />
+                <Loader2 className="w-5 h-5 sm:w-6 sm:h-6 animate-spin" />
               </div>
             ) : calculations.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
+              <div className="text-center py-6 sm:py-8 text-muted-foreground text-xs sm:text-sm px-2">
                 No previous calculations found. Calculate and save your first tax calculation to see it here.
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-3">
                 {calculations.map((calculation) => (
                   <div
                     key={calculation.id}
-                    className="border rounded-lg p-4 hover:bg-muted/50 transition-colors"
+                    className="border rounded-lg p-3 sm:p-4 hover:bg-muted/50 transition-colors"
                   >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <span className="font-semibold capitalize">{calculation.businessType}</span>
-                          <span className="text-muted-foreground">•</span>
-                          <span className="text-sm text-muted-foreground capitalize">{calculation.period}</span>
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
+                          <span className="font-semibold text-xs sm:text-sm capitalize">{calculation.businessType}</span>
+                          <span className="text-muted-foreground hidden sm:inline">•</span>
+                          <span className="text-xs sm:text-sm text-muted-foreground capitalize">{calculation.period}</span>
                         </div>
-                        <div className="text-sm text-muted-foreground mb-2">
+                        <div className="text-xs sm:text-sm text-muted-foreground mb-2">
                           {format(new Date(calculation.createdAt), "dd MMM yyyy 'at' HH:mm")}
                         </div>
-                        <div className="flex items-center gap-4 text-sm">
-                          <span>
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm">
+                          <span className="break-words">
                             <span className="text-muted-foreground">Income: </span>
                             <span className="font-medium">₦{(calculation.income || 0).toLocaleString()}</span>
                           </span>
-                          <span>
+                          <span className="break-words">
                             <span className="text-muted-foreground">Tax: </span>
                             <span className="font-medium text-primary">
                               ₦{(calculation.result?.totalTax || 0).toLocaleString()}
@@ -451,11 +442,12 @@ export default function TaxCalculatorPage() {
                           </span>
                         </div>
                       </div>
-                      <div className="flex gap-2 ml-4">
+                      <div className="flex gap-2 sm:ml-4 shrink-0">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => handleViewCalculation(calculation)}
+                          className="flex-1 sm:flex-initial text-xs sm:text-sm h-8 sm:h-9"
                         >
                           View
                         </Button>
@@ -463,8 +455,9 @@ export default function TaxCalculatorPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handlePrintCalculation(calculation)}
+                          className="px-2 sm:px-3 h-8 sm:h-9"
                         >
-                          <Printer className="w-4 h-4" />
+                          <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </Button>
                       </div>
                     </div>

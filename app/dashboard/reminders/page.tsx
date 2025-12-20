@@ -44,7 +44,7 @@ export default function RemindersPage() {
 
   if (loading && reminders.length === 0) {
     return (
-      <main className="container mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 max-w-7xl">
+      <main className="px-3 sm:px-4 md:px-6 py-4 sm:py-6">
         <RemindersSkeleton />
       </main>
     )
@@ -52,7 +52,7 @@ export default function RemindersPage() {
 
   return (
     <div className="">
-        <main className="container mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 max-w-7xl">
+        <main className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
           <div className="space-y-4 sm:space-y-6">
             {/* Error Message */}
             {error && (

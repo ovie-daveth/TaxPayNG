@@ -224,7 +224,7 @@ export default function GenerateRRRPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <main className="container mx-auto px-4 py-6 max-w-4xl">
+      <main className="px-4 py-6">
         <div className="space-y-6">
 
           <Card>
@@ -477,6 +477,7 @@ export default function GenerateRRRPage() {
       <SubscriptionRequiredModal
         open={showSubscriptionModal}
         onOpenChange={setShowSubscriptionModal}
+        businessType={profile?.businessType || 'freelancer'}
       />
     </div>
   )

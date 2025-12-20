@@ -2,7 +2,7 @@ import { Card } from "@/components/ui/card"
 
 export default function InvoicesLoading() {
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="px-4 py-8">
       <div className="mb-8">
         <div className="animate-pulse">
           <div className="h-8 w-48 bg-muted rounded mb-2" />
