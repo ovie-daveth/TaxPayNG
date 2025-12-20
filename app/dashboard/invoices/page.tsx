@@ -538,8 +538,8 @@ console.log("invoices", invoices)
                         variant="outline" 
                         className={`text-xs capitalize ${
                           paymentStatus === 'paid' 
-                            ? 'bg-green-500/10 text-green-700 dark:text-green-400 border-green-500/20' 
-                            : 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20'
+                            ? 'bg-green-500/10 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-500/20 dark:border-green-800/50' 
+                            : 'bg-red-500/10 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-500/20 dark:border-red-800/50'
                         }`}
                       >
                         {paymentStatus}

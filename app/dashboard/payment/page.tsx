@@ -165,9 +165,21 @@ export default function PaymentHistoryPage() {
 
   const getStatusBadge = (status: string) => {
     const config = {
-      completed: { icon: CheckCircle2, color: "text-green-600 bg-green-50 border-green-200", label: "Completed" },
-      pending: { icon: Loader2, color: "text-yellow-600 bg-yellow-50 border-yellow-200", label: "Pending" },
-      failed: { icon: X, color: "text-red-600 bg-red-50 border-red-200", label: "Failed" }
+      completed: { 
+        icon: CheckCircle2, 
+        color: "text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800/50", 
+        label: "Completed" 
+      },
+      pending: { 
+        icon: Loader2, 
+        color: "text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950/30 border-yellow-200 dark:border-yellow-800/50", 
+        label: "Pending" 
+      },
+      failed: { 
+        icon: X, 
+        color: "text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-800/50", 
+        label: "Failed" 
+      }
     }
     
     const { icon: Icon, color, label } = config[status as keyof typeof config] || config.pending
