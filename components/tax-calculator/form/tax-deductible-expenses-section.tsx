@@ -2,9 +2,11 @@
 
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
+import { Separator } from "@/components/ui/separator"
 import { Info } from "lucide-react"
 import { formatCurrencyInput, handleCurrencyInputChange } from "@/lib/utils/currency"
 import { CreatorExpensesSection } from "./creator-expenses-section"
+import { BusinessExpensesSection } from "./business-expenses-section"
 
 interface TaxDeductibleExpensesSectionProps {
   userType: string
@@ -15,7 +17,7 @@ interface TaxDeductibleExpensesSectionProps {
   housingFund: string
   lifeInsurance: string
   charitableDonations: string
-  businessExpenses: string
+  businessExpenses: Record<string, string>
   creatorExpenses: Record<string, string>
   onRentPaidChange: (value: string) => void
   onPensionContributionChange: (value: string) => void
@@ -23,7 +25,10 @@ interface TaxDeductibleExpensesSectionProps {
   onHousingFundChange: (value: string) => void
   onLifeInsuranceChange: (value: string) => void
   onCharitableDonationsChange: (value: string) => void
-  onBusinessExpensesChange: (value: string) => void
+  onAddBusinessExpense: (expenseType: string) => void
+  onRemoveBusinessExpense: (expenseType: string) => void
+  onUpdateBusinessExpense: (expenseType: string, value: string) => void
+  totalBusinessExpenses: number
   onAddCreatorExpense: (expenseType: string) => void
   onRemoveCreatorExpense: (expenseType: string) => void
   onUpdateCreatorExpense: (expenseType: string, value: string) => void
@@ -49,7 +54,10 @@ export function TaxDeductibleExpensesSection({
   onHousingFundChange,
   onLifeInsuranceChange,
   onCharitableDonationsChange,
-  onBusinessExpensesChange,
+  onAddBusinessExpense,
+  onRemoveBusinessExpense,
+  onUpdateBusinessExpense,
+  totalBusinessExpenses,
   onAddCreatorExpense,
   onRemoveCreatorExpense,
   onUpdateCreatorExpense,
@@ -60,37 +68,22 @@ export function TaxDeductibleExpensesSection({
   return (
     <div className="border-t border-border pt-4 sm:pt-6">
       <div className="flex items-center gap-2 mb-3 sm:mb-4">
-        <h3 className="text-base sm:text-lg font-semibold">Tax-Deductible Expenses</h3>
+        <h3 className="text-base sm:text-lg font-semibold">Tax Deductions & Reliefs</h3>
         <Info className="w-4 h-4 text-muted-foreground flex-shrink-0" />
       </div>
-      
-      {/* Business Expenses Info Box - Hidden for creators, toggleable on mobile */}
-      {userType !== "creator" && (
-        <div className={`bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4 ${showExplanations ? 'block' : 'hidden md:block'}`}>
-          <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-300 font-medium mb-1.5 sm:mb-2">
-            💡 Allowable Business Expenses for Freelancers/Self-Employed
-          </p>
-          <p className="text-[11px] sm:text-xs text-blue-600 dark:text-blue-400 mb-1.5 sm:mb-2 leading-relaxed">
-            Enter expenses that are <strong>wholly, exclusively, and necessarily</strong> incurred in producing your income. These will be deducted from your gross income before calculating tax.
-          </p>
-          <p className="text-[11px] sm:text-xs text-blue-600 dark:text-blue-400 font-semibold mt-1.5 sm:mt-2 mb-1">Examples of allowable expenses:</p>
-          <ul className="text-[11px] sm:text-xs text-blue-600 dark:text-blue-400 list-disc list-inside space-y-0.5 sm:space-y-1">
-            <li>Internet/data costs</li>
-            <li>Software subscriptions and licenses</li>
-            <li>Laptop, computer equipment, and tools</li>
-            <li>Co-working space rent</li>
-            <li>Transport to client meetings</li>
-            <li>Professional fees (accountants, lawyers)</li>
-            <li>Marketing and promotion costs</li>
-            <li>Training and professional development</li>
-          </ul>
-          <p className="text-[11px] sm:text-xs text-blue-600 dark:text-blue-400 mt-1.5 sm:mt-2">
-            💰 Enter expenses for the selected period ({getPeriodLabel().toLowerCase()}) - they will be automatically converted to annual amounts for tax calculation
-          </p>
-        </div>
-      )}
 
-      <div className="space-y-3 sm:space-y-4">
+      <div className="space-y-4 sm:space-y-6">
+        {/* Tax Reliefs Section */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <h4 className="text-sm sm:text-base font-semibold">Tax Reliefs</h4>
+            <Info className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
+          </div>
+          <p className="text-[11px] sm:text-xs text-muted-foreground mb-3 sm:mb-4">
+            Personal reliefs that reduce your taxable income. These are applied after business expenses.
+          </p>
+          
+          <div className="space-y-3 sm:space-y-4">
         <div className="space-y-1.5 sm:space-y-2">
           <Label htmlFor="rentPaid" className="text-xs sm:text-sm">{getPeriodLabel()} Rent Paid (₦)</Label>
           <Input
@@ -222,44 +215,69 @@ export function TaxDeductibleExpensesSection({
             </p>
           </div>
         </div>
-
-        {/* Creator-Specific Expenses */}
-        {userType === "creator" && (
-          <CreatorExpensesSection
-            creatorExpenses={creatorExpenses}
-            onAddCreatorExpense={onAddCreatorExpense}
-            onRemoveCreatorExpense={onRemoveCreatorExpense}
-            onUpdateCreatorExpense={onUpdateCreatorExpense}
-            totalCreatorExpenses={totalCreatorExpenses}
-          />
-        )}
-
-        {/* General Business Expenses - Hidden for creators */}
-        {userType !== "creator" && (
-          <div className="space-y-1.5 sm:space-y-2">
-            <Label htmlFor="businessExpenses" className="text-xs sm:text-sm">
-              {getPeriodLabel()} Other Business Expenses (₦)
-            </Label>
-            <Input
-              id="businessExpenses"
-              type="text"
-              inputMode="decimal"
-              placeholder="0.00"
-              value={formatCurrencyInput(businessExpenses)}
-              onChange={(e) => {
-                const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
-                if (isValid) {
-                  onBusinessExpensesChange(rawValue)
-                }
-              }}
-              className="h-9 sm:h-10 text-xs sm:text-sm"
-            />
-            <p className="text-[10px] sm:text-xs text-muted-foreground">
-              Costs wholly, exclusively, and necessarily incurred in producing income
-              {userType === "freelancer" && " (e.g., internet, software, equipment, co-working rent, transport to clients)"}
-            </p>
           </div>
-        )}
+        </div>
+
+        <Separator />
+
+        {/* Tax Deductible Expenses Section */}
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <h4 className="text-sm sm:text-base font-semibold">Tax Deductible Expenses</h4>
+            <Info className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
+          </div>
+          
+          {/* Business Expenses Info Box - Hidden for creators, toggleable on mobile */}
+          {userType !== "creator" && (
+            <div className={`bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 sm:p-4 mb-3 sm:mb-4 ${showExplanations ? 'block' : 'hidden md:block'}`}>
+              <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-300 font-medium mb-1.5 sm:mb-2">
+                💡 Allowable Business Expenses for Freelancers/Self-Employed
+              </p>
+              <p className="text-[11px] sm:text-xs text-blue-600 dark:text-blue-400 mb-1.5 sm:mb-2 leading-relaxed">
+                Enter expenses that are <strong>wholly, exclusively, and necessarily</strong> incurred in producing your income. These will be deducted from your gross income before calculating tax.
+              </p>
+              <p className="text-[11px] sm:text-xs text-blue-600 dark:text-blue-400 font-semibold mt-1.5 sm:mt-2 mb-1">Examples of allowable expenses:</p>
+              <ul className="text-[11px] sm:text-xs text-blue-600 dark:text-blue-400 list-disc list-inside space-y-0.5 sm:space-y-1">
+                <li>Internet/data costs</li>
+                <li>Software subscriptions and licenses</li>
+                <li>Laptop, computer equipment, and tools</li>
+                <li>Co-working space rent</li>
+                <li>Transport to client meetings</li>
+                <li>Professional fees (accountants, lawyers)</li>
+                <li>Marketing and promotion costs</li>
+                <li>Training and professional development</li>
+              </ul>
+              <p className="text-[11px] sm:text-xs text-blue-600 dark:text-blue-400 mt-1.5 sm:mt-2">
+                💰 Enter expenses for the selected period ({getPeriodLabel().toLowerCase()}) - they will be automatically converted to annual amounts for tax calculation
+              </p>
+            </div>
+          )}
+
+          <div className="space-y-3 sm:space-y-4">
+            {/* Creator-Specific Expenses */}
+            {userType === "creator" && (
+              <CreatorExpensesSection
+                creatorExpenses={creatorExpenses}
+                onAddCreatorExpense={onAddCreatorExpense}
+                onRemoveCreatorExpense={onRemoveCreatorExpense}
+                onUpdateCreatorExpense={onUpdateCreatorExpense}
+                totalCreatorExpenses={totalCreatorExpenses}
+              />
+            )}
+
+            {/* General Business Expenses Breakdown - Hidden for creators */}
+            {userType !== "creator" && (
+              <BusinessExpensesSection
+                businessExpenses={businessExpenses}
+                onAddBusinessExpense={onAddBusinessExpense}
+                onRemoveBusinessExpense={onRemoveBusinessExpense}
+                onUpdateBusinessExpense={onUpdateBusinessExpense}
+                totalBusinessExpenses={totalBusinessExpenses}
+                getPeriodLabel={getPeriodLabel}
+              />
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

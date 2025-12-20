@@ -186,7 +186,7 @@ export function TaxCalculatorForm({
   const [housingFund, setHousingFund] = useState("")
   const [lifeInsurance, setLifeInsurance] = useState("")
   const [charitableDonations, setCharitableDonations] = useState("")
-  const [businessExpenses, setBusinessExpenses] = useState("")
+  const [businessExpenses, setBusinessExpenses] = useState<Record<string, string>>({})
   const [creatorExpenses, setCreatorExpenses] = useState<Record<string, string>>({})
   const [dependents, setDependents] = useState("0")
   const [convertedTotalIncome, setConvertedTotalIncome] = useState<number | null>(null)
@@ -486,8 +486,28 @@ export function TaxCalculatorForm({
     setCreatorExpenses({ ...creatorExpenses, [expenseType]: value })
   }
 
+  // Business expenses handlers
+  const addBusinessExpense = (expenseType: string) => {
+    setBusinessExpenses({ ...businessExpenses, [expenseType]: "" })
+  }
+
+  const removeBusinessExpense = (expenseType: string) => {
+    const newExpenses = { ...businessExpenses }
+    delete newExpenses[expenseType]
+    setBusinessExpenses(newExpenses)
+  }
+
+  const updateBusinessExpense = (expenseType: string, value: string) => {
+    setBusinessExpenses({ ...businessExpenses, [expenseType]: value })
+  }
+
   // Calculate total creator expenses
   const totalCreatorExpenses = Object.values(creatorExpenses).reduce((sum, amount) => {
+    return sum + (Number.parseFloat(amount) || 0)
+  }, 0)
+
+  // Calculate total business expenses
+  const totalBusinessExpenses = Object.values(businessExpenses).reduce((sum, amount) => {
     return sum + (Number.parseFloat(amount) || 0)
   }, 0)
 
@@ -666,7 +686,7 @@ export function TaxCalculatorForm({
       )
 
       // Combine business expenses (including creator expenses)
-      const totalBusinessExp = (Number.parseFloat(businessExpenses) || 0) + totalCreatorExpenses
+      const totalBusinessExp = totalBusinessExpenses + totalCreatorExpenses
 
       // Handle different calculation types for business owners
       if (userType === "business" && calculationType) {
@@ -942,6 +962,15 @@ export function TaxCalculatorForm({
         }))
       }
 
+      // Add business expenses breakdown if applicable (for freelancers/self-employed)
+      if (userType !== "creator" && Object.keys(businessExpenses).length > 0) {
+        const annualizeMultiplier = period === "monthly" ? 12 : period === "quarterly" ? 4 : 1
+        result.businessExpensesBreakdown = Object.entries(businessExpenses).map(([type, amount]) => ({
+          type,
+          amount: (Number.parseFloat(amount) || 0) * annualizeMultiplier,
+        }))
+      }
+
       // Add period to result for display clarity
       result.period = period
       onCalculate(result)
@@ -953,7 +982,7 @@ export function TaxCalculatorForm({
         0
       )
 
-      const totalBusinessExp = (Number.parseFloat(businessExpenses) || 0) + totalCreatorExpenses
+      const totalBusinessExp = totalBusinessExpenses + totalCreatorExpenses
 
       const result = calculateNigerianTax({
         businessType: userType,
@@ -1226,7 +1255,10 @@ export function TaxCalculatorForm({
               onHousingFundChange={setHousingFund}
               onLifeInsuranceChange={setLifeInsurance}
               onCharitableDonationsChange={setCharitableDonations}
-              onBusinessExpensesChange={setBusinessExpenses}
+              onAddBusinessExpense={addBusinessExpense}
+              onRemoveBusinessExpense={removeBusinessExpense}
+              onUpdateBusinessExpense={updateBusinessExpense}
+              totalBusinessExpenses={totalBusinessExpenses}
               onAddCreatorExpense={addCreatorExpense}
               onRemoveCreatorExpense={removeCreatorExpense}
               onUpdateCreatorExpense={updateCreatorExpense}

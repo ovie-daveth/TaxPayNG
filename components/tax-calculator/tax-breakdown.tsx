@@ -1,14 +1,35 @@
+"use client"
+
+import { useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Download, FileText, Wallet } from "lucide-react"
+import { Printer, FileText, Wallet, Loader2 } from "lucide-react"
 import { formatCurrencyAmount } from "@/lib/utils/currency"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { toast } from "sonner"
 
 interface TaxBreakdownProps {
   result: any
+  calculationInputs?: {
+    businessType?: string
+    period?: string
+    income?: number
+    rentPaid?: number
+    pensionContribution?: number
+    healthInsurance?: number
+    housingFund?: number
+    lifeInsurance?: number
+    charitableDonations?: number
+    businessExpenses?: number
+    dependents?: number
+  }
 }
 
-export function TaxBreakdown({ result }: TaxBreakdownProps) {
+export function TaxBreakdown({ result, calculationInputs }: TaxBreakdownProps) {
+  const { user } = useAuth()
+  const [isPrinting, setIsPrinting] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   // Determine the period - all calculations are done in annual amounts
   const period = result.period || "yearly"
   const isAnnual = period === "yearly"
@@ -22,6 +43,341 @@ export function TaxBreakdown({ result }: TaxBreakdownProps) {
   // Calculate monthly equivalents for annual amounts
   const getMonthlyEquivalent = (annualAmount: number) => {
     return annualAmount / 12
+  }
+
+  const handlePrint = () => {
+    setIsPrinting(true)
+    try {
+      // Create a print-friendly HTML version
+      const printWindow = window.open('', '_blank')
+      if (!printWindow) {
+        toast.error("Please allow popups to print")
+        setIsPrinting(false)
+        return
+      }
+
+      const printHTML = `
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>Tax Calculation Report</title>
+            <style>
+              @media print {
+                body { margin: 0; }
+                .no-print { display: none !important; }
+              }
+              body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                padding: 40px;
+                max-width: 800px;
+                margin: 0 auto;
+                background: white;
+                color: #000;
+              }
+              .header {
+                display: flex;
+                justify-content: space-between;
+                align-items: flex-start;
+                border-bottom: 2px solid #059669;
+                padding-bottom: 20px;
+                margin-bottom: 30px;
+              }
+              .header-left {
+                display: flex;
+                flex-direction: column;
+                align-items: flex-start;
+              }
+              .header img {
+                height: 35px;
+                margin-bottom: 5px;
+              }
+              .header-company {
+                font-size: 11px;
+                color: #6b7280;
+                margin: 0;
+              }
+              .header-right {
+                text-align: right;
+              }
+              .header h1 {
+                color: #059669;
+                margin: 0 0 5px 0;
+                font-size: 24px;
+              }
+              .header-date {
+                font-size: 12px;
+                color: #6b7280;
+                margin: 0;
+              }
+              .section {
+                margin-bottom: 25px;
+                page-break-inside: avoid;
+              }
+              .section-title {
+                font-size: 16px;
+                font-weight: bold;
+                color: #059669;
+                margin-bottom: 10px;
+                border-bottom: 1px solid #e5e7eb;
+                padding-bottom: 5px;
+              }
+              .row {
+                display: flex;
+                justify-content: space-between;
+                padding: 8px 0;
+                border-bottom: 1px dotted #e5e7eb;
+              }
+              .row-label {
+                color: #6b7280;
+              }
+              .row-value {
+                font-weight: 600;
+                color: #000;
+              }
+              .highlight {
+                background: #f0fdf4;
+                padding: 15px;
+                border-left: 4px solid #059669;
+                margin: 15px 0;
+              }
+              .highlight-title {
+                font-weight: bold;
+                font-size: 14px;
+                color: #059669;
+                margin-bottom: 5px;
+              }
+              .highlight-value {
+                font-size: 20px;
+                font-weight: bold;
+                color: #000;
+              }
+              .footer {
+                margin-top: 40px;
+                padding-top: 20px;
+                border-top: 1px solid #e5e7eb;
+                text-align: center;
+                color: #6b7280;
+                font-size: 12px;
+              }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <div class="header-left">
+                <img src="${window.location.origin}/logootax_bg.png" alt="OTax Logo" />
+                <p class="header-company">OTax Digital Services Limited</p>
+              </div>
+              <div class="header-right">
+                <h1>Tax Calculation Report</h1>
+                <p class="header-date">Generated on: ${new Date().toLocaleDateString("en-NG")}</p>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="highlight">
+                <div class="highlight-title">Monthly Set-Aside</div>
+                <div class="highlight-value">₦${result.monthlySetAside.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Income Breakdown</div>
+              ${result.incomeBreakdown && result.incomeBreakdown.length > 0 ? result.incomeBreakdown.map((source: any) => {
+                const typeLabel = source.type.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase())
+                return `
+                  <div class="row">
+                    <span class="row-label">${typeLabel}</span>
+                    <span class="row-value">₦${source.amount.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                `
+              }).join("") : ""}
+              <div class="row">
+                <span class="row-label"><strong>Gross Income (Annual)</strong></span>
+                <span class="row-value"><strong>₦${result.grossIncome.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+              </div>
+              ${result.businessExpenses && result.businessExpenses > 0 ? `
+                <div class="row">
+                  <span class="row-label">Business Expenses (Annual)</span>
+                  <span class="row-value" style="color: #dc2626;">-₦${result.businessExpenses.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              ` : ""}
+              <div class="row">
+                <span class="row-label"><strong>Adjusted Gross Income (Annual)</strong></span>
+                <span class="row-value"><strong>₦${result.adjustedGrossIncome.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+              </div>
+            </div>
+
+            ${result.businessExpensesBreakdown && result.businessExpensesBreakdown.length > 0 ? `
+              <div class="section">
+                <div class="section-title">Business Expenses Breakdown</div>
+                ${result.businessExpensesBreakdown.map((expense: any) => {
+                  const typeLabel = expense.type.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase())
+                  return `
+                    <div class="row">
+                      <span class="row-label">${typeLabel}</span>
+                      <span class="row-value">₦${expense.amount.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  `
+                }).join("")}
+              </div>
+            ` : ""}
+
+            <div class="section">
+              <div class="section-title">Tax Reliefs & Deductions</div>
+              ${result.reliefs.rentRelief > 0 ? `
+                <div class="row">
+                  <span class="row-label">Rent Relief (20%)</span>
+                  <span class="row-value" style="color: #059669;">-₦${result.reliefs.rentRelief.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              ` : ""}
+              ${result.reliefs.pension > 0 ? `
+                <div class="row">
+                  <span class="row-label">Pension Contribution</span>
+                  <span class="row-value" style="color: #059669;">-₦${result.reliefs.pension.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              ` : ""}
+              ${result.reliefs.healthInsurance > 0 ? `
+                <div class="row">
+                  <span class="row-label">Health Insurance</span>
+                  <span class="row-value" style="color: #059669;">-₦${result.reliefs.healthInsurance.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              ` : ""}
+              ${result.reliefs.housingFund > 0 ? `
+                <div class="row">
+                  <span class="row-label">National Housing Fund (NHF)</span>
+                  <span class="row-value" style="color: #059669;">-₦${result.reliefs.housingFund.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              ` : ""}
+              ${result.reliefs.transportAllowance > 0 ? `
+                <div class="row">
+                  <span class="row-label">Transport Allowance Exemption</span>
+                  <span class="row-value" style="color: #059669;">-₦${result.reliefs.transportAllowance.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              ` : ""}
+              ${result.reliefs.lifeInsurance > 0 ? `
+                <div class="row">
+                  <span class="row-label">Life Insurance</span>
+                  <span class="row-value" style="color: #059669;">-₦${result.reliefs.lifeInsurance.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              ` : ""}
+              ${result.reliefs.charitable > 0 ? `
+                <div class="row">
+                  <span class="row-label">Charitable Donations</span>
+                  <span class="row-value" style="color: #059669;">-₦${result.reliefs.charitable.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
+              ` : ""}
+              <div class="row">
+                <span class="row-label"><strong>Total Reliefs (Annual)</strong></span>
+                <span class="row-value" style="color: #059669;"><strong>-₦${result.totalReliefs.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+              </div>
+            </div>
+
+            <div class="section">
+              <div class="section-title">Tax Calculation</div>
+              <div class="row">
+                <span class="row-label">Taxable Income (Annual)</span>
+                <span class="row-value">₦${result.taxableIncome.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+              ${result.taxBrackets.map((bracket: any) => `
+                <div class="row">
+                  <span class="row-label">${bracket.rate === 0 ? "Tax-free" : `${bracket.rate}% on ₦${bracket.amount.toLocaleString("en-NG")}`}</span>
+                  <span class="row-value">${bracket.rate === 0 ? "₦0" : `₦${bracket.tax.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}</span>
+                </div>
+              `).join("")}
+              <div class="highlight">
+                <div class="highlight-title">Total Tax Payable (Annual)</div>
+                <div class="highlight-value">₦${result.totalTax.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              </div>
+            </div>
+
+            ${result.quarterlyPayments && result.quarterlyPayments.length > 0 ? `
+              <div class="section">
+                <div class="section-title">Quarterly Payment Schedule</div>
+                ${result.quarterlyPayments.map((payment: any) => `
+                  <div class="row">
+                    <span class="row-label">${payment.quarter}</span>
+                    <span class="row-value">₦${payment.amount.toLocaleString("en-NG", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                `).join("")}
+              </div>
+            ` : ""}
+
+            <div class="footer">
+              <p>Generated by TaxPayNG</p>
+            </div>
+          </body>
+        </html>
+      `
+
+      printWindow.document.write(printHTML)
+      printWindow.document.close()
+      
+      // Wait for content to load, then print
+      printWindow.onload = () => {
+        setTimeout(() => {
+          printWindow.print()
+          setIsPrinting(false)
+        }, 250)
+      }
+    } catch (error) {
+      console.error("Error printing:", error)
+      toast.error("Failed to print. Please try again.")
+      setIsPrinting(false)
+    }
+  }
+
+  const handleSaveCalculation = async () => {
+    if (!user) {
+      toast.error("Please log in to save calculations")
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const token = await user.getIdToken()
+      
+      // Prepare the data to save
+      const saveData = {
+        businessType: calculationInputs?.businessType || result.businessType || "freelancer",
+        period: calculationInputs?.period || result.period || "yearly",
+        income: calculationInputs?.income || result.grossIncome || 0,
+        rentPaid: calculationInputs?.rentPaid || result.reliefs?.rentRelief ? (result.reliefs.rentRelief / 0.2) : 0,
+        pensionContribution: calculationInputs?.pensionContribution || result.reliefs?.pension || 0,
+        healthInsurance: calculationInputs?.healthInsurance || result.reliefs?.healthInsurance || 0,
+        housingFund: calculationInputs?.housingFund || result.reliefs?.housingFund || 0,
+        lifeInsurance: calculationInputs?.lifeInsurance || result.reliefs?.lifeInsurance || 0,
+        charitableDonations: calculationInputs?.charitableDonations || result.reliefs?.charitable || 0,
+        businessExpenses: calculationInputs?.businessExpenses || result.businessExpenses || 0,
+        dependents: calculationInputs?.dependents || 0,
+        result: result,
+        incomeBreakdown: result.incomeBreakdown,
+        businessExpensesBreakdown: result.businessExpensesBreakdown,
+        creatorExpensesBreakdown: result.creatorExpensesBreakdown,
+      }
+
+      const response = await fetch("/api/tax-calculations/save", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(saveData),
+      })
+
+      const data = await response.json()
+
+      if (data.success) {
+        toast.success("Tax calculation saved successfully")
+      } else {
+        toast.error(data.error || "Failed to save calculation")
+      }
+    } catch (error) {
+      console.error("Error saving calculation:", error)
+      toast.error("An error occurred. Please try again.")
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -294,13 +650,40 @@ export function TaxBreakdown({ result }: TaxBreakdownProps) {
       </div>
 
       <div className="flex gap-3 mt-6 pt-6 border-t border-border">
-        <Button variant="outline" className="flex-1 bg-transparent">
-          <Download className="w-4 h-4 mr-2" />
-          Download PDF
+        <Button
+          variant="outline"
+          className="flex-1 bg-transparent"
+          onClick={handlePrint}
+          disabled={isPrinting}
+        >
+          {isPrinting ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Preparing...
+            </>
+          ) : (
+            <>
+              <Printer className="w-4 h-4 mr-2" />
+              Print
+            </>
+          )}
         </Button>
-        <Button className="flex-1">
-          <FileText className="w-4 h-4 mr-2" />
-          Save Calculation
+        <Button
+          className="flex-1"
+          onClick={handleSaveCalculation}
+          disabled={isSaving || !user}
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            <>
+              <FileText className="w-4 h-4 mr-2" />
+              Save Calculation
+            </>
+          )}
         </Button>
       </div>
     </Card>

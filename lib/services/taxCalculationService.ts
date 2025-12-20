@@ -49,6 +49,7 @@ export class TaxCalculationService extends BaseService {
     rentPaid: number
     pensionContribution: number
     healthInsurance: number
+    housingFund?: number
     lifeInsurance: number
     charitableDonations: number
     businessExpenses: number
