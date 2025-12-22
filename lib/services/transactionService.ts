@@ -64,6 +64,33 @@ export class TransactionService extends BaseService {
         })
       }
       
+      // Apply search filter (searches across description, category, notes, tags, and amount)
+      if (filters?.search && filters.search.trim()) {
+        const searchTerm = filters.search.toLowerCase().trim()
+        filtered = filtered.filter(t => {
+          // Search in description
+          if (t.description?.toLowerCase().includes(searchTerm)) return true
+          
+          // Search in category
+          if (t.category?.toLowerCase().includes(searchTerm)) return true
+          
+          // Search in notes
+          if (t.notes?.toLowerCase().includes(searchTerm)) return true
+          
+          // Search in tags
+          if (t.tags && t.tags.some((tag: string) => tag.toLowerCase().includes(searchTerm))) return true
+          
+          // Search in amount (if search term is numeric)
+          const numericSearch = parseFloat(searchTerm.replace(/[\u20A6,]/g, ''))
+          if (!isNaN(numericSearch)) {
+            const amount = typeof t.amount === 'number' ? t.amount : Number(String(t.amount).replace(/[\u20A6,]/g, '').trim()) || 0
+            if (amount === numericSearch || amount.toString().includes(searchTerm)) return true
+          }
+          
+          return false
+        })
+      }
+      
       // Sort by date descending
       filtered.sort((a, b) => {
         const dateA = a.date ? new Date(a.date).getTime() : 0
@@ -284,6 +311,35 @@ export class TransactionService extends BaseService {
         return {
           success: false,
           error: 'Unauthorized: You can only delete your own transactions'
+        }
+      }
+
+      // Delete all attachment files from ImageKit
+      if (existingTransaction.attachmentFileIds && existingTransaction.attachmentFileIds.length > 0) {
+        try {
+          for (const fileId of existingTransaction.attachmentFileIds) {
+            if (fileId) {
+              try {
+                const response = await fetch(`/api/delete-image?fileId=${encodeURIComponent(fileId)}`, {
+                  method: 'DELETE',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                })
+                if (!response.ok) {
+                  console.warn(`Failed to delete ImageKit file ${fileId} for transaction ${transactionId}`)
+                } else {
+                  console.log(`Deleted ImageKit file ${fileId} for transaction ${transactionId}`)
+                }
+              } catch (deleteError) {
+                console.error(`Error deleting ImageKit file ${fileId}:`, deleteError)
+                // Continue with other files even if one fails
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error deleting attachment files from ImageKit:', error)
+          // Continue with transaction deletion even if file deletion fails
         }
       }
 

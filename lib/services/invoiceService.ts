@@ -563,7 +563,11 @@ export class InvoiceService extends BaseService {
           date: new Date().toISOString().split('T')[0],
           paymentMethod: paymentMethod || 'other',
           taxDeductible: taxDeductible !== undefined ? taxDeductible : true, // Default to true if not specified
-          notes: `Invoice: ${invoice.invoiceNumber}\nSupplier: ${invoice.supplier?.name || 'Unknown'}${invoice.items && invoice.items.length > 0 ? `\nItems: ${invoice.items.map((item: InvoiceItem) => item.description).join(', ')}` : ''}`
+          notes: `Invoice: ${invoice.invoiceNumber}\nSupplier: ${invoice.supplier?.name || 'Unknown'}${invoice.items && invoice.items.length > 0 ? `\nItems: ${invoice.items.map((item: InvoiceItem) => item.description).join(', ')}` : ''}`,
+          // Bidirectional invoice linking
+          linkedInvoiceId: invoiceId,
+          isFromInvoice: true,
+          invoiceStatus: 'completed' // Payment completed when marked as paid
         }
         
         // Only include receiptUrl and attachments if they have values
@@ -682,7 +686,11 @@ export class InvoiceService extends BaseService {
           date: new Date().toISOString().split('T')[0],
           paymentMethod: paymentMethod || invoice.paymentMethod || 'other',
           taxDeductible: false, // Sales invoices are not tax deductible
-          notes: `Invoice: ${invoice.invoiceNumber}\nClient: ${invoice.client.name}${invoice.items && invoice.items.length > 0 ? `\nItems: ${invoice.items.map((item: InvoiceItem) => item.description).join(', ')}` : ''}`
+          notes: `Invoice: ${invoice.invoiceNumber}\nClient: ${invoice.client.name}${invoice.items && invoice.items.length > 0 ? `\nItems: ${invoice.items.map((item: InvoiceItem) => item.description).join(', ')}` : ''}`,
+          // Bidirectional invoice linking
+          linkedInvoiceId: invoiceId,
+          isFromInvoice: true,
+          invoiceStatus: 'completed' // Payment confirmed when supplier confirms receipt
         }
         
         // Only include receiptUrl and attachments if they have values

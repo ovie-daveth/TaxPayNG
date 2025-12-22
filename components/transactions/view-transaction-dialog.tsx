@@ -1,0 +1,410 @@
+"use client"
+
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Separator } from "@/components/ui/separator"
+import { 
+  Calendar, 
+  DollarSign, 
+  FileText, 
+  Tag, 
+  Paperclip, 
+  Building2, 
+  User, 
+  ArrowUpRight, 
+  ArrowDownRight,
+  Receipt,
+  CreditCard,
+  Globe
+} from "lucide-react"
+import { Transaction } from "@/lib/types"
+import { formatDate } from "@/lib/utils/date"
+import { ImageViewerModal } from "@/components/ui/image-viewer-modal"
+import { useState } from "react"
+
+interface ViewTransactionDialogProps {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  transaction: Transaction | null
+  onEdit?: () => void
+}
+
+export function ViewTransactionDialog({
+  open,
+  onOpenChange,
+  transaction,
+  onEdit
+}: ViewTransactionDialogProps) {
+  const [isImageViewerOpen, setIsImageViewerOpen] = useState(false)
+  const [selectedImages, setSelectedImages] = useState<string[]>([])
+
+  if (!transaction) return null
+
+  const handleViewImages = () => {
+    if (transaction.attachments && transaction.attachments.length > 0) {
+      setSelectedImages(transaction.attachments)
+      setIsImageViewerOpen(true)
+    }
+  }
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
+      minimumFractionDigits: 0,
+    }).format(amount)
+  }
+
+  const getCategoryBadgeVariant = (category: string, type: Transaction['type']) => {
+    if (type === 'income') {
+      const incomeCategories = [
+        'Brand Sponsorship', 'Brand Deal', 'Ad Revenue', 'Affiliate Income',
+        'Content Licensing', 'Merchandise Sales', 'Subscription Revenue',
+        'Online Courses', 'Events & Speaking', 'Platform Payout'
+      ]
+      if (incomeCategories.some(cat => category.includes(cat) || cat.includes(category))) {
+        return 'default'
+      }
+    } else {
+      const expenseCategories = [
+        'Equipment', 'Software & Subscriptions', 'Studio Rent', 'Co-working Space',
+        'Editing Services', 'Marketing & Promotion', 'Travel for Content'
+      ]
+      if (expenseCategories.some(cat => category.includes(cat) || cat.includes(category))) {
+        return 'secondary'
+      }
+    }
+    return 'outline'
+  }
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="text-lg sm:text-xl flex items-center gap-2">
+                  {transaction.type === 'income' ? (
+                    <ArrowUpRight className="w-5 h-5 text-primary" />
+                  ) : (
+                    <ArrowDownRight className="w-5 h-5 text-destructive" />
+                  )}
+                  Transaction Details
+                </DialogTitle>
+                <DialogDescription className="text-xs sm:text-sm mt-1">
+                  View complete transaction information
+                </DialogDescription>
+              </div>
+              {onEdit && (
+                <Button variant="outline" size="sm" onClick={onEdit}>
+                  Edit
+                </Button>
+              )}
+            </div>
+          </DialogHeader>
+
+          <div className="space-y-6 mt-4">
+            {/* Basic Information */}
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <FileText className="w-4 h-4" />
+                  Basic Information
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Description</p>
+                    <p className="text-sm font-medium">{transaction.description}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Type</p>
+                    <Badge variant={transaction.type === 'income' ? 'default' : 'destructive'} className="text-xs">
+                      {transaction.type === 'income' ? 'Income' : transaction.type === 'expense' ? 'Expense' : 'Tax Relief'}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Category</p>
+                    <Badge 
+                      variant={getCategoryBadgeVariant(transaction.category, transaction.type)} 
+                      className="text-xs font-medium"
+                    >
+                      {transaction.category}
+                    </Badge>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Payment Method</p>
+                    <p className="text-sm font-medium flex items-center gap-1">
+                      <CreditCard className="w-3 h-3" />
+                      {transaction.paymentMethod}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Amount & Currency */}
+            <div>
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <DollarSign className="w-4 h-4" />
+                Amount & Currency
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Amount</p>
+                  <p className={`text-lg font-bold ${transaction.type === 'income' ? 'text-primary' : 'text-destructive'}`}>
+                    {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                  </p>
+                </div>
+                {transaction.currency && transaction.currency !== 'NGN' && (
+                  <>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Original Currency</p>
+                      <p className="text-sm font-medium flex items-center gap-1">
+                        <Globe className="w-3 h-3" />
+                        {transaction.currency}
+                      </p>
+                    </div>
+                    {transaction.ngnEquivalent && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">NGN Equivalent</p>
+                        <p className="text-sm font-medium">≈ {formatCurrency(transaction.ngnEquivalent)}</p>
+                      </div>
+                    )}
+                    {transaction.exchangeRate && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Exchange Rate (Locked)</p>
+                        <p className="text-sm font-medium">
+                          1 {transaction.currency} = ₦{transaction.exchangeRate.toLocaleString('en-NG', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })}
+                        </p>
+                        {transaction.exchangeRateDate && (
+                          <p className="text-[10px] text-muted-foreground mt-0.5">
+                            Locked on {formatDate(transaction.exchangeRateDate)}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Dates */}
+            <div>
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                Dates
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {transaction.transactionDate && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Transaction Date</p>
+                    <p className="text-sm font-medium">{formatDate(transaction.transactionDate)}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">When transaction occurred</p>
+                  </div>
+                )}
+                {transaction.valueDate && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Payment Date</p>
+                    <p className="text-sm font-medium">{formatDate(transaction.valueDate)}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">When money moved</p>
+                  </div>
+                )}
+                {transaction.taxPeriod && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Tax Period</p>
+                    <p className="text-sm font-medium">
+                      {transaction.taxPeriod.year}
+                      {transaction.taxPeriod.quarter && ` - Q${transaction.taxPeriod.quarter}`}
+                      {transaction.taxPeriod.month && ` - Month ${transaction.taxPeriod.month}`}
+                    </p>
+                  </div>
+                )}
+                {!transaction.transactionDate && !transaction.valueDate && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Date</p>
+                    <p className="text-sm font-medium">{formatDate(transaction.date)}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Business/Personal Status */}
+            {transaction.transactionNature && (
+              <>
+                <div>
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    {transaction.transactionNature === 'business' ? (
+                      <Building2 className="w-4 h-4" />
+                    ) : transaction.transactionNature === 'personal' ? (
+                      <User className="w-4 h-4" />
+                    ) : (
+                      <Building2 className="w-4 h-4" />
+                    )}
+                    Transaction Nature
+                  </h3>
+                  <div className="flex items-center gap-2">
+                    <Badge 
+                      variant={transaction.transactionNature === 'business' ? 'default' : transaction.transactionNature === 'personal' ? 'secondary' : 'outline'} 
+                      className="text-xs"
+                    >
+                      {transaction.transactionNature === 'business' ? 'Business' : transaction.transactionNature === 'personal' ? 'Personal' : 'Mixed'}
+                    </Badge>
+                    {transaction.transactionNature === 'mixed' && transaction.businessPercentage !== undefined && (
+                      <span className="text-xs text-muted-foreground">
+                        ({transaction.businessPercentage}% business-related)
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <Separator />
+              </>
+            )}
+
+            {/* Tax Information */}
+            <div>
+              <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                <Receipt className="w-4 h-4" />
+                Tax Information
+              </h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Tax Deductible</p>
+                  <Badge variant={transaction.taxDeductible ? 'default' : 'outline'} className="text-xs">
+                    {transaction.taxDeductible ? 'Deductible' : 'Non-deductible'}
+                  </Badge>
+                </div>
+                {transaction.taxClassification && (
+                  <div>
+                    <p className="text-xs text-muted-foreground mb-1">Tax Classification</p>
+                    <div className="flex flex-wrap gap-1">
+                      {transaction.taxClassification.incomeType && (
+                        <Badge variant="outline" className="text-xs">
+                          {transaction.taxClassification.incomeType}
+                        </Badge>
+                      )}
+                      {transaction.taxClassification.expenseType && (
+                        <Badge variant="outline" className="text-xs">
+                          {transaction.taxClassification.expenseType}
+                        </Badge>
+                      )}
+                      {transaction.taxClassification.isCapitalAsset && (
+                        <Badge variant="outline" className="text-xs">
+                          Capital Asset
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Additional Information */}
+            {(transaction.notes || transaction.tags?.length || transaction.linkedInvoiceId) && (
+              <>
+                <div>
+                  <h3 className="text-sm font-semibold mb-3">Additional Information</h3>
+                  <div className="space-y-3">
+                    {transaction.notes && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Notes</p>
+                        <p className="text-sm whitespace-pre-wrap">{transaction.notes}</p>
+                      </div>
+                    )}
+                    {transaction.tags && transaction.tags.length > 0 && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-2 flex items-center gap-1">
+                          <Tag className="w-3 h-3" />
+                          Tags
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {transaction.tags.map((tag, idx) => (
+                            <Badge key={idx} variant="outline" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {transaction.linkedInvoiceId && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
+                          <FileText className="w-3 h-3" />
+                          Linked Invoice
+                        </p>
+                        <Badge variant="outline" className="text-xs">
+                          Invoice ID: {transaction.linkedInvoiceId.substring(0, 8)}...
+                        </Badge>
+                        {transaction.isFromInvoice && (
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            This transaction was created from an invoice
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <Separator />
+              </>
+            )}
+
+            {/* Attachments */}
+            {transaction.attachments && transaction.attachments.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                  <Paperclip className="w-4 h-4" />
+                  Attachments
+                </h3>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleViewImages}
+                    className="gap-2"
+                  >
+                    <Paperclip className="w-4 h-4" />
+                    View {transaction.attachments.length} {transaction.attachments.length === 1 ? 'Receipt' : 'Receipts'}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Metadata */}
+            <div className="pt-2 border-t">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs text-muted-foreground">
+                <div>
+                  <p>Created: {formatDate(transaction.createdAt)}</p>
+                </div>
+                {transaction.updatedAt !== transaction.createdAt && (
+                  <div>
+                    <p>Last Updated: {formatDate(transaction.updatedAt)}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <ImageViewerModal
+        open={isImageViewerOpen}
+        onOpenChange={setIsImageViewerOpen}
+        images={selectedImages}
+        title={`${transaction.description} - Receipts`}
+      />
+    </>
+  )
+}
+

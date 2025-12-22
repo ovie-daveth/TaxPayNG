@@ -4,11 +4,12 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowUpRight, ArrowDownRight, MoreVertical, Pencil, Trash2, Paperclip } from "lucide-react"
+import { ArrowUpRight, ArrowDownRight, MoreVertical, Pencil, Trash2, Paperclip, FileText, Tag, Eye } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DeleteConfirmationModal } from "@/components/ui/delete-confirmation-modal"
 import { Transaction } from "@/lib/types"
 import { AddTransactionDialog } from "./add-transaction-dialog"
+import { ViewTransactionDialog } from "./view-transaction-dialog"
 import { ImageViewerModal } from "@/components/ui/image-viewer-modal"
 import { formatDate } from "@/lib/utils/date"
 import { useTransactions } from "@/lib/hooks/useTransactions"
@@ -37,6 +38,8 @@ export function TransactionList({
 }: TransactionListProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
+  const [viewingTransaction, setViewingTransaction] = useState<Transaction | null>(null)
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false)
   const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [selectedTransactionTitle, setSelectedTransactionTitle] = useState('')
@@ -85,8 +88,39 @@ export function TransactionList({
     }).format(amount)
   }
 
+  // Get category badge color based on category type (for creators)
+  const getCategoryBadgeVariant = (category: string, type: Transaction['type']) => {
+    if (type === 'income') {
+      // Income categories - use primary colors
+      const incomeCategories = [
+        'Brand Sponsorship', 'Brand Deal', 'Ad Revenue', 'Affiliate Income',
+        'Content Licensing', 'Merchandise Sales', 'Subscription Revenue',
+        'Online Courses', 'Events & Speaking', 'Platform Payout'
+      ]
+      if (incomeCategories.some(cat => category.includes(cat) || cat.includes(category))) {
+        return 'default' // Primary color
+      }
+    } else {
+      // Expense categories - use secondary colors
+      const expenseCategories = [
+        'Equipment', 'Software & Subscriptions', 'Studio Rent', 'Co-working Space',
+        'Editing Services', 'Marketing & Promotion', 'Travel for Content'
+      ]
+      if (expenseCategories.some(cat => category.includes(cat) || cat.includes(category))) {
+        return 'secondary'
+      }
+    }
+    return 'outline' // Default for custom categories
+  }
+
+  const handleView = (transaction: Transaction) => {
+    setViewingTransaction(transaction)
+    setIsViewDialogOpen(true)
+  }
+
   const handleEdit = (transaction: Transaction) => {
     setEditingTransaction(transaction)
+    setIsViewDialogOpen(false) // Close view dialog if open
     setIsAddDialogOpen(true)
   }
 
@@ -238,15 +272,17 @@ export function TransactionList({
     <Card className="overflow-hidden">
       {/* Desktop View */}
       <div className="hidden md:block overflow-x-auto w-full">
-        <table className={`w-full min-w-[900px]  ${!sidebarCollapsed ? 'lg:min-w-[1050px] md:min-w-[700px]' : 'lg:min-w-[800px] md:min-w-[580px]'}`}>
+        <table className={`w-full min-w-[1000px]  ${!sidebarCollapsed ? 'lg:min-w-[1150px] md:min-w-[800px]' : 'lg:min-w-[900px] md:min-w-[650px]'}`}>
           <thead className="bg-muted/50 border-b border-border">
             <tr>
               <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[140px] md:w-[160px]">Date</th>
               <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground min-w-[180px] md:min-w-[200px] lg:min-w-[220px]">Description</th>
-              <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[140px] md:w-[160px]">Category</th>
-              <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground hidden lg:table-cell w-[160px]">Payment Method</th>
+              <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[160px] md:w-[180px]">Category</th>
+              <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground hidden xl:table-cell w-[140px]">Payment Method</th>
               <th className="text-right py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[140px] md:w-[160px]">Amount</th>
-              <th className="text-center py-3 md:py-4 lg:py-4 px-3 md:px-4 lg:px-5 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground hidden lg:table-cell w-[180px] md:w-[200px]">Status</th>
+              <th className="text-center py-3 md:py-4 lg:py-4 px-3 md:px-4 lg:px-5 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground hidden lg:table-cell w-[180px] md:w-[200px]">
+                {profile?.businessType === 'creator' ? 'Type' : 'Status'}
+              </th>
               <th className="text-right py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[100px]">Actions</th>
             </tr>
           </thead>
@@ -264,7 +300,9 @@ export function TransactionList({
                     animation: 'highlightFade 3s ease-out forwards'
                   } : undefined}
                 >
-                  <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm align-top">{formatDate(transaction.date)}</td>
+                  <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm align-top">
+                    {formatDate(transaction.transactionDate || transaction.valueDate || transaction.date)}
+                  </td>
                   <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 align-top">
                     <div className="flex items-center gap-2 md:gap-2.5 min-w-0">
                       <span className="text-xs md:text-sm lg:text-sm font-medium truncate">{transaction.description}</span>
@@ -280,28 +318,91 @@ export function TransactionList({
                     </div>
                   </td>
                   <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 align-top">
-                    <Badge variant="secondary" className="text-xs md:text-sm">
-                      {transaction.category}
-                    </Badge>
+                    <div className="flex flex-col gap-1.5">
+                      <Badge 
+                        variant={getCategoryBadgeVariant(transaction.category, transaction.type)} 
+                        className="text-xs md:text-sm w-fit font-medium"
+                      >
+                        {transaction.category}
+                      </Badge>
+                      {transaction.tags && transaction.tags.length > 0 && (() => {
+                        // Filter out tags that conflict with transaction nature/status
+                        const excludedTags = ['personal', 'business', 'mixed', 'deductible', 'non-deductible', 'tax deductible']
+                        const filteredTags = transaction.tags.filter(tag => 
+                          !excludedTags.some(excluded => tag.toLowerCase() === excluded.toLowerCase())
+                        )
+                        return filteredTags.length > 0 && (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <Tag className="w-3 h-3 text-muted-foreground" />
+                            {filteredTags.slice(0, 2).map((tag, idx) => (
+                              <span key={idx} className="text-[10px] text-muted-foreground">
+                                {tag}
+                              </span>
+                            ))}
+                            {filteredTags.length > 2 && (
+                              <span className="text-[10px] text-muted-foreground">
+                                +{filteredTags.length - 2}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })()}
+                      {transaction.linkedInvoiceId && (
+                        <div className="flex items-center gap-1">
+                          <FileText className="w-3 h-3 text-primary" />
+                          <span className="text-[10px] text-primary">Linked to invoice</span>
+                        </div>
+                      )}
+                    </div>
                   </td>
-                  <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm text-muted-foreground hidden lg:table-cell align-top">{transaction.paymentMethod}</td>
+                  <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm text-muted-foreground hidden xl:table-cell align-top">{transaction.paymentMethod}</td>
                   <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-right align-top">
-                    <span
-                      className={`text-xs md:text-sm lg:text-sm font-semibold whitespace-nowrap ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}
-                    >
-                      {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
-                    </span>
+                    <div className="flex flex-col items-end gap-0.5">
+                      <span
+                        className={`text-xs md:text-sm lg:text-sm font-semibold whitespace-nowrap ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}
+                      >
+                        {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
+                      </span>
+                      {transaction.currency && transaction.currency !== 'NGN' && (
+                        <span className="text-[10px] text-muted-foreground">
+                          {transaction.currency} {transaction.ngnEquivalent ? `(≈₦${formatCurrency(transaction.ngnEquivalent).replace('₦', '')})` : ''}
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3 md:py-4 lg:py-4 px-3 md:px-4 lg:px-5 text-center hidden lg:table-cell align-top">
-                    {transaction.taxDeductible ? (
-                      <Badge variant="outline" className="text-xs md:text-sm">
-                        Deductible
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-xs md:text-sm">
-                        Non-deductible
-                      </Badge>
-                    )}
+                    <div className="flex flex-col items-center gap-1">
+                      {profile?.businessType === 'creator' ? (
+                        // For creators: Show transaction nature (Business/Personal/Mixed)
+                        transaction.transactionNature ? (
+                          <>
+                            <Badge 
+                              variant={transaction.transactionNature === 'business' ? 'default' : transaction.transactionNature === 'personal' ? 'secondary' : 'outline'} 
+                              className="text-xs md:text-sm"
+                            >
+                              {transaction.transactionNature === 'business' ? 'Business' : transaction.transactionNature === 'personal' ? 'Personal' : 'Mixed'}
+                            </Badge>
+                            {transaction.transactionNature === 'mixed' && transaction.businessPercentage !== undefined && (
+                              <span className="text-[10px] text-muted-foreground">
+                                {transaction.businessPercentage}% business
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <Badge variant="outline" className="text-xs md:text-sm">
+                            Business
+                          </Badge>
+                        )
+                      ) : (
+                        // For freelancers: Show tax deductible status
+                        <Badge 
+                          variant={transaction.taxDeductible ? 'default' : 'secondary'} 
+                          className="text-xs md:text-sm"
+                        >
+                          {transaction.taxDeductible ? 'Tax Deductible' : 'Non-deductible'}
+                        </Badge>
+                      )}
+                    </div>
                   </td>
                   <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-right">
                     <DropdownMenu>
@@ -311,15 +412,19 @@ export function TransactionList({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem className="cursor-pointer" onClick={() => handleEdit(transaction)}>
-                          <Pencil className="w-4 h-4 mr-2" />
+                        <DropdownMenuItem className="group cursor-pointer" onClick={() => handleView(transaction)}>
+                          <Eye className="w-4 h-4 mr-2 text-foreground group-hover:text-foreground dark:group-hover:text-gray-100" />
+                          View
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="group cursor-pointer" onClick={() => handleEdit(transaction)}>
+                          <Pencil className="w-4 h-4 mr-2 text-foreground group-hover:text-foreground dark:group-hover:text-gray-100" />
                           Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          className="text-destructive cursor-pointer"
+                          className="text-destructive group cursor-pointer"
                           onClick={() => handleDeleteClick(transaction.id)}
                         >
-                          <Trash2 className="w-4 h-4 mr-2" />
+                          <Trash2 className="w-4 h-4 mr-2 text-destructive group-hover:text-destructive dark:group-hover:text-red-400" />
                           Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -372,7 +477,9 @@ export function TransactionList({
                         </button>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-1">{formatDate(transaction.date)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formatDate(transaction.transactionDate || transaction.valueDate || transaction.date)}
+                    </p>
                   </div>
                 </div>
                 <DropdownMenu>
@@ -382,44 +489,125 @@ export function TransactionList({
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
-                    <DropdownMenuItem className="cursor-pointer" onClick={() => handleEdit(transaction)}>
-                      <Pencil className="w-4 h-4 mr-2" />
+                    <DropdownMenuItem className="group cursor-pointer" onClick={() => handleView(transaction)}>
+                      <Eye className="w-4 h-4 mr-2 text-foreground group-hover:text-foreground dark:group-hover:text-gray-100" />
+                      View
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="group cursor-pointer" onClick={() => handleEdit(transaction)}>
+                      <Pencil className="w-4 h-4 mr-2 text-foreground group-hover:text-foreground dark:group-hover:text-gray-100" />
                       Edit
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      className="text-destructive cursor-pointer"
+                      className="text-destructive group cursor-pointer"
                       onClick={() => handleDeleteClick(transaction.id)}
                     >
-                      <Trash2 className="w-4 h-4 mr-2" />
+                      <Trash2 className="w-4 h-4 mr-2 text-destructive group-hover:text-destructive dark:group-hover:text-red-400" />
                       Delete
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
               </div>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">
-                    {transaction.category}
-                  </Badge>
-                  {transaction.taxDeductible && (
-                    <Badge variant="outline" className="text-xs">
-                      Tax Deductible
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge 
+                      variant={getCategoryBadgeVariant(transaction.category, transaction.type)} 
+                      className="text-xs font-medium"
+                    >
+                      {transaction.category}
                     </Badge>
+                    {profile?.businessType === 'creator' ? (
+                      // For creators: Show transaction nature (Business/Personal/Mixed)
+                      transaction.transactionNature ? (
+                        <Badge 
+                          variant={transaction.transactionNature === 'business' ? 'default' : transaction.transactionNature === 'personal' ? 'secondary' : 'outline'} 
+                          className="text-xs"
+                        >
+                          {transaction.transactionNature === 'business' ? 'Business' : transaction.transactionNature === 'personal' ? 'Personal' : 'Mixed'}
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs">
+                          Business
+                        </Badge>
+                      )
+                    ) : (
+                      // For freelancers: Show tax deductible status
+                      <Badge 
+                        variant={transaction.taxDeductible ? 'default' : 'secondary'} 
+                        className="text-xs"
+                      >
+                        {transaction.taxDeductible ? 'Tax Deductible' : 'Non-deductible'}
+                      </Badge>
+                    )}
+                  </div>
+                  {transaction.tags && transaction.tags.length > 0 && (() => {
+                    // Filter out tags that conflict with transaction nature/status
+                    const excludedTags = ['personal', 'business', 'mixed', 'deductible', 'non-deductible', 'tax deductible']
+                    const filteredTags = transaction.tags.filter(tag => 
+                      !excludedTags.some(excluded => tag.toLowerCase() === excluded.toLowerCase())
+                    )
+                    return filteredTags.length > 0 && (
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <Tag className="w-3 h-3 text-muted-foreground" />
+                        {filteredTags.slice(0, 2).map((tag, idx) => (
+                          <span key={idx} className="text-[10px] text-muted-foreground">
+                            {tag}
+                          </span>
+                        ))}
+                        {filteredTags.length > 2 && (
+                          <span className="text-[10px] text-muted-foreground">
+                            +{filteredTags.length - 2}
+                          </span>
+                        )}
+                      </div>
+                    )
+                  })()}
+                  {transaction.linkedInvoiceId && (
+                    <div className="flex items-center gap-1">
+                      <FileText className="w-3 h-3 text-primary" />
+                      <span className="text-[10px] text-primary">Linked to invoice</span>
+                    </div>
                   )}
                 </div>
-                <span className={`font-semibold ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}>
-                  {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
-                </span>
+                <div className="flex flex-col items-end">
+                  <span className={`font-semibold text-sm ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}>
+                    {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
+                  </span>
+                  {transaction.currency && transaction.currency !== 'NGN' && (
+                    <span className="text-[10px] text-muted-foreground">
+                      {transaction.currency}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           )
         })}
       </div>
 
+      {/* View Transaction Dialog */}
+      <ViewTransactionDialog
+        open={isViewDialogOpen}
+        onOpenChange={setIsViewDialogOpen}
+        transaction={viewingTransaction}
+        onEdit={() => {
+          if (viewingTransaction) {
+            setEditingTransaction(viewingTransaction)
+            setIsViewDialogOpen(false)
+            setIsAddDialogOpen(true)
+          }
+        }}
+      />
+
       {/* Add Transaction Dialog */}
       <AddTransactionDialog
         open={isAddDialogOpen}
-        onOpenChange={setIsAddDialogOpen}
+        onOpenChange={(open) => {
+          setIsAddDialogOpen(open)
+          if (!open) {
+            setEditingTransaction(null)
+          }
+        }}
         onSubmit={handleSubmit}
         transaction={editingTransaction || null}
       />

@@ -4,16 +4,31 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Calculator, LayoutDashboard, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight } from "lucide-react"
+import { Calculator, LayoutDashboard, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, Receipt, FileText, Bell, IdCardIcon, FileCheck, BarChart3, MessageSquare, Plus } from "lucide-react"
 import OtaxLogo from "../OtaxLogo"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { useAuth } from "@/lib/hooks/useAuth"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { toast } from "sonner"
+import { User } from "lucide-react"
+import { ThemeToggle } from "../theme-toggle"
+import { NotificationBell } from "../notifications/notification-bell"
+import { AddTransactionDialog } from "../transactions/add-transaction-dialog"
+import { useTransactions } from "@/lib/hooks/useTransactions"
+import { useSubscription } from "@/lib/hooks/useSubscription"
+import { SubscriptionRequiredModal } from "../subscription/subscription-required-modal"
 
 const navItems = [
-  { href: "/dashboard-creator", label: "Overview", icon: LayoutDashboard },
+  { href: "/dashboard-creator", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard-creator/transactions", label: "Transactions", icon: Receipt },
+  { href: "/dashboard-creator/invoices", label: "Invoices", icon: FileCheck },
+  { href: "/dashboard-creator/reports", label: "Reports", icon: BarChart3 },
+  { href: "/dashboard-creator/filing-requests", label: "Filing Requests", icon: MessageSquare },
   { href: "/dashboard-creator/tax-calculator", label: "Tax Calculator", icon: Calculator },
+  { href: "/dashboard-creator/payment", label: "Payment", icon: IdCardIcon },
+  { href: "/dashboard-creator/documents", label: "Documents", icon: FileText },
+  { href: "/dashboard-creator/reminders", label: "Reminders", icon: Bell },
   { href: "/dashboard-creator/settings", label: "Settings", icon: Settings },
 ]
 
@@ -22,7 +37,80 @@ export function DashboardNavCreator() {
   const router = useRouter()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { sidebarCollapsed, toggleSidebar } = useSidebar()
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
+  const { profile } = useUserProfile()
+  const [hasFilingRequests, setHasFilingRequests] = useState(false)
+  const [isAddTransactionDialogOpen, setIsAddTransactionDialogOpen] = useState(false)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+  
+  const { isSubscribed, isExpired, loading: subscriptionLoading } = useSubscription()
+  const { createTransaction } = useTransactions(user?.uid || null)
+  
+  const checkSubscription = (action: () => void) => {
+    // Wait for subscription status to load
+    if (subscriptionLoading) {
+      return
+    }
+    // Check if user is subscribed or expired - if not, show modal
+    if (!isSubscribed || isExpired) {
+      setShowSubscriptionModal(true)
+      return
+    }
+    // User is subscribed and not expired, proceed with action
+    action()
+  }
+  
+  // Get page info for mobile add button
+  const getMobileAddButton = () => {
+    switch (pathname) {
+      case "/dashboard-creator":
+        return { icon: Plus, action: () => router.push("/dashboard-creator/payment"), show: true }
+      case "/dashboard-creator/transactions":
+        return { icon: Plus, action: () => checkSubscription(() => setIsAddTransactionDialogOpen(true)), show: true }
+      case "/dashboard-creator/invoices":
+        return { icon: Plus, action: () => {
+          const event = new CustomEvent('createInvoice')
+          window.dispatchEvent(event)
+        }, show: true }
+      case "/dashboard-creator/documents":
+        return { icon: Plus, action: () => {}, show: true }
+      case "/dashboard-creator/reminders":
+        return { icon: Plus, action: () => {}, show: true }
+      case "/dashboard-creator/reports":
+        return { icon: Plus, action: () => router.push("/dashboard-creator/reports/generate/self-assessment"), show: true }
+      case "/dashboard-creator/payment":
+        return { icon: Plus, action: () => router.push("/dashboard-creator/payment/add"), show: true }
+      default:
+        return { icon: Plus, action: () => {}, show: false }
+    }
+  }
+  
+  const mobileAddButton = getMobileAddButton()
+  const AddButtonIcon = mobileAddButton.icon
+
+  useEffect(() => {
+    const checkFilingRequests = async () => {
+      if (!user?.uid) {
+        setHasFilingRequests(false)
+        return
+      }
+
+      try {
+        const response = await fetch(`/api/filing-requests?userId=${user.uid}`)
+        const result = await response.json()
+        if (result.success && result.data && result.data.length > 0) {
+          setHasFilingRequests(true)
+        } else {
+          setHasFilingRequests(false)
+        }
+      } catch (error) {
+        console.error("Error checking filing requests:", error)
+        setHasFilingRequests(false)
+      }
+    }
+
+    checkFilingRequests()
+  }, [user?.uid])
 
   const handleLogout = async () => {
     const result = await logout()
@@ -33,6 +121,14 @@ export function DashboardNavCreator() {
       toast.error(result.error || 'Failed to log out')
     }
   }
+
+  // Filter nav items based on whether user has filing requests
+  const filteredNavItems = navItems.filter(item => {
+    if (item.href === "/dashboard-creator/filing-requests") {
+      return hasFilingRequests
+    }
+    return true
+  })
 
   return (
     <>
@@ -46,11 +142,11 @@ export function DashboardNavCreator() {
             "flex items-center gap-2 transition-all duration-300",
             sidebarCollapsed && "justify-center"
           )}>
-            <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center flex-shrink-0">
-              <Calculator className="w-5 h-5 text-primary-foreground" />
-            </div>
             {!sidebarCollapsed && (
-              <span className="font-semibold text-lg whitespace-nowrap">OTax Creators</span>
+              <>
+                <OtaxLogo />
+                <span className="font-semibold text-lg whitespace-nowrap">- Creators</span>
+              </>
             )}
           </Link>
           <Button
@@ -68,9 +164,13 @@ export function DashboardNavCreator() {
         </div>
 
         <nav className="flex-1 p-4 space-y-8">
-          {navItems.map((item) => {
+          {filteredNavItems.map((item) => {
             const Icon = item.icon
-            const isActive = pathname === item.href
+            // For Dashboard, only match exact path (not sub-routes)
+            // For other routes, match exact path or sub-routes
+            const isActive = item.href === "/dashboard-creator"
+              ? pathname === item.href || pathname === item.href + "/"
+              : pathname === item.href || pathname?.startsWith(item.href + "/")
             return (
               <Link key={item.href} href={item.href}>
                 <div
@@ -95,7 +195,41 @@ export function DashboardNavCreator() {
           })}
         </nav>
 
-        <div className="p-4 border-t border-border">
+        <div className="p-4 border-t border-border space-y-3">
+          {/* User Info */}
+          {profile && (
+            <div className={cn(
+              "flex items-center gap-2 px-2 py-2 rounded-lg transition-all duration-200",
+              sidebarCollapsed ? "justify-center" : "justify-start"
+            )}>
+              <div className={cn(
+                "flex-shrink-0 rounded-full bg-primary/10 p-1.5 flex items-center justify-center",
+                sidebarCollapsed ? "w-8 h-8" : "w-9 h-9"
+              )}>
+                <User className={cn(
+                  "text-primary",
+                  sidebarCollapsed ? "w-4 h-4" : "w-5 h-5"
+                )} />
+              </div>
+              {!sidebarCollapsed && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {profile.firstName && profile.lastName 
+                      ? `${profile.firstName} ${profile.lastName}`
+                      : profile.firstName || profile.lastName || profile.email?.split('@')[0] || 'User'
+                    }
+                  </p>
+                  {profile.email && (
+                    <p className="text-xs text-muted-foreground truncate">
+                      {profile.email}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Logout Button */}
           <Button 
             variant="ghost" 
             className={cn(
@@ -118,22 +252,39 @@ export function DashboardNavCreator() {
 
       {/* Mobile Header */}
       <header className="md:hidden sticky top-0 z-50 bg-card border-b border-border">
-        <div className="flex items-center justify-between p-4">
+        <div className="flex items-center justify-between p-3 sm:p-4">
           <Link href="/dashboard-creator" className="flex items-center gap-2">
             <OtaxLogo />
-            <span className="text-xs text-muted-foreground ml-1">Creators</span>
           </Link>
-          <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
-          </Button>
+          <div className="flex items-center gap-1.5">
+            <NotificationBell />
+            <ThemeToggle />
+            {mobileAddButton.show && (
+              <Button 
+                variant="default"
+                size="icon"
+                onClick={mobileAddButton.action}
+                className="h-8 w-8 p-0"
+              >
+                <AddButtonIcon className="w-4 h-4" />
+              </Button>
+            )}
+            <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="h-10 w-10">
+              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            </Button>
+          </div>
         </div>
 
         {/* Mobile Menu */}
         {mobileMenuOpen && (
           <nav className="border-t border-border p-4 space-y-1">
-            {navItems.map((item) => {
+            {filteredNavItems.map((item) => {
               const Icon = item.icon
-              const isActive = pathname === item.href
+              // For Dashboard, only match exact path (not sub-routes)
+              // For other routes, match exact path or sub-routes
+              const isActive = item.href === "/dashboard-creator"
+                ? pathname === item.href || pathname === item.href + "/"
+                : pathname === item.href || pathname?.startsWith(item.href + "/")
               return (
                 <Link key={item.href} href={item.href} onClick={() => setMobileMenuOpen(false)}>
                   <div
@@ -163,6 +314,22 @@ export function DashboardNavCreator() {
         )}
       </header>
 
+      {/* Add Transaction Dialog */}
+      <AddTransactionDialog 
+        open={isAddTransactionDialogOpen} 
+        onOpenChange={setIsAddTransactionDialogOpen}
+        onSubmit={createTransaction}
+        transaction={null}
+      />
+      
+      {/* Subscription Required Modal */}
+      {(profile?.businessType !== 'agent' || !profile) && (
+        <SubscriptionRequiredModal
+          open={showSubscriptionModal}
+          onOpenChange={setShowSubscriptionModal}
+          businessType={profile?.businessType || 'creator'}
+        />
+      )}
     </>
   )
 }

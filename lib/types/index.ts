@@ -61,6 +61,38 @@ export interface UserProfile {
 // Transaction Types
 export type TransactionType = 'income' | 'expense' | 'relief'
 
+// Transaction Nature - for personal vs business separation
+export type TransactionNature = 'business' | 'personal' | 'mixed'
+
+// Tax Classification - comprehensive tax tagging
+export interface TaxClassification {
+  // For income transactions
+  incomeType?: 'taxable' | 'non-taxable' | 'exempt'
+  
+  // For expense transactions
+  expenseType?: 'allowable' | 'disallowable' | 'capital'
+  
+  // Capital asset tracking (for capital allowances)
+  isCapitalAsset?: boolean
+  capitalAllowanceRate?: number // e.g., 25% for annual allowance
+  
+  // VAT handling (future)
+  vatApplicable?: boolean
+  vatRate?: number
+  
+  // Withholding Tax (WHT) credits
+  whtCreditable?: boolean
+  whtRate?: number
+  whtAmount?: number
+}
+
+// Tax Period - for time-based tax calculations
+export interface TaxPeriod {
+  year: number
+  quarter?: number // 1-4
+  month?: number // 1-12
+}
+
 export interface Transaction {
   id: string
   userId: string
@@ -68,12 +100,38 @@ export interface Transaction {
   category: string
   amount: number
   description: string
-  date: string
+  date: string // Legacy field - kept for backward compatibility
+  
+  // Phase 1: Date separation for tax compliance
+  transactionDate?: string // When transaction occurred (invoice date, service date)
+  valueDate?: string // When money actually moved (payment date, receipt date)
+  taxPeriod?: TaxPeriod // Calculated tax period (year, quarter, month)
+  
+  // Phase 1: Personal vs Business separation
+  transactionNature?: TransactionNature // 'business' | 'personal' | 'mixed'
+  businessPercentage?: number // For mixed transactions (0-100)
+  
+  // Phase 1: Locked exchange rates
+  currency?: string // Original currency code (e.g., 'USD', 'NGN')
+  exchangeRate?: number // Exchange rate used at transaction date (locked)
+  exchangeRateDate?: string // Date when exchange rate was locked
+  ngnEquivalent?: number // Locked NGN equivalent amount
+  
   paymentMethod: string
-  taxDeductible: boolean
+  taxDeductible: boolean // Legacy field - kept for backward compatibility
+  
+  // Phase 1: Comprehensive tax classification
+  taxClassification?: TaxClassification
+  
+  // Invoice linking - bidirectional connection
+  linkedInvoiceId?: string // Reference to the invoice that created this transaction
+  invoiceStatus?: 'pending' | 'completed' // Status if transaction is from an invoice
+  isFromInvoice?: boolean // Quick flag to identify invoice-generated transactions
+  
   notes?: string
   tags?: string[]
-  attachments?: string[]
+  attachments?: string[] // Array of attachment URLs
+  attachmentFileIds?: string[] // Array of ImageKit fileIds corresponding to attachments (same order)
   receiptUrl?: string
   documentId?: string
   createdAt: string
@@ -95,6 +153,7 @@ export interface TransactionFilters {
     max: number
   }
   tags?: string[]
+  search?: string // Search term to filter by description, category, notes, tags
 }
 
 // Document Types

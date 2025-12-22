@@ -3,7 +3,7 @@
 import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { ChevronLeft, ChevronRight, X, Download, ExternalLink } from "lucide-react"
+import { ChevronLeft, ChevronRight, X, Download, ExternalLink, FileText } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 
 interface ImageViewerModalProps {
@@ -23,6 +23,13 @@ export function ImageViewerModal({
 
   const currentImage = images[currentIndex]
   const hasMultipleImages = images.length > 1
+  
+  // Check if current file is a PDF
+  const isPdf = (url: string) => {
+    return url.toLowerCase().endsWith('.pdf') || url.toLowerCase().includes('.pdf?') || url.toLowerCase().includes('application/pdf')
+  }
+  
+  const currentIsPdf = currentImage ? isPdf(currentImage) : false
 
   const goToPrevious = () => {
     setCurrentIndex(prev => prev === 0 ? images.length - 1 : prev - 1)
@@ -32,20 +39,21 @@ export function ImageViewerModal({
     setCurrentIndex(prev => prev === images.length - 1 ? 0 : prev + 1)
   }
 
-  const downloadImage = async () => {
+  const downloadFile = async () => {
     try {
       const response = await fetch(currentImage)
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `receipt-${currentIndex + 1}.jpg`
+      const extension = currentIsPdf ? 'pdf' : 'jpg'
+      a.download = `receipt-${currentIndex + 1}.${extension}`
       document.body.appendChild(a)
       a.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
     } catch (error) {
-      console.error('Failed to download image:', error)
+      console.error('Failed to download file:', error)
     }
   }
 
@@ -70,7 +78,7 @@ export function ImageViewerModal({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={downloadImage}
+                onClick={downloadFile}
                 className="flex items-center gap-2"
               >
                 <Download className="w-4 h-4" />
@@ -90,20 +98,28 @@ export function ImageViewerModal({
         </DialogHeader>
 
         <div className="relative flex-1 min-h-0">
-          {/* Image Container */}
-          <div className="relative h-[60vh] flex items-center justify-center bg-black/5">
+          {/* Image/PDF Container */}
+          <div className="relative h-[60vh] flex items-center justify-center bg-black/5 overflow-auto">
             {currentImage ? (
-              <img
-                src={currentImage}
-                alt={`Receipt ${currentIndex + 1}`}
-                className="max-h-full max-w-full object-contain rounded-lg shadow-lg"
-                onError={(e) => {
-                  e.currentTarget.src = '/placeholder-image.png'
-                }}
-              />
+              currentIsPdf ? (
+                <iframe
+                  src={currentImage}
+                  className="w-full h-full border-0 rounded-lg"
+                  title={`Receipt PDF ${currentIndex + 1}`}
+                />
+              ) : (
+                <img
+                  src={currentImage}
+                  alt={`Receipt ${currentIndex + 1}`}
+                  className="max-h-full max-w-full object-contain rounded-lg shadow-lg"
+                  onError={(e) => {
+                    e.currentTarget.src = '/placeholder-image.png'
+                  }}
+                />
+              )
             ) : (
               <div className="text-center text-muted-foreground">
-                <p>No image available</p>
+                <p>No file available</p>
               </div>
             )}
 
@@ -134,26 +150,35 @@ export function ImageViewerModal({
           {hasMultipleImages && (
             <div className="p-4 border-t bg-muted/30">
               <div className="flex gap-2 overflow-x-auto">
-                {images.map((image, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setCurrentIndex(index)}
-                    className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
-                      index === currentIndex 
-                        ? 'border-primary ring-2 ring-primary/20' 
-                        : 'border-border hover:border-primary/50'
-                    }`}
-                  >
-                    <img
-                      src={image}
-                      alt={`Receipt ${index + 1}`}
-                      className="w-full h-full object-cover"
-                      onError={(e) => {
-                        e.currentTarget.src = '/placeholder-image.png'
-                      }}
-                    />
-                  </button>
-                ))}
+                {images.map((image, index) => {
+                  const imageIsPdf = isPdf(image)
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentIndex(index)}
+                      className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                        index === currentIndex 
+                          ? 'border-primary ring-2 ring-primary/20' 
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      {imageIsPdf ? (
+                        <div className="w-full h-full bg-muted flex items-center justify-center">
+                          <FileText className="w-6 h-6 text-muted-foreground" />
+                        </div>
+                      ) : (
+                        <img
+                          src={image}
+                          alt={`Receipt ${index + 1}`}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            e.currentTarget.src = '/placeholder-image.png'
+                          }}
+                        />
+                      )}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           )}
