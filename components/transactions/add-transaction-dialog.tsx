@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { Upload, Scan, Loader2, AlertCircle } from "lucide-react"
-import { Transaction, TransactionNature, TaxPeriod } from "@/lib/types"
+import { Transaction, TransactionNature, TaxPeriod, TaxClassification } from "@/lib/types"
 import { toast } from "sonner"
 import { formatDateForInput, calculateTaxPeriod } from "@/lib/utils/date"
 import { uploadToImageKit, ImageUploadResult } from "@/lib/utils/imagekit"
@@ -202,6 +202,81 @@ export function AddTransactionDialog({
   // OCR is enabled for the first upload box, but disabled when manual entry is selected
   const hasOcrAccess = hasAccess('GOLD')
   const isOcrEnabled = hasOcrAccess && !isManualEntryMode
+  
+  // Check if user has access to Tax Classification (GOLD and above plans only)
+  const hasTaxClassificationAccess = hasAccess('GOLD')
+  
+  // Tax Classification state (only for Gold+ users)
+  const [taxClassification, setTaxClassification] = useState<TaxClassification | undefined>(undefined)
+  const [showTaxClassificationSection, setShowTaxClassificationSection] = useState(false)
+  
+  // Auto-populate tax classification based on transaction data (Gold+ only)
+  const autoPopulateTaxClassification = (
+    type: Transaction['type'],
+    category: string,
+    transactionNature: TransactionNature,
+    description: string,
+    notes: string
+  ): TaxClassification => {
+    const classification: TaxClassification = {}
+    
+    if (type === 'income') {
+      // Income classification
+      classification.incomeType = 'taxable' // Default to taxable
+      
+      // Check for WHT indicators
+      const hasWHT = description.toLowerCase().includes('wht') || 
+                     description.toLowerCase().includes('withholding') ||
+                     notes.toLowerCase().includes('wht') ||
+                     notes.toLowerCase().includes('withholding') ||
+                     category.toLowerCase().includes('wht')
+      
+      if (hasWHT) {
+        classification.whtCreditable = true
+        // Common WHT rates in Nigeria: 5%, 10%
+        classification.whtRate = category.includes('Professional') || category.includes('Consulting') ? 10 : 5
+      }
+      
+      // Non-taxable income categories
+      if (category === 'Gift' || category === 'Grant' || description.toLowerCase().includes('gift')) {
+        classification.incomeType = 'non-taxable'
+      }
+    } else {
+      // Expense classification
+      const isBusiness = transactionNature === 'business' || transactionNature === 'mixed'
+      
+      if (isBusiness) {
+        classification.expenseType = 'allowable'
+        
+        // Capital asset categories
+        const capitalAssetCategories = [
+          'Equipment', 'Software & Subscriptions', 'Studio Rent', 
+          'Camera', 'Computer', 'Vehicle', 'Furniture', 'Machinery'
+        ]
+        const isCapitalAsset = capitalAssetCategories.some(cat => 
+          category.toLowerCase().includes(cat.toLowerCase()) ||
+          description.toLowerCase().includes(cat.toLowerCase())
+        )
+        
+        if (isCapitalAsset) {
+          classification.isCapitalAsset = true
+          classification.capitalAllowanceRate = 25 // 25% annual allowance (standard in Nigeria)
+        }
+      } else {
+        // Personal expenses are not allowable
+        classification.expenseType = 'disallowable'
+      }
+      
+      // VAT applicable categories (common in Nigeria)
+      const vatCategories = ['Software', 'Equipment', 'Services', 'Professional Fees']
+      if (vatCategories.some(cat => category.includes(cat))) {
+        classification.vatApplicable = true
+        classification.vatRate = 7.5 // Standard VAT rate in Nigeria
+      }
+    }
+    
+    return classification
+  }
 
   const handleFileSelect = async (files: FileList | null) => {
     if (files && files.length > 0) {
@@ -439,6 +514,23 @@ export function AddTransactionDialog({
       // Invoice linking
       setSelectedInvoiceId(transaction.linkedInvoiceId || '')
       
+      // Tax Classification (Gold+ only)
+      if (hasTaxClassificationAccess) {
+        if (transaction.taxClassification) {
+          setTaxClassification(transaction.taxClassification)
+        } else {
+          // Auto-populate if not set
+          const autoClassification = autoPopulateTaxClassification(
+            transaction.type,
+            transaction.category,
+            transaction.transactionNature || 'business',
+            transaction.description,
+            transaction.notes || ''
+          )
+          setTaxClassification(autoClassification)
+        }
+      }
+      
       // Phase 2: Initialize platform fees and platform info
       if (profile?.businessType === 'creator' && transaction.type === 'income') {
         // Enable breakdown if platform fees data exists
@@ -522,8 +614,34 @@ export function AddTransactionDialog({
       setPlatformType('social')
       setPlatformAccountId('')
       setPlatformAccountUrl('')
+      
+      // Reset tax classification (Gold+ only)
+      if (hasTaxClassificationAccess) {
+        setTaxClassification(undefined)
+        setShowTaxClassificationSection(false)
+      }
     }
-  }, [transaction, open, defaultType, defaultCategory, defaultDescription, hasOcrAccess])
+  }, [transaction, open, defaultType, defaultCategory, defaultDescription, hasOcrAccess, hasTaxClassificationAccess])
+  
+  // Auto-populate tax classification when form data changes (Gold+ only)
+  useEffect(() => {
+    if (!hasTaxClassificationAccess) return
+    if (!formData.category || !formData.type) return
+    
+    // Auto-populate tax classification
+    const autoClassification = autoPopulateTaxClassification(
+      formData.type,
+      formData.category,
+      transactionNature,
+      formData.description,
+      formData.notes
+    )
+    
+    // Only auto-update if user hasn't manually edited (section is collapsed)
+    if (!showTaxClassificationSection) {
+      setTaxClassification(autoClassification)
+    }
+  }, [formData.type, formData.category, formData.description, formData.notes, transactionNature, hasTaxClassificationAccess, showTaxClassificationSection])
 
   // Load available invoices when dialog opens (for manual linking)
   useEffect(() => {
@@ -774,7 +892,9 @@ export function AddTransactionDialog({
         tags: formData.tags,
         attachments: imageUrl,
         attachmentFileIds: attachmentFileIds,
-        documentId: documentId
+        documentId: documentId,
+        // Tax Classification (Gold+ only)
+        taxClassification: hasTaxClassificationAccess ? taxClassification : undefined
       })
 
       console.log("Result:", result)
@@ -1723,6 +1843,203 @@ export function AddTransactionDialog({
                   onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
                 />
               </div>
+
+              {/* Tax Classification Section (Gold+ only) */}
+              {hasTaxClassificationAccess && taxClassification && (
+                <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label className="text-sm font-semibold">Tax Classification</Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Auto-populated based on transaction details. Click to edit.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowTaxClassificationSection(!showTaxClassificationSection)}
+                      className="h-8 text-xs"
+                    >
+                      {showTaxClassificationSection ? 'Hide' : 'Edit'}
+                    </Button>
+                  </div>
+                  
+                  {/* Read-only summary */}
+                  {!showTaxClassificationSection && (
+                    <div className="space-y-2 text-sm">
+                      {formData.type === 'income' && taxClassification.incomeType && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Income Type:</span>
+                          <span className="font-medium capitalize">{taxClassification.incomeType}</span>
+                        </div>
+                      )}
+                      {formData.type === 'expense' && taxClassification.expenseType && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Expense Type:</span>
+                          <span className="font-medium capitalize">{taxClassification.expenseType}</span>
+                        </div>
+                      )}
+                      {taxClassification.isCapitalAsset && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Capital Asset:</span>
+                          <span className="font-medium">Yes ({taxClassification.capitalAllowanceRate}% allowance)</span>
+                        </div>
+                      )}
+                      {taxClassification.whtCreditable && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">WHT Creditable:</span>
+                          <span className="font-medium">Yes {taxClassification.whtRate && `(${taxClassification.whtRate}%)`}</span>
+                        </div>
+                      )}
+                      {taxClassification.vatApplicable && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">VAT Applicable:</span>
+                          <span className="font-medium">Yes {taxClassification.vatRate && `(${taxClassification.vatRate}%)`}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Editable form */}
+                  {showTaxClassificationSection && (
+                    <div className="space-y-4 pt-2 border-t">
+                      {formData.type === 'income' && (
+                        <div className="space-y-2">
+                          <Label>Income Type</Label>
+                          <Select
+                            value={taxClassification.incomeType || 'taxable'}
+                            onValueChange={(value) => setTaxClassification(prev => ({
+                              ...prev,
+                              incomeType: value as 'taxable' | 'non-taxable' | 'exempt'
+                            }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="taxable">Taxable</SelectItem>
+                              <SelectItem value="non-taxable">Non-taxable</SelectItem>
+                              <SelectItem value="exempt">Exempt</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      
+                      {formData.type === 'expense' && (
+                        <>
+                          <div className="space-y-2">
+                            <Label>Expense Type</Label>
+                            <Select
+                              value={taxClassification.expenseType || 'allowable'}
+                              onValueChange={(value) => setTaxClassification(prev => ({
+                                ...prev,
+                                expenseType: value as 'allowable' | 'disallowable' | 'capital'
+                              }))}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="allowable">Allowable</SelectItem>
+                                <SelectItem value="disallowable">Disallowable</SelectItem>
+                                <SelectItem value="capital">Capital</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              checked={taxClassification.isCapitalAsset || false}
+                              onCheckedChange={(checked) => setTaxClassification(prev => ({
+                                ...prev,
+                                isCapitalAsset: checked,
+                                capitalAllowanceRate: checked ? (prev?.capitalAllowanceRate || 25) : undefined
+                              }))}
+                            />
+                            <Label className="text-sm">Is Capital Asset (for capital allowance)</Label>
+                          </div>
+                          
+                          {taxClassification.isCapitalAsset && (
+                            <div className="space-y-2">
+                              <Label>Capital Allowance Rate (%)</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                value={taxClassification.capitalAllowanceRate || 25}
+                                onChange={(e) => setTaxClassification(prev => ({
+                                  ...prev,
+                                  capitalAllowanceRate: parseFloat(e.target.value) || 25
+                                }))}
+                              />
+                            </div>
+                          )}
+                        </>
+                      )}
+                      
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={taxClassification.whtCreditable || false}
+                          onCheckedChange={(checked) => setTaxClassification(prev => ({
+                            ...prev,
+                            whtCreditable: checked,
+                            whtRate: checked ? (prev?.whtRate || 5) : undefined
+                          }))}
+                        />
+                        <Label className="text-sm">WHT Creditable (Withholding Tax)</Label>
+                      </div>
+                      
+                      {taxClassification.whtCreditable && (
+                        <div className="space-y-2">
+                          <Label>WHT Rate (%)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={taxClassification.whtRate || 5}
+                            onChange={(e) => setTaxClassification(prev => ({
+                              ...prev,
+                              whtRate: parseFloat(e.target.value) || 5
+                            }))}
+                          />
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={taxClassification.vatApplicable || false}
+                          onCheckedChange={(checked) => setTaxClassification(prev => ({
+                            ...prev,
+                            vatApplicable: checked,
+                            vatRate: checked ? (prev?.vatRate || 7.5) : undefined
+                          }))}
+                        />
+                        <Label className="text-sm">VAT Applicable</Label>
+                      </div>
+                      
+                      {taxClassification.vatApplicable && (
+                        <div className="space-y-2">
+                          <Label>VAT Rate (%)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={taxClassification.vatRate || 7.5}
+                            onChange={(e) => setTaxClassification(prev => ({
+                              ...prev,
+                              vatRate: parseFloat(e.target.value) || 7.5
+                            }))}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label>Tags (Optional)</Label>

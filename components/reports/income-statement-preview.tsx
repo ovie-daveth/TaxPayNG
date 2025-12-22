@@ -8,6 +8,7 @@ import { format } from "date-fns"
 import { Printer, ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useSubscription } from "@/lib/hooks/useSubscription"
 
 interface IncomeStatementPreviewProps {
   reportData: ReportData
@@ -20,9 +21,15 @@ interface IncomeStatementPreviewProps {
 
 export function IncomeStatementPreview({ reportData, formData, onBack }: IncomeStatementPreviewProps) {
   const { profile } = useUserProfile()
+  const { hasAccess } = useSubscription()
+  const hasGoldAccess = hasAccess('GOLD')
   const formatCurrency = (amount: number) => formatCurrencyAmount(amount, 'NGN')
   
   const userName = profile?.firstName || profile?.lastName || profile?.email?.split('@')[0] || 'there'
+  
+  // Get WHT credits from tax classification (Gold+ feature)
+  const whtCredits = reportData.taxClassification?.whtCredits || 0
+  const whtCreditDetails = reportData.taxClassification?.whtCreditDetails || []
   
   const periodLabel = reportData.period.periodType === 'annual' 
     ? `Annual ${reportData.period.year}`
@@ -221,6 +228,32 @@ export function IncomeStatementPreview({ reportData, formData, onBack }: IncomeS
                     <span className="text-xs sm:text-sm font-medium">{formatCurrency(amount)}</span>
                   </div>
                 ))}
+            </div>
+          </div>
+        )}
+
+        {/* WHT Credits (Gold+ feature) */}
+        {hasGoldAccess && whtCredits > 0 && (
+          <div>
+            <h2 className="text-sm sm:text-base md:text-lg font-semibold mb-3 sm:mb-4 border-b border-border pb-2">
+              Withholding Tax (WHT) Credits
+            </h2>
+            <div className="bg-green-50 dark:bg-green-950/20 border-l-4 border-green-500 dark:border-green-400 p-3 sm:p-4 rounded mb-4">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm sm:text-base font-semibold">Total WHT Credits</span>
+                <span className="text-base sm:text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(whtCredits)}</span>
+              </div>
+              {whtCreditDetails.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-2">Breakdown:</p>
+                  {whtCreditDetails.map((detail, index) => (
+                    <div key={index} className="flex justify-between text-xs sm:text-sm py-1 border-b border-green-200 dark:border-green-800">
+                      <span className="text-muted-foreground">{detail.description}</span>
+                      <span className="font-medium">{formatCurrency(detail.whtAmount)} ({detail.whtRate}%)</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

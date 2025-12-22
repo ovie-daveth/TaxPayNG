@@ -3,8 +3,9 @@ import { transactionService } from './transactionService'
 import { invoiceService } from './invoiceService'
 import { taxCalculationService } from './taxCalculationService'
 import { userService } from './userService'
-import { Transaction, Invoice, TaxCalculation, SavedReport } from '@/lib/types'
+import { Transaction, Invoice, TaxCalculation, SavedReport, TaxPeriod } from '@/lib/types'
 import { calculateNigerianTax } from '@/lib/tax-calculator'
+import { calculateTaxClassificationBenefitsFromTransactions, TaxClassificationSummary } from '@/lib/utils/tax-classification-calculator'
 
 export interface ReportPeriod {
   startDate: string
@@ -56,6 +57,8 @@ export interface TaxData {
   }>
   totalReliefs: number
   adjustedGrossIncome: number
+  capitalAllowances?: number // Gold+ feature: capital allowances from tax classification
+  whtCredits?: number // Gold+ feature: WHT credits from tax classification
 }
 
 export interface ReportData {
@@ -70,6 +73,7 @@ export interface ReportData {
   income: IncomeData
   expenses: ExpenseData
   tax: TaxData
+  taxClassification?: TaxClassificationSummary // Gold+ feature: capital allowances and WHT credits
   generatedAt: string
 }
 
@@ -146,13 +150,31 @@ export class ReportService extends BaseService {
         ? this.calculateExpenseData(filteredTransactions, invoices, userId)
         : this.calculateExpenseDataTransactionsOnly(filteredTransactions, userId)
 
-      // Calculate tax data
+      // Calculate tax classification benefits from transactions (Gold+ feature)
+      let taxClassificationSummary: TaxClassificationSummary | undefined = undefined
+      try {
+        // Convert ReportPeriod to TaxPeriod format
+        const taxPeriod: TaxPeriod = {
+          year: period.year,
+          quarter: period.quarter,
+          month: period.periodType === 'monthly' ? new Date(period.startDate).getMonth() + 1 : undefined
+        }
+        
+        // Calculate from filtered transactions for the period
+        taxClassificationSummary = calculateTaxClassificationBenefitsFromTransactions(filteredTransactions)
+      } catch (error) {
+        console.error('Error calculating tax classification benefits:', error)
+        // Continue without tax classification if calculation fails
+      }
+
+      // Calculate tax data (now includes capital allowances and WHT credits if available)
       const taxData = await this.calculateTaxData(
         userId,
         incomeData.totalIncome,
         expenseData.totalExpenses,
         expenseData.taxDeductibleExpenses,
-        profile
+        profile,
+        taxClassificationSummary
       )
 
       return {
@@ -169,6 +191,7 @@ export class ReportService extends BaseService {
         income: incomeData,
         expenses: expenseData,
         tax: taxData,
+        taxClassification: taxClassificationSummary,
         generatedAt: new Date().toISOString()
       }
     } catch (error) {
@@ -191,14 +214,37 @@ export class ReportService extends BaseService {
 
     // Process all income transactions
     incomeTransactions.forEach(txn => {
-      const amount = typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0
-      totalIncome += amount
+      // Determine the base amount to use
+      let baseAmount = 0
+      
+      // For foreign currency transactions, ngnEquivalent is already the converted amount
+      // It represents the NGN equivalent of the net amount (after platform fees) if netAmount exists
+      if (txn.currency && txn.currency !== 'NGN' && txn.ngnEquivalent) {
+        // Use ngnEquivalent directly - it's already the NGN equivalent of the correct amount
+        baseAmount = txn.ngnEquivalent
+      } else {
+        // For NGN transactions, use netAmount if available (after platform fees), otherwise use amount
+        baseAmount = txn.netAmount !== undefined ? txn.netAmount : (typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0)
+      }
+      
+      // Apply transaction nature percentage for mixed transactions (creators only)
+      // Only apply if transactionNature is 'mixed' and businessPercentage is set
+      let taxableAmount = baseAmount
+      if (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined) {
+        taxableAmount = baseAmount * (txn.businessPercentage / 100)
+      } else if (txn.transactionNature === 'personal') {
+        // Personal transactions are not taxable income
+        taxableAmount = 0
+      }
+      // If transactionNature is 'business' or undefined, use full amount
+      
+      totalIncome += taxableAmount
       
       const category = txn.category || 'uncategorized'
-      incomeByCategory[category] = (incomeByCategory[category] || 0) + amount
+      incomeByCategory[category] = (incomeByCategory[category] || 0) + taxableAmount
       
       const source = txn.description || 'Other'
-      incomeBySource[source] = (incomeBySource[source] || 0) + amount
+      incomeBySource[source] = (incomeBySource[source] || 0) + taxableAmount
     })
 
     return {
@@ -257,14 +303,37 @@ export class ReportService extends BaseService {
 
     // Process income transactions (excluding invoice-related ones)
     incomeTransactions.forEach(txn => {
-      const amount = typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0
-      totalIncome += amount
+      // Determine the base amount to use
+      let baseAmount = 0
+      
+      // For foreign currency transactions, ngnEquivalent is already the converted amount
+      // It represents the NGN equivalent of the net amount (after platform fees) if netAmount exists
+      if (txn.currency && txn.currency !== 'NGN' && txn.ngnEquivalent) {
+        // Use ngnEquivalent directly - it's already the NGN equivalent of the correct amount
+        baseAmount = txn.ngnEquivalent
+      } else {
+        // For NGN transactions, use netAmount if available (after platform fees), otherwise use amount
+        baseAmount = txn.netAmount !== undefined ? txn.netAmount : (typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0)
+      }
+      
+      // Apply transaction nature percentage for mixed transactions (creators only)
+      // Only apply if transactionNature is 'mixed' and businessPercentage is set
+      let taxableAmount = baseAmount
+      if (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined) {
+        taxableAmount = baseAmount * (txn.businessPercentage / 100)
+      } else if (txn.transactionNature === 'personal') {
+        // Personal transactions are not taxable income
+        taxableAmount = 0
+      }
+      // If transactionNature is 'business' or undefined, use full amount
+      
+      totalIncome += taxableAmount
       
       const category = txn.category || 'uncategorized'
-      incomeByCategory[category] = (incomeByCategory[category] || 0) + amount
+      incomeByCategory[category] = (incomeByCategory[category] || 0) + taxableAmount
       
       const source = txn.description || 'Other'
-      incomeBySource[source] = (incomeBySource[source] || 0) + amount
+      incomeBySource[source] = (incomeBySource[source] || 0) + taxableAmount
     })
 
     // Process income from paid invoices only
@@ -340,15 +409,39 @@ export class ReportService extends BaseService {
 
     // Process expense transactions
     expenseTransactions.forEach(txn => {
-      const amount = typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0
-      totalExpenses += amount
+      // Determine the base amount to use
+      let baseAmount = 0
       
-      if (txn.taxDeductible) {
-        taxDeductibleExpenses += amount
+      // For foreign currency transactions, ngnEquivalent is already the converted amount
+      // It represents the NGN equivalent of the net amount (after platform fees) if netAmount exists
+      if (txn.currency && txn.currency !== 'NGN' && txn.ngnEquivalent) {
+        // Use ngnEquivalent directly - it's already the NGN equivalent of the correct amount
+        baseAmount = txn.ngnEquivalent
+      } else {
+        // For NGN transactions, use netAmount if available (after platform fees), otherwise use amount
+        baseAmount = txn.netAmount !== undefined ? txn.netAmount : (typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0)
+      }
+      
+      // Apply transaction nature percentage for mixed transactions (creators only)
+      // Only apply if transactionNature is 'mixed' and businessPercentage is set
+      let deductibleAmount = baseAmount
+      if (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined) {
+        deductibleAmount = baseAmount * (txn.businessPercentage / 100)
+      } else if (txn.transactionNature === 'personal') {
+        // Personal transactions are not tax deductible
+        deductibleAmount = 0
+      }
+      // If transactionNature is 'business' or undefined, use full amount
+      
+      totalExpenses += deductibleAmount
+      
+      // For tax deductible check, use the deductible amount
+      if (txn.taxDeductible || txn.transactionNature === 'business' || (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined && txn.businessPercentage > 0)) {
+        taxDeductibleExpenses += deductibleAmount
       }
       
       const category = txn.category || 'uncategorized'
-      expensesByCategory[category] = (expensesByCategory[category] || 0) + amount
+      expensesByCategory[category] = (expensesByCategory[category] || 0) + deductibleAmount
     })
 
     // Process expenses from invoices (incoming invoices or paid outgoing invoices)
@@ -376,7 +469,8 @@ export class ReportService extends BaseService {
     grossIncome: number,
     totalExpenses: number,
     businessExpenses: number,
-    profile: any
+    profile: any,
+    taxClassification?: TaxClassificationSummary
   ): Promise<TaxData> {
     const netIncome = grossIncome - totalExpenses
 
@@ -395,7 +489,10 @@ export class ReportService extends BaseService {
       lifeInsurance: 0, // Users can add this manually in the report
       charitableDonations: 0, // Users can add this manually in the report
       businessExpenses: businessExpenses, // This will be subtracted from gross income in the calculator
-      dependents: 0 // Users can add this manually in the report
+      dependents: 0, // Users can add this manually in the report
+      // Add tax classification benefits if available (Gold+ feature)
+      capitalAllowances: taxClassification?.capitalAllowances || undefined,
+      whtCredits: taxClassification?.whtCredits || undefined
     }
 
     // Calculate tax
@@ -418,7 +515,10 @@ export class ReportService extends BaseService {
       taxPayable: taxResult.totalTax || 0,
       taxBrackets: taxResult.taxBrackets || [],
       totalReliefs: taxResult.totalReliefs || 0,
-      adjustedGrossIncome: taxResult.adjustedGrossIncome || 0
+      adjustedGrossIncome: taxResult.adjustedGrossIncome || 0,
+      // Add tax classification data if available
+      capitalAllowances: taxResult.capitalAllowances || 0,
+      whtCredits: taxResult.whtCredits || 0
     }
   }
 

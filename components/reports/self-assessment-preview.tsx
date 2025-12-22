@@ -20,6 +20,7 @@ import { taxPaymentService, invoiceService, transactionService } from "@/lib/ser
 import { TaxPayment, Invoice, Transaction } from "@/lib/types"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useSubscription } from "@/lib/hooks/useSubscription"
 import { calculateNigerianTax } from "@/lib/tax-calculator"
 
 interface SelfAssessmentPreviewProps {
@@ -43,6 +44,18 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
   const router = useRouter()
   const { user } = useAuth()
   const { profile } = useUserProfile()
+  const { hasAccess } = useSubscription()
+  const hasGoldAccess = hasAccess('GOLD')
+  
+  // Get tax classification benefits (Gold+ feature)
+  const capitalAllowances = reportData.taxClassification?.capitalAllowances || 0
+  const whtCredits = reportData.taxClassification?.whtCredits || 0
+  const vatInput = reportData.taxClassification?.vatInput || 0
+  const vatOutput = reportData.taxClassification?.vatOutput || 0
+  const capitalAllowanceDetails = reportData.taxClassification?.capitalAllowanceDetails || []
+  const whtCreditDetails = reportData.taxClassification?.whtCreditDetails || []
+  const vatDetails = reportData.taxClassification?.vatDetails || []
+  
   const [taxCredits, setTaxCredits] = useState<{ paye: number; wht: number; provisional: number; other: number; total: number }>({
     paye: 0,
     wht: 0,
@@ -684,9 +697,9 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
   const employmentIncome = reportData.income.incomeByCategory['Salary'] || 
                            reportData.income.incomeByCategory['Employment'] || 0
   
-  // For freelancers: all income is business income (break down by category)
+  // For freelancers and creators: all income is business income (break down by category)
   // For others: business income excludes employment income
-  const businessIncomeCategories = isFreelancer
+  const businessIncomeCategories = (isFreelancer || isCreator)
     ? Object.entries(reportData.income.incomeByCategory)
         .filter(([cat]) => !['Salary', 'Employment'].includes(cat))
         .map(([cat, amount]) => ({ category: cat, amount: amount as number }))
@@ -932,7 +945,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
   <div class="section">
     <div class="section-title">Part B – Statement of Income (All Sources)</div>
     
-    ${!isFreelancer ? `
+    ${(!isFreelancer && !isCreator) ? `
     <div style="margin-bottom: 15px;">
       <strong style="font-size: 11pt;">1. Employment Income (if any)</strong>
       <div class="amount-row">
@@ -955,9 +968,9 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
     ` : ''}
 
     <div style="margin-bottom: 15px;">
-      <strong style="font-size: 11pt;">${isFreelancer ? '1.' : '2.'} Business / Self-Employment Income</strong>
+      <strong style="font-size: 11pt;">${(isFreelancer || isCreator) ? '1.' : '2.'} Business / Self-Employment Income</strong>
       ${(() => {
-        const categories = isFreelancer
+        const categories = (isFreelancer || isCreator)
           ? Object.entries(reportData.income.incomeByCategory)
               .filter(([cat]) => !['Salary', 'Employment'].includes(cat))
               .filter(([, amt]) => (amt as number) > 0)
@@ -987,9 +1000,9 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
       </div>
     </div>
 
-    ${(isCreator || !isFreelancer) ? `
+    ${(!isFreelancer && !isCreator) ? `
     <div style="margin-bottom: 15px;">
-      <strong style="font-size: 11pt;">${isFreelancer ? '2.' : '3.'} Other Income Sources</strong>
+      <strong style="font-size: 11pt;">3. Other Income Sources</strong>
       <div class="amount-row">
         <span class="amount-label">Rental income</span>
         <span class="amount-value">${formatCurrency(reportData.income.incomeByCategory['Rental'] || 0)}</span>
@@ -1023,7 +1036,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
     ` : ''}
 
     <div class="amount-row total-row" style="border-top: 3px solid #000; font-size: 12pt; padding-top: 10px;">
-      <span>${isFreelancer ? '2.' : '4.'} Total Gross Income (Sum of above)</span>
+      <span>${(isFreelancer || isCreator) ? '2.' : '4.'} Total Gross Income (Sum of above)</span>
       <span>${formatCurrency(reportData.income.totalIncome)}</span>
     </div>
   </div>
@@ -1496,7 +1509,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
         <div>
           <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 border-b-2 border-border pb-1.5 sm:pb-2 uppercase">Part B – Statement of Income (All Sources)</h2>
           
-          {!isFreelancer && (
+          {(!isFreelancer && !isCreator) && (
             <div className="mb-3 sm:mb-4">
               <h3 className="text-sm sm:text-base font-semibold mb-2 sm:mb-3">1. Employment Income (if any)</h3>
           <div className="space-y-2 text-xs sm:text-sm">
@@ -1521,7 +1534,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           )}
 
           <div className="mb-4 sm:mb-6">
-            <h3 className="text-sm sm:text-base font-semibold mb-2 sm:mb-3">{isFreelancer ? '1.' : '2.'} Business / Self-Employment Income</h3>
+            <h3 className="text-sm sm:text-base font-semibold mb-2 sm:mb-3">{(isFreelancer || isCreator) ? '1.' : '2.'} Business / Self-Employment Income</h3>
           <div className="space-y-2 text-xs sm:text-sm">
               {businessIncomeCategories.length > 0 ? (
                 <>
@@ -1551,9 +1564,9 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           </div>
         </div>
 
-          {(isCreator || !isFreelancer) && (
+          {(!isFreelancer && !isCreator) && (
             <div className="mb-3 sm:mb-4">
-              <h3 className="text-sm sm:text-base font-semibold mb-2 sm:mb-3">{isFreelancer ? '2.' : '3.'} Other Income Sources</h3>
+              <h3 className="text-sm sm:text-base font-semibold mb-2 sm:mb-3">3. Other Income Sources</h3>
               <div className="space-y-2 text-xs sm:text-sm">
                 <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
                   <span className="text-muted-foreground text-xs sm:text-sm">Rental income</span>
@@ -1589,7 +1602,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           )}
 
           <div className="flex flex-col sm:flex-row justify-between gap-2 sm:gap-0 py-3 sm:py-4 border-t-4 border-border font-bold text-base sm:text-lg bg-primary/5 rounded-lg p-3 sm:p-4">
-            <span className="text-xs sm:text-base">{isFreelancer ? '2.' : '4.'} Total Gross Income (Sum of above)</span>
+            <span className="text-xs sm:text-base">{(isFreelancer || isCreator) ? '2.' : '4.'} Total Gross Income (Sum of above)</span>
             <span className="text-sm sm:text-lg">{formatCurrency(reportData.income.totalIncome)}</span>
           </div>
         </div>
@@ -2165,12 +2178,106 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
               <span className="text-muted-foreground text-xs sm:text-sm break-words sm:break-normal">4. Less: Tax Credits / Prepaid Tax (from Part D)</span>
               <span className="font-medium text-red-600 text-xs sm:text-sm whitespace-nowrap">-{formatCurrency(taxCredits.total)}</span>
             </div>
+            {/* WHT Credits from Tax Classification (Gold+ feature) */}
+            {hasGoldAccess && whtCredits > 0 && (
+              <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border bg-green-50 dark:bg-green-950/20 px-2 rounded">
+                <span className="text-muted-foreground text-xs sm:text-sm break-words sm:break-normal">Less: WHT Credits (from Tax Classification)</span>
+                <span className="font-medium text-green-600 dark:text-green-400 text-xs sm:text-sm whitespace-nowrap">-{formatCurrency(whtCredits)}</span>
+              </div>
+            )}
             <div className="flex flex-col sm:flex-row justify-between gap-2 sm:gap-0 py-3 sm:py-4 border-t-4 border-border font-bold text-base sm:text-lg bg-primary/5 rounded-lg p-3 sm:p-4">
               <span className="text-xs sm:text-base">→ Net Tax Payable or Refund Due</span>
-              <span className="text-primary text-sm sm:text-lg whitespace-nowrap">{formatCurrency(Math.max(0, reportData.tax.taxPayable - taxCredits.total))}</span>
+              <span className="text-primary text-sm sm:text-lg whitespace-nowrap">{formatCurrency(Math.max(0, (reportData.tax.taxPayable || 0) - taxCredits.total - whtCredits))}</span>
             </div>
           </div>
         </div>
+
+        {/* Tax Classification Summary (Gold+ feature) */}
+        {hasGoldAccess && (capitalAllowances > 0 || whtCredits > 0 || vatInput > 0 || vatOutput > 0) && (
+          <div className="mt-6 border-t border-border pt-4">
+            <h3 className="text-sm sm:text-base font-semibold mb-3">Tax Classification Benefits (Gold+ Feature)</h3>
+            
+            {capitalAllowances > 0 && (
+              <div className="mb-4 bg-blue-50 dark:bg-blue-950/20 border-l-4 border-blue-500 dark:border-blue-400 p-3 sm:p-4 rounded">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm sm:text-base font-semibold">Capital Allowances</span>
+                  <span className="text-base sm:text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(capitalAllowances)}</span>
+                </div>
+                {capitalAllowanceDetails.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {capitalAllowanceDetails.map((detail, index) => (
+                      <div key={index} className="flex justify-between text-xs sm:text-sm py-1">
+                        <span className="text-muted-foreground">{detail.description}</span>
+                        <span className="font-medium">{formatCurrency(detail.allowanceAmount)} ({detail.allowanceRate}%)</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {whtCredits > 0 && (
+              <div className="mb-4 bg-green-50 dark:bg-green-950/20 border-l-4 border-green-500 dark:border-green-400 p-3 sm:p-4 rounded">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm sm:text-base font-semibold">WHT Credits</span>
+                  <span className="text-base sm:text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(whtCredits)}</span>
+                </div>
+                {whtCreditDetails.length > 0 && (
+                  <div className="mt-2 space-y-1">
+                    {whtCreditDetails.map((detail, index) => (
+                      <div key={index} className="flex justify-between text-xs sm:text-sm py-1">
+                        <span className="text-muted-foreground">{detail.description}</span>
+                        <span className="font-medium">{formatCurrency(detail.whtAmount)} ({detail.whtRate}%)</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* VAT Information */}
+            {(vatInput > 0 || vatOutput > 0) && (
+              <div className="mb-4 bg-purple-50 dark:bg-purple-950/20 border-l-4 border-purple-500 dark:border-purple-400 p-3 sm:p-4 rounded">
+                <div className="mb-3">
+                  <h4 className="text-sm sm:text-base font-semibold mb-2">VAT Summary</h4>
+                  <div className="space-y-2">
+                    {vatInput > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs sm:text-sm text-muted-foreground">Input VAT (Claimable)</span>
+                        <span className="text-sm sm:text-base font-semibold text-purple-600 dark:text-purple-400">{formatCurrency(vatInput)}</span>
+                      </div>
+                    )}
+                    {vatOutput > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs sm:text-sm text-muted-foreground">Output VAT (Payable)</span>
+                        <span className="text-sm sm:text-base font-semibold text-purple-600 dark:text-purple-400">{formatCurrency(vatOutput)}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center pt-2 border-t border-purple-200 dark:border-purple-800">
+                      <span className="text-xs sm:text-sm font-semibold">Net VAT {vatOutput > vatInput ? 'Payable' : 'Refundable'}</span>
+                      <span className={`text-sm sm:text-base font-bold ${vatOutput > vatInput ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                        {formatCurrency(Math.abs(vatOutput - vatInput))}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                {vatDetails.length > 0 && (
+                  <div className="mt-3 space-y-1">
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-2">Breakdown:</p>
+                    {vatDetails.map((detail, index) => (
+                      <div key={index} className="flex justify-between text-xs sm:text-sm py-1">
+                        <span className="text-muted-foreground">
+                          {detail.description} ({detail.type === 'input' ? 'Input' : 'Output'})
+                        </span>
+                        <span className="font-medium">{formatCurrency(detail.vatAmount)} ({detail.vatRate}%)</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Add Credit Dialog */}
         <Dialog open={showAddCredit} onOpenChange={setShowAddCredit}>

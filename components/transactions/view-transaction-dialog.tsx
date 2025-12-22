@@ -22,6 +22,8 @@ import { Transaction } from "@/lib/types"
 import { formatDate } from "@/lib/utils/date"
 import { ImageViewerModal } from "@/components/ui/image-viewer-modal"
 import { useState } from "react"
+import { useSubscription } from "@/lib/hooks/useSubscription"
+import { getCurrencySymbol } from "@/lib/utils/currency"
 
 interface ViewTransactionDialogProps {
   open: boolean
@@ -38,6 +40,8 @@ export function ViewTransactionDialog({
 }: ViewTransactionDialogProps) {
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false)
   const [selectedImages, setSelectedImages] = useState<string[]>([])
+  const { hasAccess } = useSubscription()
+  const hasTaxClassificationAccess = hasAccess('GOLD')
 
   if (!transaction) return null
 
@@ -154,27 +158,83 @@ export function ViewTransactionDialog({
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">
-                    {transaction.grossAmount && transaction.platformFees ? 'Net Amount' : 'Amount'}
-                  </p>
-                  <p className={`text-lg font-bold ${transaction.type === 'income' ? 'text-primary' : 'text-destructive'}`}>
-                    {transaction.type === 'income' ? '+' : '-'}
-                    {transaction.netAmount !== undefined ? formatCurrency(transaction.netAmount) : formatCurrency(transaction.amount)}
-                  </p>
-                  {/* Phase 2: Show platform fees breakdown if available */}
-                  {transaction.grossAmount && transaction.platformFees && (
-                    <div className="mt-2 p-2 bg-muted rounded text-xs space-y-1">
-                      <p className="text-muted-foreground">
-                        <span className="font-medium">Gross:</span> {formatCurrency(transaction.grossAmount)}
-                      </p>
-                      <p className="text-muted-foreground">
-                        <span className="font-medium">Platform Fees:</span> -{formatCurrency(transaction.platformFees)}
-                      </p>
-                      <p className="text-muted-foreground border-t pt-1">
-                        <span className="font-medium">Net:</span> {formatCurrency(transaction.netAmount || (transaction.grossAmount - transaction.platformFees))}
-                      </p>
-                    </div>
-                  )}
+                  <p className="text-xs text-muted-foreground mb-1">Amount</p>
+                  {(() => {
+                    // Calculate original amount in original currency
+                    const originalCurrency = transaction.currency || 'NGN'
+                    const isForeignCurrency = originalCurrency !== 'NGN'
+                    const exchangeRate = transaction.exchangeRate || 1
+                    
+                    let originalAmount: number
+                    let originalGrossAmount: number | undefined
+                    let originalPlatformFees: number | undefined
+                    let originalNetAmount: number | undefined
+                    
+                    if (isForeignCurrency) {
+                      // For foreign currency, calculate original amounts from NGN equivalents
+                      if (transaction.ngnEquivalent && exchangeRate) {
+                        originalAmount = transaction.ngnEquivalent / exchangeRate
+                      } else {
+                        // Fallback: reverse calculate from stored NGN amount
+                        const ngnAmount = transaction.netAmount !== undefined ? transaction.netAmount : transaction.amount
+                        originalAmount = ngnAmount / exchangeRate
+                      }
+                      
+                      // Calculate original platform fees amounts if they exist
+                      if (transaction.grossAmount && transaction.platformFees) {
+                        originalGrossAmount = transaction.grossAmount / exchangeRate
+                        originalPlatformFees = transaction.platformFees / exchangeRate
+                        if (transaction.netAmount !== undefined) {
+                          originalNetAmount = transaction.netAmount / exchangeRate
+                        } else {
+                          originalNetAmount = originalGrossAmount - originalPlatformFees
+                        }
+                      }
+                    } else {
+                      // For NGN transactions, use the stored amounts directly
+                      originalAmount = transaction.netAmount !== undefined ? transaction.netAmount : transaction.amount
+                      if (transaction.grossAmount && transaction.platformFees) {
+                        originalGrossAmount = transaction.grossAmount
+                        originalPlatformFees = transaction.platformFees
+                        originalNetAmount = transaction.netAmount || (transaction.grossAmount - transaction.platformFees)
+                      }
+                    }
+                    
+                    const currencySymbol = getCurrencySymbol(originalCurrency as any)
+                    const formattedOriginalAmount = originalAmount.toLocaleString('en-NG', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })
+                    
+                    return (
+                      <>
+                        <p className={`text-lg font-bold ${transaction.type === 'income' ? 'text-primary' : 'text-destructive'}`}>
+                          {transaction.type === 'income' ? '+' : '-'}
+                          {currencySymbol}{formattedOriginalAmount}
+                        </p>
+                        {/* Show NGN equivalent below if currency is not NGN */}
+                        {isForeignCurrency && transaction.ngnEquivalent && (
+                          <p className="text-sm text-muted-foreground mt-1">
+                            ≈ {formatCurrency(transaction.ngnEquivalent)}
+                          </p>
+                        )}
+                        {/* Phase 2: Show platform fees breakdown if available */}
+                        {originalGrossAmount !== undefined && originalPlatformFees !== undefined && originalNetAmount !== undefined && (
+                          <div className="mt-2 p-2 bg-muted rounded text-xs space-y-1">
+                            <p className="text-muted-foreground">
+                              <span className="font-medium">Gross:</span> {currencySymbol}{originalGrossAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                            <p className="text-muted-foreground">
+                              <span className="font-medium">Platform Fees:</span> -{currencySymbol}{originalPlatformFees.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                            <p className="text-muted-foreground border-t pt-1">
+                              <span className="font-medium">Net:</span> {currencySymbol}{originalNetAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            </p>
+                          </div>
+                        )}
+                      </>
+                    )
+                  })()}
                 </div>
                 {transaction.currency && transaction.currency !== 'NGN' && (
                   <>
@@ -185,12 +245,6 @@ export function ViewTransactionDialog({
                         {transaction.currency}
                       </p>
                     </div>
-                    {transaction.ngnEquivalent && (
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">NGN Equivalent</p>
-                        <p className="text-sm font-medium">≈ {formatCurrency(transaction.ngnEquivalent)}</p>
-                      </div>
-                    )}
                     {transaction.exchangeRate && (
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">Exchange Rate (Locked)</p>
@@ -344,23 +398,33 @@ export function ViewTransactionDialog({
                     {transaction.taxDeductible ? 'Deductible' : 'Non-deductible'}
                   </Badge>
                 </div>
-                {transaction.taxClassification && (
+                {hasTaxClassificationAccess && transaction.taxClassification && (
                   <div>
                     <p className="text-xs text-muted-foreground mb-1">Tax Classification</p>
                     <div className="flex flex-wrap gap-1">
                       {transaction.taxClassification.incomeType && (
                         <Badge variant="outline" className="text-xs">
-                          {transaction.taxClassification.incomeType}
+                          Income: {transaction.taxClassification.incomeType}
                         </Badge>
                       )}
                       {transaction.taxClassification.expenseType && (
                         <Badge variant="outline" className="text-xs">
-                          {transaction.taxClassification.expenseType}
+                          Expense: {transaction.taxClassification.expenseType}
                         </Badge>
                       )}
                       {transaction.taxClassification.isCapitalAsset && (
                         <Badge variant="outline" className="text-xs">
-                          Capital Asset
+                          Capital Asset ({transaction.taxClassification.capitalAllowanceRate}% allowance)
+                        </Badge>
+                      )}
+                      {transaction.taxClassification.whtCreditable && (
+                        <Badge variant="outline" className="text-xs">
+                          WHT Creditable {transaction.taxClassification.whtRate && `(${transaction.taxClassification.whtRate}%)`}
+                        </Badge>
+                      )}
+                      {transaction.taxClassification.vatApplicable && (
+                        <Badge variant="outline" className="text-xs">
+                          VAT Applicable {transaction.taxClassification.vatRate && `(${transaction.taxClassification.vatRate}%)`}
                         </Badge>
                       )}
                     </div>
