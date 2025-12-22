@@ -378,31 +378,24 @@ export class ReportService extends BaseService {
     businessExpenses: number,
     profile: any
   ): Promise<TaxData> {
-    // Get latest tax calculation or use profile defaults
-    let latestCalculation: TaxCalculation | null = null
-    try {
-      latestCalculation = await taxCalculationService.getLatestCalculation(userId)
-    } catch (error) {
-      console.log('No existing tax calculation found, using defaults')
-    }
-
     const netIncome = grossIncome - totalExpenses
 
     // Prepare tax calculation data
     // Note: calculateNigerianTax expects gross income, not net income
     // It will subtract businessExpenses internally
+    // Reliefs are NOT automatically added - users must manually add them in the self-assessment report
     const taxCalcData = {
       businessType: profile.businessType || 'freelancer',
       period: 'yearly' as const,
       income: grossIncome, // Pass gross income, not net income
-      rentPaid: latestCalculation?.rentPaid || 0,
-      pensionContribution: latestCalculation?.pensionContribution || 0,
-      healthInsurance: latestCalculation?.healthInsurance || 0,
-      housingFund: 0, // NHF - typically calculated separately, can be added to profile later
-      lifeInsurance: latestCalculation?.lifeInsurance || 0,
-      charitableDonations: latestCalculation?.charitableDonations || 0,
+      rentPaid: 0, // Users can add this manually in the report
+      pensionContribution: 0, // Users can add this manually in the report
+      healthInsurance: 0, // Users can add this manually in the report
+      housingFund: 0, // NHF - users can add this manually in the report
+      lifeInsurance: 0, // Users can add this manually in the report
+      charitableDonations: 0, // Users can add this manually in the report
       businessExpenses: businessExpenses, // This will be subtracted from gross income in the calculator
-      dependents: latestCalculation?.dependents || 0
+      dependents: 0 // Users can add this manually in the report
     }
 
     // Calculate tax

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ReportData } from "@/lib/services/reportService"
-import { formatCurrencyAmount } from "@/lib/utils/currency"
+import { formatCurrencyAmount, formatCurrencyInput, handleCurrencyInputChange } from "@/lib/utils/currency"
 import { format } from "date-fns"
 import { Printer, ArrowLeft, Plus, Trash2, X, Upload, Loader2, FileCheck, Clock, Mail, CheckCircle2, ExternalLink, Download } from "lucide-react"
 import { useRouter } from "next/navigation"
@@ -20,6 +20,7 @@ import { taxPaymentService, invoiceService, transactionService } from "@/lib/ser
 import { TaxPayment, Invoice, Transaction } from "@/lib/types"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { calculateNigerianTax } from "@/lib/tax-calculator"
 
 interface SelfAssessmentPreviewProps {
   reportData: ReportData
@@ -126,6 +127,17 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
     otherRelief: ''
   })
 
+  // Editable relief amounts (users can add/edit these)
+  const [reliefAmounts, setReliefAmounts] = useState<Record<string, number>>({
+    pensionContribution: 0,
+    nhfContribution: 0,
+    lifeInsurance: 0,
+    healthInsurance: 0,
+    depreciation: 0,
+    charitableDonations: 0,
+    otherRelief: 0
+  })
+
   // Initialize personal info from reportData or user profile
   useEffect(() => {
     if (reportData.userInfo.address) {
@@ -206,6 +218,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
       metadata.attachments = { ...attachments }
       metadata.reliefEvidence = { ...reliefEvidence }
       metadata.reliefNotes = { ...reliefNotes }
+      metadata.reliefAmounts = { ...reliefAmounts }
       metadata.manualTaxCredits = allTaxCredits.filter(c => c.source === 'manual')
       // Store evidence attached status and notes for all tax credits (keyed by id)
       metadata.taxCreditEvidence = allTaxCredits.reduce((acc, credit) => {
@@ -255,37 +268,94 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
     }
   }
 
+  // Track if we've initialized to prevent re-initialization loops
+  const hasInitializedRef = useRef(false)
+  
   // Load saved personal info and attachments from metadata
   useEffect(() => {
+    if (isUpdatingRef.current) return // Don't update if we're in the middle of syncing
+    
+    // Only initialize once, or when reportData ID changes (new report)
+    const reportId = (reportData as any).id || JSON.stringify(reportData.period)
+    const initializationKey = `${reportId}-${hasInitializedRef.current}`
+    
+    // Initialize relief amounts from reportData (which will be 0 by default now)
+    // Prefer metadata reliefAmounts if they exist, otherwise use reportData.tax.reliefs
+    const savedReliefAmounts = (reportData as any).metadata?.reliefAmounts
+    const newReliefAmounts = savedReliefAmounts ? {
+      pensionContribution: savedReliefAmounts.pensionContribution || 0,
+      nhfContribution: savedReliefAmounts.nhfContribution || 0,
+      lifeInsurance: savedReliefAmounts.lifeInsurance || 0,
+      healthInsurance: savedReliefAmounts.healthInsurance || 0,
+      depreciation: savedReliefAmounts.depreciation || 0,
+      charitableDonations: savedReliefAmounts.charitableDonations || 0,
+      otherRelief: savedReliefAmounts.otherRelief || 0
+    } : {
+      pensionContribution: reportData.tax.reliefs.pensionContribution || 0,
+      nhfContribution: reportData.tax.reliefs.nhfContribution || 0,
+      lifeInsurance: reportData.tax.reliefs.lifeInsurance || 0,
+      healthInsurance: reportData.tax.reliefs.healthInsurance || 0,
+      depreciation: 0,
+      charitableDonations: reportData.tax.reliefs.charitableDonations || 0,
+      otherRelief: 0
+    }
+    
+    // Only update if values actually changed
+    const currentReliefAmountsStr = JSON.stringify(reliefAmounts)
+    const newReliefAmountsStr = JSON.stringify(newReliefAmounts)
+    if (currentReliefAmountsStr !== newReliefAmountsStr) {
+      isUpdatingRef.current = true
+      setReliefAmounts(newReliefAmounts)
+      setTimeout(() => { isUpdatingRef.current = false }, 50)
+    }
+
     if ((reportData as any).metadata) {
       if ((reportData as any).metadata.personalInfo) {
-        setPersonalInfo(prev => ({ ...prev, ...(reportData as any).metadata.personalInfo }))
+        setPersonalInfo(prev => {
+          const newInfo = { ...prev, ...(reportData as any).metadata.personalInfo }
+          return JSON.stringify(prev) !== JSON.stringify(newInfo) ? newInfo : prev
+        })
       }
       if ((reportData as any).metadata.attachments) {
-        setAttachments(prev => ({ ...prev, ...(reportData as any).metadata.attachments }))
+        setAttachments(prev => {
+          const newAttachments = { ...prev, ...(reportData as any).metadata.attachments }
+          return JSON.stringify(prev) !== JSON.stringify(newAttachments) ? newAttachments : prev
+        })
       }
       if ((reportData as any).metadata.reliefEvidence) {
-        setReliefEvidence(prev => ({ ...prev, ...(reportData as any).metadata.reliefEvidence }))
+        setReliefEvidence(prev => {
+          const newEvidence = { ...prev, ...(reportData as any).metadata.reliefEvidence }
+          return JSON.stringify(prev) !== JSON.stringify(newEvidence) ? newEvidence : prev
+        })
       }
       if ((reportData as any).metadata.reliefNotes) {
-        setReliefNotes(prev => ({ ...prev, ...(reportData as any).metadata.reliefNotes }))
+        setReliefNotes(prev => {
+          const newNotes = { ...prev, ...(reportData as any).metadata.reliefNotes }
+          return JSON.stringify(prev) !== JSON.stringify(newNotes) ? newNotes : prev
+        })
       }
       if ((reportData as any).metadata.manualTaxCredits) {
         // Manual credits will be loaded in loadTaxCredits
       }
       if ((reportData as any).metadata.declarationInfo) {
-        setDeclarationInfo(prev => ({ 
-          ...prev, 
-          ...(reportData as any).metadata.declarationInfo,
-          signatureDate: (reportData as any).metadata.declarationInfo.signatureDate || prev.signatureDate
-        }))
+        setDeclarationInfo(prev => {
+          const newInfo = { 
+            ...prev, 
+            ...(reportData as any).metadata.declarationInfo,
+            signatureDate: (reportData as any).metadata.declarationInfo.signatureDate || prev.signatureDate
+          }
+          return JSON.stringify(prev) !== JSON.stringify(newInfo) ? newInfo : prev
+        })
       }
     }
-  }, [])
+    
+    hasInitializedRef.current = true
+  }, [reportData])
 
   // Use useRef to track previous values and prevent infinite loops
   const prevMetadataRef = useRef<string>('')
   const isInitialMount = useRef(true)
+  const isUpdatingRef = useRef(false)
   
   // Initialize prevMetadataRef with current metadata from reportData on mount
   useEffect(() => {
@@ -295,6 +365,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
         attachments: (reportData as any).metadata?.attachments || {},
         reliefEvidence: (reportData as any).metadata?.reliefEvidence || {},
         reliefNotes: (reportData as any).metadata?.reliefNotes || {},
+        reliefAmounts: (reportData as any).metadata?.reliefAmounts || {},
         manualTaxCredits: (reportData as any).metadata?.manualTaxCredits || [],
         taxCreditEvidence: (reportData as any).metadata?.taxCreditEvidence || {},
         declarationInfo: (reportData as any).metadata?.declarationInfo || {}
@@ -306,7 +377,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
   
   // Sync all metadata changes to parent reportData whenever they change
   useEffect(() => {
-    if (!onDataChange || isInitialMount.current) return
+    if (!onDataChange || isInitialMount.current || isUpdatingRef.current || !hasInitializedRef.current) return
     
     // Create new metadata object
     const newMetadata = {
@@ -314,6 +385,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
       attachments: { ...attachments },
       reliefEvidence: { ...reliefEvidence },
       reliefNotes: { ...reliefNotes },
+      reliefAmounts: { ...reliefAmounts },
       manualTaxCredits: allTaxCredits.filter(c => c.source === 'manual'),
       // Store evidence attached status and notes for all tax credits (keyed by id)
       taxCreditEvidence: allTaxCredits.reduce((acc, credit) => {
@@ -331,13 +403,56 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
     
     // Only sync if metadata actually changed
     if (prevMetadataRef.current !== newMetadataStr) {
+      isUpdatingRef.current = true
       prevMetadataRef.current = newMetadataStr
-      const updated = { ...reportData }
+      
+      // Calculate total reliefs from user-entered amounts
+      const totalReliefs = Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0)
+      
+      // Recalculate tax with updated reliefs
+      const taxCalcData = {
+        businessType: (reportData as any).userInfo?.businessType || 'freelancer',
+        period: 'yearly' as const,
+        income: reportData.tax.grossIncome,
+        rentPaid: 0,
+        pensionContribution: reliefAmounts.pensionContribution || 0,
+        healthInsurance: reliefAmounts.healthInsurance || 0,
+        housingFund: reliefAmounts.nhfContribution || 0,
+        lifeInsurance: reliefAmounts.lifeInsurance || 0,
+        charitableDonations: reliefAmounts.charitableDonations || 0,
+        businessExpenses: reportData.expenses.taxDeductibleExpenses,
+        dependents: 0
+      }
+      const taxResult = calculateNigerianTax(taxCalcData)
+      
+      const updated = { 
+        ...reportData,
+        tax: {
+          ...reportData.tax,
+          reliefs: {
+            ...reportData.tax.reliefs,
+            pensionContribution: reliefAmounts.pensionContribution || 0,
+            nhfContribution: reliefAmounts.nhfContribution || 0,
+            healthInsurance: reliefAmounts.healthInsurance || 0,
+            lifeInsurance: reliefAmounts.lifeInsurance || 0,
+            charitableDonations: reliefAmounts.charitableDonations || 0
+          },
+          totalReliefs: taxResult.totalReliefs || 0,
+          taxableIncome: taxResult.taxableIncome || 0,
+          taxPayable: taxResult.totalTax || 0,
+          taxBrackets: taxResult.taxBrackets || []
+        }
+      }
       ;(updated as any).metadata = newMetadata
       onDataChange(updated)
+      
+      // Reset the flag after a short delay to allow the update to complete
+      setTimeout(() => {
+        isUpdatingRef.current = false
+      }, 100)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [personalInfo, attachments, reliefEvidence, reliefNotes, allTaxCredits, declarationInfo])
+  }, [personalInfo, attachments, reliefEvidence, reliefNotes, reliefAmounts, allTaxCredits, declarationInfo])
 
   const formatCurrency = (amount: number) => formatCurrencyAmount(amount, 'NGN')
   
@@ -427,7 +542,58 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           return paymentDate >= periodStart && paymentDate <= periodEnd && payment.status === 'completed'
         })
 
+        // Track month/year combinations to prevent duplicates
+        const monthYearMap = new Map<string, TaxPayment>()
+        
+        // Helper function to extract month/year from taxDuration
+        const getMonthYearKey = (payment: TaxPayment): string | null => {
+          if (payment.period === 'monthly' && payment.taxDuration) {
+            // Extract month and year from taxDuration (e.g., "October 2024" -> "2024-10")
+            const monthNames = ['january', 'february', 'march', 'april', 'may', 'june', 
+                              'july', 'august', 'september', 'october', 'november', 'december']
+            const durationLower = payment.taxDuration.toLowerCase()
+            const yearMatch = payment.taxDuration.match(/\d{4}/)
+            const year = yearMatch ? yearMatch[0] : reportData.period.year.toString()
+            
+            for (let i = 0; i < monthNames.length; i++) {
+              if (durationLower.includes(monthNames[i])) {
+                const month = String(i + 1).padStart(2, '0')
+                return `${year}-${month}`
+              }
+            }
+            
+            // Try to extract month number if format is different
+            const monthMatch = payment.taxDuration.match(/\b(0?[1-9]|1[0-2])\b/)
+            if (monthMatch) {
+              const month = monthMatch[1].padStart(2, '0')
+              return `${year}-${month}`
+            }
+          }
+          return null
+        }
+
+        // Process payments and keep only one per month/year
         periodPayments.forEach(payment => {
+          if (payment.period === 'monthly') {
+            const monthYearKey = getMonthYearKey(payment)
+            if (monthYearKey) {
+              // If we already have a payment for this month/year, skip or replace if this one is newer
+              const existing = monthYearMap.get(monthYearKey)
+              if (!existing || new Date(payment.createdAt) > new Date(existing.createdAt)) {
+                monthYearMap.set(monthYearKey, payment)
+              }
+            } else {
+              // If we can't extract month/year, add it anyway (shouldn't happen often)
+              monthYearMap.set(`unknown-${payment.id}`, payment)
+            }
+          } else {
+            // For quarterly or yearly payments, add them directly (no duplicate check needed)
+            monthYearMap.set(`other-${payment.id}`, payment)
+          }
+        })
+
+        // Add unique payments to credits
+        Array.from(monthYearMap.values()).forEach(payment => {
           let type = 'Other tax credits / overpayments from prior year'
           if (payment.notes?.toLowerCase().includes('paye') || payment.paymentMethod === 'firs') {
             type = 'PAYE withheld by employer'
@@ -1442,10 +1608,27 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                 </tr>
               </thead>
               <tbody>
-                {reportData.tax.reliefs.pensionContribution > 0 && (
-                  <tr>
-                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">Pension contribution / Retirement savings</td>
-                    <td className="border border-border p-1.5 sm:p-2 text-right font-medium text-xs sm:text-sm">{formatCurrency(reportData.tax.reliefs.pensionContribution)}</td>
+                <tr>
+                  <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">Pension contribution / Retirement savings</td>
+                  <td className="border border-border p-1.5 sm:p-2 text-right font-medium text-xs sm:text-sm">
+                    {isEditing ? (
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={formatCurrencyInput(reliefAmounts.pensionContribution.toString())}
+                        onChange={(e) => {
+                          const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                          if (isValid) {
+                            setReliefAmounts(prev => ({ ...prev, pensionContribution: parseFloat(rawValue) || 0 }))
+                          }
+                        }}
+                        className="h-8 sm:h-9 text-xs sm:text-sm text-right"
+                      />
+                    ) : (
+                      formatCurrency(reliefAmounts.pensionContribution || 0)
+                    )}
+                  </td>
                     <td className="border border-border p-1.5 sm:p-2 text-center">
                       {isEditing ? (
                         <Checkbox 
@@ -1469,11 +1652,27 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                       )}
                     </td>
                   </tr>
-                )}
-                {reportData.tax.reliefs.nhfContribution > 0 && (
-                  <tr>
-                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">National Housing Fund (NHF) contribution</td>
-                    <td className="border border-border p-2 text-right font-medium">{formatCurrency(reportData.tax.reliefs.nhfContribution)}</td>
+                <tr>
+                  <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">National Housing Fund (NHF) contribution</td>
+                    <td className="border border-border p-2 text-right font-medium">
+                      {isEditing ? (
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          value={formatCurrencyInput(reliefAmounts.nhfContribution.toString())}
+                          onChange={(e) => {
+                            const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                            if (isValid) {
+                              setReliefAmounts(prev => ({ ...prev, nhfContribution: parseFloat(rawValue) || 0 }))
+                            }
+                          }}
+                          className="h-8 sm:h-9 text-xs sm:text-sm text-right"
+                        />
+                      ) : (
+                        formatCurrency(reliefAmounts.nhfContribution || 0)
+                      )}
+                    </td>
                     <td className="border border-border p-2 text-center">
                       {isEditing ? (
                         <Checkbox 
@@ -1497,11 +1696,27 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                       )}
                     </td>
                   </tr>
-                )}
-                {reportData.tax.reliefs.lifeInsurance > 0 && (
-                  <tr>
-                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">Life Insurance Premiums</td>
-                    <td className="border border-border p-2 text-right font-medium">{formatCurrency(reportData.tax.reliefs.lifeInsurance)}</td>
+                <tr>
+                  <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">Life Insurance Premiums</td>
+                    <td className="border border-border p-2 text-right font-medium">
+                      {isEditing ? (
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          value={formatCurrencyInput(reliefAmounts.lifeInsurance.toString())}
+                          onChange={(e) => {
+                            const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                            if (isValid) {
+                              setReliefAmounts(prev => ({ ...prev, lifeInsurance: parseFloat(rawValue) || 0 }))
+                            }
+                          }}
+                          className="h-8 sm:h-9 text-xs sm:text-sm text-right"
+                        />
+                      ) : (
+                        formatCurrency(reliefAmounts.lifeInsurance || 0)
+                      )}
+                    </td>
                     <td className="border border-border p-2 text-center">
                       {isEditing ? (
                         <Checkbox 
@@ -1525,11 +1740,27 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                       )}
                     </td>
                   </tr>
-                )}
-                {reportData.tax.reliefs.healthInsurance > 0 && (
-                  <tr>
-                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">Health Insurance / Medical contributions</td>
-                    <td className="border border-border p-2 text-right font-medium">{formatCurrency(reportData.tax.reliefs.healthInsurance)}</td>
+                <tr>
+                  <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">Health Insurance / Medical contributions</td>
+                    <td className="border border-border p-2 text-right font-medium">
+                      {isEditing ? (
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="0.00"
+                          value={formatCurrencyInput(reliefAmounts.healthInsurance.toString())}
+                          onChange={(e) => {
+                            const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                            if (isValid) {
+                              setReliefAmounts(prev => ({ ...prev, healthInsurance: parseFloat(rawValue) || 0 }))
+                            }
+                          }}
+                          className="h-8 sm:h-9 text-xs sm:text-sm text-right"
+                        />
+                      ) : (
+                        formatCurrency(reliefAmounts.healthInsurance || 0)
+                      )}
+                    </td>
                     <td className="border border-border p-2 text-center">
                       {isEditing ? (
                         <Checkbox 
@@ -1553,7 +1784,6 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                       )}
                     </td>
                   </tr>
-                )}
                 {reportData.expenses.totalExpenses > 0 && (
                   <tr>
                     <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">Business expenses (if self-employed) – rent, utilities, materials, fuel, services, etc.</td>
@@ -1584,7 +1814,25 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                 )}
                 <tr>
                   <td className="border border-border p-2">Depreciation / Capital Allowance on assets (if applicable)</td>
-                  <td className="border border-border p-2 text-right font-medium">₦0.00</td>
+                  <td className="border border-border p-2 text-right font-medium">
+                    {isEditing ? (
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={formatCurrencyInput(reliefAmounts.depreciation.toString())}
+                        onChange={(e) => {
+                          const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                          if (isValid) {
+                            setReliefAmounts(prev => ({ ...prev, depreciation: parseFloat(rawValue) || 0 }))
+                          }
+                        }}
+                        className="h-8 sm:h-9 text-xs sm:text-sm text-right"
+                      />
+                    ) : (
+                      formatCurrency(reliefAmounts.depreciation || 0)
+                    )}
+                  </td>
                   <td className="border border-border p-2 text-center">
                     {isEditing ? (
                       <Checkbox 
@@ -1608,10 +1856,27 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                     )}
                   </td>
                 </tr>
-                {reportData.tax.reliefs.charitableDonations > 0 && (
-                  <tr>
-                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">Charitable Donations</td>
-                    <td className="border border-border p-2 text-right font-medium">{formatCurrency(reportData.tax.reliefs.charitableDonations)}</td>
+                <tr>
+                  <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">Charitable Donations</td>
+                  <td className="border border-border p-2 text-right font-medium">
+                    {isEditing ? (
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={formatCurrencyInput(reliefAmounts.charitableDonations.toString())}
+                        onChange={(e) => {
+                          const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                          if (isValid) {
+                            setReliefAmounts(prev => ({ ...prev, charitableDonations: parseFloat(rawValue) || 0 }))
+                          }
+                        }}
+                        className="h-8 sm:h-9 text-xs sm:text-sm text-right"
+                      />
+                    ) : (
+                      formatCurrency(reliefAmounts.charitableDonations || 0)
+                    )}
+                  </td>
                     <td className="border border-border p-2 text-center">
                       {isEditing ? (
                         <Checkbox 
@@ -1635,10 +1900,27 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                       )}
                     </td>
                   </tr>
-                )}
                 <tr>
                   <td className="border border-border p-2">Any other allowed relief or deduction</td>
-                  <td className="border border-border p-2 text-right font-medium">₦0.00</td>
+                  <td className="border border-border p-2 text-right font-medium">
+                    {isEditing ? (
+                      <Input
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        value={formatCurrencyInput(reliefAmounts.otherRelief.toString())}
+                        onChange={(e) => {
+                          const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                          if (isValid) {
+                            setReliefAmounts(prev => ({ ...prev, otherRelief: parseFloat(rawValue) || 0 }))
+                          }
+                        }}
+                        className="h-8 sm:h-9 text-xs sm:text-sm text-right"
+                      />
+                    ) : (
+                      formatCurrency(reliefAmounts.otherRelief || 0)
+                    )}
+                  </td>
                   <td className="border border-border p-2 text-center">
                     {isEditing ? (
                       <Checkbox 
@@ -1664,7 +1946,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                 </tr>
                 <tr className="bg-muted font-bold">
                   <td className="border border-border p-2">Total Allowable Deductions & Reliefs</td>
-                  <td className="border border-border p-2 text-right">{formatCurrency(reportData.tax.totalReliefs + reportData.expenses.taxDeductibleExpenses)}</td>
+                  <td className="border border-border p-2 text-right">{formatCurrency((Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0)) + reportData.expenses.taxDeductibleExpenses)}</td>
                   <td className="border border-border p-2"></td>
                   <td className="border border-border p-2"></td>
                 </tr>
@@ -1854,7 +2136,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
             </div>
             <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
               <span className="text-muted-foreground text-xs sm:text-sm break-words sm:break-normal">2. Less: Total Allowable Deductions & Reliefs (from Part C)</span>
-              <span className="font-medium text-red-600 text-xs sm:text-sm whitespace-nowrap">-{formatCurrency(reportData.tax.totalReliefs + reportData.expenses.taxDeductibleExpenses)}</span>
+              <span className="font-medium text-red-600 text-xs sm:text-sm whitespace-nowrap">-{formatCurrency((Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0)) + reportData.expenses.taxDeductibleExpenses)}</span>
           </div>
             <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 sm:py-3 border-t-2 border-border font-semibold text-xs sm:text-sm">
               <span>→ Net Taxable Income</span>
@@ -2125,6 +2407,67 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
             </div>
           </div>
         </div>
+
+        {/* File Return Button at Bottom */}
+        {showFileButton && reportId && !isEditing && (
+          <div className="flex justify-end pt-6 border-t-2 border-border mt-6">
+            {(() => {
+              // Determine button text and icon based on filing status and method
+              const isFiled = filingStatus === 'filed' || filingStatus === 'submitted' || filingStatus === 'acknowledged'
+              
+              let buttonText = "File Return"
+              let ButtonIcon = FileCheck
+              let buttonVariant: "default" | "outline" | "secondary" = "default"
+              let isDisabled = false
+              
+              if (isFiled) {
+                if (filingMethod === 'agent') {
+                  if (filingStatus === 'acknowledged') {
+                    // Agent has acknowledged receipt
+                    buttonText = "Filed and Completed"
+                    ButtonIcon = CheckCircle2
+                    buttonVariant = "outline"
+                    isDisabled = true
+                  } else {
+                    // Still awaiting agent (submitted but not yet acknowledged)
+                    buttonText = "Awaiting Agent"
+                    ButtonIcon = Clock
+                    buttonVariant = "outline"
+                    isDisabled = true
+                  }
+                } else if (filingMethod === 'direct') {
+                  // Direct filing: show "Filed and Completed" when acknowledged or filed
+                  buttonText = "Filed and Completed"
+                  ButtonIcon = CheckCircle2
+                  buttonVariant = "outline"
+                  isDisabled = true
+                } else if (filingMethod === 'email') {
+                  // Email filing: show "Mail Sent, Pending Response"
+                  buttonText = "Mail Sent, Pending Response"
+                  ButtonIcon = Mail
+                  buttonVariant = "outline"
+                  isDisabled = true
+                }
+              }
+              
+              return (
+                <Button
+                  onClick={() => {
+                    if (!isDisabled) {
+                      router.push(`/dashboard/reports/file/${reportId}`)
+                    }
+                  }}
+                  variant={buttonVariant}
+                  disabled={isDisabled}
+                  className="h-10 text-sm"
+                >
+                  <ButtonIcon className="w-4 h-4 mr-2" />
+                  {buttonText}
+                </Button>
+              )
+            })()}
+          </div>
+        )}
       </div>
     </Card>
   )

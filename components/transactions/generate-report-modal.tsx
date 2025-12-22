@@ -37,6 +37,8 @@ export function GenerateReportModal({
   const [showPreview, setShowPreview] = useState(false)
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [savedReportId, setSavedReportId] = useState<string | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
   const [formData, setFormData] = useState({
     taxYear: new Date().getFullYear().toString(),
     period: 'annual' as 'annual' | 'q1' | 'q2' | 'q3' | 'q4',
@@ -149,21 +151,19 @@ export function GenerateReportModal({
         )
         toast.success("Expense report generated and saved")
       } else {
-        // For self-assessment, save as draft so user can review and edit later
-        reportId = await reportService.saveReport(
-          profile.userId,
-          title,
-          'Self-Assessment',
-          data,
-          'draft'
-        )
-        toast.success("Self-assessment report generated and saved")
+        // For self-assessment, don't save yet - wait for user to edit and click save
+        // reportId will remain null until user clicks "Save Report"
+        toast.success("Self-assessment report generated. Please review and save when ready.")
       }
       
       // Show preview instead of closing
       setReportData(data)
       setSavedReportId(reportId)
       setShowPreview(true)
+      // For self-assessment, start in editing mode
+      if (reportType === 'self-assessment') {
+        setIsEditing(true)
+      }
     } catch (error) {
       console.error("Error generating report:", error)
       toast.error(error instanceof Error ? error.message : "Failed to generate report")
@@ -270,12 +270,70 @@ export function GenerateReportModal({
     }
   }
 
+  // Handle saving self-assessment report
+  const handleSave = async () => {
+    if (!reportData || !profile?.userId) {
+      toast.error("Missing report information")
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      // Generate report title
+      const periodLabel = reportData.period.periodType === 'annual' 
+        ? `Annual ${reportData.period.year}`
+        : reportData.period.quarter 
+        ? `Q${reportData.period.quarter} ${reportData.period.year}`
+        : `${new Date(reportData.period.startDate).toLocaleDateString()} - ${new Date(reportData.period.endDate).toLocaleDateString()}`
+      
+      const title = `Self-Assessment Filing - ${periodLabel}`
+
+      if (savedReportId) {
+        // Update existing report
+        await reportService.updateReport(
+          savedReportId,
+          'Self-Assessment',
+          {
+            reportData,
+            updatedAt: new Date().toISOString()
+          }
+        )
+        toast.success("Report updated successfully")
+      } else {
+        // Create new report (first time saving)
+        const reportId = await reportService.saveReport(
+          profile.userId,
+          title,
+          'Self-Assessment',
+          reportData,
+          'draft'
+        )
+        setSavedReportId(reportId)
+        toast.success("Report saved successfully")
+      }
+
+      // Exit editing mode and show file button
+      setIsEditing(false)
+    } catch (error) {
+      console.error("Error saving report:", error)
+      toast.error(error instanceof Error ? error.message : "Failed to save report")
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Handle data changes from self-assessment preview
+  const handleDataChange = (updatedData: ReportData) => {
+    setReportData(updatedData)
+  }
+
   // Reset preview when modal closes
   const handleClose = (open: boolean) => {
     if (!open) {
       setShowPreview(false)
       setReportData(null)
       setSavedReportId(null)
+      setIsEditing(false)
     }
     onOpenChange(open)
   }
@@ -315,14 +373,52 @@ export function GenerateReportModal({
                     }}
                   />
                 ) : (
-                  <SelfAssessmentPreview
-                    reportData={reportData}
-                    reportId={savedReportId || undefined}
-                    onBack={() => {
-                      setShowPreview(false)
-                      setReportData(null)
-                    }}
-                  />
+                  <div className="space-y-4">
+                    <SelfAssessmentPreview
+                      reportData={reportData}
+                      reportId={savedReportId || undefined}
+                      isEditing={isEditing}
+                      onDataChange={handleDataChange}
+                      onBack={() => {
+                        setShowPreview(false)
+                        setReportData(null)
+                        setIsEditing(false)
+                      }}
+                      showFileButton={!isEditing && !!savedReportId}
+                    />
+                    {isEditing && (
+                      <div className="flex justify-end gap-3 pt-4 border-t">
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setShowPreview(false)
+                            setReportData(null)
+                            setIsEditing(false)
+                            setSavedReportId(null)
+                          }}
+                          disabled={isSaving}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleSave}
+                          disabled={isSaving}
+                        >
+                          {isSaving ? (
+                            <>
+                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                              Saving...
+                            </>
+                          ) : (
+                            <>
+                              <FileText className="w-4 h-4 mr-2" />
+                              Save Report
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
