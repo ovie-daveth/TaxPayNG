@@ -844,7 +844,7 @@ export default function SettingsPage() {
                                               setEditingPlatform(null)
                                               setEditingPlatformCustomName('')
                                               toast.success("Platform updated")
-                                              refetchProfile()
+                                              // State already updated via setPlatformConnections
                                             } catch (error) {
                                               console.error('Error updating platform:', error)
                                               toast.error("Failed to update platform")
@@ -941,8 +941,9 @@ export default function SettingsPage() {
                                               await userService.upsertProfile(user.uid, {
                                                 platformConnections: updated
                                               })
+                                              setPlatformConnections(updated)
                                               toast.success("Platform removed")
-                                              refetchProfile()
+                                              // State already updated via setPlatformConnections
                                             } catch (error) {
                                               console.error('Error removing platform:', error)
                                               toast.error("Failed to remove platform")
@@ -1159,9 +1160,10 @@ export default function SettingsPage() {
                                         delete updated['new']
                                         return updated
                                       })
+                                      setPlatformConnections(updated)
                                       setIsAddingPlatform(false)
                                       toast.success("Platform added")
-                                      refetchProfile()
+                                      // State already updated via setPlatformConnections
                                     } catch (error) {
                                       console.error('Error adding platform:', error)
                                       toast.error("Failed to add platform")
@@ -1336,7 +1338,7 @@ export default function SettingsPage() {
                                         setKycDocumentSizes(prev => ({ ...prev, id: 0 }))
                                         
                                         toast.success("Document removed")
-                                        await refetchProfile()
+                                        // State already updated via setKycDocuments, setKycDocumentFileIds, setKycDocumentSizes
                                         console.log('🗑️ Document removal completed')
                                       } catch (error) {
                                         console.error('🗑️ Error removing document:', error)
@@ -1419,7 +1421,7 @@ export default function SettingsPage() {
                                       }
                                       
                                       toast.success("ID document uploaded successfully")
-                                      await refetchProfile()
+                                      // State already updated via setKycDocuments, setKycDocumentFileIds, setKycDocumentSizes
                                     } catch (error) {
                                       console.error("Upload error:", error)
                                       toast.error(error instanceof Error ? error.message : "Failed to upload document")
@@ -1527,7 +1529,7 @@ export default function SettingsPage() {
                                         setKycDocumentFileIds(prev => ({ ...prev, passport: '' }))
                                         setKycDocumentSizes(prev => ({ ...prev, passport: 0 }))
                                         toast.success("Document removed")
-                                        await refetchProfile()
+                                        // State already updated via setKycDocuments, setKycDocumentFileIds, setKycDocumentSizes
                                       } catch (error) {
                                         console.error('Error removing passport:', error)
                                         toast.error("Failed to remove document")
@@ -1605,7 +1607,7 @@ export default function SettingsPage() {
                                       }
                                       
                                       toast.success("Passport uploaded successfully")
-                                      await refetchProfile()
+                                      // State already updated via setKycDocuments, setKycDocumentFileIds, setKycDocumentSizes
                                     } catch (error) {
                                       console.error("Upload error:", error)
                                       toast.error(error instanceof Error ? error.message : "Failed to upload document")
@@ -1713,7 +1715,7 @@ export default function SettingsPage() {
                                         setKycDocumentFileIds(prev => ({ ...prev, driverLicense: '' }))
                                         setKycDocumentSizes(prev => ({ ...prev, driverLicense: 0 }))
                                         toast.success("Document removed")
-                                        await refetchProfile()
+                                        // State already updated via setKycDocuments, setKycDocumentFileIds, setKycDocumentSizes
                                       } catch (error) {
                                         console.error('Error removing driver license:', error)
                                         toast.error("Failed to remove document")
@@ -1748,13 +1750,49 @@ export default function SettingsPage() {
                                     }
                                     setUploadingKYC(prev => ({ ...prev, driverLicense: true }))
                                     try {
+                                      // If replacing an existing document, get old fileId and size for deletion
+                                      const oldFileId = kycDocumentFileIds.driverLicense
+                                      const oldSize = kycDocumentSizes.driverLicense
+                                      
                                       const result = await uploadToImageKit(file, 'kyc', user.uid)
+                                      
+                                      // Update profile with new document URL, fileId, and size
                                       await userService.upsertProfile(user.uid, {
-                                        kycDocuments: { ...kycDocuments, driverLicense: result.url }
+                                        kycDocuments: { 
+                                          ...kycDocuments, 
+                                          driverLicense: result.url,
+                                          driverLicenseFileId: result.fileId,
+                                          driverLicenseSize: result.size
+                                        } as any
                                       })
                                       setKycDocuments(prev => ({ ...prev, driverLicense: result.url }))
+                                      setKycDocumentFileIds(prev => ({ ...prev, driverLicense: result.fileId || '' }))
+                                      setKycDocumentSizes(prev => ({ ...prev, driverLicense: result.size || 0 }))
+                                      
+                                      // If replacing old document, delete it from ImageKit and reduce storage
+                                      if (oldFileId && oldSize > 0) {
+                                        try {
+                                          const token = await auth.currentUser?.getIdToken()
+                                          if (token) {
+                                            await fetch(`/api/delete-image?fileId=${encodeURIComponent(oldFileId)}`, {
+                                              method: 'DELETE',
+                                              headers: { 'Authorization': `Bearer ${token}` }
+                                            })
+                                            await fetch('/api/user/update-storage', {
+                                              method: 'POST',
+                                              headers: {
+                                                'Content-Type': 'application/json',
+                                                'Authorization': `Bearer ${token}`
+                                              },
+                                              body: JSON.stringify({ additionalBytes: -oldSize })
+                                            })
+                                          }
+                                        } catch (deleteError) {
+                                          console.error('Error deleting old document:', deleteError)
+                                        }
+                                      }
                                       toast.success("Driver's License uploaded successfully")
-                                      await refetchProfile()
+                                      // State already updated via setKycDocuments, setKycDocumentFileIds, setKycDocumentSizes
                                     } catch (error) {
                                       console.error("Upload error:", error)
                                       toast.error(error instanceof Error ? error.message : "Failed to upload document")

@@ -19,13 +19,14 @@
   - Multi-currency support (NGN, USD, EUR, GBP, CAD, AUD, KES, GHS, ZAR)
   - Exchange rate fetching and conversion
   - NGN equivalent calculation
-  - **⚠️ Issue**: Exchange rates are NOT locked at transaction date (uses current rates)
+  - **✅ FIXED**: Exchange rates ARE NOW locked at transaction date
 
 ### 3. **Evidence/Receipt Upload** ✅
 - **Status**: Implemented
 - **Details**:
   - Image/PDF upload via ImageKit
   - OCR scanning (GOLD+ only)
+  - Multiple document support
   - Document linking to transactions
   - **⚠️ Issue**: Evidence is optional but should be "mandatory at filing" (not enforced)
 
@@ -43,289 +44,315 @@
   - Payment method
   - Tags and notes
 
+### 6. **Phase 1: Critical Tax Compliance** ✅
+- **Status**: IMPLEMENTED
+- **Details**:
+  - ✅ `transactionDate` and `valueDate` fields - **IMPLEMENTED**
+  - ✅ `taxPeriod` calculation - **IMPLEMENTED**
+  - ✅ `transactionNature` (business/personal/mixed) - **IMPLEMENTED**
+  - ✅ `businessPercentage` for mixed transactions - **IMPLEMENTED**
+  - ✅ Locked exchange rates (`exchangeRate`, `exchangeRateDate`, `ngnEquivalent`) - **IMPLEMENTED**
+  - ⚠️ `taxClassification` object - **INTERFACE EXISTS BUT NOT POPULATED/USED**
+
+### 7. **Phase 2: Creator-Specific Features** ✅
+- **Status**: IMPLEMENTED
+- **Details**:
+  - ✅ Platform fees tracking (`grossAmount`, `platformFees`, `netAmount`) - **IMPLEMENTED**
+  - ✅ `platform` object (name, platformType, accountId, accountUrl) - **IMPLEMENTED**
+  - ✅ Invoice-transaction linking (`linkedInvoiceId`, `invoiceStatus`, `isFromInvoice`) - **IMPLEMENTED**
+  - ❌ Platform-specific analytics - **NOT IMPLEMENTED**
+
 ---
 
 ## ❌ **Critical Missing Features**
 
-### 1. **Transaction Date vs. Value Date** ❌
-**Guideline**: "Tax is time-based, not vibe-based. You must store: Transaction date (when it happened), Value date (when money was received or paid), Tax period (month, quarter, year)"
-
-**Current State**: Only `date` field exists (single date)
-
-**Impact**: 
-- Cannot distinguish between invoice date and payment date
-- Tax period calculations may be inaccurate
-- Cash vs. accrual accounting not supported
-
-**Recommendation**: 
-```typescript
-// Add to Transaction interface:
-transactionDate: string  // When transaction occurred
-valueDate: string        // When money actually moved
-taxPeriod: {
-  year: number
-  quarter?: number
-  month?: number
-}
-```
-
----
-
-### 2. **Personal vs. Business Separation** ❌
-**Guideline**: "Every transaction must have a flag: Business, Personal, Mixed (with percentage split)"
-
-**Current State**: No personal/business flag exists
-
-**Impact**: 
-- Cannot separate personal spending from business expenses
-- Mixed-use items (phone, rent, car) cannot be partially deducted
-- Compliance risk - tax authorities care deeply about this
-
-**Recommendation**:
-```typescript
-// Add to Transaction interface:
-transactionNature: 'business' | 'personal' | 'mixed'
-businessPercentage?: number  // For mixed transactions (0-100)
-```
-
----
-
-### 3. **Platform Fees Tracking** ❌
-**Guideline**: "Each income needs: Source, Currency, Gross amount, Fees deducted (platform cuts matter for tax)"
-
-**Current State**: Only gross amount stored, no fee tracking
-
-**Impact**:
-- Cannot track platform commissions (YouTube 45%, TikTok, etc.)
-- Net income calculations are inaccurate
-- Tax calculations may be wrong (should deduct fees from gross)
-
-**Recommendation**:
-```typescript
-// Add to Transaction interface (for income):
-grossAmount: number
-platformFees?: number
-platformName?: string  // "YouTube", "TikTok", "Instagram", etc.
-netAmount: number  // grossAmount - platformFees
-```
-
----
-
-### 4. **Tax Classification Tags** ❌
+### 1. **Tax Classification Tags** ❌ **HIGH PRIORITY**
 **Guideline**: "Every transaction should carry a tax tag, even if user never sees it: Taxable income, Non-taxable income, Allowable deduction, Capital asset (for capital allowance), VAT-applicable, Withholding-tax-creditable"
 
-**Current State**: Only `taxDeductible` boolean exists
+**Current State**: 
+- ✅ Interface `TaxClassification` exists in `lib/types/index.ts`
+- ❌ **NOT being populated** when creating/editing transactions
+- ❌ **NOT being used** in tax calculations
+- ❌ **NO UI** to set or view tax classification
 
-**Impact**:
+**Impact**: 
 - Cannot distinguish between different tax treatments
 - Capital allowances cannot be calculated
-- WHT credits cannot be tracked
+- WHT credits cannot be tracked properly
 - VAT handling not supported
+
+**What Needs to Be Done**:
+1. Auto-populate `taxClassification` based on transaction type, category, and nature
+2. Add UI (optional, can be hidden) to allow manual override
+3. Use `taxClassification` in tax calculations (capital allowances, WHT credits, etc.)
+4. Update tax calculator to respect tax classification
 
 **Recommendation**:
 ```typescript
-// Add to Transaction interface:
+// Auto-populate logic needed in add-transaction-dialog.tsx:
 taxClassification: {
-  incomeType?: 'taxable' | 'non-taxable' | 'exempt'
-  expenseType?: 'allowable' | 'disallowable' | 'capital'
-  isCapitalAsset?: boolean
-  capitalAllowanceRate?: number
-  vatApplicable?: boolean
-  vatRate?: number
-  whtCreditable?: boolean
-  whtRate?: number
+  incomeType: formData.type === 'income' ? 'taxable' : undefined,
+  expenseType: formData.type === 'expense' ? (transactionNature === 'business' ? 'allowable' : 'disallowable') : undefined,
+  isCapitalAsset: isCapitalAssetCategory(category),
+  capitalAllowanceRate: isCapitalAssetCategory(category) ? 25 : undefined,
+  whtCreditable: hasWHT(category, type),
+  // ... etc
 }
 ```
 
 ---
 
-### 5. **Invoice Linking** ⚠️
-**Guideline**: "A transaction should be able to: Link to an invoice (incoming or outgoing), Be generated from an invoice, Be marked as 'pending' or 'completed'"
-
-**Current State**: 
-- Invoices can create transactions (via `markAsPaid`)
-- Transactions have `documentId` but no `invoiceId`
-- No bidirectional linking
-
-**Impact**:
-- Cannot see which transactions came from invoices
-- Cannot track unpaid invoices
-- Revenue recognition unclear
-
-**Recommendation**:
-```typescript
-// Add to Transaction interface:
-linkedInvoiceId?: string
-invoiceStatus?: 'pending' | 'completed'
-isFromInvoice?: boolean
-```
-
----
-
-### 6. **Locked Exchange Rates** ❌
-**Guideline**: "Store FX rate used, Lock the rate at transaction date, Never recalculate FX historically"
-
-**Current State**: 
-- Exchange rates fetched dynamically
-- No storage of rate used at transaction time
-- Rates recalculated on every view
-
-**Impact**:
-- Historical transactions show wrong NGN values if rates change
-- Tax calculations may be incorrect
-- Audit risk
-
-**Recommendation**:
-```typescript
-// Add to Transaction interface:
-exchangeRate: number        // Rate used at transaction date
-exchangeRateDate: string    // Date when rate was locked
-ngnEquivalent: number       // Locked NGN value
-```
-
----
-
-### 7. **Platform-Specific Income Tracking** ❌
+### 2. **Platform-Specific Analytics** ❌ **MEDIUM PRIORITY**
 **Guideline**: "Platform-specific income categorization (YouTube, Instagram, TikTok, etc.), Platform-specific tax calculations, Platform-specific reporting"
 
 **Current State**: 
-- Categories mention platforms in labels ("Ad Revenue (YouTube, Instagram, etc.)")
-- No actual platform field
-- No platform-specific analytics
+- ✅ Platform data is being captured (`platform.name`, `platform.platformType`, etc.)
+- ❌ **NO analytics dashboard** showing income by platform
+- ❌ **NO platform-specific reports**
+- ❌ **NO platform profitability analysis**
 
 **Impact**:
 - Cannot track income by platform
 - Cannot analyze which platforms are most profitable
 - Platform-specific tax rules cannot be applied
+- No insights for creators to optimize their income sources
 
-**Recommendation**:
-```typescript
-// Add to Transaction interface:
-platform?: {
-  name: string  // "YouTube", "TikTok", "Instagram", "Patreon", etc.
-  platformType: 'social' | 'subscription' | 'marketplace' | 'other'
-  accountId?: string  // Creator's account ID on platform
-}
-```
+**What Needs to Be Done**:
+1. Create analytics dashboard component showing:
+   - Income breakdown by platform
+   - Platform-specific expense tracking
+   - Platform profitability (income - expenses)
+   - Platform-specific tax implications
+2. Add platform filters to transaction list
+3. Create platform-specific reports
 
 ---
 
-### 8. **Projections & Analytics** ⚠️
+### 3. **Tax Projections & Real-Time Tax Impact** ❌ **HIGH PRIORITY**
 **Guideline**: "Show: Estimated annual tax, Quarter-by-quarter income, How much tax is 'already covered' by WHT, How expenses reduce tax in real time, 'If you stop earning today, your tax will be X'"
 
 **Current State**: 
-- Basic analytics exist (`analytics-insights.tsx`)
-- No tax projections
-- No WHT coverage tracking
-- No real-time tax impact calculations
+- ✅ Basic analytics exist (`analytics-insights.tsx`)
+- ❌ **NO tax projections** dashboard
+- ❌ **NO WHT coverage tracking** (basic exists but not comprehensive)
+- ❌ **NO real-time tax impact** calculations
+- ❌ **NO "stop earning today" scenario**
 
 **Impact**:
 - Creators cannot see tax liability in advance
 - Cannot plan for tax payments
 - No visibility into tax savings from expenses
+- Cannot make informed decisions about income/expense timing
 
-**Recommendation**: Create dedicated creator analytics dashboard with:
-- Annual tax projection
-- Quarterly income breakdown
-- WHT credit tracker
-- Real-time tax impact calculator
-- "Stop earning today" scenario
+**What Needs to Be Done**:
+1. Create tax projections dashboard showing:
+   - Estimated annual tax based on current income/expenses
+   - Quarterly income breakdown
+   - Projected tax liability by quarter
+   - WHT credit coverage (how much tax is already covered)
+2. Add real-time tax impact calculator:
+   - Show how each expense reduces tax
+   - "If you stop earning today" scenario
+   - "If you earn X more" scenario
+3. Add WHT credit tracker:
+   - Track WHT from invoices
+   - Track WHT from transactions
+   - Show remaining tax liability after WHT credits
 
 ---
 
-## 🔧 **Design & UX Improvements Needed**
+### 4. **Evidence Mandatory at Filing** ❌ **MEDIUM PRIORITY**
+**Guideline**: "Allow transactions without evidence, Show warning badges: 'Missing receipt', Block tax filing if transactions lack evidence, Bulk upload reminder before filing"
 
-### 1. **Plain English Labels** ⚠️
-**Current**: Uses accounting terms like "Tax Deductible"
-**Recommendation**: 
-- "Tax Deductible" → "Can I claim this for tax?"
-- "Category" → "What is this for?"
-- Add tooltips explaining tax implications
+**Current State**: 
+- ✅ Evidence upload is implemented
+- ❌ **NO enforcement** at filing time
+- ❌ **NO warning badges** on transactions missing evidence
+- ❌ **NO blocking** of tax filing if evidence is missing
+- ❌ **NO bulk upload reminder** before filing
 
-### 2. **Auto-Suggestions** ❌
-**Current**: No auto-suggestions based on history
-**Recommendation**: 
-- Suggest categories based on description
-- Auto-fill platform based on category
-- Suggest similar transactions
+**Impact**:
+- Users can file taxes without proper documentation
+- Audit risk
+- Compliance issues
 
-### 3. **"You can fix this later" Energy** ⚠️
-**Current**: Form feels rigid
-**Recommendation**:
-- Add "Skip for now" options
-- Show "Incomplete" badges on transactions missing evidence
-- Gentle reminders, not blockers
+**What Needs to Be Done**:
+1. Add "Missing Receipt" badge to transactions without attachments
+2. Add validation before tax filing:
+   - Check if transactions in the tax period have evidence
+   - Show list of transactions missing evidence
+   - Block filing or show strong warning
+3. Add bulk upload reminder/interface before filing
+4. Add "Skip for now" option with clear warning
 
-### 4. **Evidence Mandatory at Filing** ❌
-**Current**: Evidence optional, no enforcement
-**Recommendation**:
-- Allow transactions without evidence
-- Show warning badges: "Missing receipt"
-- Block tax filing if transactions lack evidence
-- Bulk upload reminder before filing
+---
+
+### 5. **Auto-Suggestions & Smart Defaults** ❌ **LOW PRIORITY**
+**Guideline**: "Suggest categories based on description, Auto-fill platform based on category, Suggest similar transactions"
+
+**Current State**: 
+- ❌ **NO auto-suggestions** based on history
+- ❌ **NO smart defaults** based on previous transactions
+- ❌ **NO category suggestions** from description
+
+**Impact**:
+- Slower transaction entry
+- More manual work for users
+- Potential for inconsistent categorization
+
+**What Needs to Be Done**:
+1. Implement category suggestion based on:
+   - Description keywords
+   - Previous transactions
+   - Platform name
+2. Auto-fill platform based on category:
+   - "Ad Revenue" → suggest YouTube, Instagram, TikTok
+   - "Subscription Revenue" → suggest Patreon, OnlyFans
+3. Suggest similar transactions:
+   - Show recent transactions with same category
+   - Allow quick duplicate/edit
+
+---
+
+### 6. **Plain English Labels & UX Improvements** ❌ **LOW PRIORITY**
+**Guideline**: "Use plain English: 'Tax Deductible' → 'Can I claim this for tax?', 'Category' → 'What is this for?', Add tooltips explaining tax implications"
+
+**Current State**: 
+- ⚠️ Uses accounting terms like "Tax Deductible"
+- ❌ **NO tooltips** explaining tax implications
+- ❌ **NO plain English** alternatives
+- ❌ Form feels rigid, no "you can fix this later" energy
+
+**Impact**:
+- Confusing for non-accountants
+- Users may not understand tax implications
+- Intimidating form experience
+
+**What Needs to Be Done**:
+1. Add tooltips to all tax-related fields
+2. Consider adding plain English labels:
+   - "Tax Deductible" → "Can I claim this for tax?"
+   - "Category" → "What is this for?"
+   - "Transaction Nature" → "Is this for business or personal use?"
+3. Add "Skip for now" options where appropriate
+4. Show "Incomplete" badges on transactions missing required info
+5. Add gentle reminders, not blockers
 
 ---
 
 ## 📊 **Priority Recommendations**
 
-### **Phase 1: Critical Tax Compliance (High Priority)**
-1. ✅ Add `transactionDate` and `valueDate` fields
-2. ✅ Add `taxPeriod` calculation
-3. ✅ Add `transactionNature` (business/personal/mixed)
-4. ✅ Lock exchange rates at transaction date
-5. ✅ Add `taxClassification` object
+### **Phase 1: Critical Tax Compliance (High Priority)** - ✅ MOSTLY COMPLETE
+1. ✅ Add `transactionDate` and `valueDate` fields - **DONE**
+2. ✅ Add `taxPeriod` calculation - **DONE**
+3. ✅ Add `transactionNature` (business/personal/mixed) - **DONE**
+4. ✅ Lock exchange rates at transaction date - **DONE**
+5. ⚠️ Add `taxClassification` object - **INTERFACE EXISTS, NEEDS POPULATION & USAGE**
 
-### **Phase 2: Creator-Specific Features (Medium Priority)**
-6. ✅ Add platform fees tracking (`grossAmount`, `platformFees`, `netAmount`)
-7. ✅ Add `platform` object to transactions
-8. ✅ Improve invoice-transaction linking
-9. ✅ Add platform-specific analytics
+### **Phase 2: Creator-Specific Features (Medium Priority)** - ⚠️ PARTIALLY COMPLETE
+6. ✅ Add platform fees tracking (`grossAmount`, `platformFees`, `netAmount`) - **DONE**
+7. ✅ Add `platform` object to transactions - **DONE**
+8. ✅ Improve invoice-transaction linking - **DONE**
+9. ❌ Add platform-specific analytics - **NOT IMPLEMENTED**
 
-### **Phase 3: UX & Analytics (Lower Priority)**
-10. ✅ Create tax projections dashboard
-11. ✅ Add WHT credit tracking
-12. ✅ Implement "evidence mandatory at filing" enforcement
-13. ✅ Add auto-suggestions and smart defaults
-14. ✅ Improve plain English labels
+### **Phase 3: UX & Analytics (Lower Priority)** - ❌ NOT IMPLEMENTED
+10. ❌ Create tax projections dashboard - **NOT IMPLEMENTED**
+11. ⚠️ Add WHT credit tracking - **BASIC EXISTS, NEEDS ENHANCEMENT**
+12. ❌ Implement "evidence mandatory at filing" enforcement - **NOT IMPLEMENTED**
+13. ❌ Add auto-suggestions and smart defaults - **NOT IMPLEMENTED**
+14. ❌ Improve plain English labels - **NOT IMPLEMENTED**
 
 ---
 
-## 🎯 **Next Steps**
+## 🎯 **Next Steps (Priority Order)**
 
-1. **Review this analysis** with the team
-2. **Prioritize features** based on user needs
-3. **Update Transaction interface** in `lib/types/index.ts`
-4. **Migrate existing transactions** (add default values for new fields)
-5. **Update transaction form** to capture new fields
-6. **Update tax calculator** to use new tax classification
-7. **Build analytics dashboard** for creators
-8. **Add validation** for evidence at filing time
+### **Immediate (High Priority)**
+1. **Populate and use `taxClassification`**:
+   - Add auto-population logic in `add-transaction-dialog.tsx`
+   - Update tax calculator to use tax classification
+   - Add capital allowance calculations
+   - Enhance WHT credit tracking
+
+2. **Create tax projections dashboard**:
+   - Build new component for tax projections
+   - Show estimated annual tax
+   - Show quarterly breakdowns
+   - Add "stop earning today" scenario
+
+3. **Enhance WHT credit tracking**:
+   - Improve WHT detection from transactions
+   - Show WHT coverage in tax projections
+   - Add WHT credit summary
+
+### **Short-term (Medium Priority)**
+4. **Implement evidence enforcement at filing**:
+   - Add validation before filing
+   - Show missing evidence warnings
+   - Add bulk upload interface
+
+5. **Create platform-specific analytics**:
+   - Build platform analytics dashboard
+   - Add platform filters
+   - Create platform-specific reports
+
+### **Long-term (Low Priority)**
+6. **Add auto-suggestions**:
+   - Implement category suggestions
+   - Add smart defaults
+   - Suggest similar transactions
+
+7. **Improve UX with plain English**:
+   - Add tooltips
+   - Update labels
+   - Add "skip for now" options
 
 ---
 
 ## 📝 **Implementation Notes**
 
+### Tax Classification Auto-Population Strategy
+```typescript
+// Suggested logic for auto-populating taxClassification:
+function getTaxClassification(
+  type: 'income' | 'expense',
+  category: string,
+  transactionNature: 'business' | 'personal' | 'mixed',
+  amount: number
+): TaxClassification {
+  if (type === 'income') {
+    return {
+      incomeType: 'taxable', // Default, can be overridden
+      whtCreditable: category.includes('WHT') || category.includes('Withholding'),
+    }
+  } else {
+    const isCapitalAsset = ['Equipment', 'Software', 'Studio'].includes(category)
+    return {
+      expenseType: transactionNature === 'business' ? 'allowable' : 'disallowable',
+      isCapitalAsset,
+      capitalAllowanceRate: isCapitalAsset ? 25 : undefined, // 25% annual allowance
+    }
+  }
+}
+```
+
 ### Database Migration Strategy
-- New fields should be optional initially
-- Provide defaults for existing transactions:
-  - `transactionDate` = `date` (existing)
-  - `valueDate` = `date` (existing)
-  - `transactionNature` = 'business' (assume all existing are business)
-  - `exchangeRate` = fetch current rate for historical transactions
-  - `taxClassification` = derive from category and type
+- ✅ All Phase 1 & 2 fields are already optional in the interface
+- ✅ Existing transactions continue to work
+- ⚠️ Need to add migration logic to populate `taxClassification` for existing transactions
+- ⚠️ Need to add default values for new fields on existing transactions
 
 ### Backward Compatibility
-- All new fields should be optional
-- Existing transactions should continue to work
-- Gradual migration as users edit transactions
+- ✅ All new fields are optional
+- ✅ Existing transactions continue to work
+- ✅ Gradual migration as users edit transactions
 
 ### User Education
-- Add tooltips explaining new fields
-- Create help articles for creators
-- Show examples of proper transaction entry
+- ❌ Need to add tooltips explaining new fields
+- ❌ Need to create help articles for creators
+- ❌ Need to show examples of proper transaction entry
 
 ---
 
-**Generated**: $(date)
-**Last Updated**: Analysis of current codebase
-
+**Generated**: Analysis of current codebase
+**Last Updated**: Based on actual implementation review
+**Status**: Phase 1 & 2 mostly complete, Phase 3 needs work
