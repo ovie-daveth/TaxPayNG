@@ -154,10 +154,27 @@ export function ViewTransactionDialog({
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-muted-foreground mb-1">Amount</p>
-                  <p className={`text-lg font-bold ${transaction.type === 'income' ? 'text-primary' : 'text-destructive'}`}>
-                    {transaction.type === 'income' ? '+' : '-'}{formatCurrency(transaction.amount)}
+                  <p className="text-xs text-muted-foreground mb-1">
+                    {transaction.grossAmount && transaction.platformFees ? 'Net Amount' : 'Amount'}
                   </p>
+                  <p className={`text-lg font-bold ${transaction.type === 'income' ? 'text-primary' : 'text-destructive'}`}>
+                    {transaction.type === 'income' ? '+' : '-'}
+                    {transaction.netAmount !== undefined ? formatCurrency(transaction.netAmount) : formatCurrency(transaction.amount)}
+                  </p>
+                  {/* Phase 2: Show platform fees breakdown if available */}
+                  {transaction.grossAmount && transaction.platformFees && (
+                    <div className="mt-2 p-2 bg-muted rounded text-xs space-y-1">
+                      <p className="text-muted-foreground">
+                        <span className="font-medium">Gross:</span> {formatCurrency(transaction.grossAmount)}
+                      </p>
+                      <p className="text-muted-foreground">
+                        <span className="font-medium">Platform Fees:</span> -{formatCurrency(transaction.platformFees)}
+                      </p>
+                      <p className="text-muted-foreground border-t pt-1">
+                        <span className="font-medium">Net:</span> {formatCurrency(transaction.netAmount || (transaction.grossAmount - transaction.platformFees))}
+                      </p>
+                    </div>
+                  )}
                 </div>
                 {transaction.currency && transaction.currency !== 'NGN' && (
                   <>
@@ -194,6 +211,49 @@ export function ViewTransactionDialog({
                 )}
               </div>
             </div>
+
+            {/* Phase 2: Platform Information - Only for income transactions */}
+            {transaction.type === 'income' && transaction.platform && (
+              <>
+                <Separator />
+                <div>
+                  <h3 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                    <Globe className="w-4 h-4" />
+                    Platform Information
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Platform Name</p>
+                      <p className="text-sm font-medium">{transaction.platform.name}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground mb-1">Platform Type</p>
+                      <p className="text-sm font-medium capitalize">{transaction.platform.platformType}</p>
+                    </div>
+                    {transaction.platform.accountId && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Account ID/Username</p>
+                        <p className="text-sm font-medium">{transaction.platform.accountId}</p>
+                      </div>
+                    )}
+                    {transaction.platform.accountUrl && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Account URL</p>
+                        <a 
+                          href={transaction.platform.accountUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-primary hover:underline flex items-center gap-1"
+                        >
+                          {transaction.platform.accountUrl}
+                          <Globe className="w-3 h-3" />
+                        </a>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
 
             <Separator />
 

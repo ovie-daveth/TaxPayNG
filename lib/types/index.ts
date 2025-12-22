@@ -56,6 +56,19 @@ export interface UserProfile {
   agentStates?: string[] // States the agent can handle
   agentCertification?: string // URL to certification document
   agentKycCompleted?: boolean // Whether agent has completed KYC
+  // Creator-specific fields
+  platformConnections?: PlatformConnection[] // Saved platform connections for creators
+}
+
+// Platform connection for creators
+export interface PlatformConnection {
+  id: string // Unique ID for this connection
+  name: string // Platform name (e.g., "YouTube", "TikTok", "Instagram")
+  platformType: 'social' | 'subscription' | 'marketplace' | 'streaming' | 'other'
+  accountId?: string // Creator's account ID/username on the platform
+  accountUrl?: string // URL to creator's profile/page on platform
+  createdAt: string
+  updatedAt: string
 }
 
 // Transaction Types
@@ -127,6 +140,19 @@ export interface Transaction {
   linkedInvoiceId?: string // Reference to the invoice that created this transaction
   invoiceStatus?: 'pending' | 'completed' // Status if transaction is from an invoice
   isFromInvoice?: boolean // Quick flag to identify invoice-generated transactions
+  
+  // Phase 2: Platform fees tracking (for income transactions)
+  grossAmount?: number // Gross amount before platform fees
+  platformFees?: number // Platform commission/fees deducted
+  netAmount?: number // Net amount after platform fees (grossAmount - platformFees)
+  
+  // Phase 2: Platform-specific tracking
+  platform?: {
+    name: string // "YouTube", "TikTok", "Instagram", "Patreon", "OnlyFans", etc.
+    platformType: 'social' | 'subscription' | 'marketplace' | 'streaming' | 'other'
+    accountId?: string // Creator's account ID/username on the platform
+    accountUrl?: string // URL to creator's profile/page on platform
+  }
   
   notes?: string
   tags?: string[]

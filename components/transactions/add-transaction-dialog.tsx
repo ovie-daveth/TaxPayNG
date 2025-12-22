@@ -177,6 +177,27 @@ export function AddTransactionDialog({
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('')
   const [loadingInvoices, setLoadingInvoices] = useState(false)
   
+  // Phase 2: Platform fees tracking (for income transactions)
+  const [usePlatformFeesBreakdown, setUsePlatformFeesBreakdown] = useState(false) // Switch to toggle platform fees breakdown
+  const [grossAmount, setGrossAmount] = useState('')
+  const [grossAmountDisplay, setGrossAmountDisplay] = useState('')
+  const [platformFees, setPlatformFees] = useState('')
+  const [platformFeesDisplay, setPlatformFeesDisplay] = useState('')
+  const [netAmount, setNetAmount] = useState<number | null>(null)
+  
+  // Phase 2: Platform info
+  const [platformName, setPlatformName] = useState('')
+  const [platformType, setPlatformType] = useState<'social' | 'subscription' | 'marketplace' | 'streaming' | 'other'>('social')
+  const [platformAccountId, setPlatformAccountId] = useState('')
+  const [platformAccountUrl, setPlatformAccountUrl] = useState('')
+  const [savedPlatforms, setSavedPlatforms] = useState<Array<{
+    id: string
+    name: string
+    platformType: 'social' | 'subscription' | 'marketplace' | 'streaming' | 'other'
+    accountId?: string
+    accountUrl?: string
+  }>>([])
+  
   // Check if user has access to OCR (GOLD and above plans only)
   // OCR is enabled for the first upload box, but disabled when manual entry is selected
   const hasOcrAccess = hasAccess('GOLD')
@@ -417,6 +438,40 @@ export function AddTransactionDialog({
       
       // Invoice linking
       setSelectedInvoiceId(transaction.linkedInvoiceId || '')
+      
+      // Phase 2: Initialize platform fees and platform info
+      if (profile?.businessType === 'creator' && transaction.type === 'income') {
+        // Enable breakdown if platform fees data exists
+        const hasPlatformFees = !!(transaction.grossAmount || transaction.platformFees || transaction.platform)
+        setUsePlatformFeesBreakdown(hasPlatformFees)
+        
+        if (transaction.grossAmount) {
+          const gross = transaction.currency === 'NGN' 
+            ? transaction.grossAmount 
+            : (transaction.exchangeRate ? transaction.grossAmount * transaction.exchangeRate : transaction.grossAmount)
+          setGrossAmount(gross.toString())
+          setGrossAmountDisplay(formatCurrencyInput(gross.toString()))
+        }
+        if (transaction.platformFees) {
+          const fees = transaction.currency === 'NGN'
+            ? transaction.platformFees
+            : (transaction.exchangeRate ? transaction.platformFees * transaction.exchangeRate : transaction.platformFees)
+          setPlatformFees(fees.toString())
+          setPlatformFeesDisplay(formatCurrencyInput(fees.toString()))
+        }
+        if (transaction.netAmount !== undefined) {
+          const net = transaction.currency === 'NGN'
+            ? transaction.netAmount
+            : (transaction.exchangeRate ? transaction.netAmount * transaction.exchangeRate : transaction.netAmount)
+          setNetAmount(net)
+        }
+        if (transaction.platform) {
+          setPlatformName(transaction.platform.name)
+          setPlatformType(transaction.platform.platformType)
+          setPlatformAccountId(transaction.platform.accountId || '')
+          setPlatformAccountUrl(transaction.platform.accountUrl || '')
+        }
+      }
     } else {
       // New transaction - start with file input only
       const today = new Date().toISOString().split('T')[0]
@@ -455,6 +510,18 @@ export function AddTransactionDialog({
       
       // Invoice linking
       setSelectedInvoiceId('')
+      
+      // Phase 2: Reset platform fees and platform info
+      setUsePlatformFeesBreakdown(false)
+      setGrossAmount('')
+      setGrossAmountDisplay('')
+      setPlatformFees('')
+      setPlatformFeesDisplay('')
+      setNetAmount(null)
+      setPlatformName('')
+      setPlatformType('social')
+      setPlatformAccountId('')
+      setPlatformAccountUrl('')
     }
   }, [transaction, open, defaultType, defaultCategory, defaultDescription, hasOcrAccess])
 
@@ -627,10 +694,23 @@ export function AddTransactionDialog({
         attachmentFileIds = transaction.attachmentFileIds || []
       }
 
-      // Use converted NGN amount for storage (always store in NGN)
-      const amountToStore = formData.currency === 'NGN'
-        ? parseFloat(formData.amount)
-        : (convertedAmountNGN || parseFloat(formData.amount))
+      // Phase 2: For income transactions with platform fees breakdown enabled, use netAmount if available
+      // Otherwise use the regular amount
+      let amountToStore: number
+      if (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && grossAmount && platformFees) {
+        // Use net amount (gross - fees) for income with platform fees
+        const gross = parseFloat(grossAmount)
+        const fees = parseFloat(platformFees)
+        const net = gross - fees
+        amountToStore = formData.currency === 'NGN'
+          ? net
+          : (convertedAmountNGN ? (net * (convertedAmountNGN / gross)) : net)
+      } else {
+        // Use regular amount
+        amountToStore = formData.currency === 'NGN'
+          ? parseFloat(formData.amount)
+          : (convertedAmountNGN || parseFloat(formData.amount))
+      }
 
       // Phase 1: Calculate tax period from transaction date
       const taxPeriod = calculateTaxPeriod(transactionDate || formData.date)
@@ -668,6 +748,25 @@ export function AddTransactionDialog({
         linkedInvoiceId: selectedInvoiceId || undefined,
         isFromInvoice: selectedInvoiceId ? true : undefined,
         invoiceStatus: selectedInvoiceId ? 'completed' : undefined,
+        // Phase 2: Platform fees tracking (for income transactions when breakdown is enabled)
+        grossAmount: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && grossAmount) 
+          ? (formData.currency === 'NGN' ? parseFloat(grossAmount) : (lockedExchangeRate ? parseFloat(grossAmount) * lockedExchangeRate : parseFloat(grossAmount)))
+          : undefined,
+        platformFees: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && platformFees)
+          ? (formData.currency === 'NGN' ? parseFloat(platformFees) : (lockedExchangeRate ? parseFloat(platformFees) * lockedExchangeRate : parseFloat(platformFees)))
+          : undefined,
+        netAmount: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && netAmount !== null)
+          ? (formData.currency === 'NGN' ? netAmount : (lockedExchangeRate ? netAmount * lockedExchangeRate : netAmount))
+          : undefined,
+        // Phase 2: Platform info (when breakdown is enabled)
+        platform: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && platformName && (platformName !== 'Other' || platformAccountId))
+          ? {
+              name: platformName === 'Other' ? (platformAccountId || 'Other') : platformName,
+              platformType: platformType,
+              accountId: platformName !== 'Other' ? (platformAccountId || undefined) : undefined,
+              accountUrl: platformAccountUrl || undefined
+            }
+          : undefined,
         category: formData.category,
         paymentMethod: formData.paymentMethod,
         notes: formData.notes,
@@ -1038,15 +1137,57 @@ export function AddTransactionDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="amount">
-                  Amount ({getCurrencySymbol(formData.currency)})
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="amount">
+                    {profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown
+                      ? `Net Amount (${getCurrencySymbol(formData.currency)})` 
+                      : `Amount (${getCurrencySymbol(formData.currency)})`}
+                    {profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && (
+                      <span className="text-xs text-muted-foreground ml-1">(After platform fees)</span>
+                    )}
+                  </Label>
+                  {/* Switch to toggle platform fees breakdown - Only for creators with income transactions */}
+                  {profile?.businessType === 'creator' && formData.type === 'income' && (
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="platform-fees-switch" className="text-xs text-muted-foreground cursor-pointer">
+                        Track platform fees
+                      </Label>
+                      <Switch
+                        id="platform-fees-switch"
+                        checked={usePlatformFeesBreakdown}
+                        onCheckedChange={(checked) => {
+                          setUsePlatformFeesBreakdown(checked)
+                          // If turning off, clear platform fees data
+                          if (!checked) {
+                            setGrossAmount('')
+                            setGrossAmountDisplay('')
+                            setPlatformFees('')
+                            setPlatformFeesDisplay('')
+                            setNetAmount(null)
+                            setPlatformName('')
+                            setPlatformType('social')
+                            setPlatformAccountId('')
+                            setPlatformAccountUrl('')
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
                 <Input
                   id="amount"
                   type="text"
                   placeholder="0.00"
                   value={formData.amountDisplay}
-                  onChange={(e) => handleAmountChange(e.target.value)}
+                  onChange={(e) => {
+                    // If platform fees breakdown is enabled, don't allow manual entry
+                    if (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown) {
+                      return
+                    }
+                    handleAmountChange(e.target.value)
+                  }}
+                  readOnly={!!(profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown)}
+                  disabled={!!(profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown)}
                   required
                   className="text-lg font-medium"
                 />
@@ -1076,10 +1217,248 @@ export function AddTransactionDialog({
                 )}
                 {formData.currency === 'NGN' && formData.amount && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    Amount will be stored in NGN
+                    {profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown
+                      ? 'Net amount (after platform fees) will be stored in NGN'
+                      : 'Amount will be stored in NGN'}
+                  </p>
+                )}
+                {profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && (
+                  <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
+                    💡 This field is auto-calculated from Gross Amount - Platform Fees. Enter values in the Platform Fees section below.
                   </p>
                 )}
               </div>
+
+              {/* Phase 2: Platform Fees Tracking - Only for income transactions and creators when switch is ON */}
+              {profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && (
+                <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Platform Fees (Optional)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Track platform commissions and fees for accurate net income calculation
+                    </p>
+                  </div>
+                  
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="gross-amount">
+                        Gross Amount ({getCurrencySymbol(formData.currency)})
+                        <span className="text-xs text-muted-foreground ml-1">(Before fees)</span>
+                      </Label>
+                      <Input
+                        id="gross-amount"
+                        type="text"
+                        placeholder="0.00"
+                        value={grossAmountDisplay}
+                      onChange={(e) => {
+                        const formatted = formatCurrencyInput(e.target.value)
+                        setGrossAmountDisplay(formatted)
+                        const parsedStr = parseCurrencyInput(formatted)
+                        const parsed = parseFloat(parsedStr)
+                        if (!isNaN(parsed) && parsed > 0) {
+                          setGrossAmount(parsedStr)
+                          // Auto-calculate net amount
+                          if (platformFees) {
+                            const fees = parseFloat(platformFees) || 0
+                            const net = parsed - fees
+                            setNetAmount(net)
+                            // Auto-populate the main amount field with net amount
+                            setFormData(prev => ({
+                              ...prev,
+                              amount: net.toString(),
+                              amountDisplay: formatCurrencyInput(net.toString())
+                            }))
+                          } else {
+                            setNetAmount(parsed)
+                            // Auto-populate the main amount field with gross amount (no fees yet)
+                            setFormData(prev => ({
+                              ...prev,
+                              amount: parsedStr,
+                              amountDisplay: formatCurrencyInput(parsedStr)
+                            }))
+                          }
+                        } else {
+                          setGrossAmount('')
+                          setNetAmount(null)
+                          // Clear amount field if gross amount is cleared
+                          if (!platformFees) {
+                            setFormData(prev => ({
+                              ...prev,
+                              amount: '',
+                              amountDisplay: ''
+                            }))
+                          }
+                        }
+                      }}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Total amount before platform fees
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="platform-fees">
+                        Platform Fees ({getCurrencySymbol(formData.currency)})
+                      </Label>
+                      <Input
+                        id="platform-fees"
+                        type="text"
+                        placeholder="0.00"
+                        value={platformFeesDisplay}
+                      onChange={(e) => {
+                        const formatted = formatCurrencyInput(e.target.value)
+                        setPlatformFeesDisplay(formatted)
+                        const parsedStr = parseCurrencyInput(formatted)
+                        const parsed = parseFloat(parsedStr)
+                        if (!isNaN(parsed) && parsed >= 0) {
+                          setPlatformFees(parsedStr)
+                          // Auto-calculate net amount
+                          if (grossAmount) {
+                            const gross = parseFloat(grossAmount) || 0
+                            const net = gross - parsed
+                            setNetAmount(net)
+                            // Auto-populate the main amount field with net amount
+                            setFormData(prev => ({
+                              ...prev,
+                              amount: net.toString(),
+                              amountDisplay: formatCurrencyInput(net.toString())
+                            }))
+                          } else {
+                            setNetAmount(null)
+                          }
+                        } else {
+                          setPlatformFees('')
+                          if (grossAmount) {
+                            const gross = parseFloat(grossAmount) || 0
+                            setNetAmount(gross)
+                            // Update amount field to gross (no fees)
+                            setFormData(prev => ({
+                              ...prev,
+                              amount: gross.toString(),
+                              amountDisplay: formatCurrencyInput(gross.toString())
+                            }))
+                          } else {
+                            setNetAmount(null)
+                          }
+                        }
+                      }}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Platform commission/fees deducted
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {netAmount !== null && (grossAmount || platformFees) && (
+                    <div className="p-3 bg-background rounded-md border">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">Net Amount:</span>
+                        <span className="text-lg font-semibold text-primary">
+                          {getCurrencySymbol(formData.currency)}{netAmount.toLocaleString('en-NG', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })}
+                        </span>
+                      </div>
+                      {formData.currency !== 'NGN' && convertedAmountNGN && grossAmount && netAmount !== null && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          ≈ ₦{(netAmount * (convertedAmountNGN / (parseFloat(grossAmount) || 1))).toLocaleString('en-NG', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Platform Info */}
+                  <div className="space-y-4 pt-2 border-t">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">Platform Information (Optional)</Label>
+                    </div>
+                    
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="platform-name">Platform Name</Label>
+                        <Select
+                          value={platformName}
+                          onValueChange={setPlatformName}
+                        >
+                          <SelectTrigger id="platform-name">
+                            <SelectValue placeholder="Select platform" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="YouTube">YouTube</SelectItem>
+                            <SelectItem value="TikTok">TikTok</SelectItem>
+                            <SelectItem value="Instagram">Instagram</SelectItem>
+                            <SelectItem value="Facebook">Facebook</SelectItem>
+                            <SelectItem value="Twitter">Twitter/X</SelectItem>
+                            <SelectItem value="Patreon">Patreon</SelectItem>
+                            <SelectItem value="OnlyFans">OnlyFans</SelectItem>
+                            <SelectItem value="Twitch">Twitch</SelectItem>
+                            <SelectItem value="Spotify">Spotify</SelectItem>
+                            <SelectItem value="Apple Music">Apple Music</SelectItem>
+                            <SelectItem value="Amazon">Amazon</SelectItem>
+                            <SelectItem value="Etsy">Etsy</SelectItem>
+                            <SelectItem value="Shopify">Shopify</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {platformName === 'Other' && (
+                          <Input
+                            placeholder="Enter platform name"
+                            value={platformAccountId}
+                            onChange={(e) => setPlatformAccountId(e.target.value)}
+                            className="mt-2"
+                          />
+                        )}
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="platform-type">Platform Type</Label>
+                        <Select
+                          value={platformType}
+                          onValueChange={(value) => setPlatformType(value as typeof platformType)}
+                        >
+                          <SelectTrigger id="platform-type">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="social">Social Media</SelectItem>
+                            <SelectItem value="subscription">Subscription</SelectItem>
+                            <SelectItem value="marketplace">Marketplace</SelectItem>
+                            <SelectItem value="streaming">Streaming</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    
+                    {platformName && platformName !== 'Other' && (
+                      <div className="space-y-2">
+                        <Label htmlFor="platform-account">Account ID/Username (Optional)</Label>
+                        <Input
+                          id="platform-account"
+                          placeholder="e.g., @yourusername or channel ID"
+                          value={platformAccountId}
+                          onChange={(e) => setPlatformAccountId(e.target.value)}
+                        />
+                      </div>
+                    )}
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="platform-url">Account URL (Optional)</Label>
+                      <Input
+                        id="platform-url"
+                        type="url"
+                        placeholder="https://..."
+                        value={platformAccountUrl}
+                        onChange={(e) => setPlatformAccountUrl(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
@@ -1247,11 +1626,33 @@ export function AddTransactionDialog({
                   <Label htmlFor="linked-invoice">Link to Invoice (Optional)</Label>
                   <Select
                     value={selectedInvoiceId || undefined}
-                    onValueChange={(value) => setSelectedInvoiceId(value || '')}
+                    onValueChange={(value) => {
+                      if (value && value !== 'no-invoices') {
+                        setSelectedInvoiceId(value)
+                        // Auto-fill amount and description if invoice is selected
+                        const selectedInvoice = availableInvoices.find(inv => inv.id === value)
+                        if (selectedInvoice) {
+                          // Set amount to invoice total
+                          const invoiceAmount = selectedInvoice.total.toString()
+                          setFormData(prev => ({
+                            ...prev,
+                            amount: invoiceAmount,
+                            amountDisplay: formatCurrencyInput(invoiceAmount),
+                            description: prev.description || `${selectedInvoice.invoiceType === 'incoming' ? 'Bill' : 'Invoice'} ${selectedInvoice.invoiceNumber}${selectedInvoice.client?.name ? ` - ${selectedInvoice.client.name}` : selectedInvoice.supplier?.name ? ` - ${selectedInvoice.supplier.name}` : ''}`
+                          }))
+                          // Set currency if different
+                          if (selectedInvoice.currency && selectedInvoice.currency !== formData.currency) {
+                            handleCurrencyChange(selectedInvoice.currency as CurrencyCode)
+                          }
+                        }
+                      } else {
+                        setSelectedInvoiceId('')
+                      }
+                    }}
                     disabled={loadingInvoices || !!transaction?.linkedInvoiceId}
                   >
                     <SelectTrigger id="linked-invoice">
-                      <SelectValue placeholder={loadingInvoices ? "Loading invoices..." : "Select invoice (optional)"} />
+                      <SelectValue placeholder={loadingInvoices ? "Loading invoices..." : transaction?.linkedInvoiceId ? "Already linked to invoice" : "Select invoice (optional)"} />
                     </SelectTrigger>
                     <SelectContent>
                       {availableInvoices.length === 0 ? (
@@ -1259,23 +1660,50 @@ export function AddTransactionDialog({
                           No unlinked invoices available
                         </SelectItem>
                       ) : (
-                        availableInvoices.map((invoice) => (
-                          <SelectItem key={invoice.id} value={invoice.id}>
-                            {invoice.invoiceType === 'incoming' ? 'Bill' : 'Invoice'} {invoice.invoiceNumber} - {invoice.currency} {invoice.total.toLocaleString()}
-                          </SelectItem>
-                        ))
+                        availableInvoices.map((invoice) => {
+                          const clientOrSupplier = invoice.invoiceType === 'incoming' 
+                            ? invoice.supplier?.name 
+                            : invoice.client?.name
+                          return (
+                            <SelectItem key={invoice.id} value={invoice.id}>
+                              <div className="flex flex-col">
+                                <span className="font-medium">
+                                  {invoice.invoiceType === 'incoming' ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {clientOrSupplier ? `${clientOrSupplier} • ` : ''}{invoice.currency} {invoice.total.toLocaleString()}
+                                  {invoice.issueDate && ` • ${new Date(invoice.issueDate).toLocaleDateString()}`}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          )
+                        })
                       )}
                     </SelectContent>
                   </Select>
-                  {selectedInvoiceId && (
-                    <p className="text-xs text-muted-foreground">
-                      This transaction will be linked to the selected invoice
-                    </p>
-                  )}
+                  {selectedInvoiceId && (() => {
+                    const selectedInvoice = availableInvoices.find(inv => inv.id === selectedInvoiceId)
+                    if (!selectedInvoice) return null
+                    const amountMatch = Math.abs(parseFloat(formData.amount) - selectedInvoice.total) < 0.01
+                    return (
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">
+                          This transaction will be linked to the selected invoice
+                        </p>
+                        {!amountMatch && (
+                          <p className="text-xs text-amber-600 dark:text-amber-500">
+                            ⚠️ Transaction amount ({formData.currency} {formData.amount}) doesn't match invoice total ({selectedInvoice.currency} {selectedInvoice.total.toLocaleString()})
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })()}
                   {transaction?.linkedInvoiceId && (
-                    <p className="text-xs text-muted-foreground">
-                      This transaction is already linked to an invoice
-                    </p>
+                    <div className="p-2 bg-muted rounded-md">
+                      <p className="text-xs text-muted-foreground">
+                        ✓ This transaction is already linked to an invoice
+                      </p>
+                    </div>
                   )}
                   {!selectedInvoiceId && !transaction?.linkedInvoiceId && (
                     <p className="text-xs text-muted-foreground">
@@ -1306,7 +1734,9 @@ export function AddTransactionDialog({
                 />
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+             {
+              formData.type !== 'income' && (
+                <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                 <div className="space-y-0.5">
                   <Label htmlFor="tax-deductible" className="cursor-pointer">
                     Tax Deductible
@@ -1319,6 +1749,8 @@ export function AddTransactionDialog({
                   onCheckedChange={(checked) => setFormData(prev => ({ ...prev, taxDeductible: checked }))}
                 />
               </div>
+              )
+             }
 
               <div className="flex gap-3 pt-4">
                 <Button
