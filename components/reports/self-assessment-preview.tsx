@@ -711,6 +711,117 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
   
   const businessIncome = businessIncomeCategories.reduce((sum, item) => sum + item.amount, 0)
   
+  // Calculate category breakdowns with mixed transaction details
+  const categoryBreakdowns: { [category: string]: { 
+    totalAmount: number, 
+    businessAmount: number, 
+    mixedTransactions: Array<{ description: string; originalAmount: number; businessPercentage: number; businessAmount: number }> 
+  } } = {}
+  
+  // Process transactions to build category breakdowns
+  if (reportData.income.transactions) {
+    reportData.income.transactions.forEach(txn => {
+      if (txn.type !== 'income') return
+      
+      const category = txn.category || 'uncategorized'
+      if (!categoryBreakdowns[category]) {
+        categoryBreakdowns[category] = {
+          totalAmount: 0,
+          businessAmount: 0,
+          mixedTransactions: []
+        }
+      }
+      
+      // Get the base amount
+      let baseAmount = 0
+      if (txn.currency && txn.currency !== 'NGN' && txn.ngnEquivalent) {
+        baseAmount = txn.ngnEquivalent
+      } else {
+        baseAmount = txn.netAmount !== undefined ? txn.netAmount : (typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0)
+      }
+      
+      // Apply VAT exclusion if applicable
+      if (txn.taxClassification?.vatApplicable && txn.taxClassification?.vatRate) {
+        const vatRate = txn.taxClassification.vatRate / 100
+        baseAmount = baseAmount * (1 - vatRate)
+      }
+      
+      // Calculate business amount based on transaction nature
+      let businessAmount = baseAmount
+      if (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined) {
+        businessAmount = baseAmount * (txn.businessPercentage / 100)
+        categoryBreakdowns[category].mixedTransactions.push({
+          description: txn.description || 'Untitled transaction',
+          originalAmount: baseAmount,
+          businessPercentage: txn.businessPercentage,
+          businessAmount
+        })
+      } else if (txn.transactionNature === 'personal') {
+        businessAmount = 0
+      }
+      
+      categoryBreakdowns[category].totalAmount += baseAmount
+      categoryBreakdowns[category].businessAmount += businessAmount
+    })
+  }
+  
+  // Calculate excluded/adjusted transactions for transparency
+  const excludedTransactions = {
+    vatExclusions: [] as Array<{ description: string; originalAmount: number; vatAmount: number; taxableAmount: number; vatRate: number }>,
+    personalTransactions: [] as Array<{ description: string; amount: number }>,
+    mixedTransactions: [] as Array<{ description: string; originalAmount: number; businessPercentage: number; taxableAmount: number }>,
+    totalVatExcluded: 0,
+    totalPersonalExcluded: 0,
+    totalMixedAdjustment: 0
+  }
+
+  // Process transactions to identify exclusions
+  if (reportData.income.transactions) {
+    reportData.income.transactions.forEach(txn => {
+      // VAT exclusions (for income with VAT)
+      if (txn.type === 'income' && txn.taxClassification?.vatApplicable && txn.taxClassification?.vatRate) {
+        const vatRate = txn.taxClassification.vatRate / 100
+        const originalAmount = typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0
+        const vatAmount = originalAmount * vatRate
+        const taxableAmount = originalAmount * (1 - vatRate)
+        
+        excludedTransactions.vatExclusions.push({
+          description: txn.description || 'Untitled transaction',
+          originalAmount,
+          vatAmount,
+          taxableAmount,
+          vatRate: txn.taxClassification.vatRate
+        })
+        excludedTransactions.totalVatExcluded += vatAmount
+      }
+      
+      // Personal transactions (excluded from business income)
+      if (txn.type === 'income' && txn.transactionNature === 'personal') {
+        const amount = typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0
+        excludedTransactions.personalTransactions.push({
+          description: txn.description || 'Untitled transaction',
+          amount
+        })
+        excludedTransactions.totalPersonalExcluded += amount
+      }
+      
+      // Mixed transactions (only business percentage counted)
+      if (txn.type === 'income' && txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined) {
+        const originalAmount = typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0
+        const taxableAmount = originalAmount * (txn.businessPercentage / 100)
+        const excludedAmount = originalAmount - taxableAmount
+        
+        excludedTransactions.mixedTransactions.push({
+          description: txn.description || 'Untitled transaction',
+          originalAmount,
+          businessPercentage: txn.businessPercentage,
+          taxableAmount
+        })
+        excludedTransactions.totalMixedAdjustment += excludedAmount
+      }
+    })
+  }
+  
   const otherIncome = Object.entries(reportData.income.incomeByCategory)
     .filter(([cat]) => !['Salary', 'Employment', 'Invoice Income'].includes(cat))
     .reduce((sum, [, amount]) => sum + amount, 0)
@@ -979,12 +1090,30 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
               .filter(([, amt]) => (amt as number) > 0)
         
         if (categories.length > 0) {
-          return categories.map(([cat, amt]) => `
+          return categories.map(([cat, amt]) => {
+            const breakdown = categoryBreakdowns[cat]
+            const hasMixedTransactions = breakdown?.mixedTransactions && breakdown.mixedTransactions.length > 0
+            const showBreakdown = hasMixedTransactions && breakdown && breakdown.totalAmount > breakdown.businessAmount
+            
+            let mixedDetails = ''
+            if (showBreakdown && breakdown) {
+              mixedDetails = breakdown.mixedTransactions.map(mixed => 
+                `<div style="margin-left: 15px; font-size: 9pt; color: #b45309; margin-top: 2px;">
+                  ${mixed.businessPercentage}% business: ${formatCurrency(mixed.businessAmount)} of ${formatCurrency(mixed.originalAmount)}
+                </div>`
+              ).join('')
+            }
+            
+            return `
       <div class="amount-row">
-        <span class="amount-label">${cat}</span>
-        <span class="amount-value">${formatCurrency(amt as number)}</span>
+        <div>
+          <span class="amount-label">${cat}</span>
+          <span class="amount-value">${formatCurrency(amt as number)}</span>
+        </div>
+        ${mixedDetails}
       </div>
-      `).join('')
+      `
+          }).join('')
         } else {
           return `
       <div class="amount-row">
@@ -998,6 +1127,36 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
         <span>Subtotal Business Income</span>
         <span>${formatCurrency(businessIncome)}</span>
       </div>
+      
+      ${(excludedTransactions.vatExclusions.length > 0 || excludedTransactions.personalTransactions.length > 0 || excludedTransactions.mixedTransactions.length > 0) ? `
+      <div style="margin-top: 15px; padding: 10px; background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; font-size: 9pt;">
+        <strong style="color: #666;">Transaction Adjustments & Exclusions:</strong>
+        ${excludedTransactions.vatExclusions.length > 0 ? `
+        <div style="margin-top: 8px;">
+          <strong style="color: #b45309;">VAT Exclusions (${excludedTransactions.vatExclusions.length} transaction${excludedTransactions.vatExclusions.length > 1 ? 's' : ''}):</strong>
+          <div style="margin-left: 10px; margin-top: 4px; color: #666;">
+            For income transactions with VAT, the VAT amount (${formatCurrency(excludedTransactions.totalVatExcluded)}) is excluded from taxable income as it must be remitted to the government separately.
+          </div>
+        </div>
+        ` : ''}
+        ${excludedTransactions.personalTransactions.length > 0 ? `
+        <div style="margin-top: 8px;">
+          <strong style="color: #666;">Personal Transactions Excluded (${excludedTransactions.personalTransactions.length} transaction${excludedTransactions.personalTransactions.length > 1 ? 's' : ''}):</strong>
+          <div style="margin-left: 10px; margin-top: 4px; color: #666;">
+            Personal transactions totaling ${formatCurrency(excludedTransactions.totalPersonalExcluded)} are excluded from business income as they are not taxable business income.
+          </div>
+        </div>
+        ` : ''}
+        ${excludedTransactions.mixedTransactions.length > 0 ? `
+        <div style="margin-top: 8px;">
+          <strong style="color: #666;">Mixed Transactions Adjusted (${excludedTransactions.mixedTransactions.length} transaction${excludedTransactions.mixedTransactions.length > 1 ? 's' : ''}):</strong>
+          <div style="margin-left: 10px; margin-top: 4px; color: #666;">
+            For mixed transactions, only the business portion is included. Personal portion totaling ${formatCurrency(excludedTransactions.totalMixedAdjustment)} is excluded.
+          </div>
+        </div>
+        ` : ''}
+      </div>
+      ` : ''}
     </div>
 
     ${(!isFreelancer && !isCreator) ? `
@@ -1538,12 +1697,29 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           <div className="space-y-2 text-xs sm:text-sm">
               {businessIncomeCategories.length > 0 ? (
                 <>
-                  {businessIncomeCategories.map((item, index) => (
-                    <div key={index} className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
-                      <span className="text-muted-foreground text-xs sm:text-sm">{item.category}</span>
-                      <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(item.amount)}</span>
-            </div>
-                  ))}
+                  {businessIncomeCategories.map((item, index) => {
+                    const breakdown = categoryBreakdowns[item.category]
+                    const hasMixedTransactions = breakdown?.mixedTransactions && breakdown.mixedTransactions.length > 0
+                    const showBreakdown = hasMixedTransactions && breakdown && breakdown.totalAmount > breakdown.businessAmount
+                    
+                    return (
+                      <div key={index} className="py-2 border-b border-border">
+                        <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0">
+                          <span className="text-muted-foreground text-xs sm:text-sm">{item.category}</span>
+                          <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(item.amount)}</span>
+                        </div>
+                        {showBreakdown && breakdown && (
+                          <div className="mt-1 text-[10px] text-amber-700 dark:text-amber-300 pl-2">
+                            {breakdown.mixedTransactions.map((mixed, idx) => (
+                              <div key={idx}>
+                                {mixed.businessPercentage}% business: {formatCurrency(mixed.businessAmount)} of {formatCurrency(mixed.originalAmount)}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                   <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 sm:py-3 border-t-2 border-border font-semibold text-xs sm:text-sm">
                     <span>Subtotal Business Income</span>
                     <span className="whitespace-nowrap">{formatCurrency(businessIncome)}</span>
@@ -1560,6 +1736,57 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                     <span className="whitespace-nowrap">{formatCurrency(businessIncome)}</span>
             </div>
                 </>
+              )}
+              
+              {/* Transaction Exclusions/Adjustments Explanation */}
+              {(excludedTransactions.vatExclusions.length > 0 || excludedTransactions.personalTransactions.length > 0 || excludedTransactions.mixedTransactions.length > 0) && (
+                <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
+                  <h4 className="text-xs sm:text-sm font-semibold mb-2 text-muted-foreground">Transaction Adjustments & Exclusions</h4>
+                  <div className="space-y-2 text-xs">
+                    {/* VAT Exclusions */}
+                    {excludedTransactions.vatExclusions.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="font-medium text-amber-700 dark:text-amber-300">
+                          VAT Exclusions ({excludedTransactions.vatExclusions.length} transaction{excludedTransactions.vatExclusions.length > 1 ? 's' : ''}):
+                        </p>
+                        <p className="text-muted-foreground pl-2">
+                          For income transactions with VAT, the VAT amount ({formatCurrency(excludedTransactions.totalVatExcluded)}) is excluded from taxable income as it must be remitted to the government separately.
+                        </p>
+                        <div className="pl-2 space-y-0.5 max-h-32 overflow-y-auto">
+                          {excludedTransactions.vatExclusions.map((item, idx) => (
+                            <div key={idx} className="text-muted-foreground">
+                              • {item.description}: {formatCurrency(item.originalAmount)} → {formatCurrency(item.taxableAmount)} (VAT {item.vatRate}%: {formatCurrency(item.vatAmount)} excluded)
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* Personal Transactions */}
+                    {excludedTransactions.personalTransactions.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="font-medium text-muted-foreground">
+                          Personal Transactions Excluded ({excludedTransactions.personalTransactions.length} transaction{excludedTransactions.personalTransactions.length > 1 ? 's' : ''}):
+                        </p>
+                        <p className="text-muted-foreground pl-2">
+                          Personal transactions totaling {formatCurrency(excludedTransactions.totalPersonalExcluded)} are excluded from business income as they are not taxable business income.
+                        </p>
+                      </div>
+                    )}
+                    
+                    {/* Mixed Transactions */}
+                    {excludedTransactions.mixedTransactions.length > 0 && (
+                      <div className="space-y-1">
+                        <p className="font-medium text-muted-foreground">
+                          Mixed Transactions Adjusted ({excludedTransactions.mixedTransactions.length} transaction{excludedTransactions.mixedTransactions.length > 1 ? 's' : ''}):
+                        </p>
+                        <p className="text-muted-foreground pl-2">
+                          For mixed transactions, only the business portion is included. Personal portion totaling {formatCurrency(excludedTransactions.totalMixedAdjustment)} is excluded.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
           </div>
         </div>

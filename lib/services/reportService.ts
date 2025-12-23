@@ -238,6 +238,14 @@ export class ReportService extends BaseService {
       }
       // If transactionNature is 'business' or undefined, use full amount
       
+      // For income transactions with VAT, exclude VAT amount from taxable income
+      // VAT must be remitted to government, so it shouldn't be taxed again
+      if (txn.type === 'income' && txn.taxClassification?.vatApplicable && txn.taxClassification?.vatRate) {
+        const vatRate = txn.taxClassification.vatRate / 100
+        // Taxable amount = amount - VAT portion = amount * (1 - vatRate)
+        taxableAmount = taxableAmount * (1 - vatRate)
+      }
+      
       totalIncome += taxableAmount
       
       const category = txn.category || 'uncategorized'
@@ -327,6 +335,14 @@ export class ReportService extends BaseService {
       }
       // If transactionNature is 'business' or undefined, use full amount
       
+      // For income transactions with VAT, exclude VAT amount from taxable income
+      // VAT must be remitted to government, so it shouldn't be taxed again
+      if (txn.type === 'income' && txn.taxClassification?.vatApplicable && txn.taxClassification?.vatRate) {
+        const vatRate = txn.taxClassification.vatRate / 100
+        // Taxable amount = amount - VAT portion = amount * (1 - vatRate)
+        taxableAmount = taxableAmount * (1 - vatRate)
+      }
+      
       totalIncome += taxableAmount
       
       const category = txn.category || 'uncategorized'
@@ -370,15 +386,37 @@ export class ReportService extends BaseService {
 
     // Process all expense transactions
     expenseTransactions.forEach(txn => {
-      const amount = typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0
-      totalExpenses += amount
+      // Determine the base amount to use
+      let baseAmount = 0
       
-      if (txn.taxDeductible) {
-        taxDeductibleExpenses += amount
+      // For foreign currency transactions, ngnEquivalent is already the converted amount
+      if (txn.currency && txn.currency !== 'NGN' && txn.ngnEquivalent) {
+        baseAmount = txn.ngnEquivalent
+      } else {
+        // For NGN transactions, use netAmount if available, otherwise use amount
+        baseAmount = txn.netAmount !== undefined ? txn.netAmount : (typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0)
+      }
+      
+      // Apply transaction nature percentage for mixed transactions
+      // Only apply if transactionNature is 'mixed' and businessPercentage is set
+      let deductibleAmount = baseAmount
+      if (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined) {
+        deductibleAmount = baseAmount * (txn.businessPercentage / 100)
+      } else if (txn.transactionNature === 'personal') {
+        // Personal transactions are not tax deductible
+        deductibleAmount = 0
+      }
+      // If transactionNature is 'business' or undefined, use full amount
+      
+      totalExpenses += deductibleAmount
+      
+      // For tax deductible check, use the deductible amount
+      if (txn.taxDeductible || txn.transactionNature === 'business' || (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined && txn.businessPercentage > 0)) {
+        taxDeductibleExpenses += deductibleAmount
       }
       
       const category = txn.category || 'uncategorized'
-      expensesByCategory[category] = (expensesByCategory[category] || 0) + amount
+      expensesByCategory[category] = (expensesByCategory[category] || 0) + deductibleAmount
     })
 
     return {
