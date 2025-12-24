@@ -84,6 +84,9 @@ export default function SettingsPage() {
     lastName: '',
     phone: '',
     taxId: '',
+    dateOfBirth: '',
+    gender: '',
+    maritalStatus: '',
     address: {
       street: '',
       city: '',
@@ -352,6 +355,9 @@ export default function SettingsPage() {
       lastName,
       phone: profile.phone || '',
       taxId: profile.taxId || '',
+      dateOfBirth: (profile as any).dateOfBirth || '',
+      gender: (profile as any).gender || '',
+      maritalStatus: (profile as any).maritalStatus || '',
       address: {
         street: profile.address?.street || '',
         city: profile.address?.city || '',
@@ -506,6 +512,50 @@ export default function SettingsPage() {
                           onChange={(e) => setProfileData(prev => ({ ...prev, taxId: e.target.value }))}
                           className="h-9 sm:h-10 text-xs sm:text-sm"
                         />
+                  </div>
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="dateOfBirth" className="text-xs sm:text-sm">Date of Birth</Label>
+                        <Input 
+                          id="dateOfBirth"
+                          type="date"
+                          value={profileData.dateOfBirth}
+                          onChange={(e) => setProfileData(prev => ({ ...prev, dateOfBirth: e.target.value }))}
+                          className="h-9 sm:h-10 text-xs sm:text-sm"
+                        />
+                  </div>
+                </div>
+                    <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="gender" className="text-xs sm:text-sm">Gender</Label>
+                        <Select 
+                          value={profileData.gender}
+                          onValueChange={(value) => setProfileData(prev => ({ ...prev, gender: value }))}
+                        >
+                          <SelectTrigger className="h-9 sm:h-10 text-xs sm:text-sm">
+                            <SelectValue placeholder="Select gender" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="male">Male</SelectItem>
+                            <SelectItem value="female">Female</SelectItem>
+                          </SelectContent>
+                        </Select>
+                  </div>
+                  <div className="space-y-1.5 sm:space-y-2">
+                    <Label htmlFor="maritalStatus" className="text-xs sm:text-sm">Marital Status</Label>
+                        <Select 
+                          value={profileData.maritalStatus}
+                          onValueChange={(value) => setProfileData(prev => ({ ...prev, maritalStatus: value }))}
+                        >
+                          <SelectTrigger className="h-9 sm:h-10 text-xs sm:text-sm">
+                            <SelectValue placeholder="Select marital status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="single">Single</SelectItem>
+                            <SelectItem value="married">Married</SelectItem>
+                            <SelectItem value="divorced">Divorced</SelectItem>
+                            <SelectItem value="widowed">Widowed</SelectItem>
+                          </SelectContent>
+                        </Select>
                   </div>
                 </div>
                     <Separator />
@@ -1826,6 +1876,9 @@ export default function SettingsPage() {
                               lastName: profileData.lastName,
                               phone: profileData.phone,
                               taxId: profileData.taxId || undefined,
+                              dateOfBirth: profileData.dateOfBirth || undefined,
+                              gender: profileData.gender || undefined,
+                              maritalStatus: profileData.maritalStatus || undefined,
                               address: {
                                 street: profileData.address.street,
                                 city: profileData.address.city,
@@ -1833,7 +1886,7 @@ export default function SettingsPage() {
                                 country: profileData.address.country,
                                 postalCode: profileData.address.postalCode
                               }
-                            })
+                            } as any)
                             if (result.success) {
                               toast.success("Profile updated successfully")
                               await refetchProfile()

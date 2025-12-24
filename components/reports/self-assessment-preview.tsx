@@ -155,30 +155,54 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
   // Track if personal info has been initialized from address
   const personalInfoInitializedRef = useRef(false)
   
-  // Initialize personal info from reportData or user profile (only once, don't overwrite user input)
+  // Initialize personal info from reportData metadata OR user profile (only once, don't overwrite user input)
   useEffect(() => {
-    // Only initialize once, and only if state/lga are empty (user hasn't entered anything)
+    // Only initialize once, and only if fields are empty (user hasn't entered anything)
     if (!personalInfoInitializedRef.current) {
       setPersonalInfo(prev => {
         const newState = { ...prev }
         
-        // Only set state/lga from address if they're currently empty
-        if (reportData.userInfo.address && !prev.state && !prev.lga) {
-          const addressParts = reportData.userInfo.address.split(',')
-          newState.state = addressParts[1]?.trim() || ''
-          newState.lga = addressParts[2]?.trim() || ''
-        }
+        // First, try to get from saved metadata
+        const savedPersonalInfo = (reportData as any).metadata?.personalInfo
         
-        // Only set email if it's empty
-        if (!prev.contactEmail && user?.email) {
-          newState.contactEmail = user.email
+        // Set from saved metadata if available, otherwise from profile
+        if (savedPersonalInfo) {
+          // Use saved values if they exist
+          newState.dateOfBirth = prev.dateOfBirth || savedPersonalInfo.dateOfBirth || ''
+          newState.gender = prev.gender || savedPersonalInfo.gender || ''
+          newState.maritalStatus = prev.maritalStatus || savedPersonalInfo.maritalStatus || ''
+          newState.state = prev.state || savedPersonalInfo.state || ''
+          newState.lga = prev.lga || savedPersonalInfo.lga || ''
+          newState.contactPhone = prev.contactPhone || savedPersonalInfo.contactPhone || ''
+          newState.contactEmail = prev.contactEmail || savedPersonalInfo.contactEmail || ''
+        } else {
+          // Initialize from user profile if no saved data
+          // Set state/lga from address if they're currently empty
+          if (profile?.address && !prev.state && !prev.lga) {
+            newState.state = profile.address.state || ''
+            newState.lga = profile.address.city || '' // Using city as LGA approximation
+          } else if (reportData.userInfo.address && !prev.state && !prev.lga) {
+            const addressParts = reportData.userInfo.address.split(',')
+            newState.state = addressParts[1]?.trim() || ''
+            newState.lga = addressParts[2]?.trim() || ''
+          }
+          
+          // Set phone from profile if available
+          if (!prev.contactPhone && profile?.phone) {
+            newState.contactPhone = profile.phone
+          }
+          
+          // Set email from user or profile
+          if (!prev.contactEmail) {
+            newState.contactEmail = user?.email || profile?.email || ''
+          }
         }
         
         return newState
       })
       personalInfoInitializedRef.current = true
     }
-  }, []) // Empty dependency array - only run once on mount
+  }, [profile, user, reportData]) // Include dependencies to re-initialize if profile changes
 
   // Update tax credits totals when credits change
   const updateTaxCreditsTotals = (credits: typeof allTaxCredits) => {
@@ -297,7 +321,8 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
       toast.success("Signature uploaded successfully")
     } catch (error) {
       console.error("Error uploading signature:", error)
-      toast.error("Failed to upload signature")
+      const errorMessage = error instanceof Error ? error.message : "Failed to upload signature"
+      toast.error(errorMessage)
     } finally {
       setUploadingSignature(false)
       setScanningSignature(false)
@@ -438,7 +463,18 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
   
   // Sync all metadata changes to parent reportData whenever they change
   useEffect(() => {
-    if (!onDataChange || isInitialMount.current || isUpdatingRef.current || !hasInitializedRef.current) return
+    // Don't sync if we don't have onDataChange or if we're currently updating
+    if (!onDataChange || isUpdatingRef.current) return
+    
+    // Allow sync if initialization is complete OR if user has manually entered data
+    // This ensures personalInfo changes are saved even during initial mount
+    const hasUserInput = personalInfo.dateOfBirth || personalInfo.gender || personalInfo.maritalStatus || 
+                         personalInfo.state || personalInfo.lga || personalInfo.contactPhone || personalInfo.contactEmail
+    
+    if (!hasInitializedRef.current && !hasUserInput) {
+      // Wait for initialization if no user input yet
+      return
+    }
     
     // Create new metadata object
     const newMetadata = {
@@ -2615,86 +2651,6 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           </div>
         </div>
 
-        {/* Tax Classification Summary (Gold+ feature) */}
-        {hasGoldAccess && (capitalAllowances > 0 || whtCredits > 0 || vatOutput > 0) && (
-          <div className="mt-6 border-t border-border pt-4">
-            <h3 className="text-sm sm:text-base font-semibold mb-3">Tax Classification Benefits (Gold+ Feature)</h3>
-            
-            {capitalAllowances > 0 && (
-              <div className="mb-4 bg-blue-50 dark:bg-blue-950/20 border-l-4 border-blue-500 dark:border-blue-400 p-3 sm:p-4 rounded">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm sm:text-base font-semibold">Capital Allowances</span>
-                  <span className="text-base sm:text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(capitalAllowances)}</span>
-                </div>
-                {capitalAllowanceDetails.length > 0 && (
-                  <div className="mt-2 space-y-2">
-                    {capitalAllowanceDetails.map((detail, index) => (
-                      <div key={index} className="border-l-2 border-blue-300 dark:border-blue-700 pl-2 py-1">
-                        <div className="flex justify-between items-start text-xs sm:text-sm">
-                          <div className="flex-1">
-                            <div className="font-medium">{detail.description}</div>
-                            <div className="text-muted-foreground mt-0.5 space-y-0.5">
-                              <div>Purchased: {detail.purchaseYear} • Original Cost: {formatCurrency(detail.originalCost)}</div>
-                              <div>Year {detail.yearsSincePurchase + 1} Depreciation: {formatCurrency(detail.allowanceAmount)} ({detail.allowanceRate}%)</div>
-                              <div className="text-[10px]">Remaining Book Value: {formatCurrency(detail.bookValueAfter)}</div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {whtCredits > 0 && (
-              <div className="mb-4 bg-green-50 dark:bg-green-950/20 border-l-4 border-green-500 dark:border-green-400 p-3 sm:p-4 rounded">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm sm:text-base font-semibold">WHT Credits</span>
-                  <span className="text-base sm:text-lg font-bold text-green-600 dark:text-green-400">{formatCurrency(whtCredits)}</span>
-                </div>
-                {whtCreditDetails.length > 0 && (
-                  <div className="mt-2 space-y-1">
-                    {whtCreditDetails.map((detail, index) => (
-                      <div key={index} className="flex justify-between text-xs sm:text-sm py-1">
-                        <span className="text-muted-foreground">{detail.description}</span>
-                        <span className="font-medium">{formatCurrency(detail.whtAmount)} ({detail.whtRate}%)</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* VAT Information - only show Output VAT (from income), not Input VAT (from expenses) */}
-            {vatOutput > 0 && (
-              <div className="mb-4 bg-purple-50 dark:bg-purple-950/20 border-l-4 border-purple-500 dark:border-purple-400 p-3 sm:p-4 rounded">
-                <div className="mb-3">
-                  <h4 className="text-sm sm:text-base font-semibold mb-2">VAT Summary</h4>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs sm:text-sm text-muted-foreground">Output VAT (Payable)</span>
-                      <span className="text-sm sm:text-base font-semibold text-purple-600 dark:text-purple-400">{formatCurrency(vatOutput)}</span>
-                    </div>
-                  </div>
-                </div>
-                {vatDetails.filter(d => d.type === 'output').length > 0 && (
-                  <div className="mt-3 space-y-1">
-                    <p className="text-xs sm:text-sm text-muted-foreground mb-2">Breakdown:</p>
-                    {vatDetails.filter(d => d.type === 'output').map((detail, index) => (
-                      <div key={index} className="flex justify-between text-xs sm:text-sm py-1">
-                        <span className="text-muted-foreground">
-                          {detail.description}
-                        </span>
-                        <span className="font-medium">{formatCurrency(detail.vatAmount)} ({detail.vatRate}%)</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Add Credit Dialog */}
         <Dialog open={showAddCredit} onOpenChange={setShowAddCredit}>

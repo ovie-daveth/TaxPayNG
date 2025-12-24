@@ -204,18 +204,39 @@ export async function POST(request: NextRequest) {
       })
     } catch (imagekitError) {
       console.error('ImageKit SDK error:', imagekitError)
-      const errorMessage = imagekitError instanceof Error ? imagekitError.message : 'ImageKit upload failed'
+      const errorMessage = imagekitError instanceof Error ? imagekitError.message : String(imagekitError) || 'ImageKit upload failed'
+      const errorDetails = imagekitError instanceof Error ? {
+        message: errorMessage,
+        name: imagekitError.name,
+        stack: imagekitError.stack
+      } : String(imagekitError)
       
       // Check for specific ImageKit errors
-      if (errorMessage.includes('getaddrinfo') || errorMessage.includes('EAI_AGAIN')) {
+      if (errorMessage.includes('getaddrinfo') || errorMessage.includes('EAI_AGAIN') || errorMessage.includes('ENOTFOUND') || errorMessage.includes('ECONNREFUSED')) {
         return NextResponse.json(
           { error: 'Network error: Unable to connect to ImageKit. Please check your internet connection and try again.' },
           { status: 503 }
         )
       }
       
+      // Check for ImageKit service errors (503, 502, 504)
+      if (errorMessage.includes('503') || errorMessage.includes('502') || errorMessage.includes('504') || errorMessage.includes('Service Unavailable')) {
+        return NextResponse.json(
+          { error: 'ImageKit service is temporarily unavailable. Please try again in a few moments.' },
+          { status: 503 }
+        )
+      }
+      
+      // Check for authentication/configuration errors
+      if (errorMessage.includes('401') || errorMessage.includes('403') || errorMessage.includes('Unauthorized') || errorMessage.includes('Forbidden')) {
+        return NextResponse.json(
+          { error: 'ImageKit configuration error. Please contact support.' },
+          { status: 500 }
+        )
+      }
+      
       return NextResponse.json(
-        { error: errorMessage },
+        { error: errorMessage || 'ImageKit upload failed. Please try again.' },
         { status: 500 }
       )
     }

@@ -172,7 +172,18 @@ export class ReportService extends BaseService {
       taxClassification
     )
 
-    return {
+    // Initialize personalInfo from user profile
+    const personalInfo = {
+      dateOfBirth: (profile as any).dateOfBirth || '',
+      gender: (profile as any).gender || '',
+      maritalStatus: (profile as any).maritalStatus || '',
+      state: profile.address?.state || '',
+      lga: profile.address?.city || '', // Using city as LGA approximation
+      contactPhone: profile.phone || '',
+      contactEmail: profile.email || ''
+    }
+
+    const result: ReportData & { metadata?: any } = {
       period,
       userInfo: {
         name: `${profile.firstName} ${profile.lastName}`,
@@ -189,6 +200,20 @@ export class ReportService extends BaseService {
       taxClassification,
       generatedAt: new Date().toISOString()
     }
+    
+    // Initialize metadata with personalInfo from profile
+    result.metadata = {
+      personalInfo,
+      attachments: {},
+      reliefEvidence: {},
+      reliefNotes: {},
+      reliefAmounts: {},
+      manualTaxCredits: [],
+      taxCreditEvidence: {},
+      declarationInfo: {}
+    }
+    
+    return result
   }
 
   // Generate comprehensive report data from transactions and invoices
@@ -310,7 +335,18 @@ export class ReportService extends BaseService {
         taxClassificationSummary
       )
 
-      return {
+      // Initialize personalInfo from user profile
+      const personalInfo = {
+        dateOfBirth: (profile as any).dateOfBirth || '',
+        gender: (profile as any).gender || '',
+        maritalStatus: (profile as any).maritalStatus || '',
+        state: profile.address?.state || '',
+        lga: profile.address?.city || '', // Using city as LGA approximation
+        contactPhone: profile.phone || '',
+        contactEmail: profile.email || ''
+      }
+
+      const result: ReportData & { metadata?: any } = {
         period,
         userInfo: {
           name: profile.firstName && profile.lastName 
@@ -327,6 +363,20 @@ export class ReportService extends BaseService {
         taxClassification: taxClassificationSummary,
         generatedAt: new Date().toISOString()
       }
+      
+      // Initialize metadata with personalInfo from profile
+      result.metadata = {
+        personalInfo,
+        attachments: {},
+        reliefEvidence: {},
+        reliefNotes: {},
+        reliefAmounts: {},
+        manualTaxCredits: [],
+        taxCreditEvidence: {},
+        declarationInfo: {}
+      }
+      
+      return result
     } catch (error) {
       console.error('Error generating report data:', error)
       throw error
