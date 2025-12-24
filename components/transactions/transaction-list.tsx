@@ -54,10 +54,25 @@ export function TransactionList({
 
   const { user } = useAuth()
   const { profile } = useUserProfile()
-  const { isSubscribed, loading: subscriptionLoading } = useSubscription()
+  const { isSubscribed, loading: subscriptionLoading, hasAccess } = useSubscription()
   const { sidebarCollapsed } = useSidebar()
   const { createTransaction } = useTransactions(user?.uid || null)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+
+  // Check if a transaction is incomplete (missing important information)
+  const isTransactionIncomplete = (transaction: Transaction): boolean => {
+    // Check for missing required fields
+    if (!transaction.description || !transaction.category || !transaction.amount) {
+      return true
+    }
+    
+    // For creators, check if transaction nature is missing
+    if (profile?.businessType === 'creator' && !transaction.transactionNature) {
+      return true
+    }
+    
+    return false
+  }
 
   // Listen for newly created transactions to highlight them
   useEffect(() => {
@@ -328,6 +343,20 @@ export function TransactionList({
                         >
                           <Paperclip className="w-3 h-3 md:w-3.5 md:h-3.5 text-muted-foreground hover:text-primary" />
                         </button>
+                      )}
+                      {isTransactionIncomplete(transaction) && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="outline" className="text-[9px] md:text-[10px] px-1.5 md:px-2 py-0.5 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 flex-shrink-0">
+                                Incomplete
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="text-sm">This transaction is missing some information. Click to edit and complete it.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
                     </div>
                   </td>

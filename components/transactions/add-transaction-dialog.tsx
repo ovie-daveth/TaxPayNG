@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { Upload, Scan, Loader2, AlertCircle } from "lucide-react"
+import { Upload, Scan, Loader2, AlertCircle, HelpCircle } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Transaction, TransactionNature, TaxPeriod, TaxClassification } from "@/lib/types"
 import { toast } from "sonner"
 import { formatDateForInput, calculateTaxPeriod } from "@/lib/utils/date"
@@ -209,6 +210,7 @@ export function AddTransactionDialog({
   // Tax Classification state (only for Gold+ users)
   const [taxClassification, setTaxClassification] = useState<TaxClassification | undefined>(undefined)
   const [showTaxClassificationSection, setShowTaxClassificationSection] = useState(false)
+  const [skipTaxClassification, setSkipTaxClassification] = useState(false)
   
   // Auto-populate tax classification based on transaction data (Gold+ only)
   const autoPopulateTaxClassification = (
@@ -633,6 +635,7 @@ export function AddTransactionDialog({
       // Reset tax classification (Gold+ only)
       if (hasTaxClassificationAccess) {
         setTaxClassification(undefined)
+        setSkipTaxClassification(false)
         setShowTaxClassificationSection(false)
       }
     }
@@ -642,6 +645,7 @@ export function AddTransactionDialog({
   useEffect(() => {
     if (!hasTaxClassificationAccess) return
     if (!formData.category || !formData.type) return
+    if (skipTaxClassification) return // Don't auto-populate if user skipped
     
     // Auto-populate tax classification
     const autoClassification = autoPopulateTaxClassification(
@@ -662,7 +666,7 @@ export function AddTransactionDialog({
     if (!showTaxClassificationSection) {
       setTaxClassification(autoClassification)
     }
-  }, [formData.type, formData.category, formData.description, formData.notes, transactionNature, hasTaxClassificationAccess, showTaxClassificationSection])
+  }, [formData.type, formData.category, formData.description, formData.notes, transactionNature, hasTaxClassificationAccess, showTaxClassificationSection, skipTaxClassification])
 
   // Load available invoices when dialog opens (for manual linking)
   useEffect(() => {
@@ -915,7 +919,7 @@ export function AddTransactionDialog({
         attachmentFileIds: attachmentFileIds,
         documentId: documentId,
         // Tax Classification (Gold+ only)
-        taxClassification: hasTaxClassificationAccess ? taxClassification : undefined
+        taxClassification: (hasTaxClassificationAccess && !skipTaxClassification) ? taxClassification : undefined
       })
 
       console.log("Result:", result)
@@ -1618,10 +1622,23 @@ export function AddTransactionDialog({
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   required
                 />
+                <p className="text-xs text-muted-foreground">You can add more details later</p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="category">What is this for?</Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="text-sm">Select the category that best describes this transaction. This helps us organize your finances and apply the right tax rules.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
                 <Select
                   value={formData.category && !getBaseCategories().some(cat => cat.value === formData.category) ? 'Other' : formData.category}
                   onValueChange={(value) => {
@@ -1696,7 +1713,19 @@ export function AddTransactionDialog({
               {/* Phase 1: Personal vs Business separation - Only for creators */}
               {profile?.businessType === 'creator' && (
                 <div className="space-y-2">
-                  <Label htmlFor="transaction-nature">Transaction Type</Label>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="transaction-nature">Is this for business or personal use?</Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="text-sm">Business expenses can reduce your tax bill. Personal expenses cannot. If it's a mix (like a phone used for both), select "Mixed" and specify the percentage.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
                   <Select
                     value={transactionNature}
                     onValueChange={(value) => {
@@ -1866,13 +1895,28 @@ export function AddTransactionDialog({
               </div>
 
               {/* Tax Classification Section (Gold+ only) */}
-              {hasTaxClassificationAccess && taxClassification && (
+              {hasTaxClassificationAccess && taxClassification && !skipTaxClassification && (
                 <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
                   <div className="flex items-center justify-between">
                     <div>
-                      <Label className="text-sm font-semibold">Tax Classification</Label>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm font-semibold">Tax Classification (Optional</Label>
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="sm"
+                          onClick={() => {
+                            setSkipTaxClassification(true)
+                            setTaxClassification(undefined)
+                          }}
+                          className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground underline"
+                        >
+                          - Skip for now
+                        </Button>
+                        <Label className="text-sm font-semibold">)</Label>
+                      </div>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Auto-populated based on transaction details. Click to edit.
+                        Auto-populated based on transaction details. You can edit or skip this section - you can always update it later.
                       </p>
                     </div>
                     <Button
@@ -1928,7 +1972,21 @@ export function AddTransactionDialog({
                     <div className="space-y-4 pt-2 border-t">
                       {formData.type === 'income' && (
                         <div className="space-y-2">
-                          <Label>Income Type</Label>
+                          <div className="flex items-center gap-2">
+                            <Label>Income Type</Label>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                  <p className="text-sm mb-1"><strong>Taxable:</strong> Regular income subject to tax</p>
+                                  <p className="text-sm mb-1"><strong>Non-taxable:</strong> Income that doesn't count toward your tax (e.g., gifts, grants)</p>
+                                  <p className="text-sm"><strong>Exempt:</strong> Income that's legally exempt from tax</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
                           <Select
                             value={taxClassification.incomeType || 'taxable'}
                             onValueChange={(value) => setTaxClassification(prev => ({
@@ -1951,7 +2009,21 @@ export function AddTransactionDialog({
                       {formData.type === 'expense' && (
                         <>
                           <div className="space-y-2">
-                            <Label>Expense Type</Label>
+                            <div className="flex items-center gap-2">
+                              <Label>Expense Type</Label>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p className="text-sm mb-1"><strong>Allowable:</strong> Regular business expenses you can deduct (e.g., internet, software, rent)</p>
+                                    <p className="text-sm mb-1"><strong>Disallowable:</strong> Expenses you cannot claim (e.g., personal expenses, fines)</p>
+                                    <p className="text-sm"><strong>Capital:</strong> Long-term assets eligible for depreciation (e.g., equipment, vehicles)</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
                             <Select
                               value={taxClassification.expenseType || 'allowable'}
                               onValueChange={(value) => {
@@ -2000,7 +2072,19 @@ export function AddTransactionDialog({
                                   capitalAllowanceRate: checked ? (prev?.capitalAllowanceRate || 25) : undefined
                                 }))}
                               />
-                              <Label className="text-sm">Is Capital Asset (for capital allowance)</Label>
+                              <div className="flex items-center gap-2 flex-1">
+                                <Label className="text-sm">Is this a long-term asset? (for depreciation)</Label>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      <p className="text-sm">Long-term assets (like equipment or vehicles) can be depreciated over multiple years instead of claiming the full cost immediately. This can help spread out your tax benefits.</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
                             </div>
                             <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md">
                               <p className="text-xs font-medium text-blue-900 dark:text-blue-200 mb-1.5">
@@ -2053,7 +2137,19 @@ export function AddTransactionDialog({
                             whtRate: checked ? (prev?.whtRate || 5) : undefined
                           }))}
                         />
-                        <Label className="text-sm">WHT Creditable (Withholding Tax)</Label>
+                        <div className="flex items-center gap-2 flex-1">
+                          <Label className="text-sm">Was withholding tax deducted from this?</Label>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p className="text-sm">If tax was already deducted at source (withholding tax), you can claim it as a credit against your final tax bill. This reduces how much tax you need to pay.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
                       </div>
                       
                       {taxClassification.whtCreditable && (
@@ -2085,7 +2181,19 @@ export function AddTransactionDialog({
                                 vatRate: checked ? (prev?.vatRate || 7.5) : undefined
                               }))}
                             />
-                            <Label className="text-sm">VAT Applicable</Label>
+                            <div className="flex items-center gap-2 flex-1">
+                              <Label className="text-sm">Does this include VAT?</Label>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p className="text-sm">If you're VAT-registered and this income includes VAT, you'll need to remit the VAT amount to the government. The VAT portion will be excluded from your taxable income.</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
                           </div>
                           
                           {taxClassification.vatApplicable && (
@@ -2134,11 +2242,23 @@ export function AddTransactionDialog({
               {/* Tax Deductible switch - only show if Expense Type is not set (for non-Gold users or legacy compatibility) */}
               {formData.type !== 'income' && !hasTaxClassificationAccess && (
                 <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="tax-deductible" className="cursor-pointer">
-                      Tax Deductible
-                    </Label>
-                    <p className="text-xs text-muted-foreground">Mark this expense as tax deductible</p>
+                  <div className="space-y-0.5 flex-1">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="tax-deductible" className="cursor-pointer">
+                        Can I claim this for tax?
+                      </Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="text-sm">If this expense is used for your business, you can claim it to reduce your tax bill. Personal expenses cannot be claimed.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <p className="text-xs text-muted-foreground">You can update this later if you're not sure</p>
                   </div>
                   <Switch
                     id="tax-deductible"
