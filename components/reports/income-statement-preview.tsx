@@ -2,6 +2,7 @@
 
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { ReportData } from "@/lib/services/reportService"
 import { formatCurrencyAmount } from "@/lib/utils/currency"
 import { format } from "date-fns"
@@ -9,6 +10,7 @@ import { Printer, ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { useSubscription } from "@/lib/hooks/useSubscription"
+import { useState } from "react"
 
 interface IncomeStatementPreviewProps {
   reportData: ReportData
@@ -24,6 +26,7 @@ export function IncomeStatementPreview({ reportData, formData, onBack }: IncomeS
   const { hasAccess } = useSubscription()
   const hasGoldAccess = hasAccess('GOLD')
   const formatCurrency = (amount: number) => formatCurrencyAmount(amount, 'NGN')
+  const [incomeView, setIncomeView] = useState<'category' | 'source'>('category')
   
   const userName = profile?.firstName || profile?.lastName || profile?.email?.split('@')[0] || 'there'
   
@@ -111,7 +114,7 @@ export function IncomeStatementPreview({ reportData, formData, onBack }: IncomeS
     </div>
   </div>
 
-  ${Object.keys(incomeData.incomeByCategory).length > 0 ? `
+  ${incomeView === 'category' && Object.keys(incomeData.incomeByCategory).length > 0 ? `
   <div class="section">
     <div class="section-title">Income by Category</div>
     ${Object.entries(incomeData.incomeByCategory)
@@ -125,7 +128,7 @@ export function IncomeStatementPreview({ reportData, formData, onBack }: IncomeS
   </div>
   ` : ''}
 
-  ${Object.keys(incomeData.incomeBySource).length > 0 ? `
+  ${incomeView === 'source' && Object.keys(incomeData.incomeBySource).length > 0 ? `
   <div class="section">
     <div class="section-title">Income by Source</div>
     ${Object.entries(incomeData.incomeBySource)
@@ -198,37 +201,57 @@ export function IncomeStatementPreview({ reportData, formData, onBack }: IncomeS
           </div>
         </div>
 
-        {/* Income by Category */}
-        {Object.keys(incomeData.incomeByCategory).length > 0 && (
+        {/* Income Breakdown - Toggle between Category and Source */}
+        {(Object.keys(incomeData.incomeByCategory).length > 0 || Object.keys(incomeData.incomeBySource).length > 0) && (
           <div>
-            <h2 className="text-sm sm:text-base md:text-lg font-semibold mb-3 sm:mb-4 border-b border-border pb-2">Income by Category</h2>
-            <div className="space-y-2">
-              {Object.entries(incomeData.incomeByCategory)
-                .sort(([, a], [, b]) => b - a)
-                .map(([category, amount]) => (
-                  <div key={category} className="flex justify-between py-1.5 sm:py-2 border-b border-border">
-                    <span className="text-xs sm:text-sm text-muted-foreground">{category}</span>
-                    <span className="text-xs sm:text-sm font-medium">{formatCurrency(amount)}</span>
-                  </div>
-                ))}
-            </div>
-          </div>
-        )}
+            <Tabs value={incomeView} onValueChange={(value) => setIncomeView(value as 'category' | 'source')} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-3 sm:mb-4">
+                <TabsTrigger value="category" className="text-xs sm:text-sm">
+                  Income by Category
+                </TabsTrigger>
+                <TabsTrigger value="source" className="text-xs sm:text-sm">
+                  Income by Source
+                </TabsTrigger>
+              </TabsList>
 
-        {/* Income by Source */}
-        {Object.keys(incomeData.incomeBySource).length > 0 && (
-          <div>
-            <h2 className="text-sm sm:text-base md:text-lg font-semibold mb-3 sm:mb-4 border-b border-border pb-2">Income by Source</h2>
-            <div className="space-y-2">
-              {Object.entries(incomeData.incomeBySource)
-                .sort(([, a], [, b]) => b - a)
-                .map(([source, amount]) => (
-                  <div key={source} className="flex justify-between py-1.5 sm:py-2 border-b border-border">
-                    <span className="text-xs sm:text-sm text-muted-foreground">{source}</span>
-                    <span className="text-xs sm:text-sm font-medium">{formatCurrency(amount)}</span>
+              <TabsContent value="category" className="mt-0">
+                {Object.keys(incomeData.incomeByCategory).length > 0 ? (
+                  <div className="space-y-2">
+                    {Object.entries(incomeData.incomeByCategory)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([category, amount]) => (
+                        <div key={category} className="flex justify-between py-1.5 sm:py-2 border-b border-border">
+                          <span className="text-xs sm:text-sm text-muted-foreground">{category}</span>
+                          <span className="text-xs sm:text-sm font-medium">{formatCurrency(amount)}</span>
+                        </div>
+                      ))}
                   </div>
-                ))}
-            </div>
+                ) : (
+                  <div className="text-center py-4 text-xs sm:text-sm text-muted-foreground">
+                    No income by category available
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="source" className="mt-0">
+                {Object.keys(incomeData.incomeBySource).length > 0 ? (
+                  <div className="space-y-2">
+                    {Object.entries(incomeData.incomeBySource)
+                      .sort(([, a], [, b]) => b - a)
+                      .map(([source, amount]) => (
+                        <div key={source} className="flex justify-between py-1.5 sm:py-2 border-b border-border">
+                          <span className="text-xs sm:text-sm text-muted-foreground">{source}</span>
+                          <span className="text-xs sm:text-sm font-medium">{formatCurrency(amount)}</span>
+                        </div>
+                      ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-xs sm:text-sm text-muted-foreground">
+                    No income by source available
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </div>
         )}
 

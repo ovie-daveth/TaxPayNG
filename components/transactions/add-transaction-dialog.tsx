@@ -248,17 +248,36 @@ export function AddTransactionDialog({
       if (isBusiness) {
         classification.expenseType = 'allowable'
         
-        // Capital asset categories
-        const capitalAssetCategories = [
-          'Equipment', 'Software & Subscriptions', 'Studio Rent', 
-          'Camera', 'Computer', 'Vehicle', 'Furniture', 'Machinery'
+        // Capital asset categories - only physical/intangible assets with long-term value
+        // Note: Subscriptions, Rent, and Services are operating expenses, NOT capital assets
+        const capitalAssetKeywords = [
+          'equipment', 'camera', 'computer', 'laptop', 'vehicle', 'car', 'furniture', 
+          'machinery', 'software license', 'software purchase', 'hardware', 
+          'building', 'property', 'office equipment', 'production equipment'
         ]
-        const isCapitalAsset = capitalAssetCategories.some(cat => 
-          category.toLowerCase().includes(cat.toLowerCase()) ||
-          description.toLowerCase().includes(cat.toLowerCase())
+        
+        // Check if category or description contains capital asset keywords
+        // Use exact word matching to avoid false positives (e.g., "Subscription" matching "Software & Subscriptions")
+        const categoryLower = category.toLowerCase()
+        const descriptionLower = description.toLowerCase()
+        
+        const isCapitalAsset = capitalAssetKeywords.some(keyword => {
+          // Check for whole word matches to avoid partial matches
+          const categoryMatch = categoryLower === keyword || 
+                               categoryLower.includes(` ${keyword} `) ||
+                               categoryLower.startsWith(`${keyword} `) ||
+                               categoryLower.endsWith(` ${keyword}`)
+          const descriptionMatch = descriptionLower.includes(keyword)
+          return categoryMatch || descriptionMatch
+        })
+        
+        // Exclude common non-capital expense categories
+        const nonCapitalCategories = ['rent', 'subscription', 'service', 'utilities', 'maintenance', 'repair']
+        const isNonCapital = nonCapitalCategories.some(nonCap => 
+          categoryLower.includes(nonCap) || descriptionLower.includes(nonCap)
         )
         
-        if (isCapitalAsset) {
+        if (isCapitalAsset && !isNonCapital) {
           classification.isCapitalAsset = true
           classification.capitalAllowanceRate = 25 // 25% annual allowance (standard in Nigeria)
         }
@@ -267,12 +286,8 @@ export function AddTransactionDialog({
         classification.expenseType = 'disallowable'
       }
       
-      // VAT applicable categories (common in Nigeria)
-      const vatCategories = ['Software', 'Equipment', 'Services', 'Professional Fees']
-      if (vatCategories.some(cat => category.includes(cat))) {
-        classification.vatApplicable = true
-        classification.vatRate = 7.5 // Standard VAT rate in Nigeria
-      }
+      // VAT is not applicable to expenses - only to income transactions
+      // VAT on expenses (input VAT) is handled separately and doesn't need to be tracked here
     }
     
     return classification
@@ -636,6 +651,12 @@ export function AddTransactionDialog({
       formData.description,
       formData.notes
     )
+    
+    // Ensure VAT is never set for expenses (VAT only applies to income)
+    if (formData.type === 'expense') {
+      autoClassification.vatApplicable = false
+      autoClassification.vatRate = undefined
+    }
     
     // Only auto-update if user hasn't manually edited (section is collapsed)
     if (!showTaxClassificationSection) {
@@ -1892,7 +1913,8 @@ export function AddTransactionDialog({
                           <span className="font-medium">Yes {taxClassification.whtRate && `(${taxClassification.whtRate}%)`}</span>
                         </div>
                       )}
-                      {taxClassification.vatApplicable && (
+                      {/* VAT Applicable - only show for income transactions, not expenses */}
+                      {formData.type === 'income' && taxClassification.vatApplicable && (
                         <div className="flex items-center gap-2">
                           <span className="text-muted-foreground">VAT Applicable:</span>
                           <span className="font-medium">Yes {taxClassification.vatRate && `(${taxClassification.vatRate}%)`}</span>
@@ -1932,10 +1954,19 @@ export function AddTransactionDialog({
                             <Label>Expense Type</Label>
                             <Select
                               value={taxClassification.expenseType || 'allowable'}
-                              onValueChange={(value) => setTaxClassification(prev => ({
-                                ...prev,
-                                expenseType: value as 'allowable' | 'disallowable' | 'capital'
-                              }))}
+                              onValueChange={(value) => {
+                                const expenseType = value as 'allowable' | 'disallowable' | 'capital'
+                                setTaxClassification(prev => ({
+                                  ...prev,
+                                  expenseType
+                                }))
+                                // Auto-sync taxDeductible based on expenseType
+                                // Allowable and Capital are tax deductible, Disallowable is not
+                                setFormData(prev => ({
+                                  ...prev,
+                                  taxDeductible: expenseType === 'allowable' || expenseType === 'capital'
+                                }))
+                              }}
                             >
                               <SelectTrigger>
                                 <SelectValue />
@@ -1946,18 +1977,52 @@ export function AddTransactionDialog({
                                 <SelectItem value="capital">Capital</SelectItem>
                               </SelectContent>
                             </Select>
+                            <div className="p-2.5 bg-muted/50 border border-border rounded-md">
+                              <p className="text-xs text-muted-foreground">
+                                <span className="font-medium">Allowable:</span> Tax-deductible expenses (e.g., internet, software subscriptions, office rent, business travel)
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                <span className="font-medium">Disallowable:</span> Not tax-deductible (e.g., personal expenses, fines, penalties)
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                <span className="font-medium">Capital:</span> Long-term assets eligible for capital allowances (e.g., equipment, vehicles, furniture)
+                              </p>
+                            </div>
                           </div>
                           
-                          <div className="flex items-center space-x-2">
-                            <Switch
-                              checked={taxClassification.isCapitalAsset || false}
-                              onCheckedChange={(checked) => setTaxClassification(prev => ({
-                                ...prev,
-                                isCapitalAsset: checked,
-                                capitalAllowanceRate: checked ? (prev?.capitalAllowanceRate || 25) : undefined
-                              }))}
-                            />
-                            <Label className="text-sm">Is Capital Asset (for capital allowance)</Label>
+                          <div className="space-y-2">
+                            <div className="flex items-center space-x-2">
+                              <Switch
+                                checked={taxClassification.isCapitalAsset || false}
+                                onCheckedChange={(checked) => setTaxClassification(prev => ({
+                                  ...prev,
+                                  isCapitalAsset: checked,
+                                  capitalAllowanceRate: checked ? (prev?.capitalAllowanceRate || 25) : undefined
+                                }))}
+                              />
+                              <Label className="text-sm">Is Capital Asset (for capital allowance)</Label>
+                            </div>
+                            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                              <p className="text-xs font-medium text-blue-900 dark:text-blue-200 mb-1.5">
+                                What is a Capital Asset?
+                              </p>
+                              <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+                                A capital asset is a long-term asset used in your business that provides value over multiple years (not just one tax year). You can claim capital allowances (depreciation) over time instead of deducting the full cost immediately.
+                              </p>
+                              <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                                <p className="font-medium">Examples:</p>
+                                <ul className="list-disc list-inside space-y-0.5 ml-2">
+                                  <li>Equipment: Cameras, computers, laptops, machinery</li>
+                                  <li>Vehicles: Cars, vans used for business</li>
+                                  <li>Furniture: Office furniture, desks, chairs</li>
+                                  <li>Software: One-time software license purchases</li>
+                                </ul>
+                                <p className="font-medium mt-1.5">NOT Capital Assets:</p>
+                                <ul className="list-disc list-inside space-y-0.5 ml-2">
+                                  <li>Rent, subscriptions, services, utilities, repairs</li>
+                                </ul>
+                              </div>
+                            </div>
                           </div>
                           
                           {taxClassification.isCapitalAsset && (
@@ -2008,33 +2073,36 @@ export function AddTransactionDialog({
                         </div>
                       )}
                       
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={taxClassification.vatApplicable || false}
-                          onCheckedChange={(checked) => setTaxClassification(prev => ({
-                            ...prev,
-                            vatApplicable: checked,
-                            vatRate: checked ? (prev?.vatRate || 7.5) : undefined
-                          }))}
-                        />
-                        <Label className="text-sm">VAT Applicable</Label>
-                      </div>
-                      
-                      {taxClassification.vatApplicable && (
-                        <div className="space-y-2">
-                          <Label>VAT Rate (%)</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.1"
-                            value={taxClassification.vatRate || 7.5}
-                            onChange={(e) => setTaxClassification(prev => ({
-                              ...prev,
-                              vatRate: parseFloat(e.target.value) || 7.5
-                            }))}
-                          />
-                          {formData.type === 'income' && (
+                      {/* VAT Applicable - only show for income transactions, not expenses */}
+                      {formData.type === 'income' && (
+                        <>
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              checked={taxClassification.vatApplicable || false}
+                              onCheckedChange={(checked) => setTaxClassification(prev => ({
+                                ...prev,
+                                vatApplicable: checked,
+                                vatRate: checked ? (prev?.vatRate || 7.5) : undefined
+                              }))}
+                            />
+                            <Label className="text-sm">VAT Applicable</Label>
+                          </div>
+                          
+                          {taxClassification.vatApplicable && (
+                            <div className="space-y-2">
+                              <Label>VAT Rate (%)</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                value={taxClassification.vatRate || 7.5}
+                                onChange={(e) => setTaxClassification(prev => ({
+                                  ...prev,
+                                  vatRate: parseFloat(e.target.value) || 7.5
+                                }))}
+                              />
+                              {formData.type === 'income' && (
                             <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md">
                               <p className="text-xs font-medium text-amber-900 dark:text-amber-200">
                                 ⚠️ VAT Remittance Required
@@ -2045,6 +2113,8 @@ export function AddTransactionDialog({
                             </div>
                           )}
                         </div>
+                      )}
+                        </>
                       )}
                     </div>
                   )}
@@ -2061,23 +2131,22 @@ export function AddTransactionDialog({
                 />
               </div>
 
-             {
-              formData.type !== 'income' && (
+              {/* Tax Deductible switch - only show if Expense Type is not set (for non-Gold users or legacy compatibility) */}
+              {formData.type !== 'income' && !hasTaxClassificationAccess && (
                 <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-                <div className="space-y-0.5">
-                  <Label htmlFor="tax-deductible" className="cursor-pointer">
-                    Tax Deductible
-                  </Label>
-                  <p className="text-xs text-muted-foreground">Mark this expense as tax deductible</p>
+                  <div className="space-y-0.5">
+                    <Label htmlFor="tax-deductible" className="cursor-pointer">
+                      Tax Deductible
+                    </Label>
+                    <p className="text-xs text-muted-foreground">Mark this expense as tax deductible</p>
+                  </div>
+                  <Switch
+                    id="tax-deductible"
+                    checked={formData.taxDeductible}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, taxDeductible: checked }))}
+                  />
                 </div>
-                <Switch
-                  id="tax-deductible"
-                  checked={formData.taxDeductible}
-                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, taxDeductible: checked }))}
-                />
-              </div>
-              )
-             }
+              )}
 
               <div className="flex gap-3 pt-4">
                 <Button

@@ -97,6 +97,100 @@ export class ReportService extends BaseService {
     super('reports') // Default collection, but we'll use type-specific collections
   }
 
+  /**
+   * Generate platform-specific report data
+   */
+  async generatePlatformReportData(
+    userId: string,
+    platformName: string,
+    period: ReportPeriod,
+    includeInvoices: boolean = true
+  ): Promise<ReportData> {
+    // Get all transactions for the user
+    const allTransactions = await transactionService.getAll([
+      { field: 'userId', operator: '==', value: userId }
+    ])
+
+    const periodStart = new Date(period.startDate)
+    periodStart.setHours(0, 0, 0, 0)
+    
+    const periodEnd = new Date(period.endDate)
+    periodEnd.setHours(23, 59, 59, 999)
+
+    // Filter transactions by platform and period
+    const filteredTransactions = allTransactions.filter((txn) => {
+      const txnDate = txn.date ? new Date(txn.date) : new Date(txn.createdAt)
+      const inPeriod = txnDate >= periodStart && txnDate <= periodEnd
+      const matchesPlatform = txn.platform?.name === platformName
+      return inPeriod && matchesPlatform
+    })
+
+    // Get invoices for the period (filtered by platform if possible)
+    let invoices: Invoice[] = []
+    if (includeInvoices) {
+      const invoicesResponse = await invoiceService.getUserInvoices(userId)
+      const allInvoices = invoicesResponse.data || []
+      invoices = allInvoices.filter((inv) => {
+        const invDate = new Date(inv.issueDate)
+        return invDate >= periodStart && invDate <= periodEnd
+      })
+    }
+
+    // Calculate income and expense data (only for this platform)
+    const incomeData = includeInvoices 
+      ? this.calculateIncomeData(filteredTransactions, invoices, userId)
+      : this.calculateIncomeDataTransactionsOnly(filteredTransactions, userId)
+
+    const expenseData = includeInvoices 
+      ? this.calculateExpenseData(filteredTransactions, invoices, userId)
+      : this.calculateExpenseDataTransactionsOnly(filteredTransactions, userId)
+
+    // Get user profile
+    const profile = await userService.getProfile(userId)
+    if (!profile) {
+      throw new Error('User profile not found')
+    }
+
+    // Calculate tax classification benefits (Gold+ feature)
+    let taxClassification: TaxClassificationSummary | undefined
+    try {
+      const { calculateTaxClassificationBenefitsFromTransactions } = await import('@/lib/utils/tax-classification-calculator')
+      // Determine tax year from period
+      const taxYear = period.year || new Date().getFullYear()
+      taxClassification = await calculateTaxClassificationBenefitsFromTransactions(filteredTransactions, userId, taxYear)
+    } catch (error) {
+      console.error('Error calculating tax classification benefits:', error)
+    }
+
+    // Calculate tax data
+    const taxData = await this.calculateTaxData(
+      userId,
+      incomeData.totalIncome,
+      expenseData.totalExpenses,
+      expenseData.taxDeductibleExpenses,
+      profile,
+      taxClassification
+    )
+
+    return {
+      period,
+      userInfo: {
+        name: `${profile.firstName} ${profile.lastName}`,
+        businessName: undefined, // UserProfile doesn't have businessName field
+        tin: profile.taxId,
+        businessType: profile.businessType,
+        address: profile.address ? 
+          `${profile.address.street}, ${profile.address.city}, ${profile.address.state}, ${profile.address.country}` : 
+          undefined
+      },
+      income: incomeData,
+      expenses: expenseData,
+      tax: taxData,
+      taxClassification,
+      generatedAt: new Date().toISOString()
+    }
+  }
+
   // Generate comprehensive report data from transactions and invoices
   async generateReportData(
     userId: string,
@@ -114,6 +208,16 @@ export class ReportService extends BaseService {
       const allTransactions = await transactionService.getAll([
         { field: 'userId', operator: '==', value: userId }
       ])
+      
+      console.log('🔍 [ReportService] All transactions fetched:', allTransactions.length)
+      console.log('🔍 [ReportService] Expense transactions before period filter:', allTransactions.filter(t => t.type === 'expense').map(t => ({
+        id: t.id,
+        description: t.description,
+        date: t.date,
+        createdAt: t.createdAt,
+        amount: t.amount,
+        isCapitalAsset: t.taxClassification?.isCapitalAsset
+      })))
 
       const periodStart = new Date(period.startDate)
       periodStart.setHours(0, 0, 0, 0) // Start of day
@@ -121,10 +225,38 @@ export class ReportService extends BaseService {
       const periodEnd = new Date(period.endDate)
       periodEnd.setHours(23, 59, 59, 999) // End of day
 
+      // Filter transactions by period
+      // BUT: Include capital asset transactions from previous years (for depreciation calculation)
       const filteredTransactions = allTransactions.filter((txn) => {
         const txnDate = txn.date ? new Date(txn.date) : new Date(txn.createdAt)
-        // Compare dates: transaction must be >= period start and <= period end
-        return txnDate >= periodStart && txnDate <= periodEnd
+        const isInPeriod = txnDate >= periodStart && txnDate <= periodEnd
+        
+        // If it's a capital asset, include it even if it's from a previous year
+        // (depreciation is calculated for the current tax year regardless of purchase date)
+        const isCapitalAsset = txn.taxClassification?.isCapitalAsset && txn.taxClassification?.capitalAllowanceRate
+        if (isCapitalAsset) {
+          return true // Include all capital assets for depreciation calculation
+        }
+        
+        return isInPeriod
+      })
+      
+      console.log('🔍 [ReportService] Filtered transactions by period:', {
+        periodStart: periodStart.toISOString(),
+        periodEnd: periodEnd.toISOString(),
+        totalFiltered: filteredTransactions.length,
+        expenseTransactions: filteredTransactions.filter(t => t.type === 'expense').map(t => ({
+          id: t.id,
+          description: t.description,
+          date: t.date,
+          createdAt: t.createdAt,
+          amount: t.amount,
+          isCapitalAsset: t.taxClassification?.isCapitalAsset,
+          isInPeriod: (() => {
+            const txnDate = t.date ? new Date(t.date) : new Date(t.createdAt)
+            return txnDate >= periodStart && txnDate <= periodEnd
+          })()
+        }))
       })
 
       // Get invoices for the period
@@ -161,7 +293,8 @@ export class ReportService extends BaseService {
         }
         
         // Calculate from filtered transactions for the period
-        taxClassificationSummary = calculateTaxClassificationBenefitsFromTransactions(filteredTransactions)
+        const taxYear = period.year || new Date().getFullYear()
+        taxClassificationSummary = await calculateTaxClassificationBenefitsFromTransactions(filteredTransactions, userId, taxYear)
       } catch (error) {
         console.error('Error calculating tax classification benefits:', error)
         // Continue without tax classification if calculation fails
@@ -379,6 +512,18 @@ export class ReportService extends BaseService {
   ): ExpenseData {
     // Include ALL expense transactions
     const expenseTransactions = transactions.filter(t => t.type === 'expense')
+    
+    console.log('🔍 [ReportService] All expense transactions:', expenseTransactions.map(t => ({
+      id: t.id,
+      description: t.description,
+      category: t.category,
+      amount: t.amount,
+      isCapitalAsset: t.taxClassification?.isCapitalAsset,
+      capitalAllowanceRate: t.taxClassification?.capitalAllowanceRate,
+      expenseType: t.taxClassification?.expenseType,
+      transactionNature: t.transactionNature,
+      businessPercentage: t.businessPercentage
+    })))
 
     let totalExpenses = 0
     let taxDeductibleExpenses = 0
@@ -408,15 +553,43 @@ export class ReportService extends BaseService {
       }
       // If transactionNature is 'business' or undefined, use full amount
       
-      totalExpenses += deductibleAmount
+      // Capital assets are NOT included in totalExpenses or taxDeductibleExpenses - they're claimed as depreciation instead
+      const isCapitalAsset = txn.taxClassification?.isCapitalAsset && txn.taxClassification?.capitalAllowanceRate
+      
+      // Only add to totalExpenses if not a capital asset (capital assets are tracked separately as depreciation)
+      if (!isCapitalAsset) {
+        totalExpenses += deductibleAmount
+      }
       
       // For tax deductible check, use the deductible amount
-      if (txn.taxDeductible || txn.transactionNature === 'business' || (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined && txn.businessPercentage > 0)) {
+      // Priority: 1) expenseType from taxClassification, 2) taxDeductible (legacy), 3) transactionNature
+      // EXCLUDE capital assets - they're claimed as depreciation, not as expenses
+      const isTaxDeductible = !isCapitalAsset && (
+        (txn.taxClassification?.expenseType === 'allowable') || // Only allowable expenses (not capital)
+        (txn.taxClassification?.expenseType !== 'disallowable' && txn.taxClassification?.expenseType !== 'capital' && (txn.taxDeductible || txn.transactionNature === 'business' || (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined && txn.businessPercentage > 0))) // Fallback to legacy fields if expenseType not set
+      )
+      
+      if (isTaxDeductible) {
         taxDeductibleExpenses += deductibleAmount
       }
       
-      const category = txn.category || 'uncategorized'
-      expensesByCategory[category] = (expensesByCategory[category] || 0) + deductibleAmount
+      // Only add to category totals if not a capital asset (capital assets are tracked separately)
+      if (!isCapitalAsset) {
+        const category = txn.category || 'uncategorized'
+        expensesByCategory[category] = (expensesByCategory[category] || 0) + deductibleAmount
+      }
+    })
+
+    console.log('🔍 [ReportService] Expense calculation results:', {
+      totalExpenses,
+      taxDeductibleExpenses,
+      transactionCount: expenseTransactions.length,
+      transactionsIncluded: expenseTransactions.map(t => ({
+        id: t.id,
+        description: t.description,
+        isCapitalAsset: t.taxClassification?.isCapitalAsset,
+        includedInTotal: !t.taxClassification?.isCapitalAsset
+      }))
     })
 
     return {
@@ -425,7 +598,7 @@ export class ReportService extends BaseService {
       taxDeductibleExpenses,
       transactionCount: expenseTransactions.length,
       invoiceCount: 0,
-      transactions: expenseTransactions,
+      transactions: expenseTransactions, // Return ALL expense transactions, including capital assets
       invoices: []
     }
   }
@@ -471,15 +644,31 @@ export class ReportService extends BaseService {
       }
       // If transactionNature is 'business' or undefined, use full amount
       
-      totalExpenses += deductibleAmount
+      // Capital assets are NOT included in totalExpenses or taxDeductibleExpenses - they're claimed as depreciation instead
+      const isCapitalAsset = txn.taxClassification?.isCapitalAsset && txn.taxClassification?.capitalAllowanceRate
+      
+      // Only add to totalExpenses if not a capital asset (capital assets are tracked separately as depreciation)
+      if (!isCapitalAsset) {
+        totalExpenses += deductibleAmount
+      }
       
       // For tax deductible check, use the deductible amount
-      if (txn.taxDeductible || txn.transactionNature === 'business' || (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined && txn.businessPercentage > 0)) {
+      // Priority: 1) expenseType from taxClassification, 2) taxDeductible (legacy), 3) transactionNature
+      // EXCLUDE capital assets - they're claimed as depreciation, not as expenses
+      const isTaxDeductible = !isCapitalAsset && (
+        (txn.taxClassification?.expenseType === 'allowable') || // Only allowable expenses (not capital)
+        (txn.taxClassification?.expenseType !== 'disallowable' && txn.taxClassification?.expenseType !== 'capital' && (txn.taxDeductible || txn.transactionNature === 'business' || (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined && txn.businessPercentage > 0))) // Fallback to legacy fields if expenseType not set
+      )
+      
+      if (isTaxDeductible) {
         taxDeductibleExpenses += deductibleAmount
       }
       
-      const category = txn.category || 'uncategorized'
-      expensesByCategory[category] = (expensesByCategory[category] || 0) + deductibleAmount
+      // Only add to category totals if not a capital asset (capital assets are tracked separately)
+      if (!isCapitalAsset) {
+        const category = txn.category || 'uncategorized'
+        expensesByCategory[category] = (expensesByCategory[category] || 0) + deductibleAmount
+      }
     })
 
     // Process expenses from invoices (incoming invoices or paid outgoing invoices)

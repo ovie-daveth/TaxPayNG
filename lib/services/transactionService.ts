@@ -2,6 +2,7 @@ import { BaseService } from './base'
 import { Transaction, TransactionFilters, ApiResponse, PaginatedResponse, Document } from '@/lib/types'
 import { documentService } from './documentService'
 import { userService } from './userService'
+import { capitalAssetService } from './capitalAssetService'
 
 export class TransactionService extends BaseService {
   constructor() {
@@ -43,6 +44,9 @@ export class TransactionService extends BaseService {
       }
       if (filters?.paymentMethod) {
         filtered = filtered.filter(t => t.paymentMethod === filters.paymentMethod)
+      }
+      if (filters?.platform) {
+        filtered = filtered.filter(t => t.platform?.name === filters.platform)
       }
       if (dateRange) {
         const start = dateRange.start ? new Date(dateRange.start) : null
@@ -167,6 +171,11 @@ export class TransactionService extends BaseService {
       // Increment transaction count
       await userService.incrementTransactionCount(userId)
 
+      // Create capital asset if transaction is a capital asset
+      if (createdTransaction.taxClassification?.isCapitalAsset && createdTransaction.type === 'expense') {
+        await capitalAssetService.createOrUpdateAssetFromTransaction(createdTransaction)
+      }
+
       // If transaction has attachments but no documentId, create corresponding documents
       // (documentId means document was already created in the dialog with proper storage tracking)
       if (transactionData.attachments && transactionData.attachments.length > 0 && !transactionData.documentId) {
@@ -268,6 +277,14 @@ export class TransactionService extends BaseService {
       await this.update(transactionId, updateData)
       const updatedTransaction = await this.getById(transactionId)
 
+      // Update capital asset if transaction is a capital asset
+      if (updatedTransaction.taxClassification?.isCapitalAsset && updatedTransaction.type === 'expense') {
+        await capitalAssetService.createOrUpdateAssetFromTransaction(updatedTransaction)
+      } else {
+        // If transaction is no longer a capital asset, delete the asset
+        await capitalAssetService.deleteAssetByTransactionId(transactionId)
+      }
+
       // If attachments were updated but documentId is provided, skip creating documents
       // (documentId means document was already created/updated in the dialog with proper storage tracking)
       if (updateData.attachments && updateData.attachments.length > 0 && !updateData.documentId) {
@@ -342,6 +359,9 @@ export class TransactionService extends BaseService {
           // Continue with transaction deletion even if file deletion fails
         }
       }
+
+      // Delete capital asset if transaction is a capital asset
+      await capitalAssetService.deleteAssetByTransactionId(transactionId)
 
       // Delete linked document if documentId exists
       if (existingTransaction.documentId) {

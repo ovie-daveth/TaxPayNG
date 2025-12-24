@@ -12,9 +12,11 @@ export { exchangeRateService } from './exchangeRateService'
 export { conversationService } from './conversationService'
 export { ocrService } from './ocrService'
 export { invoiceService } from './invoiceService'
+export { capitalAssetService } from './capitalAssetService'
 export type { ExchangeRate } from './exchangeRateService'
 export type { Conversation, ConversationMessage } from './conversationService'
 export type { ReceiptData } from './ocrService'
+export type { CapitalAsset } from './capitalAssetService'
 
 // Export base service for extending
 export { BaseService } from './base'

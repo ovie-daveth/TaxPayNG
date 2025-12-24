@@ -81,6 +81,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
   const [newCredit, setNewCredit] = useState({
     type: '',
     amount: '',
+    amountDisplay: '',
     taxYear: reportData.period.year.toString(),
     evidenceAttached: false,
     notes: ''
@@ -151,17 +152,33 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
     otherRelief: 0
   })
 
-  // Initialize personal info from reportData or user profile
+  // Track if personal info has been initialized from address
+  const personalInfoInitializedRef = useRef(false)
+  
+  // Initialize personal info from reportData or user profile (only once, don't overwrite user input)
   useEffect(() => {
-    if (reportData.userInfo.address) {
-      const addressParts = reportData.userInfo.address.split(',')
-      setPersonalInfo(prev => ({
-        ...prev,
-        state: addressParts[1]?.trim() || '',
-        contactEmail: user?.email || ''
-      }))
+    // Only initialize once, and only if state/lga are empty (user hasn't entered anything)
+    if (!personalInfoInitializedRef.current) {
+      setPersonalInfo(prev => {
+        const newState = { ...prev }
+        
+        // Only set state/lga from address if they're currently empty
+        if (reportData.userInfo.address && !prev.state && !prev.lga) {
+          const addressParts = reportData.userInfo.address.split(',')
+          newState.state = addressParts[1]?.trim() || ''
+          newState.lga = addressParts[2]?.trim() || ''
+        }
+        
+        // Only set email if it's empty
+        if (!prev.contactEmail && user?.email) {
+          newState.contactEmail = user.email
+        }
+        
+        return newState
+      })
+      personalInfoInitializedRef.current = true
     }
-  }, [reportData, user])
+  }, []) // Empty dependency array - only run once on mount
 
   // Update tax credits totals when credits change
   const updateTaxCreditsTotals = (credits: typeof allTaxCredits) => {
@@ -192,7 +209,12 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
   }
 
   const handleAddCredit = () => {
-    if (!newCredit.type || !newCredit.amount) {
+    // Parse the amount from display value or raw value
+    const amountValue = newCredit.amountDisplay ? 
+      parseFloat(newCredit.amountDisplay.replace(/[,\u20A6]/g, '')) : 
+      parseFloat(newCredit.amount) || 0
+
+    if (!newCredit.type || !amountValue || amountValue <= 0) {
       toast.error("Please fill in type and amount")
       return
     }
@@ -200,7 +222,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
     const credit = {
       id: `manual-${Date.now()}`,
       type: newCredit.type,
-      amount: parseFloat(newCredit.amount) || 0,
+      amount: amountValue,
       taxYear: parseInt(newCredit.taxYear) || reportData.period.year,
       evidenceAttached: newCredit.evidenceAttached,
       notes: newCredit.notes,
@@ -214,6 +236,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
     setNewCredit({
       type: '',
       amount: '',
+      amountDisplay: '',
       taxYear: reportData.period.year.toString(),
       evidenceAttached: false,
       notes: ''
@@ -295,12 +318,14 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
     // Initialize relief amounts from reportData (which will be 0 by default now)
     // Prefer metadata reliefAmounts if they exist, otherwise use reportData.tax.reliefs
     const savedReliefAmounts = (reportData as any).metadata?.reliefAmounts
+    // Auto-populate depreciation from capital allowances if available
+    const autoDepreciation = capitalAllowances > 0 ? capitalAllowances : 0
     const newReliefAmounts = savedReliefAmounts ? {
       pensionContribution: savedReliefAmounts.pensionContribution || 0,
       nhfContribution: savedReliefAmounts.nhfContribution || 0,
       lifeInsurance: savedReliefAmounts.lifeInsurance || 0,
       healthInsurance: savedReliefAmounts.healthInsurance || 0,
-      depreciation: savedReliefAmounts.depreciation || 0,
+      depreciation: savedReliefAmounts.depreciation || autoDepreciation, // Use saved value or auto-populate
       charitableDonations: savedReliefAmounts.charitableDonations || 0,
       otherRelief: savedReliefAmounts.otherRelief || 0
     } : {
@@ -308,9 +333,14 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
       nhfContribution: reportData.tax.reliefs.nhfContribution || 0,
       lifeInsurance: reportData.tax.reliefs.lifeInsurance || 0,
       healthInsurance: reportData.tax.reliefs.healthInsurance || 0,
-      depreciation: 0,
+      depreciation: autoDepreciation, // Auto-populate from capital allowances
       charitableDonations: reportData.tax.reliefs.charitableDonations || 0,
       otherRelief: 0
+    }
+    
+    // Always update depreciation if capital allowances are available and depreciation is 0 or not set
+    if (autoDepreciation > 0 && (newReliefAmounts.depreciation === 0 || (!savedReliefAmounts || !savedReliefAmounts.depreciation))) {
+      newReliefAmounts.depreciation = autoDepreciation
     }
     
     // Only update if values actually changed
@@ -321,6 +351,24 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
       setReliefAmounts(newReliefAmounts)
       setTimeout(() => { isUpdatingRef.current = false }, 50)
     }
+  }, [reportData, capitalAllowances]) // Add capitalAllowances as dependency
+
+  // Separate useEffect to update depreciation when capitalAllowances changes
+  useEffect(() => {
+    if (isUpdatingRef.current) return
+    if (capitalAllowances > 0 && (reliefAmounts.depreciation === 0 || reliefAmounts.depreciation !== capitalAllowances)) {
+      // Only update if it's truly 0 or different from capitalAllowances
+      const savedReliefAmounts = (reportData as any).metadata?.reliefAmounts
+      if (!savedReliefAmounts || !savedReliefAmounts.depreciation || savedReliefAmounts.depreciation === 0) {
+        isUpdatingRef.current = true
+        setReliefAmounts(prev => ({ ...prev, depreciation: capitalAllowances }))
+        setTimeout(() => { isUpdatingRef.current = false }, 50)
+      }
+    }
+  }, [capitalAllowances, reportData])
+
+  useEffect(() => {
+    if (isUpdatingRef.current) return
 
     if ((reportData as any).metadata) {
       if ((reportData as any).metadata.personalInfo) {
@@ -711,11 +759,12 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
   
   const businessIncome = businessIncomeCategories.reduce((sum, item) => sum + item.amount, 0)
   
-  // Calculate category breakdowns with mixed transaction details
+  // Calculate category breakdowns with mixed transaction details and VAT transactions
   const categoryBreakdowns: { [category: string]: { 
     totalAmount: number, 
     businessAmount: number, 
-    mixedTransactions: Array<{ description: string; originalAmount: number; businessPercentage: number; businessAmount: number }> 
+    mixedTransactions: Array<{ description: string; originalAmount: number; businessPercentage: number; businessAmount: number }>
+    vatTransactions: Array<{ description: string; originalAmount: number; vatAmount: number; taxableAmount: number; vatRate: number }>
   } } = {}
   
   // Process transactions to build category breakdowns
@@ -728,22 +777,33 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
         categoryBreakdowns[category] = {
           totalAmount: 0,
           businessAmount: 0,
-          mixedTransactions: []
+          mixedTransactions: [],
+          vatTransactions: []
         }
       }
       
-      // Get the base amount
-      let baseAmount = 0
+      // Get the original amount (before VAT exclusion)
+      let originalAmount = 0
       if (txn.currency && txn.currency !== 'NGN' && txn.ngnEquivalent) {
-        baseAmount = txn.ngnEquivalent
+        originalAmount = txn.ngnEquivalent
       } else {
-        baseAmount = txn.netAmount !== undefined ? txn.netAmount : (typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0)
+        originalAmount = txn.netAmount !== undefined ? txn.netAmount : (typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0)
       }
       
-      // Apply VAT exclusion if applicable
+      // Track VAT transactions and apply VAT exclusion if applicable
+      let baseAmount = originalAmount
       if (txn.taxClassification?.vatApplicable && txn.taxClassification?.vatRate) {
         const vatRate = txn.taxClassification.vatRate / 100
-        baseAmount = baseAmount * (1 - vatRate)
+        const vatAmount = originalAmount * vatRate
+        baseAmount = originalAmount * (1 - vatRate)
+        
+        categoryBreakdowns[category].vatTransactions.push({
+          description: txn.description || 'Untitled transaction',
+          originalAmount,
+          vatAmount,
+          taxableAmount: baseAmount,
+          vatRate: txn.taxClassification.vatRate
+        })
       }
       
       // Calculate business amount based on transaction nature
@@ -1093,15 +1153,25 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           return categories.map(([cat, amt]) => {
             const breakdown = categoryBreakdowns[cat]
             const hasMixedTransactions = breakdown?.mixedTransactions && breakdown.mixedTransactions.length > 0
-            const showBreakdown = hasMixedTransactions && breakdown && breakdown.totalAmount > breakdown.businessAmount
+            const hasVatTransactions = breakdown?.vatTransactions && breakdown.vatTransactions.length > 0
+            // Show breakdown if there are VAT transactions OR mixed transactions (regardless of amount comparison)
+            const showBreakdownWithVat = (hasMixedTransactions || hasVatTransactions) && breakdown
             
-            let mixedDetails = ''
-            if (showBreakdown && breakdown) {
-              mixedDetails = breakdown.mixedTransactions.map(mixed => 
+            let breakdownDetails = ''
+            if (showBreakdownWithVat && breakdown) {
+              const vatDetails = hasVatTransactions ? breakdown.vatTransactions.map((vat: { description: string; originalAmount: number; vatAmount: number; taxableAmount: number; vatRate: number }) => 
+                `<div style="margin-left: 15px; font-size: 9pt; color: #1e40af; margin-top: 2px;">
+                  VAT ${vat.vatRate}% deducted: ${formatCurrency(vat.vatAmount)} of ${formatCurrency(vat.originalAmount)}
+                </div>`
+              ).join('') : ''
+              
+              const mixedDetails = hasMixedTransactions ? breakdown.mixedTransactions.map(mixed => 
                 `<div style="margin-left: 15px; font-size: 9pt; color: #b45309; margin-top: 2px;">
                   ${mixed.businessPercentage}% business: ${formatCurrency(mixed.businessAmount)} of ${formatCurrency(mixed.originalAmount)}
                 </div>`
-              ).join('')
+              ).join('') : ''
+              
+              breakdownDetails = vatDetails + mixedDetails
             }
             
             return `
@@ -1110,7 +1180,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           <span class="amount-label">${cat}</span>
           <span class="amount-value">${formatCurrency(amt as number)}</span>
         </div>
-        ${mixedDetails}
+        ${breakdownDetails}
       </div>
       `
           }).join('')
@@ -1162,18 +1232,76 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
     ${(!isFreelancer && !isCreator) ? `
     <div style="margin-bottom: 15px;">
       <strong style="font-size: 11pt;">3. Other Income Sources</strong>
+      ${(() => {
+        const rentalAmount = reportData.income.incomeByCategory['Rental'] || 0
+        const rentalBreakdown = categoryBreakdowns['Rental']
+        const hasRentalVat = rentalBreakdown?.vatTransactions && rentalBreakdown.vatTransactions.length > 0
+        const rentalVatDetails = hasRentalVat ? rentalBreakdown.vatTransactions.map((vat: { description: string; originalAmount: number; vatAmount: number; taxableAmount: number; vatRate: number }) => 
+          `<div style="margin-left: 15px; font-size: 9pt; color: #1e40af; margin-top: 2px;">
+            VAT ${vat.vatRate}% deducted: ${formatCurrency(vat.vatAmount)} of ${formatCurrency(vat.originalAmount)}
+          </div>`
+        ).join('') : ''
+        
+        return rentalAmount > 0 ? `
       <div class="amount-row">
-        <span class="amount-label">Rental income</span>
-        <span class="amount-value">${formatCurrency(reportData.income.incomeByCategory['Rental'] || 0)}</span>
+        <div>
+          <span class="amount-label">Rental income</span>
+          <span class="amount-value">${formatCurrency(rentalAmount)}</span>
+        </div>
+        ${rentalVatDetails}
       </div>
+        ` : ''
+      })()}
+      ${(() => {
+        const investmentAmount = reportData.income.incomeByCategory['Investment'] || reportData.income.incomeByCategory['Dividend'] || 0
+        const investmentBreakdown = categoryBreakdowns['Investment'] || categoryBreakdowns['Dividend']
+        const hasInvestmentVat = investmentBreakdown?.vatTransactions && investmentBreakdown.vatTransactions.length > 0
+        const investmentVatDetails = hasInvestmentVat ? investmentBreakdown.vatTransactions.map((vat: { description: string; originalAmount: number; vatAmount: number; taxableAmount: number; vatRate: number }) => 
+          `<div style="margin-left: 15px; font-size: 9pt; color: #1e40af; margin-top: 2px;">
+            VAT ${vat.vatRate}% deducted: ${formatCurrency(vat.vatAmount)} of ${formatCurrency(vat.originalAmount)}
+          </div>`
+        ).join('') : ''
+        
+        return investmentAmount > 0 ? `
       <div class="amount-row">
-        <span class="amount-label">Dividends / Interest / Investment returns</span>
-        <span class="amount-value">${formatCurrency(reportData.income.incomeByCategory['Investment'] || reportData.income.incomeByCategory['Dividend'] || 0)}</span>
+        <div>
+          <span class="amount-label">Dividends / Interest / Investment returns</span>
+          <span class="amount-value">${formatCurrency(investmentAmount)}</span>
+        </div>
+        ${investmentVatDetails}
       </div>
+        ` : ''
+      })()}
+      ${Object.entries(reportData.income.incomeByCategory)
+        .filter(([cat, amt]) => 
+          !['Salary', 'Employment', 'Invoice Income', 'Rental', 'Investment', 'Dividend'].includes(cat) && 
+          (amt as number) > 0
+        )
+        .map(([cat, amt]) => {
+          const breakdown = categoryBreakdowns[cat]
+          const hasVat = breakdown?.vatTransactions && breakdown.vatTransactions.length > 0
+          const vatDetails = hasVat ? breakdown.vatTransactions.map((vat: { description: string; originalAmount: number; vatAmount: number; taxableAmount: number; vatRate: number }) => 
+            `<div style="margin-left: 15px; font-size: 9pt; color: #1e40af; margin-top: 2px;">
+              VAT ${vat.vatRate}% deducted: ${formatCurrency(vat.vatAmount)} of ${formatCurrency(vat.originalAmount)}
+            </div>`
+          ).join('') : ''
+          
+          return `
+      <div class="amount-row">
+        <div>
+          <span class="amount-label">${cat}</span>
+          <span class="amount-value">${formatCurrency(amt as number)}</span>
+        </div>
+        ${vatDetails}
+      </div>
+          `
+        }).join('')}
+      ${otherIncome > 0 ? `
       <div class="amount-row">
         <span class="amount-label">Royalties, commissions, digital earnings, foreign income, etc.</span>
         <span class="amount-value">${formatCurrency(otherIncome)}</span>
       </div>
+      ` : ''}
       <div class="amount-row">
         <span class="amount-label">Capital gains (if applicable)</span>
         <span class="amount-value">₦0.00</span>
@@ -1700,7 +1828,9 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                   {businessIncomeCategories.map((item, index) => {
                     const breakdown = categoryBreakdowns[item.category]
                     const hasMixedTransactions = breakdown?.mixedTransactions && breakdown.mixedTransactions.length > 0
-                    const showBreakdown = hasMixedTransactions && breakdown && breakdown.totalAmount > breakdown.businessAmount
+                    const hasVatTransactions = breakdown?.vatTransactions && breakdown.vatTransactions.length > 0
+                    // Show breakdown if there are VAT transactions OR mixed transactions (regardless of amount comparison)
+                    const showBreakdown = (hasMixedTransactions || hasVatTransactions) && breakdown
                     
                     return (
                       <div key={index} className="py-2 border-b border-border">
@@ -1709,9 +1839,14 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                           <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(item.amount)}</span>
                         </div>
                         {showBreakdown && breakdown && (
-                          <div className="mt-1 text-[10px] text-amber-700 dark:text-amber-300 pl-2">
-                            {breakdown.mixedTransactions.map((mixed, idx) => (
-                              <div key={idx}>
+                          <div className="mt-1 text-[10px] pl-2 space-y-0.5">
+                            {hasVatTransactions && breakdown.vatTransactions.map((vat: { description: string; originalAmount: number; vatAmount: number; taxableAmount: number; vatRate: number }, idx: number) => (
+                              <div key={`vat-${idx}`} className="text-blue-700 dark:text-blue-300">
+                                VAT {vat.vatRate}% deducted: {formatCurrency(vat.vatAmount)} of {formatCurrency(vat.originalAmount)}
+                              </div>
+                            ))}
+                            {hasMixedTransactions && breakdown.mixedTransactions.map((mixed, idx) => (
+                              <div key={`mixed-${idx}`} className="text-amber-700 dark:text-amber-300">
                                 {mixed.businessPercentage}% business: {formatCurrency(mixed.businessAmount)} of {formatCurrency(mixed.originalAmount)}
                               </div>
                             ))}
@@ -1737,57 +1872,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
             </div>
                 </>
               )}
-              
-              {/* Transaction Exclusions/Adjustments Explanation */}
-              {(excludedTransactions.vatExclusions.length > 0 || excludedTransactions.personalTransactions.length > 0 || excludedTransactions.mixedTransactions.length > 0) && (
-                <div className="mt-4 p-3 bg-muted/50 rounded-lg border border-border">
-                  <h4 className="text-xs sm:text-sm font-semibold mb-2 text-muted-foreground">Transaction Adjustments & Exclusions</h4>
-                  <div className="space-y-2 text-xs">
-                    {/* VAT Exclusions */}
-                    {excludedTransactions.vatExclusions.length > 0 && (
-                      <div className="space-y-1">
-                        <p className="font-medium text-amber-700 dark:text-amber-300">
-                          VAT Exclusions ({excludedTransactions.vatExclusions.length} transaction{excludedTransactions.vatExclusions.length > 1 ? 's' : ''}):
-                        </p>
-                        <p className="text-muted-foreground pl-2">
-                          For income transactions with VAT, the VAT amount ({formatCurrency(excludedTransactions.totalVatExcluded)}) is excluded from taxable income as it must be remitted to the government separately.
-                        </p>
-                        <div className="pl-2 space-y-0.5 max-h-32 overflow-y-auto">
-                          {excludedTransactions.vatExclusions.map((item, idx) => (
-                            <div key={idx} className="text-muted-foreground">
-                              • {item.description}: {formatCurrency(item.originalAmount)} → {formatCurrency(item.taxableAmount)} (VAT {item.vatRate}%: {formatCurrency(item.vatAmount)} excluded)
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Personal Transactions */}
-                    {excludedTransactions.personalTransactions.length > 0 && (
-                      <div className="space-y-1">
-                        <p className="font-medium text-muted-foreground">
-                          Personal Transactions Excluded ({excludedTransactions.personalTransactions.length} transaction{excludedTransactions.personalTransactions.length > 1 ? 's' : ''}):
-                        </p>
-                        <p className="text-muted-foreground pl-2">
-                          Personal transactions totaling {formatCurrency(excludedTransactions.totalPersonalExcluded)} are excluded from business income as they are not taxable business income.
-                        </p>
-                      </div>
-                    )}
-                    
-                    {/* Mixed Transactions */}
-                    {excludedTransactions.mixedTransactions.length > 0 && (
-                      <div className="space-y-1">
-                        <p className="font-medium text-muted-foreground">
-                          Mixed Transactions Adjusted ({excludedTransactions.mixedTransactions.length} transaction{excludedTransactions.mixedTransactions.length > 1 ? 's' : ''}):
-                        </p>
-                        <p className="text-muted-foreground pl-2">
-                          For mixed transactions, only the business portion is included. Personal portion totaling {formatCurrency(excludedTransactions.totalMixedAdjustment)} is excluded.
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+           
           </div>
         </div>
 
@@ -1795,18 +1880,92 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
             <div className="mb-3 sm:mb-4">
               <h3 className="text-sm sm:text-base font-semibold mb-2 sm:mb-3">3. Other Income Sources</h3>
               <div className="space-y-2 text-xs sm:text-sm">
-                <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
-                  <span className="text-muted-foreground text-xs sm:text-sm">Rental income</span>
-                  <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(reportData.income.incomeByCategory['Rental'] || 0)}</span>
-                </div>
-                <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
-                  <span className="text-muted-foreground text-xs sm:text-sm break-words sm:break-normal">Dividends / Interest / Investment returns</span>
-                  <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(reportData.income.incomeByCategory['Investment'] || reportData.income.incomeByCategory['Dividend'] || 0)}</span>
-                </div>
-                <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
-                  <span className="text-muted-foreground text-xs sm:text-sm break-words sm:break-normal">Royalties, commissions, digital earnings, foreign income, etc.</span>
-                  <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(otherIncome)}</span>
-                </div>
+                {/* Rental income */}
+                {(() => {
+                  const rentalAmount = reportData.income.incomeByCategory['Rental'] || 0
+                  const rentalBreakdown = categoryBreakdowns['Rental']
+                  const hasRentalVat = rentalBreakdown?.vatTransactions && rentalBreakdown.vatTransactions.length > 0
+                  return rentalAmount > 0 ? (
+                    <div className="py-2 border-b border-border">
+                      <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0">
+                        <span className="text-muted-foreground text-xs sm:text-sm">Rental income</span>
+                        <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(rentalAmount)}</span>
+                      </div>
+                      {hasRentalVat && rentalBreakdown && (
+                        <div className="mt-1 text-[10px] pl-2 space-y-0.5">
+                          {rentalBreakdown.vatTransactions.map((vat: { description: string; originalAmount: number; vatAmount: number; taxableAmount: number; vatRate: number }, idx: number) => (
+                            <div key={`rental-vat-${idx}`} className="text-blue-700 dark:text-blue-300">
+                              VAT {vat.vatRate}% deducted: {formatCurrency(vat.vatAmount)} of {formatCurrency(vat.originalAmount)}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : null
+                })()}
+                
+                {/* Dividends / Interest / Investment returns */}
+                {(() => {
+                  const investmentAmount = reportData.income.incomeByCategory['Investment'] || reportData.income.incomeByCategory['Dividend'] || 0
+                  const investmentBreakdown = categoryBreakdowns['Investment'] || categoryBreakdowns['Dividend']
+                  const hasInvestmentVat = investmentBreakdown?.vatTransactions && investmentBreakdown.vatTransactions.length > 0
+                  return investmentAmount > 0 ? (
+                    <div className="py-2 border-b border-border">
+                      <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0">
+                        <span className="text-muted-foreground text-xs sm:text-sm break-words sm:break-normal">Dividends / Interest / Investment returns</span>
+                        <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(investmentAmount)}</span>
+                      </div>
+                      {hasInvestmentVat && investmentBreakdown && (
+                        <div className="mt-1 text-[10px] pl-2 space-y-0.5">
+                          {investmentBreakdown.vatTransactions.map((vat: { description: string; originalAmount: number; vatAmount: number; taxableAmount: number; vatRate: number }, idx: number) => (
+                            <div key={`investment-vat-${idx}`} className="text-blue-700 dark:text-blue-300">
+                              VAT {vat.vatRate}% deducted: {formatCurrency(vat.vatAmount)} of {formatCurrency(vat.originalAmount)}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : null
+                })()}
+                
+                {/* Other income categories */}
+                {Object.entries(reportData.income.incomeByCategory)
+                  .filter(([cat, amt]) => 
+                    !['Salary', 'Employment', 'Invoice Income', 'Rental', 'Investment', 'Dividend'].includes(cat) && 
+                    (amt as number) > 0
+                  )
+                  .map(([cat, amt]) => {
+                    const breakdown = categoryBreakdowns[cat]
+                    const hasVat = breakdown?.vatTransactions && breakdown.vatTransactions.length > 0
+                    return (
+                      <div key={cat} className="py-2 border-b border-border">
+                        <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0">
+                          <span className="text-muted-foreground text-xs sm:text-sm break-words sm:break-normal">{cat}</span>
+                          <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(amt as number)}</span>
+                        </div>
+                        {hasVat && breakdown && (
+                          <div className="mt-1 text-[10px] pl-2 space-y-0.5">
+                            {breakdown.vatTransactions.map((vat: { description: string; originalAmount: number; vatAmount: number; taxableAmount: number; vatRate: number }, idx: number) => (
+                              <div key={`${cat}-vat-${idx}`} className="text-blue-700 dark:text-blue-300">
+                                VAT {vat.vatRate}% deducted: {formatCurrency(vat.vatAmount)} of {formatCurrency(vat.originalAmount)}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                
+                {/* Royalties, commissions, digital earnings, foreign income, etc. */}
+                {otherIncome > 0 && (
+                  <div className="py-2 border-b border-border">
+                    <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0">
+                      <span className="text-muted-foreground text-xs sm:text-sm break-words sm:break-normal">Royalties, commissions, digital earnings, foreign income, etc.</span>
+                      <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{formatCurrency(otherIncome)}</span>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
                   <span className="text-muted-foreground text-xs sm:text-sm">Capital gains (if applicable)</span>
                   <span className="font-medium text-xs sm:text-sm whitespace-nowrap">₦0.00</span>
@@ -1837,17 +1996,21 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
         {/* Part C: Deductible Expenses & Reliefs */}
         <div>
           <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 border-b-2 border-border pb-1.5 sm:pb-2 uppercase">Part C – Deductible Expenses & Reliefs</h2>
-          <div className="overflow-x-auto -mx-3 sm:-mx-4 md:mx-0 px-3 sm:px-4 md:px-0">
-            <table className="w-full min-w-[600px] border-collapse border border-border text-xs sm:text-sm">
-              <thead>
-                <tr className="bg-muted">
-                  <th className="border border-border p-1.5 sm:p-2 text-left" style={{ width: '50%' }}>Deduction / Relief Type</th>
-                  <th className="border border-border p-1.5 sm:p-2 text-right" style={{ width: '25%' }}>Amount (₦)</th>
-                  <th className="border border-border p-1.5 sm:p-2 text-center" style={{ width: '12%' }}>Evidence Attached? (Y/N)</th>
-                  <th className="border border-border p-1.5 sm:p-2 text-left" style={{ width: '13%' }}>Notes</th>
-                </tr>
-              </thead>
-              <tbody>
+          
+          {/* Section 1: Reliefs */}
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Reliefs</h3>
+            <div className="overflow-x-auto -mx-3 sm:-mx-4 md:mx-0 px-3 sm:px-4 md:px-0">
+              <table className="w-full min-w-[600px] border-collapse border border-border text-xs sm:text-sm">
+                <thead>
+                  <tr className="bg-muted">
+                    <th className="border border-border p-1.5 sm:p-2 text-left" style={{ width: '50%' }}>Relief Type</th>
+                    <th className="border border-border p-1.5 sm:p-2 text-right" style={{ width: '25%' }}>Amount (₦)</th>
+                    <th className="border border-border p-1.5 sm:p-2 text-center" style={{ width: '12%' }}>Evidence Attached? (Y/N)</th>
+                    <th className="border border-border p-1.5 sm:p-2 text-left" style={{ width: '13%' }}>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
                 <tr>
                   <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">Pension contribution / Retirement savings</td>
                   <td className="border border-border p-1.5 sm:p-2 text-right font-medium text-xs sm:text-sm">
@@ -2024,176 +2187,209 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                       )}
                     </td>
                   </tr>
-                {reportData.expenses.totalExpenses > 0 && (
-                  <tr>
-                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">Business expenses (if self-employed) – rent, utilities, materials, fuel, services, etc.</td>
-                    <td className="border border-border p-2 text-right font-medium">{formatCurrency(reportData.expenses.totalExpenses)}</td>
-                    <td className="border border-border p-2 text-center">
-                      {isEditing ? (
-                        <Checkbox 
-                          checked={reliefEvidence.businessExpenses}
-                          onCheckedChange={(checked) => setReliefEvidence(prev => ({ ...prev, businessExpenses: !!checked }))}
-                        />
-                      ) : (
-                        reliefEvidence.businessExpenses ? '☑' : '☐'
-                      )}
-                    </td>
-                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">
-                      {isEditing ? (
-                        <Input 
-                          value={reliefNotes.businessExpenses}
-                          onChange={(e) => setReliefNotes(prev => ({ ...prev, businessExpenses: e.target.value }))}
-                          placeholder="Notes"
-                          className="h-8 sm:h-9 text-xs sm:text-sm"
-                        />
-                      ) : (
-                        reliefNotes.businessExpenses || ''
-                      )}
-                    </td>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Section 2: Business Expenses */}
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Business Expenses</h3>
+            <div className="overflow-x-auto -mx-3 sm:-mx-4 md:mx-0 px-3 sm:px-4 md:px-0">
+              <table className="w-full min-w-[600px] border-collapse border border-border text-xs sm:text-sm">
+                <thead>
+                  <tr className="bg-muted">
+                    <th className="border border-border p-1.5 sm:p-2 text-left" style={{ width: '50%' }}>Expense Description</th>
+                    <th className="border border-border p-1.5 sm:p-2 text-right" style={{ width: '25%' }}>Amount (₦)</th>
+                    <th className="border border-border p-1.5 sm:p-2 text-center" style={{ width: '12%' }}>Evidence Attached? (Y/N)</th>
+                    <th className="border border-border p-1.5 sm:p-2 text-left" style={{ width: '13%' }}>Notes</th>
                   </tr>
-                )}
-                <tr>
-                  <td className="border border-border p-2">Depreciation / Capital Allowance on assets (if applicable)</td>
-                  <td className="border border-border p-2 text-right font-medium">
-                    {isEditing ? (
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        value={formatCurrencyInput(reliefAmounts.depreciation.toString())}
-                        onChange={(e) => {
-                          const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
-                          if (isValid) {
-                            setReliefAmounts(prev => ({ ...prev, depreciation: parseFloat(rawValue) || 0 }))
+                </thead>
+                <tbody>
+                  {(() => {
+                    console.log('🔍 [SelfAssessment] All expense transactions from reportData:', reportData.expenses.transactions?.map(t => ({
+                      id: t.id,
+                      description: t.description,
+                      category: t.category,
+                      amount: t.amount,
+                      isCapitalAsset: t.taxClassification?.isCapitalAsset,
+                      capitalAllowanceRate: t.taxClassification?.capitalAllowanceRate,
+                      expenseType: t.taxClassification?.expenseType,
+                      transactionNature: t.transactionNature
+                    })))
+                    console.log('🔍 [SelfAssessment] Capital allowance details:', capitalAllowanceDetails)
+                    return null
+                  })()}
+                  {reportData.expenses.transactions && reportData.expenses.transactions.length > 0 ? (
+                    reportData.expenses.transactions
+                      .filter(txn => {
+                        // Show all expense transactions (including capital assets)
+                        // Capital assets should be shown even if they're not in the deductible expenses total
+                        // because they're claimed as depreciation instead
+                        console.log('🔍 [SelfAssessment] Filtering transaction:', {
+                          id: txn.id,
+                          description: txn.description,
+                          isCapitalAsset: txn.taxClassification?.isCapitalAsset,
+                          willShow: true
+                        })
+                        return true
+                      })
+                      .map((txn, index) => {
+                        // Calculate base amount
+                        let baseAmount = 0
+                        if (txn.currency && txn.currency !== 'NGN' && txn.ngnEquivalent) {
+                          baseAmount = txn.ngnEquivalent
+                        } else {
+                          baseAmount = txn.netAmount !== undefined ? txn.netAmount : (typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0)
+                        }
+                        
+                        // Check if this is a capital asset
+                        const isCapitalAsset = txn.taxClassification?.isCapitalAsset && txn.taxClassification?.capitalAllowanceRate
+                        const capitalAssetDetail = isCapitalAsset && capitalAllowanceDetails.find(d => d.transactionId === txn.id)
+                        
+                        // For capital assets, show the original purchase amount (not deductible as expense, but as depreciation)
+                        // For non-capital assets, calculate deductible amount
+                        let deductibleAmount = baseAmount
+                        if (!isCapitalAsset) {
+                          // Regular expenses: apply business percentage
+                          if (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined) {
+                            deductibleAmount = baseAmount * (txn.businessPercentage / 100)
+                          } else if (txn.transactionNature === 'personal') {
+                            deductibleAmount = 0
                           }
-                        }}
-                        className="h-8 sm:h-9 text-xs sm:text-sm text-right"
-                      />
-                    ) : (
-                      formatCurrency(reliefAmounts.depreciation || 0)
-                    )}
-                  </td>
-                  <td className="border border-border p-2 text-center">
-                    {isEditing ? (
-                      <Checkbox 
-                        checked={reliefEvidence.depreciation}
-                        onCheckedChange={(checked) => setReliefEvidence(prev => ({ ...prev, depreciation: !!checked }))}
-                      />
-                    ) : (
-                      reliefEvidence.depreciation ? '☑' : '☐'
-                    )}
-                  </td>
-                  <td className="border border-border p-2">
-                    {isEditing ? (
-                      <Input 
-                        value={reliefNotes.depreciation}
-                        onChange={(e) => setReliefNotes(prev => ({ ...prev, depreciation: e.target.value }))}
-                        placeholder="Notes"
-                        className="h-8 text-xs"
-                      />
-                    ) : (
-                      reliefNotes.depreciation || ''
-                    )}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">Charitable Donations</td>
-                  <td className="border border-border p-2 text-right font-medium">
-                    {isEditing ? (
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        value={formatCurrencyInput(reliefAmounts.charitableDonations.toString())}
-                        onChange={(e) => {
-                          const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
-                          if (isValid) {
-                            setReliefAmounts(prev => ({ ...prev, charitableDonations: parseFloat(rawValue) || 0 }))
-                          }
-                        }}
-                        className="h-8 sm:h-9 text-xs sm:text-sm text-right"
-                      />
-                    ) : (
-                      formatCurrency(reliefAmounts.charitableDonations || 0)
-                    )}
-                  </td>
-                    <td className="border border-border p-2 text-center">
-                      {isEditing ? (
-                        <Checkbox 
-                          checked={reliefEvidence.charitableDonations}
-                          onCheckedChange={(checked) => setReliefEvidence(prev => ({ ...prev, charitableDonations: !!checked }))}
-                        />
-                      ) : (
-                        reliefEvidence.charitableDonations ? '☑' : '☐'
-                      )}
-                    </td>
-                    <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">
-                      {isEditing ? (
-                        <Input 
-                          value={reliefNotes.charitableDonations}
-                          onChange={(e) => setReliefNotes(prev => ({ ...prev, charitableDonations: e.target.value }))}
-                          placeholder="Notes"
-                          className="h-8 sm:h-9 text-xs sm:text-sm"
-                        />
-                      ) : (
-                        reliefNotes.charitableDonations || ''
-                      )}
-                    </td>
-                  </tr>
-                <tr>
-                  <td className="border border-border p-2">Any other allowed relief or deduction</td>
-                  <td className="border border-border p-2 text-right font-medium">
-                    {isEditing ? (
-                      <Input
-                        type="text"
-                        inputMode="decimal"
-                        placeholder="0.00"
-                        value={formatCurrencyInput(reliefAmounts.otherRelief.toString())}
-                        onChange={(e) => {
-                          const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
-                          if (isValid) {
-                            setReliefAmounts(prev => ({ ...prev, otherRelief: parseFloat(rawValue) || 0 }))
-                          }
-                        }}
-                        className="h-8 sm:h-9 text-xs sm:text-sm text-right"
-                      />
-                    ) : (
-                      formatCurrency(reliefAmounts.otherRelief || 0)
-                    )}
-                  </td>
-                  <td className="border border-border p-2 text-center">
-                    {isEditing ? (
-                      <Checkbox 
-                        checked={reliefEvidence.otherRelief}
-                        onCheckedChange={(checked) => setReliefEvidence(prev => ({ ...prev, otherRelief: !!checked }))}
-                      />
-                    ) : (
-                      reliefEvidence.otherRelief ? '☑' : '☐'
-                    )}
-                  </td>
-                  <td className="border border-border p-2">
-                    {isEditing ? (
-                      <Input 
-                        value={reliefNotes.otherRelief}
-                        onChange={(e) => setReliefNotes(prev => ({ ...prev, otherRelief: e.target.value }))}
-                        placeholder="Notes"
-                        className="h-8 text-xs"
-                      />
-                    ) : (
-                      reliefNotes.otherRelief || ''
-                    )}
-                  </td>
-                </tr>
+                        }
+
+                        return (
+                          <tr key={txn.id || index}>
+                            <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="font-medium">{txn.description || 'Untitled transaction'}</span>
+                                {txn.category && (
+                                  <span className="text-[10px] text-muted-foreground">Category: {txn.category}</span>
+                                )}
+                                {txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined && (
+                                  <span className="text-[10px] text-amber-700 dark:text-amber-300">Mixed: {txn.businessPercentage}% business</span>
+                                )}
+                                {isCapitalAsset && capitalAssetDetail && (
+                                  <div className="text-[12px] text-blue-700 dark:text-blue-300 mt-1 space-y-1">
+                                    <div className="font-medium text-[10px] text-muted-foreground mb-1">Depreciation / Capital Allowance on assets</div>
+                                    {(() => {
+                                      // Calculate the book value at the start of the year for display
+                                      let bookValueAtStartOfYear = capitalAssetDetail.originalCost
+                                      if (capitalAssetDetail.yearsSincePurchase > 0) {
+                                        // Calculate cumulative depreciation up to the start of this year
+                                        for (let year = 0; year < capitalAssetDetail.yearsSincePurchase; year++) {
+                                          const yearDepreciation = bookValueAtStartOfYear * (capitalAssetDetail.allowanceRate / 100)
+                                          bookValueAtStartOfYear -= yearDepreciation
+                                        }
+                                      }
+
+                                      // Calculate Year 1 depreciation for clarity
+                                      const year1Depreciation = capitalAssetDetail.originalCost * (capitalAssetDetail.allowanceRate / 100)
+                                      const bookValueAfterYear1 = capitalAssetDetail.originalCost - year1Depreciation
+
+                                      return (
+                                        <div className="border-l-2 border-blue-300 dark:border-blue-700 pl-2 py-0.5">
+                                          <div className="text-[11px] space-y-0.5 mt-0.5">
+                                            <div>Purchased {capitalAssetDetail.purchaseYear}: {formatCurrency(capitalAssetDetail.originalCost)}</div>
+                                            {capitalAssetDetail.yearsSincePurchase > 0 && (
+                                              <>
+                                                <div className="text-blue-600 dark:text-blue-400 font-medium">Year 1 Depreciation ({capitalAssetDetail.allowanceRate}% of {formatCurrency(capitalAssetDetail.originalCost)}): <strong>{formatCurrency(year1Depreciation)}</strong></div>
+                                                <div className="text-blue-600 dark:text-blue-400">Book Value after Year 1: <strong>{formatCurrency(bookValueAfterYear1)}</strong></div>
+                                              </>
+                                            )}
+                                            {capitalAssetDetail.yearsSincePurchase > 0 && (
+                                              <div>Book Value at start of Year {capitalAssetDetail.yearsSincePurchase + 1}: {formatCurrency(bookValueAtStartOfYear)}</div>
+                                            )}
+                                            <div>Year {capitalAssetDetail.yearsSincePurchase + 1} Depreciation ({capitalAssetDetail.allowanceRate}% of {formatCurrency(bookValueAtStartOfYear)}): <strong className="text-blue-700 dark:text-blue-300">{formatCurrency(capitalAssetDetail.allowanceAmount)}</strong></div>
+                                            <div>Remaining Book Value: {formatCurrency(capitalAssetDetail.bookValueAfter)}</div>
+                                          </div>
+                                        </div>
+                                      )
+                                    })()}
+                                  </div>
+                                )}
+                               
+                              </div>
+                            </td>
+                            <td className="border border-border p-2 text-right font-medium text-xs sm:text-sm">
+                              {isCapitalAsset ? (
+                                <div className="flex flex-col items-end gap-0.5">
+                                  <span className="text-muted-foreground text-[10px]">Purchase: {formatCurrency(baseAmount)}</span>
+                                  {capitalAssetDetail && (
+                                    <span className="text-blue-700 dark:text-blue-300 font-semibold text-xs">
+                                      Depreciation: {formatCurrency(capitalAssetDetail.allowanceAmount)}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                formatCurrency(deductibleAmount)
+                              )}
+                            </td>
+                            <td className="border border-border p-2 text-center">
+                              {isEditing ? (
+                                <Checkbox 
+                                  checked={reliefEvidence[`expense_${txn.id}`] || false}
+                                  onCheckedChange={(checked) => setReliefEvidence(prev => ({ ...prev, [`expense_${txn.id}`]: !!checked }))}
+                                />
+                              ) : (
+                                (reliefEvidence[`expense_${txn.id}`] || false) ? '☑' : '☐'
+                              )}
+                            </td>
+                            <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">
+                              {isEditing ? (
+                                <Input 
+                                  value={reliefNotes[`expense_${txn.id}`] || ''}
+                                  onChange={(e) => setReliefNotes(prev => ({ ...prev, [`expense_${txn.id}`]: e.target.value }))}
+                                  placeholder="Notes"
+                                  className="h-8 sm:h-9 text-xs sm:text-sm"
+                                />
+                              ) : (
+                                reliefNotes[`expense_${txn.id}`] || ''
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="border border-border p-2 text-center text-muted-foreground text-xs sm:text-sm">
+                        No business expenses recorded for this period
+                      </td>
+                    </tr>
+                  )}
+                  {reportData.expenses.transactions && reportData.expenses.transactions.length > 0 && (
+                    <tr className="bg-muted font-bold">
+                      <td className="border border-border p-2 text-xs sm:text-sm">Subtotal Business Expenses</td>
+                      <td className="border border-border p-2 text-right text-xs sm:text-sm">{formatCurrency(reportData.expenses.taxDeductibleExpenses)}</td>
+                      <td className="border border-border p-2"></td>
+                      <td className="border border-border p-2"></td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Total Row */}
+          <div className="mt-4 overflow-x-auto -mx-3 sm:-mx-4 md:mx-0 px-3 sm:px-4 md:px-0">
+            <table className="w-full min-w-[600px] border-collapse border border-border text-xs sm:text-sm">
+              <tbody>
                 <tr className="bg-muted font-bold">
-                  <td className="border border-border p-2">Total Allowable Deductions & Reliefs</td>
-                  <td className="border border-border p-2 text-right">{formatCurrency((Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0)) + reportData.expenses.taxDeductibleExpenses)}</td>
-                  <td className="border border-border p-2"></td>
-                  <td className="border border-border p-2"></td>
+                  <td className="border border-border p-2 text-xs sm:text-sm" style={{ width: '50%' }}>Total Allowable Deductions & Reliefs</td>
+                  <td className="border border-border p-2 text-right text-xs sm:text-sm" style={{ width: '25%' }}>
+                    {formatCurrency(
+                      Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0) + 
+                      reportData.expenses.taxDeductibleExpenses
+                    )}
+                  </td>
+                  <td className="border border-border p-2" style={{ width: '12%' }}></td>
+                  <td className="border border-border p-2" style={{ width: '13%' }}></td>
                 </tr>
               </tbody>
             </table>
-            </div>
           </div>
+        </div>
 
         {/* Part D: Tax Already Paid (Credits) */}
         <div>
@@ -2420,7 +2616,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
         </div>
 
         {/* Tax Classification Summary (Gold+ feature) */}
-        {hasGoldAccess && (capitalAllowances > 0 || whtCredits > 0 || vatInput > 0 || vatOutput > 0) && (
+        {hasGoldAccess && (capitalAllowances > 0 || whtCredits > 0 || vatOutput > 0) && (
           <div className="mt-6 border-t border-border pt-4">
             <h3 className="text-sm sm:text-base font-semibold mb-3">Tax Classification Benefits (Gold+ Feature)</h3>
             
@@ -2431,11 +2627,19 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                   <span className="text-base sm:text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(capitalAllowances)}</span>
                 </div>
                 {capitalAllowanceDetails.length > 0 && (
-                  <div className="mt-2 space-y-1">
+                  <div className="mt-2 space-y-2">
                     {capitalAllowanceDetails.map((detail, index) => (
-                      <div key={index} className="flex justify-between text-xs sm:text-sm py-1">
-                        <span className="text-muted-foreground">{detail.description}</span>
-                        <span className="font-medium">{formatCurrency(detail.allowanceAmount)} ({detail.allowanceRate}%)</span>
+                      <div key={index} className="border-l-2 border-blue-300 dark:border-blue-700 pl-2 py-1">
+                        <div className="flex justify-between items-start text-xs sm:text-sm">
+                          <div className="flex-1">
+                            <div className="font-medium">{detail.description}</div>
+                            <div className="text-muted-foreground mt-0.5 space-y-0.5">
+                              <div>Purchased: {detail.purchaseYear} • Original Cost: {formatCurrency(detail.originalCost)}</div>
+                              <div>Year {detail.yearsSincePurchase + 1} Depreciation: {formatCurrency(detail.allowanceAmount)} ({detail.allowanceRate}%)</div>
+                              <div className="text-[10px]">Remaining Book Value: {formatCurrency(detail.bookValueAfter)}</div>
+                            </div>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -2462,39 +2666,25 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
               </div>
             )}
 
-            {/* VAT Information */}
-            {(vatInput > 0 || vatOutput > 0) && (
+            {/* VAT Information - only show Output VAT (from income), not Input VAT (from expenses) */}
+            {vatOutput > 0 && (
               <div className="mb-4 bg-purple-50 dark:bg-purple-950/20 border-l-4 border-purple-500 dark:border-purple-400 p-3 sm:p-4 rounded">
                 <div className="mb-3">
                   <h4 className="text-sm sm:text-base font-semibold mb-2">VAT Summary</h4>
                   <div className="space-y-2">
-                    {vatInput > 0 && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs sm:text-sm text-muted-foreground">Input VAT (Claimable)</span>
-                        <span className="text-sm sm:text-base font-semibold text-purple-600 dark:text-purple-400">{formatCurrency(vatInput)}</span>
-                      </div>
-                    )}
-                    {vatOutput > 0 && (
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs sm:text-sm text-muted-foreground">Output VAT (Payable)</span>
-                        <span className="text-sm sm:text-base font-semibold text-purple-600 dark:text-purple-400">{formatCurrency(vatOutput)}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between items-center pt-2 border-t border-purple-200 dark:border-purple-800">
-                      <span className="text-xs sm:text-sm font-semibold">Net VAT {vatOutput > vatInput ? 'Payable' : 'Refundable'}</span>
-                      <span className={`text-sm sm:text-base font-bold ${vatOutput > vatInput ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                        {formatCurrency(Math.abs(vatOutput - vatInput))}
-                      </span>
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs sm:text-sm text-muted-foreground">Output VAT (Payable)</span>
+                      <span className="text-sm sm:text-base font-semibold text-purple-600 dark:text-purple-400">{formatCurrency(vatOutput)}</span>
                     </div>
                   </div>
                 </div>
-                {vatDetails.length > 0 && (
+                {vatDetails.filter(d => d.type === 'output').length > 0 && (
                   <div className="mt-3 space-y-1">
                     <p className="text-xs sm:text-sm text-muted-foreground mb-2">Breakdown:</p>
-                    {vatDetails.map((detail, index) => (
+                    {vatDetails.filter(d => d.type === 'output').map((detail, index) => (
                       <div key={index} className="flex justify-between text-xs sm:text-sm py-1">
                         <span className="text-muted-foreground">
-                          {detail.description} ({detail.type === 'input' ? 'Input' : 'Output'})
+                          {detail.description}
                         </span>
                         <span className="font-medium">{formatCurrency(detail.vatAmount)} ({detail.vatRate}%)</span>
                       </div>
@@ -2537,9 +2727,25 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                 <Label htmlFor="credit-amount">Amount (₦)</Label>
                 <Input
                   id="credit-amount"
-                  type="number"
-                  value={newCredit.amount}
-                  onChange={(e) => setNewCredit(prev => ({ ...prev, amount: e.target.value }))}
+                  type="text"
+                  inputMode="decimal"
+                  value={newCredit.amountDisplay || formatCurrencyInput(newCredit.amount)}
+                  onChange={(e) => {
+                    const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                    if (isValid) {
+                      setNewCredit(prev => ({ 
+                        ...prev, 
+                        amount: rawValue,
+                        amountDisplay: formatCurrencyInput(rawValue)
+                      }))
+                    } else if (e.target.value === '') {
+                      setNewCredit(prev => ({ 
+                        ...prev, 
+                        amount: '',
+                        amountDisplay: ''
+                      }))
+                    }
+                  }}
                   placeholder="0.00"
                 />
               </div>

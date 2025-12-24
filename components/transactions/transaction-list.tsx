@@ -416,13 +416,33 @@ export function TransactionList({
                                   breakdown.push(`After Fees: ${formatCurrency(currentAmount)}`)
                                 }
                                 
-                                // VAT deduction
+                                // VAT deduction (for income)
                                 if (transaction.type === 'income' && transaction.taxClassification?.vatApplicable && transaction.taxClassification?.vatRate) {
                                   const vatAmount = currentAmount * (transaction.taxClassification.vatRate / 100)
                                   const afterVat = currentAmount * (1 - transaction.taxClassification.vatRate / 100)
                                   breakdown.push(`VAT ${transaction.taxClassification.vatRate}%: -${formatCurrency(vatAmount)}`)
                                   currentAmount = afterVat
                                   breakdown.push(`After VAT: ${formatCurrency(afterVat)}`)
+                                }
+                                
+                                // WHT Credit (for expenses)
+                                if (transaction.type === 'expense' && transaction.taxClassification?.whtCreditable) {
+                                  const whtAmount = transaction.taxClassification.whtAmount !== undefined
+                                    ? transaction.taxClassification.whtAmount
+                                    : transaction.taxClassification.whtRate
+                                      ? currentAmount * (transaction.taxClassification.whtRate / 100)
+                                      : 0
+                                  if (whtAmount > 0) {
+                                    breakdown.push(`WHT Credit ${transaction.taxClassification.whtRate ? `${transaction.taxClassification.whtRate}%` : ''}: +${formatCurrency(whtAmount)}`)
+                                    breakdown.push(`(Tax credit available to reduce tax liability)`)
+                                  }
+                                }
+                                
+                                // Capital Allowance (for expenses)
+                                if (transaction.type === 'expense' && transaction.taxClassification?.isCapitalAsset && transaction.taxClassification?.capitalAllowanceRate) {
+                                  const allowanceAmount = currentAmount * (transaction.taxClassification.capitalAllowanceRate / 100)
+                                  breakdown.push(`Capital Allowance ${transaction.taxClassification.capitalAllowanceRate}%: ${formatCurrency(allowanceAmount)}`)
+                                  breakdown.push(`(Annual depreciation claim - reduces taxable income)`)
                                 }
                                 
                                 // Business percentage (for mixed transactions - both income and expense)
@@ -472,6 +492,40 @@ export function TransactionList({
                             </div>
                             <div className="text-muted-foreground font-bold text-[10px]">
                               Taxable: {formatCurrency(transaction.amount * (1 - transaction.taxClassification.vatRate / 100))}
+                            </div>
+                          </div>
+                        )}
+                        {/* WHT Credit Display for Expense Transactions */}
+                        {transaction.type === 'expense' && transaction.taxClassification?.whtCreditable && (
+                          <div className="text-[9px] text-green-700 dark:text-green-300 space-y-0.5">
+                            <div className="flex items-center gap-1">
+                              <span>WHT Credit {transaction.taxClassification.whtRate ? `${transaction.taxClassification.whtRate}%` : ''}:</span>
+                              <span className="font-medium">
+                                +{formatCurrency(
+                                  transaction.taxClassification.whtAmount !== undefined
+                                    ? transaction.taxClassification.whtAmount
+                                    : transaction.taxClassification.whtRate
+                                      ? transaction.amount * (transaction.taxClassification.whtRate / 100)
+                                      : 0
+                                )}
+                              </span>
+                            </div>
+                            <div className="text-muted-foreground font-bold text-[10px]">
+                              Tax Credit Available
+                            </div>
+                          </div>
+                        )}
+                        {/* Capital Allowance Display for Expense Transactions */}
+                        {transaction.type === 'expense' && transaction.taxClassification?.isCapitalAsset && transaction.taxClassification?.capitalAllowanceRate && (
+                          <div className="text-[9px] text-blue-700 dark:text-blue-300 space-y-0.5">
+                            <div className="flex items-center gap-1">
+                              <span>Capital Allowance {transaction.taxClassification.capitalAllowanceRate}%:</span>
+                              <span className="font-medium">
+                                {formatCurrency(transaction.amount * (transaction.taxClassification.capitalAllowanceRate / 100))}
+                              </span>
+                            </div>
+                            <div className="text-muted-foreground font-bold text-[10px]">
+                              Annual Depreciation Claim
                             </div>
                           </div>
                         )}

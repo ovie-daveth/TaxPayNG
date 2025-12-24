@@ -168,6 +168,7 @@ export interface TransactionFilters {
   type?: TransactionType
   category?: string
   paymentMethod?: string
+  platform?: string // Platform name filter (for creators)
   startDate?: string
   endDate?: string
   dateRange?: {

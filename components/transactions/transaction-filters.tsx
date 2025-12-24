@@ -4,6 +4,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button"
 import { X } from "lucide-react"
 import { TransactionFilters as TransactionFiltersType } from "@/lib/types"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useTransactions } from "@/lib/hooks/useTransactions"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { useEffect, useState } from "react"
 
 interface TransactionFiltersProps {
   filters: TransactionFiltersType
@@ -11,6 +15,26 @@ interface TransactionFiltersProps {
 }
 
 export function TransactionFilters({ filters, onFiltersChange }: TransactionFiltersProps) {
+  const { profile } = useUserProfile()
+  const { user } = useAuth()
+  const { transactions } = useTransactions(user?.uid || null)
+  const [availablePlatforms, setAvailablePlatforms] = useState<string[]>([])
+
+  // Get unique platforms from transactions (for creators only)
+  useEffect(() => {
+    if (profile?.businessType === 'creator' && transactions.length > 0) {
+      const platforms = new Set<string>()
+      transactions.forEach(txn => {
+        if (txn.platform?.name) {
+          platforms.add(txn.platform.name)
+        }
+      })
+      setAvailablePlatforms(Array.from(platforms).sort())
+    } else {
+      setAvailablePlatforms([])
+    }
+  }, [transactions, profile?.businessType])
+
   const handleClearAll = () => {
     onFiltersChange({})
   }
@@ -33,6 +57,13 @@ export function TransactionFilters({ filters, onFiltersChange }: TransactionFilt
     onFiltersChange({
       ...filters,
       paymentMethod: value === 'all' ? undefined : value
+    })
+  }
+
+  const handlePlatformChange = (value: string) => {
+    onFiltersChange({
+      ...filters,
+      platform: value === 'all' ? undefined : value
     })
   }
 
@@ -94,6 +125,22 @@ export function TransactionFilters({ filters, onFiltersChange }: TransactionFilt
             </SelectContent>
           </Select>
         </div>
+        {profile?.businessType === 'creator' && availablePlatforms.length > 0 && (
+          <div className="space-y-2">
+            <Label htmlFor="platform">Platform</Label>
+            <Select value={filters.platform || 'all'} onValueChange={handlePlatformChange}>
+              <SelectTrigger id="platform">
+                <SelectValue placeholder="All platforms" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All platforms</SelectItem>
+                {availablePlatforms.map(platform => (
+                  <SelectItem key={platform} value={platform}>{platform}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
         <div className="space-y-2">
           <Label htmlFor="category">Category</Label>
           <Select value={filters.category || 'all'} onValueChange={handleCategoryChange}>

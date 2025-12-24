@@ -422,7 +422,8 @@ export function ViewTransactionDialog({
                           WHT Creditable {transaction.taxClassification.whtRate && `(${transaction.taxClassification.whtRate}%)`}
                         </Badge>
                       )}
-                      {transaction.taxClassification.vatApplicable && (
+                      {/* VAT Applicable - only show for income transactions, not expenses */}
+                      {transaction.type === 'income' && transaction.taxClassification.vatApplicable && (
                         <Badge variant="outline" className="text-xs">
                           VAT Applicable {transaction.taxClassification.vatRate && `(${transaction.taxClassification.vatRate}%)`}
                         </Badge>
