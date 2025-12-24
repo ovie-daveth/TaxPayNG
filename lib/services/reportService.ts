@@ -741,6 +741,62 @@ export class ReportService extends BaseService {
     }
   }
 
+  /**
+   * Public method to calculate tax for dashboard/quick view
+   * Uses the same calculation engine as self-assessment reports
+   */
+  async calculateTaxForPeriod(
+    userId: string,
+    startDate: Date,
+    endDate: Date,
+    businessType: string = 'freelancer'
+  ): Promise<TaxData & { taxClassification?: TaxClassificationSummary }> {
+    // Fetch user profile
+    const profile = await userService.getProfile(userId)
+    
+    // Fetch transactions for the period
+    const allTransactions = await transactionService.getAll([
+      { field: 'userId', operator: '==', value: userId }
+    ])
+    
+    // Filter transactions by period
+    const filteredTransactions = allTransactions.filter(txn => {
+      const txnDate = txn.date ? new Date(txn.date) : new Date(txn.createdAt)
+      return txnDate >= startDate && txnDate <= endDate
+    })
+    
+    // Calculate income data (excluding VAT for income transactions)
+    const incomeData = this.calculateIncomeDataTransactionsOnly(filteredTransactions, userId)
+    
+    // Calculate expense data
+    const expenseData = this.calculateExpenseDataTransactionsOnly(filteredTransactions, userId)
+    
+    // Calculate tax classification benefits (Gold+ feature)
+    let taxClassificationSummary: TaxClassificationSummary | undefined = undefined
+    try {
+      const taxYear = endDate.getFullYear()
+      taxClassificationSummary = await calculateTaxClassificationBenefitsFromTransactions(filteredTransactions, userId, taxYear)
+    } catch (error) {
+      console.error('Error calculating tax classification benefits:', error)
+      // Continue without tax classification if calculation fails
+    }
+    
+    // Calculate tax data using the same engine as self-assessment
+    const taxData = await this.calculateTaxData(
+      userId,
+      incomeData.totalIncome,
+      expenseData.totalExpenses,
+      expenseData.taxDeductibleExpenses,
+      profile,
+      taxClassificationSummary
+    )
+    
+    return {
+      ...taxData,
+      taxClassification: taxClassificationSummary
+    }
+  }
+
   private async calculateTaxData(
     userId: string,
     grossIncome: number,

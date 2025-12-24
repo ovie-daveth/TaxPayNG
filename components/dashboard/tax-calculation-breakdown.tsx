@@ -17,10 +17,22 @@ export function TaxCalculationBreakdown({ calculation, formatCurrency }: TaxCalc
           <span className="text-muted-foreground">Gross Income</span>
           <span className="font-medium">{formatCurrency(calculation.grossIncome)}</span>
         </div>
+        {calculation.vatOutput > 0 && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Less: Output VAT (paid separately)</span>
+            <span className="font-medium text-destructive">-{formatCurrency(calculation.vatOutput)}</span>
+          </div>
+        )}
         <div className="flex items-center justify-between text-sm">
           <span className="text-muted-foreground">Business Expenses</span>
           <span className="font-medium text-destructive">-{formatCurrency(calculation.businessExpenses)}</span>
         </div>
+        {calculation.capitalAllowances > 0 && (
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Capital Allowances (Depreciation)</span>
+            <span className="font-medium text-destructive">-{formatCurrency(calculation.capitalAllowances)}</span>
+          </div>
+        )}
         <div className="flex items-center justify-between text-sm font-medium pt-1 border-t">
           <span>Adjusted Gross Income</span>
           <span>{formatCurrency(calculation.adjustedGrossIncome)}</span>
@@ -98,10 +110,31 @@ export function TaxCalculationBreakdown({ calculation, formatCurrency }: TaxCalc
         ))}
       </div>
 
+      {/* WHT Credits */}
+      {calculation.whtCredits > 0 && (
+        <div className="space-y-2 border-b pb-3">
+          <p className="text-xs font-medium text-muted-foreground mb-2">Tax Credits:</p>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">Withholding Tax (WHT) Credits</span>
+            <span className="font-medium text-green-600">-{formatCurrency(calculation.whtCredits)}</span>
+          </div>
+        </div>
+      )}
+
       {/* Total Tax */}
       <div className="pt-3 border-t space-y-2">
         <div className="flex items-center justify-between text-sm font-semibold">
-          <span>Annual Tax Payable</span>
+          <span>Gross Tax Payable</span>
+          <span className="text-accent">{formatCurrency((calculation.totalTax || 0) + (calculation.whtCredits || 0))}</span>
+        </div>
+        {calculation.whtCredits > 0 && (
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span>Less: WHT Credits</span>
+            <span className="text-green-600">-{formatCurrency(calculation.whtCredits)}</span>
+          </div>
+        )}
+        <div className="flex items-center justify-between text-sm font-semibold pt-1 border-t">
+          <span>Net Tax Payable</span>
           <span className="text-accent">{formatCurrency(calculation.totalTax)}</span>
         </div>
         <div className="flex items-center justify-between text-xs text-muted-foreground">

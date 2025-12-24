@@ -518,7 +518,11 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
         lifeInsurance: reliefAmounts.lifeInsurance || 0,
         charitableDonations: reliefAmounts.charitableDonations || 0,
         businessExpenses: reportData.expenses.taxDeductibleExpenses,
-        dependents: 0
+        dependents: 0,
+        // Include capital allowances (depreciation) in the recalculation
+        capitalAllowances: capitalAllowances > 0 ? capitalAllowances : undefined,
+        // Include WHT credits if available
+        whtCredits: whtCredits > 0 ? whtCredits : undefined
       }
       const taxResult = calculateNigerianTax(taxCalcData)
       
@@ -928,6 +932,12 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
       toast.error("Please allow popups to print")
       return
     }
+
+    // Calculate total deductions for print view
+    // Include: business expenses + capital allowances + other reliefs (excluding depreciation to avoid double-counting)
+    const totalDeductions = reportData.expenses.taxDeductibleExpenses + 
+                            capitalAllowances + // Capital allowances (depreciation) - source of truth
+                            (Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0) - (reliefAmounts.depreciation || 0)) // Other reliefs (excluding depreciation)
 
     const printContent = `
 <!DOCTYPE html>
@@ -1494,7 +1504,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
     </div>
     <div class="amount-row">
       <span class="amount-label">2. Less: Total Allowable Deductions & Reliefs (from Part C)</span>
-      <span class="amount-value" style="color: #dc2626;">-${formatCurrency(reportData.tax.totalReliefs + reportData.expenses.taxDeductibleExpenses)}</span>
+      <span class="amount-value" style="color: #dc2626;">-${formatCurrency(totalDeductions)}</span>
     </div>
     <div class="amount-row total-row">
       <span>→ Net Taxable Income</span>
@@ -2394,14 +2404,6 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                       </td>
                     </tr>
                   )}
-                  {reportData.expenses.transactions && reportData.expenses.transactions.length > 0 && (
-                    <tr className="bg-muted font-bold">
-                      <td className="border border-border p-2 text-xs sm:text-sm">Subtotal Business Expenses</td>
-                      <td className="border border-border p-2 text-right text-xs sm:text-sm">{formatCurrency(reportData.expenses.taxDeductibleExpenses)}</td>
-                      <td className="border border-border p-2"></td>
-                      <td className="border border-border p-2"></td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
@@ -2608,7 +2610,11 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
             </div>
             <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
               <span className="text-muted-foreground text-xs sm:text-sm break-words sm:break-normal">2. Less: Total Allowable Deductions & Reliefs (from Part C)</span>
-              <span className="font-medium text-red-600 text-xs sm:text-sm whitespace-nowrap">-{formatCurrency((Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0)) + reportData.expenses.taxDeductibleExpenses)}</span>
+              <span className="font-medium text-red-600 text-xs sm:text-sm whitespace-nowrap">-{formatCurrency(
+                reportData.expenses.taxDeductibleExpenses + // Business expenses
+                capitalAllowances + // Capital allowances (depreciation) - explicitly include this
+                (Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0) - (reliefAmounts.depreciation || 0)) // Other reliefs (excluding depreciation to avoid double-counting with capitalAllowances)
+              )}</span>
           </div>
             <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 sm:py-3 border-t-2 border-border font-semibold text-xs sm:text-sm">
               <span>→ Net Taxable Income</span>
