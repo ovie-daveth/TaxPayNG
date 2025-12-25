@@ -8,7 +8,7 @@ import { TaxCalculatorSkeleton } from "@/components/ui/skeletons"
 import { Sparkles, Camera, History, Printer, Loader2 } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
-import { TaxBreakdownModalContent } from "@/app/demo/components/tax-breakdown-modal-content"
+import { TaxBreakdown } from "@/components/tax-calculator/tax-breakdown"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { toast } from "sonner"
 import { format } from "date-fns"
@@ -84,7 +84,7 @@ export default function CreatorTaxCalculatorPage() {
   }
 
   const handlePrintCalculation = (calculation: any) => {
-    // Use the same print logic from TaxBreakdownModalContent
+    // Use the same print logic from TaxBreakdown
     const result = calculation.result || {}
     
     const printWindow = window.open('', '_blank')
@@ -412,7 +412,7 @@ export default function CreatorTaxCalculatorPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
-                <TaxBreakdownModalContent result={taxResult || selectedCalculation?.result} />
+                <TaxBreakdown result={taxResult || selectedCalculation?.result} />
               </div>
             </>
           )}
