@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Badge } from "@/components/ui/badge"
 import { Plus, Trash2, Loader2, Info, X } from "lucide-react"
 import { Invoice, InvoiceItem, InvoiceClient, InvoiceSupplier, InvoiceTemplateType, InvoiceType } from "@/lib/types"
 import { invoiceService, userService } from "@/lib/services"
@@ -50,6 +51,23 @@ export function AddInvoiceDialog({
   const [itemConvertedAmounts, setItemConvertedAmounts] = useState<Record<string, number>>({})
 
   const [isSendingToUser, setIsSendingToUser] = useState(false)
+  
+  // New invoice fields for creators (optional)
+  const [showCreatorFields, setShowCreatorFields] = useState(false)
+  const [platformName, setPlatformName] = useState("")
+  const [platformType, setPlatformType] = useState<'social' | 'subscription' | 'marketplace' | 'streaming' | 'other'>('other')
+  const [platformAccountId, setPlatformAccountId] = useState("")
+  const [platformAccountUrl, setPlatformAccountUrl] = useState("")
+  const [transactionNature, setTransactionNature] = useState<'business' | 'personal' | 'mixed' | undefined>(undefined)
+  const [businessPercentage, setBusinessPercentage] = useState<number | undefined>(undefined)
+  const [tags, setTags] = useState<string[]>([])
+  const [tagInput, setTagInput] = useState("")
+  const [paymentMethod, setPaymentMethod] = useState("")
+  
+  // Item-level platform fees (for creator mode)
+  const [itemGrossAmounts, setItemGrossAmounts] = useState<Record<string, number | undefined>>({})
+  const [itemPlatformFees, setItemPlatformFees] = useState<Record<string, number | undefined>>({})
+  const [itemPlatformFeesDisplay, setItemPlatformFeesDisplay] = useState<Record<string, string>>({})
   
   // Initialize supplier info from user profile
   const getInitialSupplier = useCallback((): InvoiceSupplier => {
@@ -240,6 +258,32 @@ export function AddInvoiceDialog({
         sendToOtaxUser: !!invoice.recipientUserId,
         recipientEmail: invoice.recipientEmail || ""
       })
+      
+      // Initialize new invoice fields
+      if (invoice.platform) {
+        setShowCreatorFields(true)
+        setPlatformName(invoice.platform.name || "")
+        setPlatformType(invoice.platform.platformType || 'other')
+        setPlatformAccountId(invoice.platform.accountId || "")
+        setPlatformAccountUrl(invoice.platform.accountUrl || "")
+      }
+      setTransactionNature(invoice.transactionNature)
+      setBusinessPercentage(invoice.businessPercentage)
+      setTags(invoice.tags || [])
+      setPaymentMethod(invoice.paymentMethod || "")
+      
+      // Initialize item-level platform fees
+      const grossAmounts: Record<string, number | undefined> = {}
+      const platformFees: Record<string, number | undefined> = {}
+      const platformFeesDisplay: Record<string, string> = {}
+      items.forEach(item => {
+        grossAmounts[item.id] = item.grossAmount
+        platformFees[item.id] = item.platformFees
+        platformFeesDisplay[item.id] = item.platformFees ? formatCurrencyInput(item.platformFees.toString()) : ""
+      })
+      setItemGrossAmounts(grossAmounts)
+      setItemPlatformFees(platformFees)
+      setItemPlatformFeesDisplay(platformFeesDisplay)
     } else {
       // Reset form
       const newItemId = crypto.randomUUID()
@@ -285,12 +329,26 @@ export function AddInvoiceDialog({
         sendToOtaxUser: false,
         recipientEmail: ""
       })
+      
+      // Reset new invoice fields
+      setShowCreatorFields(false)
+      setPlatformName("")
+      setPlatformType('other')
+      setPlatformAccountId("")
+      setPlatformAccountUrl("")
+      setTransactionNature(undefined)
+      setBusinessPercentage(undefined)
+      setTags([])
+      setTagInput("")
+      setPaymentMethod("")
+      setItemGrossAmounts({})
+      setItemPlatformFees({})
+      setItemPlatformFeesDisplay({})
     }
   }, [invoice, open])
 
-  const calculateItemAmount = (item: InvoiceItem): number => {
-    // Use the exact same logic as calculateTotals for consistency
-    // If unit price is 0, amount should always be 0
+  // Calculate gross amount (Quantity × Unit Price) - always fixed
+  const calculateGrossAmount = (item: InvoiceItem): number => {
     if (item.unitPrice === 0) {
       return 0
     }
@@ -299,9 +357,28 @@ export function AddInvoiceDialog({
     const basePrice = itemCurrency !== formData.currency 
       ? (itemConvertedAmounts[item.id] || item.unitPrice)
       : item.unitPrice
-    // Amount is just subtotal (no item-level tax/VAT)
-    const subtotal = item.quantity * basePrice
-    return subtotal
+    return item.quantity * basePrice
+  }
+
+  const calculateItemAmount = (item: InvoiceItem): number => {
+    // If unit price is 0, amount should always be 0
+    if (item.unitPrice === 0) {
+      return 0
+    }
+    
+    // Calculate gross amount first
+    const grossAmount = calculateGrossAmount(item)
+    
+    // For creator items with platform fees, return net amount (gross - fees)
+    if (profile?.businessType === 'creator' && formData.invoiceType === 'outgoing') {
+      const platformFees = itemPlatformFees[item.id]
+      if (platformFees) {
+        return grossAmount - platformFees
+      }
+    }
+    
+    // Otherwise return gross amount
+    return grossAmount
   }
 
   // Handle currency conversion for item unit price
@@ -352,7 +429,27 @@ export function AddInvoiceDialog({
       items: prev.items.map(item => {
         if (item.id === itemId) {
           const updated = { ...item, ...updates }
+          
+          // Always calculate gross amount (Quantity × Unit Price)
+          const grossAmount = calculateGrossAmount(updated)
+          
+          // For creators, store gross amount and calculate net amount
+          if (profile?.businessType === 'creator' && formData.invoiceType === 'outgoing') {
+            setItemGrossAmounts(prev => ({ ...prev, [itemId]: grossAmount }))
+            updated.grossAmount = grossAmount
+            
+            // Calculate net amount if platform fees exist
+            const platformFees = itemPlatformFees[itemId]
+            if (platformFees) {
+              updated.netAmount = grossAmount - platformFees
+            } else {
+              updated.netAmount = undefined
+            }
+          }
+          
+          // Amount field shows net amount (if fees exist) or gross amount
           updated.amount = calculateItemAmount(updated)
+          
           return updated
         }
         return item
@@ -439,6 +536,10 @@ export function AddInvoiceDialog({
       ...prev,
       [newItemId]: 0
     }))
+    // Initialize platform fees state for new item
+    setItemGrossAmounts(prev => ({ ...prev, [newItemId]: undefined }))
+    setItemPlatformFees(prev => ({ ...prev, [newItemId]: undefined }))
+    setItemPlatformFeesDisplay(prev => ({ ...prev, [newItemId]: "" }))
     setFormData(prev => ({
       ...prev,
       items: [
@@ -464,6 +565,7 @@ export function AddInvoiceDialog({
 
   const calculateTotals = () => {
     // Calculate subtotal and vatable subtotal
+    // Use calculateItemAmount to get net amount (after platform fees) for creators
     let subtotal = 0
     let vatableSubtotal = 0
     
@@ -471,19 +573,14 @@ export function AddInvoiceDialog({
       // If unit price is 0, skip this item
       if (item.unitPrice === 0) return
       
-      // Get the converted price in base currency
-      const itemCurrency = itemCurrencies[item.id] || formData.currency
-      const basePrice = itemCurrency !== formData.currency 
-        ? (itemConvertedAmounts[item.id] || item.unitPrice)
-        : item.unitPrice
-      
-      // Calculate item subtotal (quantity × converted unit price)
-      const itemSubtotal = item.quantity * basePrice
-      subtotal += itemSubtotal
+      // Use calculateItemAmount which returns net amount (gross - platform fees) for creators
+      // or gross amount (quantity × unit price) for non-creators
+      const itemAmount = calculateItemAmount(item)
+      subtotal += itemAmount
       
       // Only include in vatable subtotal if item is marked as vatable
       if (item.vatable) {
-        vatableSubtotal += itemSubtotal
+        vatableSubtotal += itemAmount
       }
     })
     
@@ -582,11 +679,18 @@ export function AddInvoiceDialog({
   
       // Use items as-is (amounts are already calculated during input via updateItem)
       // Just ensure currency is saved if different from invoice currency
+      // Include item-level platform fees for creators
       const itemsWithCalculatedAmounts = formData.items.map(item => {
         const itemCurrency = itemCurrencies[item.id] || formData.currency
         return {
           ...item,
-          currency: itemCurrency !== formData.currency ? itemCurrency : undefined
+          currency: itemCurrency !== formData.currency ? itemCurrency : undefined,
+          // Include platform fees if available
+          grossAmount: itemGrossAmounts[item.id],
+          platformFees: itemPlatformFees[item.id],
+          netAmount: itemGrossAmounts[item.id] && itemPlatformFees[item.id] 
+            ? (itemGrossAmounts[item.id] || 0) - (itemPlatformFees[item.id] || 0)
+            : undefined
         }
       })
   
@@ -611,7 +715,18 @@ export function AddInvoiceDialog({
         taxAmount: totals.taxAmount, // Legacy field
         invoiceTotal: totals.invoiceTotal,
         // Note: WHT fields are not set by issuer - they are set by client when deducting
-        total: totals.total
+        total: totals.total,
+        // New invoice fields for creators (optional)
+        platform: (showCreatorFields && (platformName || platformAccountId || platformAccountUrl)) ? {
+          name: platformName,
+          platformType: platformType,
+          accountId: platformAccountId || undefined,
+          accountUrl: platformAccountUrl || undefined
+        } : undefined,
+        transactionNature: showCreatorFields ? transactionNature : undefined,
+        businessPercentage: showCreatorFields ? businessPercentage : undefined,
+        tags: tags.length > 0 ? tags : undefined,
+        paymentMethod: paymentMethod || undefined
       }
       
       console.log('Invoice data:', invoiceData)
@@ -1079,7 +1194,7 @@ export function AddInvoiceDialog({
             
             <div className="space-y-3 sm:space-y-4">
               {formData.items.map((item, index) => (
-                <div key={item.id} className="space-y-3 sm:space-y-4 p-3 sm:p-4 border rounded-lg flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4">
+                <div key={item.id} className="space-y-3 p-3 sm:p-4 border rounded-lg">
                   {/* Row 1: Description and Quantity */}
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 flex-1">
                     <div className="flex-1 space-y-2">
@@ -1212,6 +1327,75 @@ export function AddInvoiceDialog({
                         </div>
                       </div>
                     </div>
+                    
+                  </div>
+                  
+                  {/* Platform Fees Breakdown (for creators) - Compact inline layout */}
+                  {profile?.businessType === 'creator' && formData.invoiceType === 'outgoing' && (
+                    <div className="pt-2 border-t space-y-2">
+                      <Label className="text-xs sm:text-sm font-medium text-muted-foreground">Platform Fees Breakdown (Optional)</Label>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="space-y-1">
+                          <Label htmlFor={`gross-${item.id}`} className="text-xs">Gross Amount</Label>
+                          <div className="h-8 sm:h-9 px-2 py-1.5 rounded-md border border-input bg-muted text-xs font-medium flex items-center">
+                            {getCurrencySymbol(formData.currency)}{calculateGrossAmount(item).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <Label htmlFor={`fees-${item.id}`} className="text-xs">Platform Fees</Label>
+                          <Input
+                            id={`fees-${item.id}`}
+                            type="text"
+                            value={itemPlatformFeesDisplay[item.id] || ""}
+                            onChange={(e) => {
+                              const inputValue = e.target.value
+                              
+                              // Allow empty string
+                              if (inputValue === "") {
+                                setItemPlatformFeesDisplay(prev => ({ ...prev, [item.id]: "" }))
+                                setItemPlatformFees(prev => ({ ...prev, [item.id]: undefined }))
+                                // Gross amount stays fixed, just clear fees
+                                updateItem(item.id, { 
+                                  platformFees: undefined,
+                                  netAmount: undefined
+                                })
+                                return
+                              }
+                              
+                              // Format the input
+                              const formatted = formatCurrencyInput(inputValue)
+                              setItemPlatformFeesDisplay(prev => ({ ...prev, [item.id]: formatted }))
+                              
+                              // Parse the numeric value
+                              const parsed = parseCurrencyInput(formatted)
+                              const numericValue = parseFloat(parsed) || 0
+                              
+                              if (numericValue > 0) {
+                                const grossAmount = calculateGrossAmount(item)
+                                setItemPlatformFees(prev => ({ ...prev, [item.id]: numericValue }))
+                                // Gross amount stays fixed, only update fees and net amount
+                                updateItem(item.id, { 
+                                  platformFees: numericValue,
+                                  netAmount: grossAmount - numericValue
+                                })
+                              }
+                            }}
+                            onKeyDown={handleInputKeyDown}
+                            onClick={(e) => e.stopPropagation()}
+                            placeholder="0.00"
+                            className="h-8 sm:h-9 text-xs"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Net Amount</Label>
+                          <div className="h-8 sm:h-9 px-2 py-1.5 rounded-md border border-input bg-muted text-xs font-medium flex items-center">
+                            {getCurrencySymbol(formData.currency)}{(calculateGrossAmount(item) - (itemPlatformFees[item.id] || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                    
                     {/* <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <Label>Amount ({getCurrencySymbol(formData.currency)})</Label>
@@ -1231,7 +1415,6 @@ export function AddInvoiceDialog({
                         {formatCurrencyAmount(item.amount, formData.currency)}
                       </div>
                     </div> */}
-                  </div>
                 </div>
               ))}
             </div>
@@ -1301,6 +1484,196 @@ export function AddInvoiceDialog({
               <span>Amount Payable:</span>
               <span className="text-primary whitespace-nowrap">{getCurrencySymbol(formData.currency)} {totals.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
             </div>
+          </div>
+
+          {/* Creator-Specific Fields (for outgoing invoices) - Optional */}
+          {profile?.businessType === 'creator' && formData.invoiceType === 'outgoing' && (
+            <div className="space-y-4 border-t pt-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base sm:text-lg font-semibold">Creator-Specific Information (Optional)</h3>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowCreatorFields(!showCreatorFields)}
+                  className="text-xs sm:text-sm"
+                >
+                  {showCreatorFields ? "Hide" : "Show"}
+                </Button>
+              </div>
+              
+              {showCreatorFields && (
+                <>
+                  {/* Platform Information */}
+                  <div className="space-y-3 p-3 sm:p-4 border rounded-lg bg-muted/30">
+                    <h4 className="text-sm font-medium">Platform Information</h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="platform-name" className="text-xs sm:text-sm">Platform Name</Label>
+                        <Select value={platformName} onValueChange={(value) => setPlatformName(value)}>
+                          <SelectTrigger id="platform-name" className="h-9 sm:h-10 text-xs sm:text-sm">
+                            <SelectValue placeholder="Select platform" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="YouTube">YouTube</SelectItem>
+                            <SelectItem value="TikTok">TikTok</SelectItem>
+                            <SelectItem value="Instagram">Instagram</SelectItem>
+                            <SelectItem value="Facebook">Facebook</SelectItem>
+                            <SelectItem value="Twitter">Twitter/X</SelectItem>
+                            <SelectItem value="Patreon">Patreon</SelectItem>
+                            <SelectItem value="OnlyFans">OnlyFans</SelectItem>
+                            <SelectItem value="Twitch">Twitch</SelectItem>
+                            <SelectItem value="Spotify">Spotify</SelectItem>
+                            <SelectItem value="Apple Music">Apple Music</SelectItem>
+                            <SelectItem value="Amazon">Amazon</SelectItem>
+                            <SelectItem value="Etsy">Etsy</SelectItem>
+                            <SelectItem value="Shopify">Shopify</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="platform-type" className="text-xs sm:text-sm">Platform Type</Label>
+                        <Select value={platformType} onValueChange={(value: any) => setPlatformType(value)}>
+                          <SelectTrigger className="h-9 sm:h-10 text-xs sm:text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="social">Social Media</SelectItem>
+                            <SelectItem value="subscription">Subscription</SelectItem>
+                            <SelectItem value="marketplace">Marketplace</SelectItem>
+                            <SelectItem value="streaming">Streaming</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="platform-account-id" className="text-xs sm:text-sm">Account ID/Username</Label>
+                        <Input
+                          id="platform-account-id"
+                          value={platformAccountId}
+                          onChange={(e) => setPlatformAccountId(e.target.value)}
+                          placeholder="Your account ID or username"
+                          className="h-9 sm:h-10 text-xs sm:text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="platform-account-url" className="text-xs sm:text-sm">Account URL</Label>
+                        <Input
+                          id="platform-account-url"
+                          type="url"
+                          value={platformAccountUrl}
+                          onChange={(e) => setPlatformAccountUrl(e.target.value)}
+                          placeholder="https://..."
+                          className="h-9 sm:h-10 text-xs sm:text-sm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Transaction Nature */}
+                  <div className="space-y-3 p-3 sm:p-4 border rounded-lg bg-muted/30">
+                    <h4 className="text-sm font-medium">Transaction Nature</h4>
+                    <div className="space-y-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="transaction-nature" className="text-xs sm:text-sm">Is this for business or personal use?</Label>
+                        <Select value={transactionNature || ""} onValueChange={(value: any) => {
+                          setTransactionNature(value || undefined)
+                          if (value !== 'mixed') setBusinessPercentage(undefined)
+                        }}>
+                          <SelectTrigger className="h-9 sm:h-10 text-xs sm:text-sm">
+                            <SelectValue placeholder="Select transaction nature" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="business">Business</SelectItem>
+                            <SelectItem value="personal">Personal</SelectItem>
+                            <SelectItem value="mixed">Mixed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {transactionNature === 'mixed' && (
+                        <div className="space-y-2">
+                          <Label htmlFor="business-percentage" className="text-xs sm:text-sm">Business Percentage (%)</Label>
+                          <Input
+                            id="business-percentage"
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={businessPercentage || ""}
+                            onChange={(e) => setBusinessPercentage(e.target.value ? parseFloat(e.target.value) : undefined)}
+                            placeholder="e.g., 55"
+                            className="h-9 sm:h-10 text-xs sm:text-sm"
+                          />
+                          <p className="text-xs text-muted-foreground">Enter the percentage that applies to business use (0-100)</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Tags */}
+          <div className="space-y-2">
+            <Label htmlFor="tags" className="text-xs sm:text-sm">Tags (Optional)</Label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {tags.map((tag, index) => (
+                <Badge key={index} variant="secondary" className="text-xs">
+                  {tag}
+                  <button
+                    type="button"
+                    onClick={() => setTags(tags.filter((_, i) => i !== index))}
+                    className="ml-2 hover:text-destructive"
+                  >
+                    ×
+                  </button>
+                </Badge>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Input
+                id="tags"
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && tagInput.trim()) {
+                    e.preventDefault()
+                    if (!tags.includes(tagInput.trim())) {
+                      setTags([...tags, tagInput.trim()])
+                    }
+                    setTagInput("")
+                  }
+                }}
+                placeholder="Type and press Enter to add tag"
+                className="h-9 sm:h-10 text-xs sm:text-sm"
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">Add tags to organize and search your invoices</p>
+          </div>
+
+          {/* Payment Method */}
+          <div className="space-y-2">
+            <Label htmlFor="payment-method" className="text-xs sm:text-sm">Expected Payment Method</Label>
+            <Select
+              value={paymentMethod}
+              onValueChange={(value) => setPaymentMethod(value)}
+            >
+              <SelectTrigger id="payment-method" className="h-9 sm:h-10 text-xs sm:text-sm">
+                <SelectValue placeholder="Select payment method" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                <SelectItem value="Cash">Cash</SelectItem>
+                <SelectItem value="Card">Card</SelectItem>
+                <SelectItem value="Mobile Money">Mobile Money</SelectItem>
+                <SelectItem value="Check">Check</SelectItem>
+                <SelectItem value="PayPal">PayPal</SelectItem>
+                <SelectItem value="Other">Other</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">How you expect to receive payment for this invoice</p>
           </div>
 
           {/* Additional Fields */}

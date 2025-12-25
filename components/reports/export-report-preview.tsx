@@ -36,11 +36,53 @@ export function ExportReportPreview({ reportData, onBack, onExport, isExporting 
     new Map(allTransactions.map(t => [t.id, t])).values()
   )
   
-  // Sort by date (newest first)
+  // Sort by createdAt descending (newest first)
+  // Helper function to extract timestamp (handles Firestore Timestamps, ISO strings, and server timestamps)
+  const getCreatedAtTime = (createdAt: any): number => {
+    if (!createdAt) return 0
+    
+    // If it's already an ISO string, parse it
+    if (typeof createdAt === 'string') {
+      const parsed = new Date(createdAt).getTime()
+      return isNaN(parsed) ? 0 : parsed
+    }
+    
+    // Handle Firestore Timestamp object with toDate method
+    if (createdAt && typeof createdAt === 'object' && typeof createdAt.toDate === 'function') {
+      return createdAt.toDate().getTime()
+    }
+    
+    // Handle Firestore Timestamp object with seconds property
+    if (createdAt && typeof createdAt === 'object' && createdAt.seconds !== undefined) {
+      return createdAt.seconds * 1000 + (createdAt.nanoseconds || 0) / 1000000
+    }
+    
+    // Handle server timestamp placeholder (_methodName: "serverTimestamp")
+    if (createdAt && typeof createdAt === 'object' && createdAt._methodName === 'serverTimestamp') {
+      // Use current time for server timestamps (they're the newest)
+      return Date.now()
+    }
+    
+    // Try to parse as date
+    try {
+      const parsed = new Date(createdAt).getTime()
+      return isNaN(parsed) ? 0 : parsed
+    } catch {
+      return 0
+    }
+  }
+  
   const sortedTransactions = uniqueTransactions.sort((a, b) => {
-    const dateA = a.transactionDate || a.valueDate || a.date || a.createdAt
-    const dateB = b.transactionDate || b.valueDate || b.date || b.createdAt
-    return new Date(dateB).getTime() - new Date(dateA).getTime()
+    // Prioritize createdAt, then fallback to other date fields
+    const dateA = getCreatedAtTime(a.createdAt) || 
+                  (a.transactionDate ? new Date(a.transactionDate).getTime() : 0) ||
+                  (a.valueDate ? new Date(a.valueDate).getTime() : 0) ||
+                  (a.date ? new Date(a.date).getTime() : 0)
+    const dateB = getCreatedAtTime(b.createdAt) || 
+                  (b.transactionDate ? new Date(b.transactionDate).getTime() : 0) ||
+                  (b.valueDate ? new Date(b.valueDate).getTime() : 0) ||
+                  (b.date ? new Date(b.date).getTime() : 0)
+    return dateB - dateA
   })
 
   const getAmount = (transaction: Transaction) => {

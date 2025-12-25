@@ -95,10 +95,46 @@ export class TransactionService extends BaseService {
         })
       }
       
-      // Sort by date descending
+      // Sort by createdAt descending (newest first)
+      // Helper function to extract timestamp from createdAt (handles Firestore Timestamps, ISO strings, and server timestamps)
+      const getCreatedAtTime = (createdAt: any): number => {
+        if (!createdAt) return 0
+        
+        // If it's already an ISO string, parse it
+        if (typeof createdAt === 'string') {
+          const parsed = new Date(createdAt).getTime()
+          return isNaN(parsed) ? 0 : parsed
+        }
+        
+        // Handle Firestore Timestamp object with toDate method
+        if (createdAt && typeof createdAt === 'object' && typeof (createdAt as any).toDate === 'function') {
+          return (createdAt as any).toDate().getTime()
+        }
+        
+        // Handle Firestore Timestamp object with seconds property
+        if (createdAt && typeof createdAt === 'object' && (createdAt as any).seconds !== undefined) {
+          return (createdAt as any).seconds * 1000 + ((createdAt as any).nanoseconds || 0) / 1000000
+        }
+        
+        // Handle server timestamp placeholder (_methodName: "serverTimestamp")
+        if (createdAt && typeof createdAt === 'object' && (createdAt as any)._methodName === 'serverTimestamp') {
+          // Use current time for server timestamps (they're the newest)
+          return Date.now()
+        }
+        
+        // Try to parse as date
+        try {
+          const parsed = new Date(createdAt).getTime()
+          return isNaN(parsed) ? 0 : parsed
+        } catch {
+          return 0
+        }
+      }
+      
       filtered.sort((a, b) => {
-        const dateA = a.date ? new Date(a.date).getTime() : 0
-        const dateB = b.date ? new Date(b.date).getTime() : 0
+        const dateA = getCreatedAtTime(a.createdAt)
+        const dateB = getCreatedAtTime(b.createdAt)
+        // Descending order: newest first (dateB - dateA)
         return dateB - dateA
       })
       

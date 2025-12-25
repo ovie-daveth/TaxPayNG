@@ -356,6 +356,10 @@ export interface InvoiceItem {
   currency?: string // Currency code for this item (if different from invoice currency)
   vatable?: boolean // Whether this item is subject to VAT (default: false)
   amount: number // quantity * unitPrice (converted to invoice currency if needed)
+  // Platform fees breakdown (for creator income items)
+  grossAmount?: number // Gross amount before platform fees
+  platformFees?: number // Platform commission/fees deducted
+  netAmount?: number // Net amount after platform fees (grossAmount - platformFees)
 }
 
 export interface InvoiceClient {
@@ -475,6 +479,44 @@ export interface Invoice {
   
   // Attachments
   pdfUrl?: string
+  
+  // Phase 2: Platform-specific tracking (for creators - especially for income invoices)
+  platform?: {
+    name: string // "YouTube", "TikTok", "Instagram", "Patreon", "OnlyFans", etc.
+    platformType: 'social' | 'subscription' | 'marketplace' | 'streaming' | 'other'
+    accountId?: string // Creator's account ID/username on the platform
+    accountUrl?: string // URL to creator's profile/page on platform
+  }
+  
+  // Phase 2: Platform fees breakdown (for creator income invoices)
+  grossAmount?: number // Gross amount before platform fees
+  platformFees?: number // Platform commission/fees deducted
+  netAmount?: number // Net amount after platform fees (grossAmount - platformFees)
+  
+  // Phase 2: Transaction nature (for creators - business/personal/mixed)
+  transactionNature?: TransactionNature // 'business' | 'personal' | 'mixed'
+  businessPercentage?: number // For mixed transactions (0-100)
+  
+  // Phase 2: Tax period tracking
+  taxPeriod?: TaxPeriod // Calculated tax period (year, quarter, month)
+  
+  // Phase 2: Exchange rate locking (for foreign currency invoices)
+  exchangeRate?: number // Exchange rate used at invoice date (locked)
+  exchangeRateDate?: string // Date when exchange rate was locked
+  ngnEquivalent?: number // Locked NGN equivalent amount
+  
+  // Phase 2: Payment method tracking
+  paymentMethod?: string // Expected or actual payment method
+  
+  // Phase 2: Tags for organization
+  tags?: string[] // Tags for categorizing and searching invoices
+  
+  // Phase 2: Additional attachments (beyond PDF)
+  attachments?: string[] // Array of attachment URLs
+  attachmentFileIds?: string[] // Array of ImageKit fileIds corresponding to attachments
+  
+  // Phase 2: Value date (when payment is actually received/made)
+  valueDate?: string // When money actually moved (payment date, receipt date)
   
   createdAt: string
   updatedAt: string
