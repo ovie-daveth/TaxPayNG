@@ -83,7 +83,8 @@ export async function POST(request: NextRequest) {
       templateKey,
       customSubject,
       customBody,
-      isCustomEmail
+      isCustomEmail,
+      images
     } = body as {
       waitlistId?: string
       recipientEmail?: string
@@ -92,6 +93,7 @@ export async function POST(request: NextRequest) {
       customSubject?: string
       customBody?: string
       isCustomEmail?: boolean
+      images?: Array<{ base64: string; filename: string; contentType: string }>
     }
 
     if (!recipientEmail) {
@@ -154,12 +156,103 @@ export async function POST(request: NextRequest) {
 
     const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER || "noreply@otax.com"
 
+    // Convert email body to HTML (escape HTML to prevent XSS)
+    const escapeHtml = (text: string) => {
+      const map: Record<string, string> = {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#039;'
+      }
+      return text.replace(/[&<>"']/g, (m) => map[m])
+    }
+    
+    // Prepare attachments and image references for CID
+    const attachments: Array<{
+      filename: string
+      content: Buffer
+      cid: string
+      contentType?: string
+    }> = []
+    
+    // Map to store image index to CID mapping
+    const imageCidMap: Record<number, string> = {}
+    
+    // Process images and create attachments
+    if (images && images.length > 0) {
+      images.forEach((image, index) => {
+        // Extract base64 data (remove data:image/...;base64, prefix if present)
+        let base64Data = image.base64
+        if (base64Data.includes(',')) {
+          base64Data = base64Data.split(',')[1]
+        }
+        
+        // Create unique CID for each image
+        const cid = `image-${index}-${Date.now()}@email`
+        imageCidMap[index] = cid
+        
+        // Convert base64 to Buffer for nodemailer
+        const imageBuffer = Buffer.from(base64Data, 'base64')
+        
+        // Add as attachment with CID
+        attachments.push({
+          filename: image.filename,
+          content: imageBuffer,
+          cid: cid,
+          contentType: image.contentType || 'image/jpeg'
+        })
+      })
+    }
+    
+    // Replace image placeholders in the email body with actual image HTML
+    let processedBody = emailBody
+    const imagePlaceholderRegex = /\{\{image:(\d+)\}\}/g
+    
+    processedBody = processedBody.replace(imagePlaceholderRegex, (match, imageIndex) => {
+      const index = parseInt(imageIndex, 10)
+      if (imageCidMap[index] !== undefined && images && images[index]) {
+        const cid = imageCidMap[index]
+        const safeFilename = escapeHtml(images[index].filename)
+        // Return placeholder that will be converted to HTML
+        return `{{IMAGE_PLACEHOLDER:${cid}:${safeFilename}}}`
+      }
+      // If image index is invalid, remove the placeholder
+      return ''
+    })
+    
+    // Convert to HTML (escape HTML and convert newlines)
+    const escapedBody = escapeHtml(processedBody).replace(/\n/g, "<br />")
+    
+    // Replace image placeholders with actual HTML img tags
+    let htmlBodyContent = escapedBody.replace(/\{\{IMAGE_PLACEHOLDER:([^:]+):([^}]+)\}\}/g, (match, cid, alt) => {
+      return `<div style="margin: 5px 0; text-align: center;">
+        <img src="cid:${cid}" alt="${alt}" style="width: 100%; height: auto; border-radius: 8px; display: block; margin: 0 auto;" />
+      </div>`
+    })
+    
+    // Build HTML body
+    const htmlBody = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f5f5f5;">
+  <div style="background-color: #ffffff; padding: 10px; border-radius: 8px;">
+    <div style="white-space: pre-wrap;">${htmlBodyContent}</div>
+  </div>
+</body>
+</html>`
+
     await transporter.sendMail({
       from: `"OTax" <${fromEmail}>`,
       to: recipientEmail,
       subject,
       text: emailBody,
-      html: emailBody.replace(/\n/g, "<br />")
+      html: htmlBody,
+      attachments: attachments.length > 0 ? attachments : undefined
     })
 
     let updatedWaitlistDoc: any = null

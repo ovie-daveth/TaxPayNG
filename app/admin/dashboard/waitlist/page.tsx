@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { ArrowLeft, Search, Mail, Send, Copy, Loader2, Check, AlertTriangle } from "lucide-react"
+import { ArrowLeft, Search, Mail, Send, Copy, Loader2, Check, AlertTriangle, Image as ImageIcon, X } from "lucide-react"
 import { AdminTableSkeleton } from "@/components/ui/skeletons"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useAdmin } from "@/lib/hooks/useAdmin"
@@ -48,6 +48,11 @@ export default function AdminWaitlistPage() {
   const [markingId, setMarkingId] = useState<string | null>(null)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
   const [pendingAction, setPendingAction] = useState<null | { type: "sendEmail" | "markNotified"; payload: any }>(null)
+  const [emailImages, setEmailImages] = useState<Array<{ id: string; file: File; preview: string; base64: string }>>([])
+  const [bulkEmailImages, setBulkEmailImages] = useState<Array<{ id: string; file: File; preview: string; base64: string }>>([])
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const emailBodyTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const bulkEmailBodyTextareaRef = useRef<HTMLTextAreaElement>(null)
 
   useEffect(() => {
     if (!authLoading && !adminLoading) {
@@ -165,6 +170,9 @@ export default function AdminWaitlistPage() {
     setEmailPreview(preview)
     setEditableSubject(preview.subject)
     setEditableBody(preview.body)
+    // Clear images when opening dialog
+    emailImages.forEach(img => URL.revokeObjectURL(img.preview))
+    setEmailImages([])
     setEmailDialogOpen(true)
   }
 
@@ -179,6 +187,115 @@ export default function AdminWaitlistPage() {
       setEditableSubject("")
       setEditableBody("")
     }
+  }
+
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.readAsDataURL(file)
+      reader.onload = () => resolve(reader.result as string)
+      reader.onerror = error => reject(error)
+    })
+  }
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>, isBulk: boolean = false) => {
+    const files = e.target.files
+    if (!files || files.length === 0) return
+
+    setUploadingImage(true)
+    try {
+      const newImages = []
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        
+        // Validate file type
+        if (!file.type.startsWith('image/')) {
+          toast.error(`${file.name} is not a valid image file`)
+          continue
+        }
+
+        // Validate file size (max 5MB per image)
+        if (file.size > 5 * 1024 * 1024) {
+          toast.error(`${file.name} is too large. Maximum size is 5MB`)
+          continue
+        }
+
+        const base64 = await fileToBase64(file)
+        const preview = URL.createObjectURL(file)
+        const id = `${Date.now()}-${Math.random()}`
+
+        newImages.push({ id, file, preview, base64 })
+      }
+
+      if (isBulk) {
+        setBulkEmailImages(prev => [...prev, ...newImages])
+      } else {
+        setEmailImages(prev => [...prev, ...newImages])
+      }
+
+      if (newImages.length > 0) {
+        toast.success(`${newImages.length} image(s) uploaded`)
+      }
+    } catch (error) {
+      console.error('Image upload error:', error)
+      toast.error('Failed to process images')
+    } finally {
+      setUploadingImage(false)
+      // Reset input
+      e.target.value = ''
+    }
+  }
+
+  const handleRemoveImage = (id: string, isBulk: boolean = false) => {
+    if (isBulk) {
+      setBulkEmailImages(prev => {
+        const image = prev.find(img => img.id === id)
+        if (image) {
+          URL.revokeObjectURL(image.preview)
+        }
+        return prev.filter(img => img.id !== id)
+      })
+    } else {
+      setEmailImages(prev => {
+        const image = prev.find(img => img.id === id)
+        if (image) {
+          URL.revokeObjectURL(image.preview)
+        }
+        return prev.filter(img => img.id !== id)
+      })
+    }
+  }
+
+  const insertImagePlaceholder = (imageIndex: number, isBulk: boolean = false) => {
+    const textarea = isBulk ? bulkEmailBodyTextareaRef.current : emailBodyTextareaRef.current
+    const currentValue = isBulk ? bulkEditableBody : editableBody
+    const setValue = isBulk ? setBulkEditableBody : setEditableBody
+    
+    if (!textarea) return
+    
+    // Focus the textarea first
+    textarea.focus()
+    
+    // Get cursor position
+    const cursorPos = textarea.selectionStart || currentValue.length
+    
+    // Create placeholder
+    const placeholder = `\n{{image:${imageIndex}}}\n`
+    
+    // Insert placeholder at cursor position
+    const newValue = 
+      currentValue.slice(0, cursorPos) + 
+      placeholder + 
+      currentValue.slice(cursorPos)
+    
+    setValue(newValue)
+    
+    // Set cursor position after the placeholder
+    setTimeout(() => {
+      const newCursorPos = cursorPos + placeholder.length
+      textarea.setSelectionRange(newCursorPos, newCursorPos)
+      textarea.focus()
+    }, 0)
   }
 
   const handleCopyBody = async () => {
@@ -227,6 +344,11 @@ export default function AdminWaitlistPage() {
           customSubject: editableSubject.trim(),
           customBody: editableBody.trim(),
           isCustomEmail: isCustom,
+          images: emailImages.map(img => ({
+            base64: img.base64,
+            filename: img.file.name,
+            contentType: img.file.type
+          }))
         })
       })
 
@@ -242,6 +364,9 @@ export default function AdminWaitlistPage() {
       setSelectedTemplate("launchPreview")
       setEditableSubject("")
       setEditableBody("")
+      // Clean up image previews
+      emailImages.forEach(img => URL.revokeObjectURL(img.preview))
+      setEmailImages([])
 
       if (data.updatedWaitlist) {
         setWaitlist((prev) => prev.map((entry) => entry.id === data.updatedWaitlist.id ? data.updatedWaitlist : entry))
@@ -351,6 +476,11 @@ export default function AdminWaitlistPage() {
               customSubject: bulkEditableSubject.trim(),
               customBody: bulkEditableBody.trim(),
               isCustomEmail: isCustom,
+              images: bulkEmailImages.map(img => ({
+                base64: img.base64,
+                filename: img.file.name,
+                contentType: img.file.type
+              }))
             })
           })
 
@@ -375,6 +505,9 @@ export default function AdminWaitlistPage() {
       setBulkEditableSubject("")
       setBulkEditableBody("")
       setBulkUserTypeFilter("all")
+      // Clean up image previews
+      bulkEmailImages.forEach(img => URL.revokeObjectURL(img.preview))
+      setBulkEmailImages([])
 
       if (successes > 0) {
         setWaitlist((prev) =>
@@ -599,6 +732,7 @@ export default function AdminWaitlistPage() {
             <div>
               <Label htmlFor="email-body">Email Body *</Label>
               <Textarea
+                ref={emailBodyTextareaRef}
                 id="email-body"
                 value={editableBody}
                 onChange={(e) => setEditableBody(e.target.value)}
@@ -607,8 +741,74 @@ export default function AdminWaitlistPage() {
                 className="mt-1"
               />
               <p className="text-xs text-muted-foreground mt-2">
-                You can use placeholders: {"{{name}}"} for recipient name, {"{{siteLink}}"} for site URL
+                You can use placeholders: {"{{name}}"} for recipient name, {"{{siteLink}}"} for site URL. Use {"{{image:0}}"}, {"{{image:1}}"}, etc. to insert images at specific positions.
               </p>
+            </div>
+
+            {/* Image Upload */}
+            <div>
+              <Label>Images (Optional)</Label>
+              <div className="mt-1">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => handleImageUpload(e, false)}
+                  className="hidden"
+                  id="email-image-upload"
+                  disabled={uploadingImage}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={uploadingImage}
+                  onClick={() => document.getElementById('email-image-upload')?.click()}
+                >
+                  <ImageIcon className="w-4 h-4 mr-2" />
+                  {uploadingImage ? "Uploading..." : "Upload Images"}
+                </Button>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Upload images to include in the email (max 5MB per image)
+                </p>
+              </div>
+
+              {/* Image Previews */}
+              {emailImages.length > 0 && (
+                <div className="mt-3 space-y-3">
+                  <p className="text-xs font-medium text-foreground">Uploaded Images - Click "Insert" to add at cursor position:</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {emailImages.map((image, index) => (
+                      <div key={image.id} className="relative group border rounded-lg overflow-hidden">
+                        <img
+                          src={image.preview}
+                          alt={image.file.name}
+                          className="w-full h-32 object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(image.id, false)}
+                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        <div className="p-2 space-y-1">
+                          <p className="text-xs text-muted-foreground truncate">{image.file.name}</p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full text-xs h-7"
+                            onClick={() => insertImagePlaceholder(index, false)}
+                          >
+                            Insert at Cursor
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -621,6 +821,9 @@ export default function AdminWaitlistPage() {
               <Button
                 variant="ghost"
                 onClick={() => {
+                  // Clean up image previews
+                  emailImages.forEach(img => URL.revokeObjectURL(img.preview))
+                  setEmailImages([])
                   setEmailDialogOpen(false)
                   setSelectedRecipient(null)
                   setSendingEmail(false)
@@ -785,6 +988,7 @@ export default function AdminWaitlistPage() {
             <div>
               <Label htmlFor="bulk-body">Email Body *</Label>
               <Textarea
+                ref={bulkEmailBodyTextareaRef}
                 id="bulk-body"
                 value={bulkEditableBody}
                 onChange={(e) => setBulkEditableBody(e.target.value)}
@@ -793,8 +997,74 @@ export default function AdminWaitlistPage() {
                 className="mt-1"
               />
               <p className="text-xs text-muted-foreground mt-2">
-                You can use placeholders: {"{{name}}"} for recipient name, {"{{siteLink}}"} for site URL
+                You can use placeholders: {"{{name}}"} for recipient name, {"{{siteLink}}"} for site URL. Use {"{{image:0}}"}, {"{{image:1}}"}, etc. to insert images at specific positions.
               </p>
+            </div>
+
+            {/* Image Upload */}
+            <div>
+              <Label>Images (Optional)</Label>
+              <div className="mt-1">
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => handleImageUpload(e, true)}
+                  className="hidden"
+                  id="bulk-email-image-upload"
+                  disabled={uploadingImage}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={uploadingImage}
+                  onClick={() => document.getElementById('bulk-email-image-upload')?.click()}
+                >
+                  <ImageIcon className="w-4 h-4 mr-2" />
+                  {uploadingImage ? "Uploading..." : "Upload Images"}
+                </Button>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Upload images to include in the email (max 5MB per image)
+                </p>
+              </div>
+
+              {/* Image Previews */}
+              {bulkEmailImages.length > 0 && (
+                <div className="mt-3 space-y-3">
+                  <p className="text-xs font-medium text-foreground">Uploaded Images - Click "Insert" to add at cursor position:</p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {bulkEmailImages.map((image, index) => (
+                      <div key={image.id} className="relative group border rounded-lg overflow-hidden">
+                        <img
+                          src={image.preview}
+                          alt={image.file.name}
+                          className="w-full h-32 object-cover"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveImage(image.id, true)}
+                          className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                        <div className="p-2 space-y-1">
+                          <p className="text-xs text-muted-foreground truncate">{image.file.name}</p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="w-full text-xs h-7"
+                            onClick={() => insertImagePlaceholder(index, true)}
+                          >
+                            Insert at Cursor
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <div className="rounded-lg border border-dashed border-muted-foreground/40 p-4 text-sm text-muted-foreground">
@@ -828,7 +1098,15 @@ export default function AdminWaitlistPage() {
           </div>
 
           <DialogFooter className="flex items-center justify-between">
-            <Button variant="ghost" onClick={() => setBulkDialogOpen(false)}>
+            <Button 
+              variant="ghost" 
+              onClick={() => {
+                // Clean up image previews
+                bulkEmailImages.forEach(img => URL.revokeObjectURL(img.preview))
+                setBulkEmailImages([])
+                setBulkDialogOpen(false)
+              }}
+            >
               Cancel
             </Button>
             <Button 
