@@ -64,10 +64,23 @@ function LayoutContent({
       return
     }
 
-    if (profile.businessType === 'creator' && !currentPath.startsWith('/dashboard-creator')) {
-      console.log("Redirecting creator to /dashboard-creator")
-      router.push('/dashboard-creator')
-      return
+    // Creator redirects - check first before freelancer checks
+    if (profile.businessType === 'creator') {
+      if (currentPath === '/dashboard' || currentPath === '/dashboard/') {
+        console.log("Redirecting creator from /dashboard to /dashboard-creator")
+        router.push('/dashboard-creator')
+        return
+      }
+      if (currentPath.startsWith('/dashboard-sme')) {
+        console.log("Redirecting creator from /dashboard-sme to /dashboard-creator")
+        router.push('/dashboard-creator')
+        return
+      }
+      if (!currentPath.startsWith('/dashboard-creator')) {
+        console.log("Redirecting creator to /dashboard-creator")
+        router.push('/dashboard-creator')
+        return
+      }
     }
 
     if (profile.businessType === 'freelancer' && currentPath.startsWith('/dashboard-sme')) {
@@ -80,11 +93,6 @@ function LayoutContent({
       console.log("Redirecting freelancer from /dashboard-creator to /dashboard")
       router.push('/dashboard')
       return
-    }
-
-    if (profile.businessType === 'creator' && currentPath.startsWith('/dashboard-sme')) {
-      console.log("Redirecting creator from /dashboard-sme to /dashboard-creator")
-      router.push('/dashboard-creator')
     }
   }, [profile, router])
 

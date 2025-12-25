@@ -3,8 +3,9 @@ import { transactionService } from './transactionService'
 import { invoiceService } from './invoiceService'
 import { taxCalculationService } from './taxCalculationService'
 import { userService } from './userService'
-import { Transaction, Invoice, TaxCalculation, SavedReport } from '@/lib/types'
+import { Transaction, Invoice, TaxCalculation, SavedReport, TaxPeriod } from '@/lib/types'
 import { calculateNigerianTax } from '@/lib/tax-calculator'
+import { calculateTaxClassificationBenefitsFromTransactions, TaxClassificationSummary } from '@/lib/utils/tax-classification-calculator'
 
 export interface ReportPeriod {
   startDate: string
@@ -56,6 +57,8 @@ export interface TaxData {
   }>
   totalReliefs: number
   adjustedGrossIncome: number
+  capitalAllowances?: number // Gold+ feature: capital allowances from tax classification
+  whtCredits?: number // Gold+ feature: WHT credits from tax classification
 }
 
 export interface ReportData {
@@ -70,6 +73,7 @@ export interface ReportData {
   income: IncomeData
   expenses: ExpenseData
   tax: TaxData
+  taxClassification?: TaxClassificationSummary // Gold+ feature: capital allowances and WHT credits
   generatedAt: string
 }
 
@@ -93,6 +97,125 @@ export class ReportService extends BaseService {
     super('reports') // Default collection, but we'll use type-specific collections
   }
 
+  /**
+   * Generate platform-specific report data
+   */
+  async generatePlatformReportData(
+    userId: string,
+    platformName: string,
+    period: ReportPeriod,
+    includeInvoices: boolean = true
+  ): Promise<ReportData> {
+    // Get all transactions for the user
+    const allTransactions = await transactionService.getAll([
+      { field: 'userId', operator: '==', value: userId }
+    ])
+
+    const periodStart = new Date(period.startDate)
+    periodStart.setHours(0, 0, 0, 0)
+    
+    const periodEnd = new Date(period.endDate)
+    periodEnd.setHours(23, 59, 59, 999)
+
+    // Filter transactions by platform and period
+    const filteredTransactions = allTransactions.filter((txn) => {
+      const txnDate = txn.date ? new Date(txn.date) : new Date(txn.createdAt)
+      const inPeriod = txnDate >= periodStart && txnDate <= periodEnd
+      const matchesPlatform = txn.platform?.name === platformName
+      return inPeriod && matchesPlatform
+    })
+
+    // Get invoices for the period (filtered by platform if possible)
+    let invoices: Invoice[] = []
+    if (includeInvoices) {
+      const invoicesResponse = await invoiceService.getUserInvoices(userId)
+      const allInvoices = invoicesResponse.data || []
+      invoices = allInvoices.filter((inv) => {
+        const invDate = new Date(inv.issueDate)
+        return invDate >= periodStart && invDate <= periodEnd
+      })
+    }
+
+    // Calculate income and expense data (only for this platform)
+    const incomeData = includeInvoices 
+      ? this.calculateIncomeData(filteredTransactions, invoices, userId)
+      : this.calculateIncomeDataTransactionsOnly(filteredTransactions, userId)
+
+    const expenseData = includeInvoices 
+      ? this.calculateExpenseData(filteredTransactions, invoices, userId)
+      : this.calculateExpenseDataTransactionsOnly(filteredTransactions, userId)
+
+    // Get user profile
+    const profile = await userService.getProfile(userId)
+    if (!profile) {
+      throw new Error('User profile not found')
+    }
+
+    // Calculate tax classification benefits (Gold+ feature)
+    let taxClassification: TaxClassificationSummary | undefined
+    try {
+      const { calculateTaxClassificationBenefitsFromTransactions } = await import('@/lib/utils/tax-classification-calculator')
+      // Determine tax year from period
+      const taxYear = period.year || new Date().getFullYear()
+      taxClassification = await calculateTaxClassificationBenefitsFromTransactions(filteredTransactions, userId, taxYear)
+    } catch (error) {
+      console.error('Error calculating tax classification benefits:', error)
+    }
+
+    // Calculate tax data
+    const taxData = await this.calculateTaxData(
+      userId,
+      incomeData.totalIncome,
+      expenseData.totalExpenses,
+      expenseData.taxDeductibleExpenses,
+      profile,
+      taxClassification
+    )
+
+    // Initialize personalInfo from user profile
+    const personalInfo = {
+      dateOfBirth: (profile as any).dateOfBirth || '',
+      gender: (profile as any).gender || '',
+      maritalStatus: (profile as any).maritalStatus || '',
+      state: profile.address?.state || '',
+      lga: profile.address?.city || '', // Using city as LGA approximation
+      contactPhone: profile.phone || '',
+      contactEmail: profile.email || ''
+    }
+
+    const result: ReportData & { metadata?: any } = {
+      period,
+      userInfo: {
+        name: `${profile.firstName} ${profile.lastName}`,
+        businessName: undefined, // UserProfile doesn't have businessName field
+        tin: profile.taxId,
+        businessType: profile.businessType,
+        address: profile.address ? 
+          `${profile.address.street}, ${profile.address.city}, ${profile.address.state}, ${profile.address.country}` : 
+          undefined
+      },
+      income: incomeData,
+      expenses: expenseData,
+      tax: taxData,
+      taxClassification,
+      generatedAt: new Date().toISOString()
+    }
+    
+    // Initialize metadata with personalInfo from profile
+    result.metadata = {
+      personalInfo,
+      attachments: {},
+      reliefEvidence: {},
+      reliefNotes: {},
+      reliefAmounts: {},
+      manualTaxCredits: [],
+      taxCreditEvidence: {},
+      declarationInfo: {}
+    }
+    
+    return result
+  }
+
   // Generate comprehensive report data from transactions and invoices
   async generateReportData(
     userId: string,
@@ -110,6 +233,16 @@ export class ReportService extends BaseService {
       const allTransactions = await transactionService.getAll([
         { field: 'userId', operator: '==', value: userId }
       ])
+      
+      console.log('🔍 [ReportService] All transactions fetched:', allTransactions.length)
+      console.log('🔍 [ReportService] Expense transactions before period filter:', allTransactions.filter(t => t.type === 'expense').map(t => ({
+        id: t.id,
+        description: t.description,
+        date: t.date,
+        createdAt: t.createdAt,
+        amount: t.amount,
+        isCapitalAsset: t.taxClassification?.isCapitalAsset
+      })))
 
       const periodStart = new Date(period.startDate)
       periodStart.setHours(0, 0, 0, 0) // Start of day
@@ -117,10 +250,38 @@ export class ReportService extends BaseService {
       const periodEnd = new Date(period.endDate)
       periodEnd.setHours(23, 59, 59, 999) // End of day
 
+      // Filter transactions by period
+      // BUT: Include capital asset transactions from previous years (for depreciation calculation)
       const filteredTransactions = allTransactions.filter((txn) => {
         const txnDate = txn.date ? new Date(txn.date) : new Date(txn.createdAt)
-        // Compare dates: transaction must be >= period start and <= period end
-        return txnDate >= periodStart && txnDate <= periodEnd
+        const isInPeriod = txnDate >= periodStart && txnDate <= periodEnd
+        
+        // If it's a capital asset, include it even if it's from a previous year
+        // (depreciation is calculated for the current tax year regardless of purchase date)
+        const isCapitalAsset = txn.taxClassification?.isCapitalAsset && txn.taxClassification?.capitalAllowanceRate
+        if (isCapitalAsset) {
+          return true // Include all capital assets for depreciation calculation
+        }
+        
+        return isInPeriod
+      })
+      
+      console.log('🔍 [ReportService] Filtered transactions by period:', {
+        periodStart: periodStart.toISOString(),
+        periodEnd: periodEnd.toISOString(),
+        totalFiltered: filteredTransactions.length,
+        expenseTransactions: filteredTransactions.filter(t => t.type === 'expense').map(t => ({
+          id: t.id,
+          description: t.description,
+          date: t.date,
+          createdAt: t.createdAt,
+          amount: t.amount,
+          isCapitalAsset: t.taxClassification?.isCapitalAsset,
+          isInPeriod: (() => {
+            const txnDate = t.date ? new Date(t.date) : new Date(t.createdAt)
+            return txnDate >= periodStart && txnDate <= periodEnd
+          })()
+        }))
       })
 
       // Get invoices for the period
@@ -146,16 +307,46 @@ export class ReportService extends BaseService {
         ? this.calculateExpenseData(filteredTransactions, invoices, userId)
         : this.calculateExpenseDataTransactionsOnly(filteredTransactions, userId)
 
-      // Calculate tax data
+      // Calculate tax classification benefits from transactions (Gold+ feature)
+      let taxClassificationSummary: TaxClassificationSummary | undefined = undefined
+      try {
+        // Convert ReportPeriod to TaxPeriod format
+        const taxPeriod: TaxPeriod = {
+          year: period.year,
+          quarter: period.quarter,
+          month: period.periodType === 'monthly' ? new Date(period.startDate).getMonth() + 1 : undefined
+        }
+        
+        // Calculate from filtered transactions for the period
+        const taxYear = period.year || new Date().getFullYear()
+        taxClassificationSummary = await calculateTaxClassificationBenefitsFromTransactions(filteredTransactions, userId, taxYear)
+      } catch (error) {
+        console.error('Error calculating tax classification benefits:', error)
+        // Continue without tax classification if calculation fails
+      }
+
+      // Calculate tax data (now includes capital allowances and WHT credits if available)
       const taxData = await this.calculateTaxData(
         userId,
         incomeData.totalIncome,
         expenseData.totalExpenses,
         expenseData.taxDeductibleExpenses,
-        profile
+        profile,
+        taxClassificationSummary
       )
 
-      return {
+      // Initialize personalInfo from user profile
+      const personalInfo = {
+        dateOfBirth: (profile as any).dateOfBirth || '',
+        gender: (profile as any).gender || '',
+        maritalStatus: (profile as any).maritalStatus || '',
+        state: profile.address?.state || '',
+        lga: profile.address?.city || '', // Using city as LGA approximation
+        contactPhone: profile.phone || '',
+        contactEmail: profile.email || ''
+      }
+
+      const result: ReportData & { metadata?: any } = {
         period,
         userInfo: {
           name: profile.firstName && profile.lastName 
@@ -169,8 +360,23 @@ export class ReportService extends BaseService {
         income: incomeData,
         expenses: expenseData,
         tax: taxData,
+        taxClassification: taxClassificationSummary,
         generatedAt: new Date().toISOString()
       }
+      
+      // Initialize metadata with personalInfo from profile
+      result.metadata = {
+        personalInfo,
+        attachments: {},
+        reliefEvidence: {},
+        reliefNotes: {},
+        reliefAmounts: {},
+        manualTaxCredits: [],
+        taxCreditEvidence: {},
+        declarationInfo: {}
+      }
+      
+      return result
     } catch (error) {
       console.error('Error generating report data:', error)
       throw error
@@ -191,14 +397,45 @@ export class ReportService extends BaseService {
 
     // Process all income transactions
     incomeTransactions.forEach(txn => {
-      const amount = typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0
-      totalIncome += amount
+      // Determine the base amount to use
+      let baseAmount = 0
+      
+      // For foreign currency transactions, ngnEquivalent is already the converted amount
+      // It represents the NGN equivalent of the net amount (after platform fees) if netAmount exists
+      if (txn.currency && txn.currency !== 'NGN' && txn.ngnEquivalent) {
+        // Use ngnEquivalent directly - it's already the NGN equivalent of the correct amount
+        baseAmount = txn.ngnEquivalent
+      } else {
+        // For NGN transactions, use netAmount if available (after platform fees), otherwise use amount
+        baseAmount = txn.netAmount !== undefined ? txn.netAmount : (typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0)
+      }
+      
+      // Apply transaction nature percentage for mixed transactions (creators only)
+      // Only apply if transactionNature is 'mixed' and businessPercentage is set
+      let taxableAmount = baseAmount
+      if (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined) {
+        taxableAmount = baseAmount * (txn.businessPercentage / 100)
+      } else if (txn.transactionNature === 'personal') {
+        // Personal transactions are not taxable income
+        taxableAmount = 0
+      }
+      // If transactionNature is 'business' or undefined, use full amount
+      
+      // For income transactions with VAT, exclude VAT amount from taxable income
+      // VAT must be remitted to government, so it shouldn't be taxed again
+      if (txn.type === 'income' && txn.taxClassification?.vatApplicable && txn.taxClassification?.vatRate) {
+        const vatRate = txn.taxClassification.vatRate / 100
+        // Taxable amount = amount - VAT portion = amount * (1 - vatRate)
+        taxableAmount = taxableAmount * (1 - vatRate)
+      }
+      
+      totalIncome += taxableAmount
       
       const category = txn.category || 'uncategorized'
-      incomeByCategory[category] = (incomeByCategory[category] || 0) + amount
+      incomeByCategory[category] = (incomeByCategory[category] || 0) + taxableAmount
       
       const source = txn.description || 'Other'
-      incomeBySource[source] = (incomeBySource[source] || 0) + amount
+      incomeBySource[source] = (incomeBySource[source] || 0) + taxableAmount
     })
 
     return {
@@ -257,14 +494,45 @@ export class ReportService extends BaseService {
 
     // Process income transactions (excluding invoice-related ones)
     incomeTransactions.forEach(txn => {
-      const amount = typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0
-      totalIncome += amount
+      // Determine the base amount to use
+      let baseAmount = 0
+      
+      // For foreign currency transactions, ngnEquivalent is already the converted amount
+      // It represents the NGN equivalent of the net amount (after platform fees) if netAmount exists
+      if (txn.currency && txn.currency !== 'NGN' && txn.ngnEquivalent) {
+        // Use ngnEquivalent directly - it's already the NGN equivalent of the correct amount
+        baseAmount = txn.ngnEquivalent
+      } else {
+        // For NGN transactions, use netAmount if available (after platform fees), otherwise use amount
+        baseAmount = txn.netAmount !== undefined ? txn.netAmount : (typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0)
+      }
+      
+      // Apply transaction nature percentage for mixed transactions (creators only)
+      // Only apply if transactionNature is 'mixed' and businessPercentage is set
+      let taxableAmount = baseAmount
+      if (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined) {
+        taxableAmount = baseAmount * (txn.businessPercentage / 100)
+      } else if (txn.transactionNature === 'personal') {
+        // Personal transactions are not taxable income
+        taxableAmount = 0
+      }
+      // If transactionNature is 'business' or undefined, use full amount
+      
+      // For income transactions with VAT, exclude VAT amount from taxable income
+      // VAT must be remitted to government, so it shouldn't be taxed again
+      if (txn.type === 'income' && txn.taxClassification?.vatApplicable && txn.taxClassification?.vatRate) {
+        const vatRate = txn.taxClassification.vatRate / 100
+        // Taxable amount = amount - VAT portion = amount * (1 - vatRate)
+        taxableAmount = taxableAmount * (1 - vatRate)
+      }
+      
+      totalIncome += taxableAmount
       
       const category = txn.category || 'uncategorized'
-      incomeByCategory[category] = (incomeByCategory[category] || 0) + amount
+      incomeByCategory[category] = (incomeByCategory[category] || 0) + taxableAmount
       
       const source = txn.description || 'Other'
-      incomeBySource[source] = (incomeBySource[source] || 0) + amount
+      incomeBySource[source] = (incomeBySource[source] || 0) + taxableAmount
     })
 
     // Process income from paid invoices only
@@ -294,6 +562,18 @@ export class ReportService extends BaseService {
   ): ExpenseData {
     // Include ALL expense transactions
     const expenseTransactions = transactions.filter(t => t.type === 'expense')
+    
+    console.log('🔍 [ReportService] All expense transactions:', expenseTransactions.map(t => ({
+      id: t.id,
+      description: t.description,
+      category: t.category,
+      amount: t.amount,
+      isCapitalAsset: t.taxClassification?.isCapitalAsset,
+      capitalAllowanceRate: t.taxClassification?.capitalAllowanceRate,
+      expenseType: t.taxClassification?.expenseType,
+      transactionNature: t.transactionNature,
+      businessPercentage: t.businessPercentage
+    })))
 
     let totalExpenses = 0
     let taxDeductibleExpenses = 0
@@ -301,15 +581,65 @@ export class ReportService extends BaseService {
 
     // Process all expense transactions
     expenseTransactions.forEach(txn => {
-      const amount = typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0
-      totalExpenses += amount
+      // Determine the base amount to use
+      let baseAmount = 0
       
-      if (txn.taxDeductible) {
-        taxDeductibleExpenses += amount
+      // For foreign currency transactions, ngnEquivalent is already the converted amount
+      if (txn.currency && txn.currency !== 'NGN' && txn.ngnEquivalent) {
+        baseAmount = txn.ngnEquivalent
+      } else {
+        // For NGN transactions, use netAmount if available, otherwise use amount
+        baseAmount = txn.netAmount !== undefined ? txn.netAmount : (typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0)
       }
       
-      const category = txn.category || 'uncategorized'
-      expensesByCategory[category] = (expensesByCategory[category] || 0) + amount
+      // Apply transaction nature percentage for mixed transactions
+      // Only apply if transactionNature is 'mixed' and businessPercentage is set
+      let deductibleAmount = baseAmount
+      if (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined) {
+        deductibleAmount = baseAmount * (txn.businessPercentage / 100)
+      } else if (txn.transactionNature === 'personal') {
+        // Personal transactions are not tax deductible
+        deductibleAmount = 0
+      }
+      // If transactionNature is 'business' or undefined, use full amount
+      
+      // Capital assets are NOT included in totalExpenses or taxDeductibleExpenses - they're claimed as depreciation instead
+      const isCapitalAsset = txn.taxClassification?.isCapitalAsset && txn.taxClassification?.capitalAllowanceRate
+      
+      // Only add to totalExpenses if not a capital asset (capital assets are tracked separately as depreciation)
+      if (!isCapitalAsset) {
+        totalExpenses += deductibleAmount
+      }
+      
+      // For tax deductible check, use the deductible amount
+      // Priority: 1) expenseType from taxClassification, 2) taxDeductible (legacy), 3) transactionNature
+      // EXCLUDE capital assets - they're claimed as depreciation, not as expenses
+      const isTaxDeductible = !isCapitalAsset && (
+        (txn.taxClassification?.expenseType === 'allowable') || // Only allowable expenses (not capital)
+        (txn.taxClassification?.expenseType !== 'disallowable' && txn.taxClassification?.expenseType !== 'capital' && (txn.taxDeductible || txn.transactionNature === 'business' || (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined && txn.businessPercentage > 0))) // Fallback to legacy fields if expenseType not set
+      )
+      
+      if (isTaxDeductible) {
+        taxDeductibleExpenses += deductibleAmount
+      }
+      
+      // Only add to category totals if not a capital asset (capital assets are tracked separately)
+      if (!isCapitalAsset) {
+        const category = txn.category || 'uncategorized'
+        expensesByCategory[category] = (expensesByCategory[category] || 0) + deductibleAmount
+      }
+    })
+
+    console.log('🔍 [ReportService] Expense calculation results:', {
+      totalExpenses,
+      taxDeductibleExpenses,
+      transactionCount: expenseTransactions.length,
+      transactionsIncluded: expenseTransactions.map(t => ({
+        id: t.id,
+        description: t.description,
+        isCapitalAsset: t.taxClassification?.isCapitalAsset,
+        includedInTotal: !t.taxClassification?.isCapitalAsset
+      }))
     })
 
     return {
@@ -318,7 +648,7 @@ export class ReportService extends BaseService {
       taxDeductibleExpenses,
       transactionCount: expenseTransactions.length,
       invoiceCount: 0,
-      transactions: expenseTransactions,
+      transactions: expenseTransactions, // Return ALL expense transactions, including capital assets
       invoices: []
     }
   }
@@ -340,15 +670,55 @@ export class ReportService extends BaseService {
 
     // Process expense transactions
     expenseTransactions.forEach(txn => {
-      const amount = typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0
-      totalExpenses += amount
+      // Determine the base amount to use
+      let baseAmount = 0
       
-      if (txn.taxDeductible) {
-        taxDeductibleExpenses += amount
+      // For foreign currency transactions, ngnEquivalent is already the converted amount
+      // It represents the NGN equivalent of the net amount (after platform fees) if netAmount exists
+      if (txn.currency && txn.currency !== 'NGN' && txn.ngnEquivalent) {
+        // Use ngnEquivalent directly - it's already the NGN equivalent of the correct amount
+        baseAmount = txn.ngnEquivalent
+      } else {
+        // For NGN transactions, use netAmount if available (after platform fees), otherwise use amount
+        baseAmount = txn.netAmount !== undefined ? txn.netAmount : (typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0)
       }
       
-      const category = txn.category || 'uncategorized'
-      expensesByCategory[category] = (expensesByCategory[category] || 0) + amount
+      // Apply transaction nature percentage for mixed transactions (creators only)
+      // Only apply if transactionNature is 'mixed' and businessPercentage is set
+      let deductibleAmount = baseAmount
+      if (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined) {
+        deductibleAmount = baseAmount * (txn.businessPercentage / 100)
+      } else if (txn.transactionNature === 'personal') {
+        // Personal transactions are not tax deductible
+        deductibleAmount = 0
+      }
+      // If transactionNature is 'business' or undefined, use full amount
+      
+      // Capital assets are NOT included in totalExpenses or taxDeductibleExpenses - they're claimed as depreciation instead
+      const isCapitalAsset = txn.taxClassification?.isCapitalAsset && txn.taxClassification?.capitalAllowanceRate
+      
+      // Only add to totalExpenses if not a capital asset (capital assets are tracked separately as depreciation)
+      if (!isCapitalAsset) {
+        totalExpenses += deductibleAmount
+      }
+      
+      // For tax deductible check, use the deductible amount
+      // Priority: 1) expenseType from taxClassification, 2) taxDeductible (legacy), 3) transactionNature
+      // EXCLUDE capital assets - they're claimed as depreciation, not as expenses
+      const isTaxDeductible = !isCapitalAsset && (
+        (txn.taxClassification?.expenseType === 'allowable') || // Only allowable expenses (not capital)
+        (txn.taxClassification?.expenseType !== 'disallowable' && txn.taxClassification?.expenseType !== 'capital' && (txn.taxDeductible || txn.transactionNature === 'business' || (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined && txn.businessPercentage > 0))) // Fallback to legacy fields if expenseType not set
+      )
+      
+      if (isTaxDeductible) {
+        taxDeductibleExpenses += deductibleAmount
+      }
+      
+      // Only add to category totals if not a capital asset (capital assets are tracked separately)
+      if (!isCapitalAsset) {
+        const category = txn.category || 'uncategorized'
+        expensesByCategory[category] = (expensesByCategory[category] || 0) + deductibleAmount
+      }
     })
 
     // Process expenses from invoices (incoming invoices or paid outgoing invoices)
@@ -371,38 +741,91 @@ export class ReportService extends BaseService {
     }
   }
 
+  /**
+   * Public method to calculate tax for dashboard/quick view
+   * Uses the same calculation engine as self-assessment reports
+   */
+  async calculateTaxForPeriod(
+    userId: string,
+    startDate: Date,
+    endDate: Date,
+    businessType: string = 'freelancer'
+  ): Promise<TaxData & { taxClassification?: TaxClassificationSummary }> {
+    // Fetch user profile
+    const profile = await userService.getProfile(userId)
+    
+    // Fetch transactions for the period
+    const allTransactions = await transactionService.getAll([
+      { field: 'userId', operator: '==', value: userId }
+    ])
+    
+    // Filter transactions by period
+    const filteredTransactions = allTransactions.filter(txn => {
+      const txnDate = txn.date ? new Date(txn.date) : new Date(txn.createdAt)
+      return txnDate >= startDate && txnDate <= endDate
+    })
+    
+    // Calculate income data (excluding VAT for income transactions)
+    const incomeData = this.calculateIncomeDataTransactionsOnly(filteredTransactions, userId)
+    
+    // Calculate expense data
+    const expenseData = this.calculateExpenseDataTransactionsOnly(filteredTransactions, userId)
+    
+    // Calculate tax classification benefits (Gold+ feature)
+    let taxClassificationSummary: TaxClassificationSummary | undefined = undefined
+    try {
+      const taxYear = endDate.getFullYear()
+      taxClassificationSummary = await calculateTaxClassificationBenefitsFromTransactions(filteredTransactions, userId, taxYear)
+    } catch (error) {
+      console.error('Error calculating tax classification benefits:', error)
+      // Continue without tax classification if calculation fails
+    }
+    
+    // Calculate tax data using the same engine as self-assessment
+    const taxData = await this.calculateTaxData(
+      userId,
+      incomeData.totalIncome,
+      expenseData.totalExpenses,
+      expenseData.taxDeductibleExpenses,
+      profile,
+      taxClassificationSummary
+    )
+    
+    return {
+      ...taxData,
+      taxClassification: taxClassificationSummary
+    }
+  }
+
   private async calculateTaxData(
     userId: string,
     grossIncome: number,
     totalExpenses: number,
     businessExpenses: number,
-    profile: any
+    profile: any,
+    taxClassification?: TaxClassificationSummary
   ): Promise<TaxData> {
-    // Get latest tax calculation or use profile defaults
-    let latestCalculation: TaxCalculation | null = null
-    try {
-      latestCalculation = await taxCalculationService.getLatestCalculation(userId)
-    } catch (error) {
-      console.log('No existing tax calculation found, using defaults')
-    }
-
     const netIncome = grossIncome - totalExpenses
 
     // Prepare tax calculation data
     // Note: calculateNigerianTax expects gross income, not net income
     // It will subtract businessExpenses internally
+    // Reliefs are NOT automatically added - users must manually add them in the self-assessment report
     const taxCalcData = {
       businessType: profile.businessType || 'freelancer',
       period: 'yearly' as const,
       income: grossIncome, // Pass gross income, not net income
-      rentPaid: latestCalculation?.rentPaid || 0,
-      pensionContribution: latestCalculation?.pensionContribution || 0,
-      healthInsurance: latestCalculation?.healthInsurance || 0,
-      housingFund: 0, // NHF - typically calculated separately, can be added to profile later
-      lifeInsurance: latestCalculation?.lifeInsurance || 0,
-      charitableDonations: latestCalculation?.charitableDonations || 0,
+      rentPaid: 0, // Users can add this manually in the report
+      pensionContribution: 0, // Users can add this manually in the report
+      healthInsurance: 0, // Users can add this manually in the report
+      housingFund: 0, // NHF - users can add this manually in the report
+      lifeInsurance: 0, // Users can add this manually in the report
+      charitableDonations: 0, // Users can add this manually in the report
       businessExpenses: businessExpenses, // This will be subtracted from gross income in the calculator
-      dependents: latestCalculation?.dependents || 0
+      dependents: 0, // Users can add this manually in the report
+      // Add tax classification benefits if available (Gold+ feature)
+      capitalAllowances: taxClassification?.capitalAllowances || undefined,
+      whtCredits: taxClassification?.whtCredits || undefined
     }
 
     // Calculate tax
@@ -425,7 +848,10 @@ export class ReportService extends BaseService {
       taxPayable: taxResult.totalTax || 0,
       taxBrackets: taxResult.taxBrackets || [],
       totalReliefs: taxResult.totalReliefs || 0,
-      adjustedGrossIncome: taxResult.adjustedGrossIncome || 0
+      adjustedGrossIncome: taxResult.adjustedGrossIncome || 0,
+      // Add tax classification data if available
+      capitalAllowances: taxResult.capitalAllowances || 0,
+      whtCredits: taxResult.whtCredits || 0
     }
   }
 

@@ -1,5 +1,7 @@
 import { BaseService } from './base'
 import { Invoice, InvoiceFilters, InvoiceItem, ApiResponse, PaginatedResponse, SavedClient, WHTCreditNote } from '@/lib/types'
+import { calculateTaxPeriod } from '@/lib/utils/date'
+import { fetchExchangeRate } from '@/lib/utils/currency'
 
 export class InvoiceService extends BaseService {
   private sendingInvoices: Set<string> = new Set() // Track invoices being sent to prevent duplicates
@@ -224,6 +226,28 @@ export class InvoiceService extends BaseService {
       // Calculate totals
      // const totals = this.calculateTotals(invoiceData.items, invoiceData.discount)
       
+      // Calculate tax period from issue date
+      const taxPeriod = invoiceData.issueDate ? calculateTaxPeriod(invoiceData.issueDate) : undefined
+      
+      // Lock exchange rate for foreign currency invoices
+      let exchangeRate: number | undefined
+      let exchangeRateDate: string | undefined
+      let ngnEquivalent: number | undefined
+      
+      if (invoiceData.currency && invoiceData.currency !== 'NGN' && invoiceData.total) {
+        try {
+          const rate = await fetchExchangeRate(invoiceData.currency, 'NGN', invoiceData.issueDate)
+          if (rate) {
+            exchangeRate = rate.rate
+            exchangeRateDate = rate.date
+            ngnEquivalent = invoiceData.total * rate.rate
+          }
+        } catch (error) {
+          console.error('Error fetching exchange rate for invoice:', error)
+          // Continue without exchange rate - user can update later
+        }
+      }
+      
       // Check if invoice is overdue
       let status = invoiceData.status || 'draft'
       if (status === 'sent') {
@@ -239,6 +263,10 @@ export class InvoiceService extends BaseService {
         userId,
         invoiceNumber,
         status,
+        taxPeriod,
+        exchangeRate,
+        exchangeRateDate,
+        ngnEquivalent,
         // Set default payment statuses
         clientPaymentStatus: 'pending' as const,
         supplierPaymentStatus: 'pending' as const,
@@ -561,15 +589,51 @@ export class InvoiceService extends BaseService {
           amount: invoice.total,
           description,
           date: new Date().toISOString().split('T')[0],
-          paymentMethod: paymentMethod || 'other',
+          transactionDate: invoice.issueDate, // Use invoice issue date as transaction date
+          valueDate: new Date().toISOString().split('T')[0], // Payment date
+          paymentMethod: paymentMethod || invoice.paymentMethod || 'other',
           taxDeductible: taxDeductible !== undefined ? taxDeductible : true, // Default to true if not specified
-          notes: `Invoice: ${invoice.invoiceNumber}\nSupplier: ${invoice.supplier?.name || 'Unknown'}${invoice.items && invoice.items.length > 0 ? `\nItems: ${invoice.items.map((item: InvoiceItem) => item.description).join(', ')}` : ''}`
+          notes: `Invoice: ${invoice.invoiceNumber}\nSupplier: ${invoice.supplier?.name || 'Unknown'}${invoice.items && invoice.items.length > 0 ? `\nItems: ${invoice.items.map((item: InvoiceItem) => item.description).join(', ')}` : ''}`,
+          // Bidirectional invoice linking
+          linkedInvoiceId: invoiceId,
+          isFromInvoice: true,
+          invoiceStatus: 'completed', // Payment completed when marked as paid
+          // Include new invoice fields in transaction
+          platform: invoice.platform,
+          transactionNature: invoice.transactionNature,
+          businessPercentage: invoice.businessPercentage,
+          taxPeriod: invoice.taxPeriod,
+          currency: invoice.currency,
+          exchangeRate: invoice.exchangeRate,
+          exchangeRateDate: invoice.exchangeRateDate,
+          ngnEquivalent: invoice.ngnEquivalent,
+          tags: invoice.tags,
+          attachments: invoice.attachments,
+          attachmentFileIds: invoice.attachmentFileIds
         }
         
         // Only include receiptUrl and attachments if they have values
         if (receiptUrl) {
           transactionData.receiptUrl = receiptUrl
-          transactionData.attachments = [receiptUrl]
+          transactionData.attachments = [...(transactionData.attachments || []), receiptUrl]
+        }
+        
+        // For creator income invoices (outgoing), include platform fees breakdown
+        // Calculate totals from item-level platform fees
+        if (invoice.invoiceType === 'outgoing' && invoice.platform) {
+          transactionData.type = 'income' as const
+          transactionData.category = invoice.items[0]?.description || 'sales'
+          
+          // Sum up item-level platform fees
+          const totalGross = invoice.items.reduce((sum, item) => sum + (item.grossAmount || item.amount || 0), 0)
+          const totalFees = invoice.items.reduce((sum, item) => sum + (item.platformFees || 0), 0)
+          const totalNet = totalGross - totalFees
+          
+          transactionData.grossAmount = totalGross || invoice.total
+          transactionData.platformFees = totalFees
+          transactionData.netAmount = totalNet || invoice.total
+          // Use net amount as the transaction amount for income
+          transactionData.amount = transactionData.netAmount
         }
 
         const transactionResult = await transactionService.createTransaction(userId, transactionData)
@@ -676,19 +740,41 @@ export class InvoiceService extends BaseService {
         
         const transactionData: any = {
           type: 'income' as const,
-          category: 'sales',
-          amount: invoice.total,
+          category: invoice.items[0]?.description || 'sales',
+          amount: invoice.netAmount || invoice.total, // Use net amount if platform fees exist
           description,
           date: new Date().toISOString().split('T')[0],
+          transactionDate: invoice.issueDate, // Use invoice issue date as transaction date
+          valueDate: new Date().toISOString().split('T')[0], // Payment date
           paymentMethod: paymentMethod || invoice.paymentMethod || 'other',
           taxDeductible: false, // Sales invoices are not tax deductible
-          notes: `Invoice: ${invoice.invoiceNumber}\nClient: ${invoice.client.name}${invoice.items && invoice.items.length > 0 ? `\nItems: ${invoice.items.map((item: InvoiceItem) => item.description).join(', ')}` : ''}`
+          notes: `Invoice: ${invoice.invoiceNumber}\nClient: ${invoice.client.name}${invoice.items && invoice.items.length > 0 ? `\nItems: ${invoice.items.map((item: InvoiceItem) => item.description).join(', ')}` : ''}`,
+          // Bidirectional invoice linking
+          linkedInvoiceId: invoiceId,
+          isFromInvoice: true,
+          invoiceStatus: 'completed', // Payment confirmed when supplier confirms receipt
+          // Include new invoice fields in transaction
+          platform: invoice.platform,
+          transactionNature: invoice.transactionNature,
+          businessPercentage: invoice.businessPercentage,
+          taxPeriod: invoice.taxPeriod,
+          currency: invoice.currency,
+          exchangeRate: invoice.exchangeRate,
+          exchangeRateDate: invoice.exchangeRateDate,
+          ngnEquivalent: invoice.ngnEquivalent,
+          tags: invoice.tags,
+          attachments: invoice.attachments,
+          attachmentFileIds: invoice.attachmentFileIds,
+          // Platform fees breakdown for creator income (from item-level fees)
+          grossAmount: invoice.items.reduce((sum, item) => sum + (item.grossAmount || item.amount || 0), 0) || invoice.total,
+          platformFees: invoice.items.reduce((sum, item) => sum + (item.platformFees || 0), 0),
+          netAmount: invoice.items.reduce((sum, item) => sum + (item.netAmount || item.amount || 0), 0) || invoice.total
         }
         
         // Only include receiptUrl and attachments if they have values
         if (clientReceiptUrl) {
           transactionData.receiptUrl = clientReceiptUrl
-          transactionData.attachments = [clientReceiptUrl]
+          transactionData.attachments = [...(transactionData.attachments || []), clientReceiptUrl]
         }
 
         const transactionResult = await transactionService.createTransaction(userId, transactionData)

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { DashboardNav } from "@/components/dashboard/dashboard-nav"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { Card } from "@/components/ui/card"
@@ -23,6 +23,7 @@ import { toast } from "sonner"
 
 export default function GenerateSelfAssessmentPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { isSubscribed } = useSubscription()
@@ -33,6 +34,7 @@ export default function GenerateSelfAssessmentPage() {
   const [isEditing, setIsEditing] = useState(true) // Start in edit mode by default
   const [isSaving, setIsSaving] = useState(false)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+  const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null)
   const [formData, setFormData] = useState({
     taxYear: new Date().getFullYear().toString(),
     period: 'annual' as 'annual' | 'q1' | 'q2' | 'q3' | 'q4',
@@ -42,6 +44,14 @@ export default function GenerateSelfAssessmentPage() {
     includeReliefs: true,
     includeDocuments: false
   })
+
+  // Get platform from URL params
+  useEffect(() => {
+    const platform = searchParams.get('platform')
+    if (platform) {
+      setSelectedPlatform(platform)
+    }
+  }, [searchParams])
 
   // Load existing report if editing
   useEffect(() => {
@@ -152,11 +162,19 @@ export default function GenerateSelfAssessmentPage() {
       }
 
       // For self-assessment, use only transaction data (no invoices)
-      const data = await reportService.generateReportData(
-        profile.userId,
-        period,
-        false // includeInvoices = false (use only transactions)
-      )
+      // If platform is specified, generate platform-specific report
+      const data = selectedPlatform
+        ? await reportService.generatePlatformReportData(
+            profile.userId,
+            selectedPlatform,
+            period,
+            false // includeInvoices = false (use only transactions)
+          )
+        : await reportService.generateReportData(
+            profile.userId,
+            period,
+            false // includeInvoices = false (use only transactions)
+          )
 
       // Generate report title
       const periodLabel = period.periodType === 'annual' 
@@ -165,7 +183,8 @@ export default function GenerateSelfAssessmentPage() {
         ? `Q${period.quarter} ${period.year}`
         : `${new Date(period.startDate).toLocaleDateString()} - ${new Date(period.endDate).toLocaleDateString()}`
 
-      const title = `Self-Assessment Filing - ${periodLabel}`
+      const platformLabel = selectedPlatform ? ` - ${selectedPlatform}` : ''
+      const title = `Self-Assessment Filing${platformLabel} - ${periodLabel}`
 
       // Don't save immediately - let user edit first
       setReportId(null) // No report ID yet - will be created on save

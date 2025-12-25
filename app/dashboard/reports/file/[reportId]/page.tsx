@@ -268,41 +268,18 @@ export default function FileTaxReturnPage() {
   }
 
   const handleFileReturn = async () => {
-    if (!report || !user?.uid || filing) return
+    if (!report || !user?.uid) return
 
-    setFiling(true)
-    try {
-      const response = await fetch('/api/reports/file', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          reportId: report.id,
-          userId: user.uid
-        })
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to file return')
-      }
-
-      // Update local state
-      setFiled(true)
-      setBalanceDue(data.balanceDue)
-      setTaxesAlreadyPaid(data.taxesAlreadyPaid)
-
-      // Reload report to get updated data
-      await loadReport()
-
-      toast.success("Tax return filed successfully!")
-    } catch (error) {
-      console.error("Error filing return:", error)
-      toast.error(error instanceof Error ? error.message : "Failed to file return")
-    } finally {
-      setFiling(false)
+    // Navigate to the appropriate flow based on balance due
+    // If balance > 0, go to generate RRR and payment first
+    // If balance <= 0, go directly to state selection and submission method
+    if (balanceDue !== null && balanceDue > 0) {
+      // Has balance to pay - go to payment flow first
+      router.push(`/dashboard/reports/file/${reportId}/generate-rrr`)
+    } else {
+      // No balance or already balanced - go directly to state selection and submission
+      // Use payment-success page with amount=0 (it handles state selection and submission method)
+      router.push(`/dashboard/reports/file/${reportId}/payment-success?amount=0`)
     }
   }
 

@@ -12,6 +12,7 @@ import { SubscriptionType, BusinessType } from "@/lib/types"
 import { auth } from "@/firebase/firebase"
 import { toast } from "sonner"
 import { MigrateToCreatorModal } from "./migrate-to-creator-modal"
+import { MigrateToFreelancerModal } from "./migrate-to-freelancer-modal"
 
 interface SubscriptionRequiredModalProps {
   open: boolean
@@ -27,6 +28,7 @@ export function SubscriptionRequiredModal({
   const router = useRouter()
   const [processingSubscription, setProcessingSubscription] = useState<string | null>(null)
   const [showMigrationModal, setShowMigrationModal] = useState(false)
+  const [showFreelancerMigrationModal, setShowFreelancerMigrationModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
 
   const getAvailablePlans = (): SubscriptionType[] => {
@@ -39,22 +41,17 @@ export function SubscriptionRequiredModal({
 
   const availablePlans = getAvailablePlans()
 
-  // Check if migration is needed (freelancer trying to subscribe to GOLD or PLATINUM)
+  // Check if migration is needed
+  // - Freelancer trying to subscribe to GOLD or PLATINUM (needs to migrate to creator)
+  // - Creator trying to subscribe to PRO (needs to migrate to freelancer)
   const needsMigration = (planType: SubscriptionType): boolean => {
-    const isFreelancer = businessType === 'freelancer'
-    const isGoldOrPlatinum = planType === 'GOLD' || planType === 'PLATINUM'
-    const needs = isFreelancer && isGoldOrPlatinum
-    console.log('=== needsMigration check ===', { 
-      businessType, 
-      planType, 
-      needs,
-      isFreelancer,
-      isGoldOrPlatinum,
-      'businessType === "freelancer"': businessType === 'freelancer',
-      'planType === "GOLD"': planType === 'GOLD',
-      'planType === "PLATINUM"': planType === 'PLATINUM'
-    })
-    return needs
+    if (businessType === 'freelancer' && (planType === 'GOLD' || planType === 'PLATINUM')) {
+      return true
+    }
+    if (businessType === 'creator' && planType === 'PRO') {
+      return true
+    }
+    return false
   }
 
   const handleSubscribe = async (planType: SubscriptionType) => {
@@ -72,10 +69,15 @@ export function SubscriptionRequiredModal({
       console.log('Migration needed - showing migration modal')
       console.log('Setting selectedPlan to:', planType)
       setSelectedPlan(planType)
-      // Use setTimeout to ensure state updates properly
+      // Show appropriate migration modal based on direction
       setTimeout(() => {
-        console.log('Setting showMigrationModal to true')
-        setShowMigrationModal(true)
+        if (businessType === 'creator' && planType === 'PRO') {
+          console.log('Setting showFreelancerMigrationModal to true')
+          setShowFreelancerMigrationModal(true)
+        } else if (businessType === 'freelancer' && (planType === 'GOLD' || planType === 'PLATINUM')) {
+          console.log('Setting showMigrationModal to true')
+          setShowMigrationModal(true)
+        }
       }, 0)
       return
     }
@@ -98,7 +100,17 @@ export function SubscriptionRequiredModal({
 
       const token = await currentUser.getIdToken()
 
-      // Update business type to creator
+      // Determine target business type based on plan
+      let targetBusinessType: string
+      if (businessType === 'freelancer' && (selectedPlan === 'GOLD' || selectedPlan === 'PLATINUM')) {
+        targetBusinessType = 'creator'
+      } else if (businessType === 'creator' && selectedPlan === 'PRO') {
+        targetBusinessType = 'freelancer'
+      } else {
+        throw new Error("Invalid migration path")
+      }
+
+      // Update business type
       const updateResponse = await fetch("/api/user/update-business-type", {
         method: "POST",
         headers: {
@@ -106,7 +118,7 @@ export function SubscriptionRequiredModal({
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
-          businessType: 'creator'
+          businessType: targetBusinessType
         })
       })
 
@@ -117,8 +129,9 @@ export function SubscriptionRequiredModal({
       }
 
       // Migration successful - proceed silently to payment
-      // Close migration modal first
+      // Close migration modals first
       setShowMigrationModal(false)
+      setShowFreelancerMigrationModal(false)
       // Close subscription modal
       onOpenChange(false)
       // Small delay to ensure modals close, then proceed with subscription
@@ -188,7 +201,7 @@ export function SubscriptionRequiredModal({
     <>
     <Dialog open={open} onOpenChange={(isOpen) => {
       // Don't allow closing if migration modal is showing
-      if (!isOpen && showMigrationModal) {
+      if (!isOpen && (showMigrationModal || showFreelancerMigrationModal)) {
         return
       }
       onOpenChange(isOpen)
@@ -306,24 +319,40 @@ export function SubscriptionRequiredModal({
       </DialogContent>
     </Dialog>
 
-    {/* Migration modal - always render when selectedPlan exists, show when needed */}
-    {selectedPlan && (
-      <>
-        <MigrateToCreatorModal
-          open={showMigrationModal}
-          onOpenChange={(isOpen) => {
-            console.log('Migration modal onOpenChange:', isOpen, 'selectedPlan:', selectedPlan)
-            setShowMigrationModal(isOpen)
-            if (!isOpen) {
-              // If migration modal is cancelled, clear selected plan
-              // Subscription modal will reopen automatically because open prop is still true
-              setSelectedPlan(null)
-            }
-          }}
-          planType={selectedPlan}
-          onConfirm={handleMigrateAndSubscribe}
-        />
-      </>
+    {/* Migration modal - Creator (for freelancer -> creator) */}
+    {selectedPlan && businessType === 'freelancer' && (
+      <MigrateToCreatorModal
+        open={showMigrationModal}
+        onOpenChange={(isOpen) => {
+          console.log('Migration modal onOpenChange:', isOpen, 'selectedPlan:', selectedPlan)
+          setShowMigrationModal(isOpen)
+          if (!isOpen) {
+            // If migration modal is cancelled, clear selected plan
+            // Subscription modal will reopen automatically because open prop is still true
+            setSelectedPlan(null)
+          }
+        }}
+        planType={selectedPlan}
+        onConfirm={handleMigrateAndSubscribe}
+      />
+    )}
+
+    {/* Migration modal - Freelancer (for creator -> freelancer) */}
+    {selectedPlan && businessType === 'creator' && (
+      <MigrateToFreelancerModal
+        open={showFreelancerMigrationModal}
+        onOpenChange={(isOpen) => {
+          console.log('Freelancer migration modal onOpenChange:', isOpen, 'selectedPlan:', selectedPlan)
+          setShowFreelancerMigrationModal(isOpen)
+          if (!isOpen) {
+            // If migration modal is cancelled, clear selected plan
+            // Subscription modal will reopen automatically because open prop is still true
+            setSelectedPlan(null)
+          }
+        }}
+        planType={selectedPlan}
+        onConfirm={handleMigrateAndSubscribe}
+      />
     )}
     </>
   )

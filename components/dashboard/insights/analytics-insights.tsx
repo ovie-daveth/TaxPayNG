@@ -21,7 +21,6 @@ type DashboardBusinessType = "freelancer" | "creator"
 
 interface AnalyticsInsightsProps {
   businessType?: DashboardBusinessType
-  useMockData?: boolean
   periodType?: PeriodType
   selectedYear?: number
   selectedQuarter?: number
@@ -110,37 +109,6 @@ const isToolCategory = (category?: string) => {
   return TOOL_KEYWORDS.some((keyword) => normalized.includes(keyword))
 }
 
-const mockInsights: Insight[] = [
-  {
-    id: "growth",
-    title: "Income momentum",
-    metric: "▲ 22.5%",
-    description: "Average monthly earnings grew this quarter. Keep up the steady pipeline of retainers and add-ons.",
-    tone: "positive",
-    action: "Schedule a quarterly pricing review",
-    actionIntent: "income",
-  },
-  {
-    id: "tool-spend",
-    title: "Tooling costs",
-    metric: "18% of income",
-    description: "Software and platform subscriptions are eating into margins. Audit licenses you no longer need.",
-    tone: "warning",
-    action: "Run a tool-by-tool ROI review",
-    actionIntent: "expense",
-    actionCategory: "Software",
-  },
-  {
-    id: "tax-reserve",
-    title: "Tax readiness",
-    metric: "₦420k set aside",
-    description: "Thanks to disciplined tax reserves, you’re covered for the next quarterly filing.",
-    tone: "info",
-    action: "Review the reliefs you’ve logged",
-    actionIntent: "relief-info",
-  },
-]
-
 const toneStyles: Record<InsightTone, { badge: string; icon: ReactNode }> = {
   positive: {
     badge: "bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300",
@@ -158,7 +126,6 @@ const toneStyles: Record<InsightTone, { badge: string; icon: ReactNode }> = {
 
 export function AnalyticsInsights({ 
   businessType = "freelancer", 
-  useMockData = false,
   periodType = "year",
   selectedYear,
   selectedQuarter,
@@ -174,7 +141,7 @@ export function AnalyticsInsights({
   const effectiveQuarter = selectedQuarter ?? currentQuarter
 
   const [insights, setInsights] = useState<Insight[]>([])
-  const [loading, setLoading] = useState<boolean>(!useMockData)
+  const [loading, setLoading] = useState<boolean>(true)
   const [transactionDialogOpen, setTransactionDialogOpen] = useState(false)
   const [transactionPreset, setTransactionPreset] = useState<{ type: Transaction["type"]; category?: string; description?: string } | null>(null)
   const [reliefDialogOpen, setReliefDialogOpen] = useState(false)
@@ -229,12 +196,6 @@ export function AnalyticsInsights({
   }, [reliefFaq])
 
   useEffect(() => {
-    if (useMockData) {
-      setInsights(mockInsights)
-      setLoading(false)
-      return
-    }
-
     if (!user) {
       setInsights([])
       setLoading(false)
@@ -579,8 +540,8 @@ export function AnalyticsInsights({
       } catch (error) {
         console.error("Error loading analytics insights:", error)
         if (isMounted) {
-          toast.error("Unable to load analytics insights. Showing recent trends instead.")
-          setInsights(mockInsights)
+          toast.error("Unable to load analytics insights.")
+          setInsights([])
         }
       } finally {
         if (isMounted) {
@@ -601,7 +562,7 @@ export function AnalyticsInsights({
       isMounted = false
       window.removeEventListener("transactionChanged", handleTransactionChanged)
     }
-  }, [businessType, useMockData, user?.uid, periodType, effectiveYear, effectiveQuarter])
+  }, [businessType, user?.uid, periodType, effectiveYear, effectiveQuarter])
 
   const headerText = useMemo(() => {
     if (loading) return "Crunching numbers..."
@@ -626,11 +587,6 @@ export function AnalyticsInsights({
   }
 
   const loadToolAudit = useCallback(async () => {
-    if (useMockData) {
-      toast.info("Audit workspace is available after you connect your real data.")
-      return
-    }
-
     const uid = user?.uid
     if (!uid) {
       toast.info("Sign in to prepare audit evidence.")
@@ -691,7 +647,7 @@ export function AnalyticsInsights({
     } finally {
       setAuditLoading(false)
     }
-  }, [useMockData, user?.uid, periodType, effectiveYear, effectiveQuarter])
+  }, [user?.uid, periodType, effectiveYear, effectiveQuarter])
 
   const handleActionClick = (insight: Insight) => {
     if (!insight.actionIntent) return
@@ -703,11 +659,6 @@ export function AnalyticsInsights({
 
     if (insight.actionIntent === "relief-info") {
       setReliefDialogOpen(true)
-      return
-    }
-
-    if (useMockData) {
-      toast.info("Insights preview only. Sign in to log transactions.")
       return
     }
 

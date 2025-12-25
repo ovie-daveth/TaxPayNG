@@ -2,6 +2,7 @@ import { BaseService } from './base'
 import { Transaction, TransactionFilters, ApiResponse, PaginatedResponse, Document } from '@/lib/types'
 import { documentService } from './documentService'
 import { userService } from './userService'
+import { capitalAssetService } from './capitalAssetService'
 
 export class TransactionService extends BaseService {
   constructor() {
@@ -44,6 +45,9 @@ export class TransactionService extends BaseService {
       if (filters?.paymentMethod) {
         filtered = filtered.filter(t => t.paymentMethod === filters.paymentMethod)
       }
+      if (filters?.platform) {
+        filtered = filtered.filter(t => t.platform?.name === filters.platform)
+      }
       if (dateRange) {
         const start = dateRange.start ? new Date(dateRange.start) : null
         const end = dateRange.end ? new Date(dateRange.end) : null
@@ -64,10 +68,73 @@ export class TransactionService extends BaseService {
         })
       }
       
-      // Sort by date descending
+      // Apply search filter (searches across description, category, notes, tags, and amount)
+      if (filters?.search && filters.search.trim()) {
+        const searchTerm = filters.search.toLowerCase().trim()
+        filtered = filtered.filter(t => {
+          // Search in description
+          if (t.description?.toLowerCase().includes(searchTerm)) return true
+          
+          // Search in category
+          if (t.category?.toLowerCase().includes(searchTerm)) return true
+          
+          // Search in notes
+          if (t.notes?.toLowerCase().includes(searchTerm)) return true
+          
+          // Search in tags
+          if (t.tags && t.tags.some((tag: string) => tag.toLowerCase().includes(searchTerm))) return true
+          
+          // Search in amount (if search term is numeric)
+          const numericSearch = parseFloat(searchTerm.replace(/[\u20A6,]/g, ''))
+          if (!isNaN(numericSearch)) {
+            const amount = typeof t.amount === 'number' ? t.amount : Number(String(t.amount).replace(/[\u20A6,]/g, '').trim()) || 0
+            if (amount === numericSearch || amount.toString().includes(searchTerm)) return true
+          }
+          
+          return false
+        })
+      }
+      
+      // Sort by createdAt descending (newest first)
+      // Helper function to extract timestamp from createdAt (handles Firestore Timestamps, ISO strings, and server timestamps)
+      const getCreatedAtTime = (createdAt: any): number => {
+        if (!createdAt) return 0
+        
+        // If it's already an ISO string, parse it
+        if (typeof createdAt === 'string') {
+          const parsed = new Date(createdAt).getTime()
+          return isNaN(parsed) ? 0 : parsed
+        }
+        
+        // Handle Firestore Timestamp object with toDate method
+        if (createdAt && typeof createdAt === 'object' && typeof (createdAt as any).toDate === 'function') {
+          return (createdAt as any).toDate().getTime()
+        }
+        
+        // Handle Firestore Timestamp object with seconds property
+        if (createdAt && typeof createdAt === 'object' && (createdAt as any).seconds !== undefined) {
+          return (createdAt as any).seconds * 1000 + ((createdAt as any).nanoseconds || 0) / 1000000
+        }
+        
+        // Handle server timestamp placeholder (_methodName: "serverTimestamp")
+        if (createdAt && typeof createdAt === 'object' && (createdAt as any)._methodName === 'serverTimestamp') {
+          // Use current time for server timestamps (they're the newest)
+          return Date.now()
+        }
+        
+        // Try to parse as date
+        try {
+          const parsed = new Date(createdAt).getTime()
+          return isNaN(parsed) ? 0 : parsed
+        } catch {
+          return 0
+        }
+      }
+      
       filtered.sort((a, b) => {
-        const dateA = a.date ? new Date(a.date).getTime() : 0
-        const dateB = b.date ? new Date(b.date).getTime() : 0
+        const dateA = getCreatedAtTime(a.createdAt)
+        const dateB = getCreatedAtTime(b.createdAt)
+        // Descending order: newest first (dateB - dateA)
         return dateB - dateA
       })
       
@@ -139,6 +206,11 @@ export class TransactionService extends BaseService {
 
       // Increment transaction count
       await userService.incrementTransactionCount(userId)
+
+      // Create capital asset if transaction is a capital asset
+      if (createdTransaction.taxClassification?.isCapitalAsset && createdTransaction.type === 'expense') {
+        await capitalAssetService.createOrUpdateAssetFromTransaction(createdTransaction)
+      }
 
       // If transaction has attachments but no documentId, create corresponding documents
       // (documentId means document was already created in the dialog with proper storage tracking)
@@ -241,6 +313,14 @@ export class TransactionService extends BaseService {
       await this.update(transactionId, updateData)
       const updatedTransaction = await this.getById(transactionId)
 
+      // Update capital asset if transaction is a capital asset
+      if (updatedTransaction.taxClassification?.isCapitalAsset && updatedTransaction.type === 'expense') {
+        await capitalAssetService.createOrUpdateAssetFromTransaction(updatedTransaction)
+      } else {
+        // If transaction is no longer a capital asset, delete the asset
+        await capitalAssetService.deleteAssetByTransactionId(transactionId)
+      }
+
       // If attachments were updated but documentId is provided, skip creating documents
       // (documentId means document was already created/updated in the dialog with proper storage tracking)
       if (updateData.attachments && updateData.attachments.length > 0 && !updateData.documentId) {
@@ -286,6 +366,38 @@ export class TransactionService extends BaseService {
           error: 'Unauthorized: You can only delete your own transactions'
         }
       }
+
+      // Delete all attachment files from ImageKit
+      if (existingTransaction.attachmentFileIds && existingTransaction.attachmentFileIds.length > 0) {
+        try {
+          for (const fileId of existingTransaction.attachmentFileIds) {
+            if (fileId) {
+              try {
+                const response = await fetch(`/api/delete-image?fileId=${encodeURIComponent(fileId)}`, {
+                  method: 'DELETE',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                })
+                if (!response.ok) {
+                  console.warn(`Failed to delete ImageKit file ${fileId} for transaction ${transactionId}`)
+                } else {
+                  console.log(`Deleted ImageKit file ${fileId} for transaction ${transactionId}`)
+                }
+              } catch (deleteError) {
+                console.error(`Error deleting ImageKit file ${fileId}:`, deleteError)
+                // Continue with other files even if one fails
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error deleting attachment files from ImageKit:', error)
+          // Continue with transaction deletion even if file deletion fails
+        }
+      }
+
+      // Delete capital asset if transaction is a capital asset
+      await capitalAssetService.deleteAssetByTransactionId(transactionId)
 
       // Delete linked document if documentId exists
       if (existingTransaction.documentId) {

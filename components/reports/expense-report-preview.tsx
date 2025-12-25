@@ -8,6 +8,7 @@ import { format } from "date-fns"
 import { Printer, ArrowLeft } from "lucide-react"
 import { toast } from "sonner"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useSubscription } from "@/lib/hooks/useSubscription"
 
 interface ExpenseReportPreviewProps {
   reportData: ReportData
@@ -16,9 +17,15 @@ interface ExpenseReportPreviewProps {
 
 export function ExpenseReportPreview({ reportData, onBack }: ExpenseReportPreviewProps) {
   const { profile } = useUserProfile()
+  const { hasAccess } = useSubscription()
+  const hasGoldAccess = hasAccess('GOLD')
   const formatCurrency = (amount: number) => formatCurrencyAmount(amount, 'NGN')
   
   const userName = profile?.firstName || profile?.lastName || profile?.email?.split('@')[0] || 'there'
+  
+  // Get capital allowances from tax classification (Gold+ feature)
+  const capitalAllowances = reportData.taxClassification?.capitalAllowances || 0
+  const capitalAllowanceDetails = reportData.taxClassification?.capitalAllowanceDetails || []
   
   const periodLabel = reportData.period.periodType === 'annual' 
     ? `Annual ${reportData.period.year}`
@@ -206,6 +213,32 @@ export function ExpenseReportPreview({ reportData, onBack }: ExpenseReportPrevie
                     <span className="text-xs sm:text-sm font-medium">{formatCurrency(amount)}</span>
                   </div>
                 ))}
+            </div>
+          </div>
+        )}
+
+        {/* Capital Allowances (Gold+ feature) */}
+        {hasGoldAccess && capitalAllowances > 0 && (
+          <div>
+            <h2 className="text-sm sm:text-base md:text-lg font-semibold mb-3 sm:mb-4 border-b border-border pb-2">
+              Capital Allowances
+            </h2>
+            <div className="bg-blue-50 dark:bg-blue-950/20 border-l-4 border-blue-500 dark:border-blue-400 p-3 sm:p-4 rounded mb-4">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm sm:text-base font-semibold">Total Capital Allowances</span>
+                <span className="text-base sm:text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(capitalAllowances)}</span>
+              </div>
+              {capitalAllowanceDetails.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  <p className="text-xs sm:text-sm text-muted-foreground mb-2">Breakdown:</p>
+                  {capitalAllowanceDetails.map((detail, index) => (
+                    <div key={index} className="flex justify-between text-xs sm:text-sm py-1 border-b border-blue-200 dark:border-blue-800">
+                      <span className="text-muted-foreground">{detail.description}</span>
+                      <span className="font-medium">{formatCurrency(detail.allowanceAmount)} ({detail.allowanceRate}%)</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

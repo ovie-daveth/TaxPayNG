@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react"
 import type { LucideIcon } from "lucide-react"
 import { Card } from "@/components/ui/card"
-import { calculateNigerianTax } from "@/lib/tax-calculator"
+import { reportService } from "@/lib/services"
 import { SmallBusinessExemptionInfo } from "@/components/dashboard/small-business-exemption-info"
 import { TaxCalculationBreakdown } from "@/components/dashboard/tax-calculation-breakdown"
 import {
@@ -15,13 +15,13 @@ import {
   CheckCircle2,
 } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
+import { useSubscription } from "@/lib/hooks/useSubscription"
 import { transactionService, taxPaymentService } from "@/lib/services"
 import { toast } from "sonner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Calendar, Filter } from "lucide-react"
-import { getCurrentPeriodTax } from "@/lib/utils/tax-period-calculation"
 
 type DashboardBusinessType = "freelancer" | "creator" | "small-business"
 type TrendDirection = "up" | "down" | "neutral"
@@ -58,7 +58,6 @@ interface TransactionSummary {
 interface StatsCardsProps {
   businessType?: DashboardBusinessType
   sidebarCollapsed?: boolean
-  useMockData?: boolean
   periodType?: PeriodType
   selectedYear?: number
   selectedQuarter?: number
@@ -242,7 +241,9 @@ const buildStatsFromSummary = (
   periodType: PeriodType,
   taxPaymentsTotal: number = 0, // Total tax payments made in the year
   periodPayments: any[] = [], // Payments for the specific period
-  periodTaxInfo: { amount: number; taxDuration: string; period: 'monthly' | 'quarterly' | 'yearly' } | null = null // Tax info for the specific period
+  periodTaxInfo: { amount: number; taxDuration: string; period: 'monthly' | 'quarterly' | 'yearly' } | null = null, // Tax info for the specific period
+  periodTaxCalculation: any = null, // Tax calculation for the period (from unified engine)
+  yearTaxCalculation: any = null // Tax calculation for the full year (from unified engine)
 ): StatDefinition[] => {
   // Use period summary for display (income/expenses)
   const totalIncome = periodSummary?.totalIncome ?? 0
@@ -265,59 +266,9 @@ const buildStatsFromSummary = (
   const incomeBreakdown = buildCategoryBreakdown(periodSummary, "income", totalIncome, formatCurrency)
   const expenseBreakdown = buildCategoryBreakdown(periodSummary, "expenses", totalExpenses, formatCurrency)
 
-  // Calculate tax based on the SELECTED PERIOD's income (not full year divided by 4)
-  // This ensures if income only came in Q4, we show Q4 tax, not annual/4
-  const periodIncome = periodSummary?.totalIncome ?? 0
-  const periodExpenses = periodSummary?.totalExpenses ?? 0
-  
-  // Also get full year data for context
-  const yearIncome = yearSummary?.totalIncome ?? 0
-  const yearExpenses = yearSummary?.totalExpenses ?? 0
-
-  const calculatedBusinessType = businessType === "small-business" ? "sme" : businessType
-  
-  // Calculate tax for the selected period (quarter or year)
-  const periodTaxCalculationRaw =
-    businessType === "small-business" && periodIncome <= SMALL_BUSINESS_TURNOVER_THRESHOLD
-      ? null
-      : periodIncome > 0 // Only calculate if period has income
-      ? calculateNigerianTax({
-          businessType: calculatedBusinessType,
-          period: "yearly",
-          income: periodIncome, // Use selected period income
-          rentPaid: 0,
-          pensionContribution: 0,
-          healthInsurance: 0,
-          housingFund: 0,
-          lifeInsurance: 0,
-          charitableDonations: 0,
-          businessExpenses: periodExpenses, // Use selected period expenses
-          dependents: 0,
-        })
-      : null
-
-  // Also calculate full year tax for yearly view or context
-  const yearTaxCalculationRaw =
-    businessType === "small-business" && yearIncome <= SMALL_BUSINESS_TURNOVER_THRESHOLD
-      ? null
-      : yearIncome > 0
-      ? calculateNigerianTax({
-          businessType: calculatedBusinessType,
-          period: "yearly",
-          income: yearIncome,
-          rentPaid: 0,
-          pensionContribution: 0,
-          healthInsurance: 0,
-          housingFund: 0,
-          lifeInsurance: 0,
-          charitableDonations: 0,
-          businessExpenses: yearExpenses,
-          dependents: 0,
-        })
-      : null
-
+  // Use tax calculations from unified engine (passed as parameters)
   // Use period tax for display, year tax for yearly view
-  const taxCalculationRaw = periodType === "year" ? yearTaxCalculationRaw : periodTaxCalculationRaw
+  const taxCalculationRaw = periodType === "year" ? yearTaxCalculation : periodTaxCalculation
 
   const taxCalculation = taxCalculationRaw
     ? {
@@ -430,231 +381,17 @@ const buildStatsFromSummary = (
   ]
 }
 
-const getMockStats = (
-  businessType: DashboardBusinessType,
-  formatCurrency: (amount: number) => string
-): StatDefinition[] => {
-  const formatValue = (amount: number) => formatCurrency(amount)
-
-  if (businessType === "creator") {
-    const mockIncome = 4_200_000
-    const mockExpenses = 1_350_000
-    const taxCalculation = calculateNigerianTax({
-      businessType: "creator",
-      period: "yearly",
-      income: mockIncome,
-      businessExpenses: mockExpenses,
-      rentPaid: 450_000,
-      pensionContribution: 0,
-      healthInsurance: 0,
-      housingFund: 0,
-      lifeInsurance: 0,
-      charitableDonations: 0,
-      dependents: 0,
-    })
-
-    return [
-      {
-        id: "total-income",
-        label: "Total Income",
-        value: "₦4,200,000",
-        change: "+28.5%",
-        trend: "up",
-        icon: ArrowUpRight,
-        color: "text-primary",
-        barColor: "bg-primary",
-        breakdown: [
-          { label: "Brand Sponsorships", value: "₦1,700,000", percentage: 40 },
-          { label: "YouTube Ad Revenue", value: "₦1,260,000", percentage: 30 },
-          { label: "Instagram Brand Deals", value: "₦840,000", percentage: 20 },
-          { label: "TikTok Creator Fund", value: "₦400,000", percentage: 10 },
-        ],
-      },
-      {
-        id: "total-expenses",
-        label: "Total Expenses",
-        value: "₦1,350,000",
-        change: "+15.2%",
-        trend: "up",
-        icon: ArrowDownRight,
-        color: "text-destructive",
-        barColor: "bg-destructive",
-        breakdown: [
-          { label: "Video Equipment", value: "₦560,000", percentage: 41 },
-          { label: "Studio Rent", value: "₦450,000", percentage: 33 },
-          { label: "Editing Software", value: "₦135,000", percentage: 10 },
-          { label: "Marketing & Promotion", value: "₦205,000", percentage: 16 },
-        ],
-      },
-      {
-        id: "net-profit",
-        label: "Net Profit",
-        value: "₦2,850,000",
-        change: "+35.8%",
-        trend: "up",
-        icon: TrendingUp,
-        color: "text-chart-3",
-        barColor: "bg-green-500",
-        breakdown: [{ label: "After Expenses", value: "₦2,850,000", percentage: 100 }],
-      },
-      {
-        id: "tax-payable",
-        label: "Tax Payable",
-        value: formatValue(Math.round(taxCalculation.totalTax / 4)),
-        change: "Q1 2025",
-        trend: "neutral",
-        icon: Calculator,
-        color: "text-accent",
-        barColor: "bg-accent",
-        breakdown: undefined,
-        taxCalculation,
-      },
-    ]
-  }
-
-  if (businessType === "small-business") {
-    return [
-      {
-        id: "total-revenue",
-        label: "Total Revenue",
-        value: "₦8,500,000",
-        change: "+22.3%",
-        trend: "up",
-        icon: ArrowUpRight,
-        color: "text-primary",
-        barColor: "bg-primary",
-        breakdown: [
-          { label: "Product Sales", value: "₦5,100,000", percentage: 60 },
-          { label: "Service Revenue", value: "₦2,550,000", percentage: 30 },
-          { label: "Consulting Services", value: "₦850,000", percentage: 10 },
-        ],
-      },
-      {
-        id: "total-expenses",
-        label: "Total Expenses",
-        value: "₦5,200,000",
-        change: "+18.5%",
-        trend: "up",
-        icon: ArrowDownRight,
-        color: "text-destructive",
-        barColor: "bg-destructive",
-        breakdown: [
-          { label: "Employee Salaries", value: "₦2,550,000", percentage: 49 },
-          { label: "Inventory Purchase", value: "₦1,560,000", percentage: 30 },
-          { label: "Office Rent & Utilities", value: "₦780,000", percentage: 15 },
-          { label: "Marketing Campaign", value: "₦310,000", percentage: 6 },
-        ],
-      },
-      {
-        id: "net-profit",
-        label: "Net Profit",
-        value: "₦3,300,000",
-        change: "+30.1%",
-        trend: "up",
-        icon: TrendingUp,
-        color: "text-chart-3",
-        barColor: "bg-green-500",
-        breakdown: [{ label: "After Expenses", value: "₦3,300,000", percentage: 100 }],
-      },
-      {
-        id: "tax-payable",
-        label: "Tax Payable",
-        value: formatValue(0),
-        change: "Exempt",
-        trend: "neutral",
-        icon: CheckCircle2,
-        color: "text-green-600",
-        barColor: "bg-green-500",
-        breakdown: undefined,
-        isSmallBusinessExempt: true,
-      },
-    ]
-  }
-
-  // Default freelancer mock
-  const mockIncome = 2_450_000
-  const mockExpenses = 890_000
-  const taxCalculation = calculateNigerianTax({
-    businessType: "freelancer",
-    period: "yearly",
-    income: mockIncome,
-    businessExpenses: mockExpenses,
-    rentPaid: 480_000,
-    pensionContribution: 0,
-    healthInsurance: 0,
-    housingFund: 0,
-    lifeInsurance: 0,
-    charitableDonations: 0,
-    dependents: 0,
-  })
-
-  return [
-    {
-      id: "total-income",
-      label: "Total Income",
-      value: "₦2,450,000",
-      change: "+12.5%",
-      trend: "up",
-      icon: ArrowUpRight,
-      color: "text-primary",
-      barColor: "bg-primary",
-      breakdown: [
-        { label: "Client Payments", value: "₦1,200,000", percentage: 49 },
-        { label: "Consulting Services", value: "₦850,000", percentage: 35 },
-        { label: "Freelance Projects", value: "₦400,000", percentage: 16 },
-      ],
-    },
-    {
-      id: "total-expenses",
-      label: "Total Expenses",
-      value: "₦890,000",
-      change: "+8.2%",
-      trend: "up",
-      icon: ArrowDownRight,
-      color: "text-destructive",
-      barColor: "bg-destructive",
-      breakdown: [
-        { label: "Office Rent", value: "₦480,000", percentage: 54 },
-        { label: "Software Subscriptions", value: "₦140,000", percentage: 16 },
-        { label: "Business Expenses", value: "₦270,000", percentage: 30 },
-      ],
-    },
-    {
-      id: "net-profit",
-      label: "Net Profit",
-      value: "₦1,560,000",
-      change: "+15.3%",
-      trend: "up",
-      icon: TrendingUp,
-      color: "text-chart-3",
-      barColor: "bg-green-500",
-      breakdown: [{ label: "After Expenses", value: "₦1,560,000", percentage: 100 }],
-    },
-    {
-      id: "tax-payable",
-      label: "Tax Payable",
-      value: formatValue(Math.round(taxCalculation.totalTax / 4)),
-      change: "Q1 2025",
-      trend: "neutral",
-      icon: Calculator,
-      color: "text-accent",
-      barColor: "bg-accent",
-      breakdown: undefined,
-      taxCalculation,
-    },
-  ]
-}
-
 export function StatsCards({
   businessType = "freelancer",
   sidebarCollapsed = false,
-  useMockData = false,
   periodType: propPeriodType,
   selectedYear: propSelectedYear,
   selectedQuarter: propSelectedQuarter,
   onPeriodChange,
 }: StatsCardsProps) {
   const { user } = useAuth()
+  const { hasAccess } = useSubscription()
+  const hasGoldAccess = hasAccess('GOLD')
   const now = new Date()
   const currentYear = now.getFullYear()
   const currentQuarter = Math.floor(now.getMonth() / 3) + 1
@@ -695,11 +432,9 @@ export function StatsCards({
   const [hoveredCard, setHoveredCard] = useState<string | null>(null)
   const [isHoverEnabled, setIsHoverEnabled] = useState(false)
   const [showTapHint, setShowTapHint] = useState(false)
-  const [loadingSummary, setLoadingSummary] = useState(false)
+  const [loadingSummary, setLoadingSummary] = useState(true)
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false)
-  const [stats, setStats] = useState<StatDefinition[]>(() =>
-    getMockStats(businessType, formatCurrencyValue)
-  )
+  const [stats, setStats] = useState<StatDefinition[]>([])
   const dropdownRefs = useRef<{ [key: string]: HTMLDivElement | null }>({})
   const hintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -772,8 +507,11 @@ export function StatsCards({
   }, [openDropdown])
 
   useEffect(() => {
-    if (useMockData || !user) {
-      setStats(getMockStats(businessType, formatCurrencyValue))
+    // Set loading to true when component mounts or dependencies change
+    setLoadingSummary(true)
+    
+    if (!user) {
+      setStats([])
       setLoadingSummary(false)
       return
     }
@@ -843,67 +581,102 @@ export function StatsCards({
           })
           const totalPayments = yearPayments.reduce((sum, payment) => sum + (payment.amount || 0), 0)
           
-          // Intelligently determine which period to show tax for
-          // If viewing a quarter, show quarterly tax; if viewing year, show yearly tax
-          // Also consider showing monthly tax for current month if it's more relevant
+          // Use unified tax calculation engine (same as self-assessment)
           let periodTaxInfo: { amount: number; taxDuration: string; period: 'monthly' | 'quarterly' | 'yearly' } | null = null
           const calculatedBusinessType = businessType === 'small-business' ? 'sme' : businessType
           
-          if (periodType === 'year') {
-            // For yearly view, calculate yearly tax
-            try {
-              const yearTax = await getCurrentPeriodTax(user.uid, 'yearly', calculatedBusinessType)
-              if (yearTax && yearTax.amount > 0) {
+          // Calculate tax for period and year using unified engine
+          let periodTaxData: any = null
+          let yearTaxData: any = null
+          let periodTaxCalculationRaw: any = null
+          let yearTaxCalculationRaw: any = null
+          
+          try {
+            if (periodType === 'year') {
+              // For yearly view, use full year
+              yearTaxData = await reportService.calculateTaxForPeriod(
+                user.uid,
+                yearInfo.start,
+                yearEndDate,
+                calculatedBusinessType
+              )
+              periodTaxData = yearTaxData
+              
+              if (yearTaxData && yearTaxData.taxPayable > 0) {
                 periodTaxInfo = {
-                  amount: yearTax.amount,
-                  taxDuration: yearTax.taxDuration,
+                  amount: yearTaxData.taxPayable,
+                  taxDuration: `${selectedYear}`,
                   period: 'yearly'
                 }
               }
-            } catch (error) {
-              console.error('Error calculating yearly tax:', error)
-            }
-          } else {
-            // For quarter view, calculate quarterly tax for the selected quarter
-            try {
-              // Calculate tax for the selected quarter
+            } else {
+              // For quarter view, calculate tax for the selected quarter
               const quarterStartMonth = (selectedQuarter - 1) * 3
               const qStart = new Date(selectedYear, quarterStartMonth, 1)
               const qEnd = new Date(selectedYear, quarterStartMonth + 3, 0, 23, 59, 59, 999)
-              const quarterSummary = await transactionService.getTransactionSummary(
+              
+              periodTaxData = await reportService.calculateTaxForPeriod(
                 user.uid,
-                qStart.toISOString(),
-                qEnd.toISOString()
+                qStart,
+                qEnd,
+                calculatedBusinessType
               )
               
-              if (quarterSummary && quarterSummary.totalIncome > 0) {
-                const quarterTaxCalc = calculateNigerianTax({
-                  businessType: calculatedBusinessType,
-                  period: 'yearly',
-                  income: quarterSummary.totalIncome,
-                  businessExpenses: quarterSummary.totalExpenses || 0,
-                  rentPaid: 0,
-                  pensionContribution: 0,
-                  healthInsurance: 0,
-                  housingFund: 0,
-                  lifeInsurance: 0,
-                  charitableDonations: 0,
-                  dependents: 0,
-                })
-                
+              // Also calculate full year for context
+              yearTaxData = await reportService.calculateTaxForPeriod(
+                user.uid,
+                yearInfo.start,
+                yearEndDate,
+                calculatedBusinessType
+              )
+              
+              if (periodTaxData && periodTaxData.taxPayable > 0) {
                 const months = ['Jan-Mar', 'Apr-Jun', 'Jul-Sep', 'Oct-Dec']
                 const quarterTaxDuration = `Q${selectedQuarter} ${selectedYear} (${months[selectedQuarter - 1]})`
                 
                 periodTaxInfo = {
-                  amount: quarterTaxCalc.totalTax,
+                  amount: periodTaxData.taxPayable,
                   taxDuration: quarterTaxDuration,
                   period: 'quarterly'
                 }
               }
-            } catch (error) {
-              console.error('Error calculating quarterly tax:', error)
             }
+          } catch (error) {
+            console.error('Error calculating tax using unified engine:', error)
           }
+          
+          // Convert to format expected by buildStatsFromSummary
+          periodTaxCalculationRaw = periodTaxData ? {
+            grossIncome: periodTaxData.grossIncome,
+            businessExpenses: periodTaxData.totalExpenses,
+            adjustedGrossIncome: periodTaxData.adjustedGrossIncome,
+            taxableIncome: periodTaxData.taxableIncome,
+            totalTax: periodTaxData.taxPayable,
+            taxBrackets: periodTaxData.taxBrackets,
+            totalReliefs: periodTaxData.totalReliefs,
+            monthlySetAside: periodTaxData.taxPayable / 12,
+            capitalAllowances: periodTaxData.capitalAllowances,
+            whtCredits: periodTaxData.whtCredits,
+            vatOutput: periodTaxData.taxClassification?.vatOutput || 0,
+            reliefs: periodTaxData.reliefs,
+            effectiveRate: periodTaxData.taxableIncome > 0 ? ((periodTaxData.taxPayable / periodTaxData.taxableIncome) * 100).toFixed(2) : '0'
+          } : null
+          
+          yearTaxCalculationRaw = yearTaxData ? {
+            grossIncome: yearTaxData.grossIncome,
+            businessExpenses: yearTaxData.totalExpenses,
+            adjustedGrossIncome: yearTaxData.adjustedGrossIncome,
+            taxableIncome: yearTaxData.taxableIncome,
+            totalTax: yearTaxData.taxPayable,
+            taxBrackets: yearTaxData.taxBrackets,
+            totalReliefs: yearTaxData.totalReliefs,
+            monthlySetAside: yearTaxData.taxPayable / 12,
+            capitalAllowances: yearTaxData.capitalAllowances,
+            whtCredits: yearTaxData.whtCredits,
+            vatOutput: yearTaxData.taxClassification?.vatOutput || 0,
+            reliefs: yearTaxData.reliefs,
+            effectiveRate: yearTaxData.taxableIncome > 0 ? ((yearTaxData.taxPayable / yearTaxData.taxableIncome) * 100).toFixed(2) : '0'
+          } : null
           
           setStats(buildStatsFromSummary(
             periodSummary, 
@@ -915,14 +688,16 @@ export function StatsCards({
             periodType, 
             totalPayments,
             yearPayments, // Pass all year payments for matching
-            periodTaxInfo // Pass period-specific tax info
+            periodTaxInfo, // Pass period-specific tax info
+            periodTaxCalculationRaw, // Pass period tax calculation from unified engine
+            yearTaxCalculationRaw // Pass year tax calculation from unified engine
           ))
         })
         .catch((error) => {
           console.error("Error loading transaction summary:", error)
           if (!isMounted) return
-          setStats(getMockStats(businessType, formatCurrencyValue))
-          toast.error("Unable to load your latest stats. Showing recent data instead.")
+          setStats([])
+          toast.error("Unable to load your latest stats.")
         })
         .finally(() => {
           if (isMounted) setLoadingSummary(false)
@@ -941,7 +716,7 @@ export function StatsCards({
       isMounted = false
       window.removeEventListener("transactionChanged", handleTransactionChanged)
     }
-  }, [user?.uid, businessType, useMockData, periodType, selectedYear, selectedQuarter])
+  }, [user?.uid, businessType, periodType, selectedYear, selectedQuarter])
 
   const handleCardClick = (statId: string) => {
     setOpenDropdown(openDropdown === statId ? null : statId)
@@ -959,7 +734,7 @@ export function StatsCards({
     setHoveredCard(statId)
   }
 
-  const cardLoadingClass = !useMockData && loadingSummary ? "pointer-events-none opacity-60 animate-pulse" : ""
+  const cardLoadingClass = loadingSummary ? "pointer-events-none opacity-60 animate-pulse" : ""
 
   // Generate year options (current year and previous 2 years)
   const yearOptions = Array.from({ length: 3 }, (_, i) => currentYear - i)
@@ -1145,7 +920,22 @@ export function StatsCards({
         ref={containerRef}
         className={`grid grid-cols-2 sm:grid-cols-2 ${sidebarCollapsed ? "lg:grid-cols-4" : "lg:grid-cols-2 xl:grid-cols-4"} gap-2 sm:gap-3 md:gap-4`}
       >
-      {stats.map((stat, index) => {
+      {loadingSummary ? (
+        // Skeleton loading state
+        Array.from({ length: 4 }).map((_, index) => (
+          <Card key={`skeleton-${index}`} className="p-4 sm:p-5 md:p-6 h-full flex flex-col animate-pulse">
+            <div className="flex items-start justify-between flex-1">
+              <div className="flex-1 min-w-0">
+                <div className="h-3 sm:h-4 bg-muted rounded w-20 sm:w-24 mb-2 sm:mb-3"></div>
+                <div className="h-6 sm:h-7 md:h-8 lg:h-9 bg-muted rounded w-32 sm:w-40 mb-2 sm:mb-3"></div>
+                <div className="h-3 sm:h-4 bg-muted rounded w-16 sm:w-20"></div>
+              </div>
+              <div className="w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-lg bg-muted flex-shrink-0 ml-2"></div>
+            </div>
+          </Card>
+        ))
+      ) : (
+        stats.map((stat, index) => {
         const Icon = stat.icon
         const isOpen = openDropdown === stat.id
         const isHovered = hoveredCard === stat.id && isHoverEnabled
@@ -1235,7 +1025,8 @@ export function StatsCards({
             )}
           </div>
         )
-      })}
+      })
+      )}
       </div>
     </div>
   )

@@ -8,7 +8,6 @@ import { transactionService } from "@/lib/services/transactionService"
 import { toast } from "sonner"
 
 interface IncomeExpenseChartProps {
-  useMockData?: boolean
   periodType?: PeriodType
   selectedYear?: number
   selectedQuarter?: number
@@ -72,15 +71,6 @@ const buildEmptyChartDataForPeriod = (startDate: Date, endDate: Date): ChartPoin
   return points
 }
 
-const mockData: ChartPoint[] = [
-  { key: "2024-12", month: "Dec", year: 2024, income: 850000, expenses: 420000 },
-  { key: "2025-1", month: "Jan", year: 2025, income: 920000, expenses: 450000 },
-  { key: "2025-2", month: "Feb", year: 2025, income: 880000, expenses: 390000 },
-  { key: "2025-3", month: "Mar", year: 2025, income: 960000, expenses: 520000 },
-  { key: "2025-4", month: "Apr", year: 2025, income: 1010000, expenses: 480000 },
-  { key: "2025-5", month: "May", year: 2025, income: 1100000, expenses: 540000 },
-]
-
 const CustomTooltip = ({ active, payload }: any) => {
   if (active && payload && payload.length) {
     const datum: ChartPoint | undefined = payload[0]?.payload
@@ -109,7 +99,6 @@ const CustomTooltip = ({ active, payload }: any) => {
 }
 
 export function IncomeExpenseChart({ 
-  useMockData = false,
   periodType = "quarter",
   selectedYear,
   selectedQuarter
@@ -127,15 +116,9 @@ export function IncomeExpenseChart({
     const periodInfo = getQuarterInfo(now, effectiveQuarter)
     return buildEmptyChartDataForPeriod(periodInfo.start, periodInfo.end > now ? now : periodInfo.end)
   })
-  const [loading, setLoading] = useState<boolean>(!useMockData)
+  const [loading, setLoading] = useState<boolean>(true)
 
   useEffect(() => {
-    if (useMockData) {
-      setChartData(mockData)
-      setLoading(false)
-      return
-    }
-
     if (!user) {
       const periodInfo = periodType === "year" 
         ? getYearInfo(now, effectiveYear)
@@ -198,8 +181,11 @@ export function IncomeExpenseChart({
       } catch (error) {
         console.error("Error loading income vs expenses chart:", error)
         if (!isMounted) return
-        toast.error("Unable to load income vs expenses chart. Showing recent data instead.")
-        setChartData(mockData)
+        toast.error("Unable to load income vs expenses chart.")
+        const periodInfo = periodType === "year" 
+          ? getYearInfo(now, effectiveYear)
+          : getQuarterInfo(now, effectiveQuarter)
+        setChartData(buildEmptyChartDataForPeriod(periodInfo.start, periodInfo.end > now ? now : periodInfo.end))
       } finally {
         if (isMounted) {
           setLoading(false)
@@ -219,7 +205,7 @@ export function IncomeExpenseChart({
       isMounted = false
       window.removeEventListener("transactionChanged", handleTransactionChanged)
     }
-  }, [useMockData, user?.uid, periodType, effectiveYear, effectiveQuarter])
+  }, [user?.uid, periodType, effectiveYear, effectiveQuarter])
 
   const chartDescription = useMemo(() => {
     if (periodType === "year") {

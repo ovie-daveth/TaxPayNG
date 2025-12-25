@@ -1,17 +1,18 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { Upload, Scan, Loader2, AlertCircle } from "lucide-react"
-import { Transaction } from "@/lib/types"
+import { Upload, Scan, Loader2, AlertCircle, HelpCircle } from "lucide-react"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Transaction, TransactionNature, TaxPeriod, TaxClassification } from "@/lib/types"
 import { toast } from "sonner"
-import { formatDateForInput } from "@/lib/utils/date"
+import { formatDateForInput, calculateTaxPeriod } from "@/lib/utils/date"
 import { uploadToImageKit, ImageUploadResult } from "@/lib/utils/imagekit"
 import { TagsInput } from "@/components/ui/tags-input"
 import { ocrService, ReceiptData } from "@/lib/services"
@@ -22,7 +23,8 @@ import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { SubscriptionAlert } from "@/components/subscription/subscription-restriction"
 import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { useAuth } from "@/lib/hooks/useAuth"
-import { documentService } from "@/lib/services"
+import { documentService, invoiceService } from "@/lib/services"
+import { Invoice } from "@/lib/types"
 
 interface AddTransactionDialogProps {
   open: boolean
@@ -44,6 +46,93 @@ export function AddTransactionDialog({
   defaultDescription
 }: AddTransactionDialogProps) {
   const { user } = useAuth()
+  const { profile } = useUserProfile()
+  
+  // Define base categories based on business type and transaction type
+  const getBaseCategories = () => {
+    const isCreator = profile?.businessType === 'creator'
+    const isIncome = formData.type === 'income'
+    
+    if (isCreator) {
+      if (isIncome) {
+        return [
+          { value: "Brand Sponsorship", label: "Brand Sponsorship" },
+          { value: "Ad Revenue", label: "Ad Revenue (YouTube, Instagram, etc.)" },
+          { value: "Affiliate Income", label: "Affiliate Income" },
+          { value: "Brand Deal", label: "Brand Deal" },
+          { value: "Content Licensing", label: "Content Licensing" },
+          { value: "Merchandise Sales", label: "Merchandise Sales" },
+          { value: "Subscription Revenue", label: "Subscription Revenue (Patreon, etc.)" },
+          { value: "Online Courses", label: "Online Courses/Coaching" },
+          { value: "Events & Speaking", label: "Events & Speaking" },
+          { value: "Platform Payout", label: "Platform Payout (YouTube, TikTok, etc.)" },
+          { value: "Other", label: "Other" },
+        ]
+      } else {
+        return [
+          { value: "Equipment", label: "Equipment (Camera, Mic, etc.)" },
+          { value: "Software & Subscriptions", label: "Software & Subscriptions" },
+          { value: "Studio Rent", label: "Studio Rent/Setup" },
+          { value: "Co-working Space", label: "Co-working Space" },
+          { value: "Editing Services", label: "Editing Services" },
+          { value: "Marketing & Promotion", label: "Marketing & Promotion" },
+          { value: "Travel for Content", label: "Travel for Content" },
+          { value: "Props & Supplies", label: "Props & Supplies" },
+          { value: "Internet & Utilities", label: "Internet & Utilities" },
+          { value: "Staff/Contractor", label: "Staff/Contractor Payments" },
+          { value: "Professional Fees", label: "Professional Fees (Accountants, Lawyers)" },
+          { value: "Rent", label: "Rent" },
+          { value: "Food", label: "Food" },
+          { value: "Transport", label: "Transport" },
+          { value: "Healthcare", label: "Healthcare" },
+          { value: "Other", label: "Other" },
+        ]
+      }
+    } else {
+      // Freelancer categories
+      if (isIncome) {
+        return [
+          { value: "Services", label: "Services" },
+          { value: "Consulting", label: "Consulting" },
+          { value: "Projects", label: "Projects" },
+          { value: "Platform Income", label: "Platform Income (Upwork, Fiverr, etc.)" },
+          { value: "Retainer", label: "Retainer Fees" },
+          { value: "Commission", label: "Commission-Based Income" },
+          { value: "Other", label: "Other" },
+        ]
+      } else {
+        return [
+          { value: "Rent", label: "Rent" },
+          { value: "Software", label: "Software" },
+          { value: "Utilities", label: "Utilities" },
+          { value: "Marketing", label: "Marketing" },
+          { value: "Food", label: "Food" },
+          { value: "Transport", label: "Transport" },
+          { value: "Entertainment", label: "Entertainment" },
+          { value: "Healthcare", label: "Healthcare" },
+          { value: "Education", label: "Education" },
+          { value: "Other", label: "Other" },
+        ]
+      }
+    }
+  }
+
+  // Get categories with custom category included if it exists
+  const getCategories = () => {
+    const baseCategories = getBaseCategories()
+    
+    // If there's a custom category (not in base list), add it before "Other"
+    if (formData.category && !baseCategories.some(cat => cat.value === formData.category)) {
+      const categoriesWithoutOther = baseCategories.filter(cat => cat.value !== 'Other')
+      return [
+        ...categoriesWithoutOther,
+        { value: formData.category, label: formData.category },
+        { value: 'Other', label: 'Other' }
+      ]
+    }
+    
+    return baseCategories
+  }
 
   const [formData, setFormData] = useState({
     type: 'income' as Transaction['type'],
@@ -64,23 +153,153 @@ export function AddTransactionDialog({
   const [isConverting, setIsConverting] = useState(false)
   const [exchangeRate, setExchangeRate] = useState<number | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
-  const [uploadedImage, setUploadedImage] = useState<ImageUploadResult | null>(null)
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null) // Store the original file for document creation
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]) // Multiple files support
+  const [uploadedImages, setUploadedImages] = useState<ImageUploadResult[]>([]) // Multiple upload results
+  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]) // Store original files for document creation
   const [uploadingImages, setUploadingImages] = useState(false)
   const [isScanning, setIsScanning] = useState(false)
   const [ocrResult, setOcrResult] = useState<ReceiptData | null>(null)
   const [ocrProgress, setOcrProgress] = useState(0)
   const [showFormFields, setShowFormFields] = useState(false) // Track if form fields should be shown
-  const { isSubscribed } = useSubscription()
-  const { profile } = useUserProfile()
+  const [isManualEntryMode, setIsManualEntryMode] = useState(false) // Track if user explicitly chose manual entry
+  const [customCategory, setCustomCategory] = useState('') // For "Other" category custom input
+  const [showCustomCategoryModal, setShowCustomCategoryModal] = useState(false) // Modal for custom category
+  const { isSubscribed, subscriptionType, hasAccess } = useSubscription()
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+  
+  // Phase 1: New fields for tax compliance
+  const [transactionDate, setTransactionDate] = useState('') // When transaction occurred
+  const [valueDate, setValueDate] = useState('') // When money moved
+  const [transactionNature, setTransactionNature] = useState<TransactionNature>('business') // business/personal/mixed
+  const [businessPercentage, setBusinessPercentage] = useState<number>(100) // For mixed transactions
+  
+  // Invoice linking - optional manual linking
+  const [availableInvoices, setAvailableInvoices] = useState<Invoice[]>([])
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('')
+  const [loadingInvoices, setLoadingInvoices] = useState(false)
+  
+  // Phase 2: Platform fees tracking (for income transactions)
+  const [usePlatformFeesBreakdown, setUsePlatformFeesBreakdown] = useState(false) // Switch to toggle platform fees breakdown
+  const [grossAmount, setGrossAmount] = useState('')
+  const [grossAmountDisplay, setGrossAmountDisplay] = useState('')
+  const [platformFees, setPlatformFees] = useState('')
+  const [platformFeesDisplay, setPlatformFeesDisplay] = useState('')
+  const [netAmount, setNetAmount] = useState<number | null>(null)
+  
+  // Phase 2: Platform info
+  const [platformName, setPlatformName] = useState('')
+  const [platformType, setPlatformType] = useState<'social' | 'subscription' | 'marketplace' | 'streaming' | 'other'>('social')
+  const [platformAccountId, setPlatformAccountId] = useState('')
+  const [platformAccountUrl, setPlatformAccountUrl] = useState('')
+  const [savedPlatforms, setSavedPlatforms] = useState<Array<{
+    id: string
+    name: string
+    platformType: 'social' | 'subscription' | 'marketplace' | 'streaming' | 'other'
+    accountId?: string
+    accountUrl?: string
+  }>>([])
+  
+  // Check if user has access to OCR (GOLD and above plans only)
+  // OCR is enabled for the first upload box, but disabled when manual entry is selected
+  const hasOcrAccess = hasAccess('GOLD')
+  const isOcrEnabled = hasOcrAccess && !isManualEntryMode
+  
+  // Check if user has access to Tax Classification (GOLD and above plans only)
+  const hasTaxClassificationAccess = hasAccess('GOLD')
+  
+  // Tax Classification state (only for Gold+ users)
+  const [taxClassification, setTaxClassification] = useState<TaxClassification | undefined>(undefined)
+  const [showTaxClassificationSection, setShowTaxClassificationSection] = useState(false)
+  const [skipTaxClassification, setSkipTaxClassification] = useState(false)
+  
+  // Auto-populate tax classification based on transaction data (Gold+ only)
+  const autoPopulateTaxClassification = (
+    type: Transaction['type'],
+    category: string,
+    transactionNature: TransactionNature,
+    description: string,
+    notes: string
+  ): TaxClassification => {
+    const classification: TaxClassification = {}
+    
+    if (type === 'income') {
+      // Income classification
+      classification.incomeType = 'taxable' // Default to taxable
+      
+      // Check for WHT indicators
+      const hasWHT = description.toLowerCase().includes('wht') || 
+                     description.toLowerCase().includes('withholding') ||
+                     notes.toLowerCase().includes('wht') ||
+                     notes.toLowerCase().includes('withholding') ||
+                     category.toLowerCase().includes('wht')
+      
+      if (hasWHT) {
+        classification.whtCreditable = true
+        // Common WHT rates in Nigeria: 5%, 10%
+        classification.whtRate = category.includes('Professional') || category.includes('Consulting') ? 10 : 5
+      }
+      
+      // Non-taxable income categories
+      if (category === 'Gift' || category === 'Grant' || description.toLowerCase().includes('gift')) {
+        classification.incomeType = 'non-taxable'
+      }
+    } else {
+      // Expense classification
+      const isBusiness = transactionNature === 'business' || transactionNature === 'mixed'
+      
+      if (isBusiness) {
+        classification.expenseType = 'allowable'
+        
+        // Capital asset categories - only physical/intangible assets with long-term value
+        // Note: Subscriptions, Rent, and Services are operating expenses, NOT capital assets
+        const capitalAssetKeywords = [
+          'equipment', 'camera', 'computer', 'laptop', 'vehicle', 'car', 'furniture', 
+          'machinery', 'software license', 'software purchase', 'hardware', 
+          'building', 'property', 'office equipment', 'production equipment'
+        ]
+        
+        // Check if category or description contains capital asset keywords
+        // Use exact word matching to avoid false positives (e.g., "Subscription" matching "Software & Subscriptions")
+        const categoryLower = category.toLowerCase()
+        const descriptionLower = description.toLowerCase()
+        
+        const isCapitalAsset = capitalAssetKeywords.some(keyword => {
+          // Check for whole word matches to avoid partial matches
+          const categoryMatch = categoryLower === keyword || 
+                               categoryLower.includes(` ${keyword} `) ||
+                               categoryLower.startsWith(`${keyword} `) ||
+                               categoryLower.endsWith(` ${keyword}`)
+          const descriptionMatch = descriptionLower.includes(keyword)
+          return categoryMatch || descriptionMatch
+        })
+        
+        // Exclude common non-capital expense categories
+        const nonCapitalCategories = ['rent', 'subscription', 'service', 'utilities', 'maintenance', 'repair']
+        const isNonCapital = nonCapitalCategories.some(nonCap => 
+          categoryLower.includes(nonCap) || descriptionLower.includes(nonCap)
+        )
+        
+        if (isCapitalAsset && !isNonCapital) {
+          classification.isCapitalAsset = true
+          classification.capitalAllowanceRate = 25 // 25% annual allowance (standard in Nigeria)
+        }
+      } else {
+        // Personal expenses are not allowable
+        classification.expenseType = 'disallowable'
+      }
+      
+      // VAT is not applicable to expenses - only to income transactions
+      // VAT on expenses (input VAT) is handled separately and doesn't need to be tracked here
+    }
+    
+    return classification
+  }
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const file = e.target.files[0]
-      setSelectedFile(file)
-      setUploadedFile(file) // Store file for later upload when saving
+  const handleFileSelect = async (files: FileList | null) => {
+    if (files && files.length > 0) {
+      const fileArray = Array.from(files)
+      setSelectedFiles(prev => [...prev, ...fileArray])
+      setUploadedFiles(prev => [...prev, ...fileArray]) // Store files for later upload when saving
       // Don't upload to ImageKit automatically - wait until transaction is saved
     }
   }
@@ -152,30 +371,21 @@ export function AddTransactionDialog({
     }
   }
 
-  const uploadFileToImageKit = async (file: File) => {
-    setUploadingImages(true)
-
-    try {
-      const result = await uploadToImageKit(file, 'transactions', user?.uid)
-      setUploadedImage(result)
-      setUploadedFile(file) // Store the file for later document creation
-      toast.success('Document uploaded successfully!')
-    } catch (error) {
-      console.error('Upload error:', error)
-      toast.error('Failed to upload document')
-      setSelectedFile(null)
-      setUploadedFile(null)
-    } finally {
-      setUploadingImages(false)
+  const handleRemoveFile = (index: number) => {
+    // Clean up object URL if it was a preview
+    if (uploadedImages[index] && uploadedImages[index].url && uploadedImages[index].url.startsWith('blob:')) {
+      URL.revokeObjectURL(uploadedImages[index].url)
+      if (uploadedImages[index].thumbnailUrl && uploadedImages[index].thumbnailUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(uploadedImages[index].thumbnailUrl)
+      }
     }
-  }
-
-  const handleRemoveFile = () => {
-    setSelectedFile(null)
-    setUploadedImage(null)
-    setUploadedFile(null)
-    // Clear documentId if removing file (will be deleted on save)
-    setFormData(prev => ({ ...prev, documentId: undefined }))
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index))
+    setUploadedImages(prev => prev.filter((_, i) => i !== index))
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index))
+    // Clear documentId if removing all files (will be deleted on save)
+    if (selectedFiles.length === 1) {
+      setFormData(prev => ({ ...prev, documentId: undefined }))
+    }
   }
 
   // Handle currency conversion
@@ -247,13 +457,38 @@ export function AddTransactionDialog({
     if (transaction) {
       // Editing existing transaction - show all fields immediately
       const transactionCurrency = (transaction as any).currency || 'NGN' as CurrencyCode
-      const amountStr = transaction.amount.toString()
+      
+      // Calculate original amount based on locked exchange rate
+      let originalAmount: number
+      let displayAmount: string
+      
+      if (transactionCurrency !== 'NGN' && transaction.ngnEquivalent && transaction.exchangeRate) {
+        // Reverse calculate: original amount = ngnEquivalent / exchangeRate
+        originalAmount = transaction.ngnEquivalent / transaction.exchangeRate
+        displayAmount = formatCurrencyInput(originalAmount.toString())
+        // Set the locked exchange rate and converted amount
+        setExchangeRate(transaction.exchangeRate)
+        setConvertedAmountNGN(transaction.ngnEquivalent)
+      } else if (transactionCurrency !== 'NGN' && transaction.exchangeRate) {
+        // Fallback: if we have exchange rate but no ngnEquivalent, calculate from stored amount
+        // This handles edge cases where ngnEquivalent might be missing
+        originalAmount = transaction.amount / transaction.exchangeRate
+        displayAmount = formatCurrencyInput(originalAmount.toString())
+        setExchangeRate(transaction.exchangeRate)
+        setConvertedAmountNGN(transaction.amount)
+      } else {
+        // NGN transaction or no currency info
+        originalAmount = transaction.amount
+        displayAmount = formatCurrencyInput(transaction.amount.toString())
+        setConvertedAmountNGN(transaction.amount)
+        setExchangeRate(1)
+      }
 
       setFormData({
         type: transaction.type,
         description: transaction.description,
-        amount: amountStr,
-        amountDisplay: formatCurrencyInput(amountStr),
+        amount: originalAmount.toString(),
+        amountDisplay: displayAmount,
         currency: transactionCurrency,
         date: formatDateForInput(transaction.date),
         category: transaction.category,
@@ -265,57 +500,195 @@ export function AddTransactionDialog({
         documentId: transaction.documentId
       })
 
-      // Initialize conversion if currency is not NGN
-      if (transactionCurrency !== 'NGN') {
-        handleCurrencyConversion(amountStr, transactionCurrency)
-      } else {
-        setConvertedAmountNGN(transaction.amount)
-        setExchangeRate(1)
-      }
-
-      // Load existing attachment if available
+      // Load multiple attachments if they exist
       if (transaction.attachments && transaction.attachments.length > 0) {
-        const attachmentUrl = transaction.attachments[0]
-        // Extract filename from URL (last part after the last /)
-        const filename = attachmentUrl.split('/').pop() || 'attachment'
-        setUploadedImage({
-          url: attachmentUrl,
-          name: filename,
-          fileId: '', // Not needed for existing attachments
-          thumbnailUrl: attachmentUrl,
-          size: 0 // Size unknown for existing attachments
+        const attachmentImages: ImageUploadResult[] = transaction.attachments.map((url, index) => {
+          const filename = url.split('/').pop() || `Receipt ${index + 1}`
+          return {
+            url: url,
+            name: filename,
+            thumbnailUrl: url,
+            fileId: transaction.attachmentFileIds?.[index] || '', // Get corresponding fileId
+            size: 0 // Size unknown for existing attachments
+          }
         })
+        setUploadedImages(attachmentImages)
+        setSelectedFiles([]) // Files already uploaded, no need to store File objects
       } else {
-        setUploadedImage(null)
+        setUploadedImages([])
       }
 
-      setSelectedFile(null)
+      setSelectedFiles([])
       setOcrResult(null)
       setShowFormFields(true) // Show fields for editing
+      
+      // Phase 1: Initialize new fields from existing transaction
+      setTransactionDate(transaction.transactionDate || transaction.date)
+      setValueDate(transaction.valueDate || transaction.date)
+      setTransactionNature(transaction.transactionNature || 'business')
+      setBusinessPercentage(transaction.businessPercentage || 100)
+      
+      // Invoice linking
+      setSelectedInvoiceId(transaction.linkedInvoiceId || '')
+      
+      // Tax Classification (Gold+ only)
+      if (hasTaxClassificationAccess) {
+        if (transaction.taxClassification) {
+          setTaxClassification(transaction.taxClassification)
+        } else {
+          // Auto-populate if not set
+          const autoClassification = autoPopulateTaxClassification(
+            transaction.type,
+            transaction.category,
+            transaction.transactionNature || 'business',
+            transaction.description,
+            transaction.notes || ''
+          )
+          setTaxClassification(autoClassification)
+        }
+      }
+      
+      // Phase 2: Initialize platform fees and platform info
+      if (profile?.businessType === 'creator' && transaction.type === 'income') {
+        // Enable breakdown if platform fees data exists
+        const hasPlatformFees = !!(transaction.grossAmount || transaction.platformFees || transaction.platform)
+        setUsePlatformFeesBreakdown(hasPlatformFees)
+        
+        if (transaction.grossAmount) {
+          const gross = transaction.currency === 'NGN' 
+            ? transaction.grossAmount 
+            : (transaction.exchangeRate ? transaction.grossAmount * transaction.exchangeRate : transaction.grossAmount)
+          setGrossAmount(gross.toString())
+          setGrossAmountDisplay(formatCurrencyInput(gross.toString()))
+        }
+        if (transaction.platformFees) {
+          const fees = transaction.currency === 'NGN'
+            ? transaction.platformFees
+            : (transaction.exchangeRate ? transaction.platformFees * transaction.exchangeRate : transaction.platformFees)
+          setPlatformFees(fees.toString())
+          setPlatformFeesDisplay(formatCurrencyInput(fees.toString()))
+        }
+        if (transaction.netAmount !== undefined) {
+          const net = transaction.currency === 'NGN'
+            ? transaction.netAmount
+            : (transaction.exchangeRate ? transaction.netAmount * transaction.exchangeRate : transaction.netAmount)
+          setNetAmount(net)
+        }
+        if (transaction.platform) {
+          setPlatformName(transaction.platform.name)
+          setPlatformType(transaction.platform.platformType)
+          setPlatformAccountId(transaction.platform.accountId || '')
+          setPlatformAccountUrl(transaction.platform.accountUrl || '')
+        }
+      }
     } else {
       // New transaction - start with file input only
+      const today = new Date().toISOString().split('T')[0]
       setFormData({
         type: defaultType ?? 'income',
         description: defaultDescription ?? '',
         amount: '',
         amountDisplay: '',
         currency: 'NGN' as CurrencyCode,
-        date: new Date().toISOString().split('T')[0],
+        date: today,
         category: defaultCategory ?? '',
         paymentMethod: 'Bank Transfer',
         notes: '',
         taxDeductible: false,
         tags: [],
-        attachments: []
+        attachments: [],
+        documentId: undefined
       })
-      setSelectedFile(null)
-      setUploadedImage(null)
+      setSelectedFiles([])
+      setUploadedImages([])
+      setUploadedFiles([])
       setOcrResult(null)
-      setShowFormFields(false) // Hide fields initially for new transactions
+      // For freelancers (no OCR access), show form fields directly
+      // For creators (with OCR access), show upload screen first
+      const shouldShowFormFields = !hasOcrAccess
+      setShowFormFields(shouldShowFormFields)
+      setIsManualEntryMode(shouldShowFormFields) // Set manual mode for freelancers
       setConvertedAmountNGN(null)
       setExchangeRate(null)
+      
+      // Phase 1: Initialize new fields for new transaction
+      setTransactionDate(today)
+      setValueDate(today)
+      setTransactionNature('business')
+      setBusinessPercentage(100)
+      
+      // Invoice linking
+      setSelectedInvoiceId('')
+      
+      // Phase 2: Reset platform fees and platform info
+      setUsePlatformFeesBreakdown(false)
+      setGrossAmount('')
+      setGrossAmountDisplay('')
+      setPlatformFees('')
+      setPlatformFeesDisplay('')
+      setNetAmount(null)
+      setPlatformName('')
+      setPlatformType('social')
+      setPlatformAccountId('')
+      setPlatformAccountUrl('')
+      
+      // Reset tax classification (Gold+ only)
+      if (hasTaxClassificationAccess) {
+        setTaxClassification(undefined)
+        setSkipTaxClassification(false)
+        setShowTaxClassificationSection(false)
+      }
     }
-  }, [transaction, open, defaultType, defaultCategory, defaultDescription])
+  }, [transaction, open, defaultType, defaultCategory, defaultDescription, hasOcrAccess, hasTaxClassificationAccess])
+  
+  // Auto-populate tax classification when form data changes (Gold+ only)
+  useEffect(() => {
+    if (!hasTaxClassificationAccess) return
+    if (!formData.category || !formData.type) return
+    if (skipTaxClassification) return // Don't auto-populate if user skipped
+    
+    // Auto-populate tax classification
+    const autoClassification = autoPopulateTaxClassification(
+      formData.type,
+      formData.category,
+      transactionNature,
+      formData.description,
+      formData.notes
+    )
+    
+    // Ensure VAT is never set for expenses (VAT only applies to income)
+    if (formData.type === 'expense') {
+      autoClassification.vatApplicable = false
+      autoClassification.vatRate = undefined
+    }
+    
+    // Only auto-update if user hasn't manually edited (section is collapsed)
+    if (!showTaxClassificationSection) {
+      setTaxClassification(autoClassification)
+    }
+  }, [formData.type, formData.category, formData.description, formData.notes, transactionNature, hasTaxClassificationAccess, showTaxClassificationSection, skipTaxClassification])
+
+  // Load available invoices when dialog opens (for manual linking)
+  useEffect(() => {
+    const loadInvoices = async () => {
+      if (!open || !profile?.userId) return
+      
+      try {
+        setLoadingInvoices(true)
+        // Fetch unpaid or pending invoices that could be linked
+        const result = await invoiceService.getUserInvoices(profile.userId, {}, 1, 100)
+        // Filter to show invoices that don't already have a linked transaction
+        const unlinkedInvoices = result.data.filter(inv => !inv.linkedTransactionId)
+        setAvailableInvoices(unlinkedInvoices)
+      } catch (error) {
+        console.error('Error loading invoices:', error)
+      } finally {
+        setLoadingInvoices(false)
+      }
+    }
+    
+    loadInvoices()
+  }, [open, profile?.userId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -332,88 +705,221 @@ export function AddTransactionDialog({
     try {
       let documentId: string | undefined = undefined
       let imageUrl: string[] = []
+      let attachmentFileIds: string[] = []
 
-      // Handle document upload/replacement/deletion
-      if (uploadedFile && user?.uid) {
-        // New file to upload (either new transaction or replacing existing)
+      // Handle multiple file uploads
+      if (uploadedFiles.length > 0 && user?.uid) {
+        // New files to upload (either new transaction or replacing existing)
         try {
           setUploadingImages(true)
           
-          // If editing and there's an existing document, delete it first
-          if (transaction?.documentId) {
+          // If editing and there are existing attachments, delete them first
+          if (transaction?.attachmentFileIds && transaction.attachmentFileIds.length > 0) {
             try {
-              await documentService.deleteDocument(transaction.documentId, user.uid)
-              console.log(`Deleted old document ${transaction.documentId} before replacing`)
+              // Delete all existing attachment files from ImageKit
+              for (const fileId of transaction.attachmentFileIds) {
+                if (fileId) {
+                  try {
+                    const response = await fetch(`/api/delete-image?fileId=${encodeURIComponent(fileId)}`, {
+                      method: 'DELETE',
+                      headers: {
+                        'Content-Type': 'application/json',
+                      },
+                    })
+                    if (!response.ok) {
+                      console.warn(`Failed to delete ImageKit file ${fileId}`)
+                    }
+                  } catch (deleteError) {
+                    console.error(`Error deleting ImageKit file ${fileId}:`, deleteError)
+                  }
+                }
+              }
+              // Delete linked document if it exists
+              if (transaction.documentId) {
+                await documentService.deleteDocument(transaction.documentId, user.uid)
+                console.log(`Deleted old document ${transaction.documentId} before replacing`)
+              }
             } catch (deleteError) {
-              console.error('Error deleting old document:', deleteError)
+              console.error('Error deleting old documents:', deleteError)
               // Continue even if deletion fails
             }
           }
 
-          // Upload to ImageKit
-          const uploadResult = await uploadToImageKit(uploadedFile, 'transactions', user.uid)
-          setUploadedImage(uploadResult)
-          imageUrl = [uploadResult.url]
+          // Upload all files to ImageKit
+          const uploadResults: ImageUploadResult[] = []
+          for (const file of uploadedFiles) {
+            try {
+              const uploadResult = await uploadToImageKit(file, 'transactions', user.uid)
+              uploadResults.push(uploadResult)
+              imageUrl.push(uploadResult.url)
+              attachmentFileIds.push(uploadResult.fileId)
+            } catch (uploadError) {
+              console.error('Error uploading file:', uploadError)
+              toast.error(`Failed to upload ${file.name}. Continuing with other files...`)
+            }
+          }
 
-          // Create document record (will link to transaction after transaction is created)
-          const documentType = formData.type === 'income' ? 'invoice' : 'receipt'
-          const docResult = await documentService.uploadDocument(user.uid, {
-            file: uploadedFile,
-            name: `${formData.description} - Receipt`,
-            type: documentType,
-            imageKitUrl: uploadResult.url,
-            imageKitFileId: uploadResult.fileId,
-            fileSize: uploadResult.size,
-            date: formData.date,
-            notes: `Auto-created from transaction: ${formData.description}`
-          })
+          setUploadedImages(uploadResults)
 
-          if (docResult.success && docResult.data) {
-            documentId = docResult.data.id
+          // Create document record for the first file (for backward compatibility)
+          if (uploadResults.length > 0) {
+            const firstFile = uploadedFiles[0]
+            const firstResult = uploadResults[0]
+            const documentType = formData.type === 'income' ? 'invoice' : 'receipt'
+            const docResult = await documentService.uploadDocument(user.uid, {
+              file: firstFile,
+              name: `${formData.description} - Receipt`,
+              type: documentType,
+              imageKitUrl: firstResult.url,
+              imageKitFileId: firstResult.fileId,
+              fileSize: firstResult.size,
+              date: formData.date,
+              notes: `Auto-created from transaction: ${formData.description}`
+            })
+
+            if (docResult.success && docResult.data) {
+              documentId = docResult.data.id
+            }
+          }
+
+          if (uploadResults.length > 0) {
+            toast.success(`Successfully uploaded ${uploadResults.length} file(s)`)
           }
         } catch (error) {
-          console.error('Error uploading document:', error)
-          toast.error('Failed to upload document. Transaction will be saved without attachment.')
-          // Continue with transaction creation even if document upload fails
+          console.error('Error uploading documents:', error)
+          toast.error('Failed to upload some documents. Transaction will be saved with available attachments.')
+          // Continue with transaction creation even if some uploads fail
         } finally {
           setUploadingImages(false)
         }
-      } else if (transaction?.documentId && !uploadedFile) {
-        // Editing transaction but file was removed - delete the document
+      } else if (transaction?.attachments && transaction.attachments.length > 0 && uploadedFiles.length === 0) {
+        // Editing transaction but all files were removed - delete all attachments
         try {
-          await documentService.deleteDocument(transaction.documentId, user?.uid || '')
-          console.log(`Deleted document ${transaction.documentId} as file was removed`)
+          // Delete all attachment files from ImageKit
+          if (transaction.attachmentFileIds && transaction.attachmentFileIds.length > 0) {
+            for (const fileId of transaction.attachmentFileIds) {
+              if (fileId) {
+                try {
+                  const response = await fetch(`/api/delete-image?fileId=${encodeURIComponent(fileId)}`, {
+                    method: 'DELETE',
+                    headers: {
+                      'Content-Type': 'application/json',
+                    },
+                  })
+                  if (!response.ok) {
+                    console.warn(`Failed to delete ImageKit file ${fileId}`)
+                  }
+                } catch (deleteError) {
+                  console.error(`Error deleting ImageKit file ${fileId}:`, deleteError)
+                }
+              }
+            }
+          }
+          // Delete linked document if it exists
+          if (transaction.documentId) {
+            await documentService.deleteDocument(transaction.documentId, user?.uid || '')
+            console.log(`Deleted document ${transaction.documentId} as files were removed`)
+          }
           documentId = undefined
           imageUrl = []
+          attachmentFileIds = []
         } catch (deleteError) {
-          console.error('Error deleting document:', deleteError)
-          // Keep existing documentId if deletion fails
+          console.error('Error deleting documents:', deleteError)
+          // Keep existing attachments if deletion fails
           documentId = transaction.documentId
           imageUrl = transaction.attachments || []
+          attachmentFileIds = transaction.attachmentFileIds || []
         }
-      } else if (transaction?.documentId) {
-        // Editing transaction, no file change - keep existing document
+      } else if (transaction?.attachments && transaction.attachments.length > 0) {
+        // Editing transaction, no file change - keep existing attachments
         documentId = transaction.documentId
         imageUrl = transaction.attachments || []
+        attachmentFileIds = transaction.attachmentFileIds || []
       }
 
-      // Use converted NGN amount for storage (always store in NGN)
-      const amountToStore = formData.currency === 'NGN'
-        ? parseFloat(formData.amount)
-        : (convertedAmountNGN || parseFloat(formData.amount))
+      // Phase 2: For income transactions with platform fees breakdown enabled, use netAmount if available
+      // Otherwise use the regular amount
+      let amountToStore: number
+      if (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && grossAmount && platformFees) {
+        // Use net amount (gross - fees) for income with platform fees
+        const gross = parseFloat(grossAmount)
+        const fees = parseFloat(platformFees)
+        const net = gross - fees
+        amountToStore = formData.currency === 'NGN'
+          ? net
+          : (convertedAmountNGN ? (net * (convertedAmountNGN / gross)) : net)
+      } else {
+        // Use regular amount
+        amountToStore = formData.currency === 'NGN'
+          ? parseFloat(formData.amount)
+          : (convertedAmountNGN || parseFloat(formData.amount))
+      }
 
+      // Phase 1: Calculate tax period from transaction date
+      const taxPeriod = calculateTaxPeriod(transactionDate || formData.date)
+      
+      // Phase 1: Lock exchange rate at transaction date
+      const lockedExchangeRate = formData.currency === 'NGN' 
+        ? 1 
+        : (exchangeRate || 1)
+      const lockedNgnEquivalent = formData.currency === 'NGN'
+        ? amountToStore
+        : (convertedAmountNGN || amountToStore * lockedExchangeRate)
+      const exchangeRateDate = new Date().toISOString().split('T')[0] // Current date when rate is locked
+
+      // Use transactionDate as the primary date (for backward compatibility with legacy 'date' field)
+      const primaryDate = transactionDate || formData.date
+      
       const result = await onSubmit({
         type: formData.type,
         description: formData.description,
         amount: amountToStore,
-        date: formData.date,
+        date: primaryDate, // Keep for backward compatibility - uses transactionDate
+        // Phase 1: New date fields
+        transactionDate: primaryDate,
+        valueDate: valueDate || primaryDate,
+        taxPeriod: taxPeriod,
+        // Phase 1: Personal vs Business
+        transactionNature: transactionNature,
+        businessPercentage: transactionNature === 'mixed' ? businessPercentage : undefined,
+        // Phase 1: Locked exchange rates
+        currency: formData.currency,
+        exchangeRate: formData.currency !== 'NGN' ? lockedExchangeRate : undefined,
+        exchangeRateDate: formData.currency !== 'NGN' ? exchangeRateDate : undefined,
+        ngnEquivalent: formData.currency !== 'NGN' ? lockedNgnEquivalent : undefined,
+        // Invoice linking - optional manual linking
+        linkedInvoiceId: selectedInvoiceId || undefined,
+        isFromInvoice: selectedInvoiceId ? true : undefined,
+        invoiceStatus: selectedInvoiceId ? 'completed' : undefined,
+        // Phase 2: Platform fees tracking (for income transactions when breakdown is enabled)
+        grossAmount: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && grossAmount) 
+          ? (formData.currency === 'NGN' ? parseFloat(grossAmount) : (lockedExchangeRate ? parseFloat(grossAmount) * lockedExchangeRate : parseFloat(grossAmount)))
+          : undefined,
+        platformFees: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && platformFees)
+          ? (formData.currency === 'NGN' ? parseFloat(platformFees) : (lockedExchangeRate ? parseFloat(platformFees) * lockedExchangeRate : parseFloat(platformFees)))
+          : undefined,
+        netAmount: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && netAmount !== null)
+          ? (formData.currency === 'NGN' ? netAmount : (lockedExchangeRate ? netAmount * lockedExchangeRate : netAmount))
+          : undefined,
+        // Phase 2: Platform info (when breakdown is enabled)
+        platform: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && platformName && (platformName !== 'Other' || platformAccountId))
+          ? {
+              name: platformName === 'Other' ? (platformAccountId || 'Other') : platformName,
+              platformType: platformType,
+              accountId: platformName !== 'Other' ? (platformAccountId || undefined) : undefined,
+              accountUrl: platformAccountUrl || undefined
+            }
+          : undefined,
         category: formData.category,
         paymentMethod: formData.paymentMethod,
         notes: formData.notes,
         taxDeductible: formData.taxDeductible,
         tags: formData.tags,
         attachments: imageUrl,
-        documentId: documentId
+        attachmentFileIds: attachmentFileIds,
+        documentId: documentId,
+        // Tax Classification (Gold+ only)
+        taxClassification: (hasTaxClassificationAccess && !skipTaxClassification) ? taxClassification : undefined
       })
 
       console.log("Result:", result)
@@ -488,7 +994,7 @@ export function AddTransactionDialog({
               <div className="text-center space-y-2">
                 <h3 className="text-lg font-semibold">Upload Receipt or Invoice</h3>
                 <p className="text-sm text-muted-foreground">
-                  Upload a receipt image to automatically extract transaction details
+                  Upload a receipt image or enter details manually
                 </p>
               </div>
 
@@ -515,17 +1021,17 @@ export function AddTransactionDialog({
                 id="file-upload"
                 className="hidden"
                 accept="image/*,.pdf"
+                multiple
                 onChange={async (e) => {
                   if (e.target.files && e.target.files.length > 0) {
-                    const file = e.target.files[0]
-                    setSelectedFile(file)
-                    setUploadedFile(file) // Store file for later upload when saving
-                    // Check if it's an image or PDF for OCR
-                    if (file.type.startsWith('image/') || file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-                      // Automatically scan the receipt (but don't upload to ImageKit yet)
-                      await handleScanReceipt(file)
+                    const files = Array.from(e.target.files)
+                    handleFileSelect(e.target.files)
+                    // OCR is enabled for the first upload box (if user has access)
+                    // Only scan the first file if OCR is enabled (not in manual entry mode)
+                    if (isOcrEnabled && files.length > 0) {
+                      await handleScanReceipt(files[0])
                     } else {
-                      // For other file types, just show form to enter details manually
+                      // Just show the form without scanning
                       setShowFormFields(true)
                     }
                   }
@@ -539,7 +1045,7 @@ export function AddTransactionDialog({
               >
                 <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
                 <p className="text-sm font-medium mb-1">
-                  {uploadingImages ? 'Uploading...' : isScanning ? 'Scanning...' : 'Click to upload or drag and drop'}
+                  {isScanning ? 'Scanning...' : 'Click to upload or drag and drop'}
                 </p>
                 <p className="text-xs text-muted-foreground">Images or PDF up to 10MB</p>
               </label>
@@ -548,7 +1054,10 @@ export function AddTransactionDialog({
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => setShowFormFields(true)}
+                  onClick={() => {
+                    setIsManualEntryMode(true) // Disable OCR when manual entry is selected
+                    setShowFormFields(true)
+                  }}
                   className="text-sm"
                 >
                   Or enter details manually
@@ -564,40 +1073,54 @@ export function AddTransactionDialog({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label>Attach Receipt/Invoice</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const input = document.createElement('input')
-                      input.type = 'file'
-                      input.accept = 'image/*,.pdf'
-                      input.onchange = async (e) => {
-                        const file = (e.target as HTMLInputElement).files?.[0]
-                        if (file) {
-                          await handleScanReceipt(file)
-                          // Also upload the file
-                          setSelectedFile(file)
-                          await uploadFileToImageKit(file)
+                  {isOcrEnabled && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const input = document.createElement('input')
+                        input.type = 'file'
+                        input.accept = 'image/*,.pdf'
+                        input.multiple = true
+                        input.onchange = async (e) => {
+                          const files = (e.target as HTMLInputElement).files
+                          if (files && files.length > 0) {
+                            const fileArray = Array.from(files)
+                            handleFileSelect(files)
+                            // Scan the first file if OCR is enabled
+                            if (isOcrEnabled && fileArray.length > 0) {
+                              await handleScanReceipt(fileArray[0])
+                            }
+                            // Create preview objects without uploading
+                            const previews: ImageUploadResult[] = fileArray.map(file => ({
+                              url: URL.createObjectURL(file),
+                              name: file.name,
+                              fileId: '',
+                              thumbnailUrl: URL.createObjectURL(file),
+                              size: file.size
+                            }))
+                            setUploadedImages(prev => [...prev, ...previews])
+                          }
                         }
-                      }
-                      input.click()
-                    }}
-                    disabled={isScanning || uploadingImages}
-                    className="gap-2"
-                  >
-                    {isScanning ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Scanning...
-                      </>
-                    ) : (
-                      <>
-                        <Scan className="w-4 h-4" />
-                        Scan Receipt
-                      </>
-                    )}
-                  </Button>
+                        input.click()
+                      }}
+                      disabled={isScanning || uploadingImages}
+                      className="gap-2"
+                    >
+                      {isScanning ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          Scanning...
+                        </>
+                      ) : (
+                        <>
+                          <Scan className="w-4 h-4" />
+                          Scan Receipt
+                        </>
+                      )}
+                    </Button>
+                  )}
                 </div>
 
                 {isScanning && (
@@ -650,20 +1173,21 @@ export function AddTransactionDialog({
                   id="file-upload-secondary"
                   className="hidden"
                   accept="image/*,.pdf"
+                  multiple
                   onChange={async (e) => {
                     if (e.target.files && e.target.files.length > 0) {
-                      const file = e.target.files[0]
-                      // Check if it's an image or PDF
-                      if (file.type.startsWith('image/') || file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
-                        // Offer to scan the receipt
-                        const shouldScan = window.confirm('Would you like to scan this receipt to auto-fill transaction details?')
-                        if (shouldScan) {
-                          await handleScanReceipt(file)
-                        }
-                      }
-                      // Always upload the file
-                      setSelectedFile(file)
-                      await uploadFileToImageKit(file)
+                      const files = e.target.files
+                      handleFileSelect(files)
+                      // Create preview objects without uploading
+                      const fileArray = Array.from(files)
+                      const previews: ImageUploadResult[] = fileArray.map(file => ({
+                        url: URL.createObjectURL(file),
+                        name: file.name,
+                        fileId: '',
+                        thumbnailUrl: URL.createObjectURL(file),
+                        size: file.size
+                      }))
+                      setUploadedImages(prev => [...prev, ...previews])
                     }
                   }}
                   disabled={uploadingImages || isScanning}
@@ -675,35 +1199,39 @@ export function AddTransactionDialog({
                 >
                   <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                   <p className="text-sm text-muted-foreground">
-                    {uploadingImages ? 'Uploading...' : isScanning ? 'Scanning...' : 'Click to upload or drag and drop'}
+                    {isScanning ? 'Scanning...' : 'Click to upload or drag and drop'}
                   </p>
-                  <p className="text-xs text-muted-foreground mt-1">Images or PDF up to 10MB</p>
+                  <p className="text-xs text-muted-foreground mt-1">Images or PDF up to 10MB (multiple files supported)</p>
                 </label>
 
-                {uploadedImage && (
-                  <div className="mt-2">
-                    <div className="flex items-center justify-between p-2 bg-primary/5 rounded-lg border border-primary/20">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-primary/10 rounded flex items-center justify-center">
-                          <Upload className="w-4 h-4 text-primary" />
+                {uploadedImages.length > 0 && (
+                  <div className="mt-2 space-y-2">
+                    {uploadedImages.map((image, index) => (
+                      <div key={index} className="flex items-center justify-between p-2 bg-primary/5 rounded-lg border border-primary/20">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 bg-primary/10 rounded flex items-center justify-center">
+                            <Upload className="w-4 h-4 text-primary" />
+                          </div>
+                          <div>
+                            <span className="text-sm font-medium">{image.name}</span>
+                            <p className="text-xs text-muted-foreground">
+                              {image.url && image.url.startsWith('blob:') ? 'Ready to upload when saved' : 'Uploaded successfully'}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <span className="text-sm font-medium">{uploadedImage.name}</span>
-                          <p className="text-xs text-muted-foreground">Uploaded successfully</p>
-                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRemoveFile(index)}
+                          className="text-destructive hover:text-destructive/80"
+                        >
+                          Remove
+                        </Button>
                       </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleRemoveFile}
-                        className="text-destructive hover:text-destructive/80"
-                      >
-                        Remove
-                      </Button>
-                    </div>
+                    ))}
                     <p className="text-xs text-muted-foreground mt-2">
-                      💡 You can add more documents later in the Documents module
+                      💡 Files will be uploaded when you save the transaction
                     </p>
                   </div>
                 )}
@@ -714,7 +1242,14 @@ export function AddTransactionDialog({
                   <Label htmlFor="type">Transaction Type</Label>
                   <Select
                     value={formData.type}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, type: value as Transaction['type'] }))}
+                    onValueChange={(value) => {
+                      const newType = value as Transaction['type']
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        type: newType,
+                        category: '' // Reset category when type changes since categories differ by type
+                      }))
+                    }}
                   >
                     <SelectTrigger id="type">
                       <SelectValue placeholder="Select type" />
@@ -747,15 +1282,57 @@ export function AddTransactionDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="amount">
-                  Amount ({getCurrencySymbol(formData.currency)})
-                </Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="amount">
+                    {profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown
+                      ? `Net Amount (${getCurrencySymbol(formData.currency)})` 
+                      : `Amount (${getCurrencySymbol(formData.currency)})`}
+                    {profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && (
+                      <span className="text-xs text-muted-foreground ml-1">(After platform fees)</span>
+                    )}
+                  </Label>
+                  {/* Switch to toggle platform fees breakdown - Only for creators with income transactions */}
+                  {profile?.businessType === 'creator' && formData.type === 'income' && (
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="platform-fees-switch" className="text-xs text-muted-foreground cursor-pointer">
+                        Track platform fees
+                      </Label>
+                      <Switch
+                        id="platform-fees-switch"
+                        checked={usePlatformFeesBreakdown}
+                        onCheckedChange={(checked) => {
+                          setUsePlatformFeesBreakdown(checked)
+                          // If turning off, clear platform fees data
+                          if (!checked) {
+                            setGrossAmount('')
+                            setGrossAmountDisplay('')
+                            setPlatformFees('')
+                            setPlatformFeesDisplay('')
+                            setNetAmount(null)
+                            setPlatformName('')
+                            setPlatformType('social')
+                            setPlatformAccountId('')
+                            setPlatformAccountUrl('')
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
                 <Input
                   id="amount"
                   type="text"
                   placeholder="0.00"
                   value={formData.amountDisplay}
-                  onChange={(e) => handleAmountChange(e.target.value)}
+                  onChange={(e) => {
+                    // If platform fees breakdown is enabled, don't allow manual entry
+                    if (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown) {
+                      return
+                    }
+                    handleAmountChange(e.target.value)
+                  }}
+                  readOnly={!!(profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown)}
+                  disabled={!!(profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown)}
                   required
                   className="text-lg font-medium"
                 />
@@ -785,60 +1362,416 @@ export function AddTransactionDialog({
                 )}
                 {formData.currency === 'NGN' && formData.amount && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    Amount will be stored in NGN
+                    {profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown
+                      ? 'Net amount (after platform fees) will be stored in NGN'
+                      : 'Amount will be stored in NGN'}
+                  </p>
+                )}
+                {profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && (
+                  <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
+                    💡 This field is auto-calculated from Gross Amount - Platform Fees. Enter values in the Platform Fees section below.
                   </p>
                 )}
               </div>
+
+              {/* Phase 2: Platform Fees Tracking - Only for income transactions and creators when switch is ON */}
+              {profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && (
+                <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold">Platform Fees (Optional)</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Track platform commissions and fees for accurate net income calculation
+                    </p>
+                  </div>
+                  
+                  <div className="grid sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="gross-amount">
+                        Gross Amount ({getCurrencySymbol(formData.currency)})
+                        <span className="text-xs text-muted-foreground ml-1">(Before fees)</span>
+                      </Label>
+                      <Input
+                        id="gross-amount"
+                        type="text"
+                        placeholder="0.00"
+                        value={grossAmountDisplay}
+                      onChange={(e) => {
+                        const formatted = formatCurrencyInput(e.target.value)
+                        setGrossAmountDisplay(formatted)
+                        const parsedStr = parseCurrencyInput(formatted)
+                        const parsed = parseFloat(parsedStr)
+                        if (!isNaN(parsed) && parsed > 0) {
+                          setGrossAmount(parsedStr)
+                          // Auto-calculate net amount
+                          if (platformFees) {
+                            const fees = parseFloat(platformFees) || 0
+                            const net = parsed - fees
+                            setNetAmount(net)
+                            // Auto-populate the main amount field with net amount
+                            setFormData(prev => ({
+                              ...prev,
+                              amount: net.toString(),
+                              amountDisplay: formatCurrencyInput(net.toString())
+                            }))
+                          } else {
+                            setNetAmount(parsed)
+                            // Auto-populate the main amount field with gross amount (no fees yet)
+                            setFormData(prev => ({
+                              ...prev,
+                              amount: parsedStr,
+                              amountDisplay: formatCurrencyInput(parsedStr)
+                            }))
+                          }
+                        } else {
+                          setGrossAmount('')
+                          setNetAmount(null)
+                          // Clear amount field if gross amount is cleared
+                          if (!platformFees) {
+                            setFormData(prev => ({
+                              ...prev,
+                              amount: '',
+                              amountDisplay: ''
+                            }))
+                          }
+                        }
+                      }}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Total amount before platform fees
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="platform-fees">
+                        Platform Fees ({getCurrencySymbol(formData.currency)})
+                      </Label>
+                      <Input
+                        id="platform-fees"
+                        type="text"
+                        placeholder="0.00"
+                        value={platformFeesDisplay}
+                      onChange={(e) => {
+                        const formatted = formatCurrencyInput(e.target.value)
+                        setPlatformFeesDisplay(formatted)
+                        const parsedStr = parseCurrencyInput(formatted)
+                        const parsed = parseFloat(parsedStr)
+                        if (!isNaN(parsed) && parsed >= 0) {
+                          setPlatformFees(parsedStr)
+                          // Auto-calculate net amount
+                          if (grossAmount) {
+                            const gross = parseFloat(grossAmount) || 0
+                            const net = gross - parsed
+                            setNetAmount(net)
+                            // Auto-populate the main amount field with net amount
+                            setFormData(prev => ({
+                              ...prev,
+                              amount: net.toString(),
+                              amountDisplay: formatCurrencyInput(net.toString())
+                            }))
+                          } else {
+                            setNetAmount(null)
+                          }
+                        } else {
+                          setPlatformFees('')
+                          if (grossAmount) {
+                            const gross = parseFloat(grossAmount) || 0
+                            setNetAmount(gross)
+                            // Update amount field to gross (no fees)
+                            setFormData(prev => ({
+                              ...prev,
+                              amount: gross.toString(),
+                              amountDisplay: formatCurrencyInput(gross.toString())
+                            }))
+                          } else {
+                            setNetAmount(null)
+                          }
+                        }
+                      }}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Platform commission/fees deducted
+                      </p>
+                    </div>
+                  </div>
+                  
+                  {netAmount !== null && (grossAmount || platformFees) && (
+                    <div className="p-3 bg-background rounded-md border">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">Net Amount:</span>
+                        <span className="text-lg font-semibold text-primary">
+                          {getCurrencySymbol(formData.currency)}{netAmount.toLocaleString('en-NG', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })}
+                        </span>
+                      </div>
+                      {formData.currency !== 'NGN' && convertedAmountNGN && grossAmount && netAmount !== null && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          ≈ ₦{(netAmount * (convertedAmountNGN / (parseFloat(grossAmount) || 1))).toLocaleString('en-NG', {
+                            minimumFractionDigits: 2,
+                            maximumFractionDigits: 2
+                          })}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Platform Info */}
+                  <div className="space-y-4 pt-2 border-t">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-semibold">Platform Information (Optional)</Label>
+                    </div>
+                    
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="platform-name">Platform Name</Label>
+                        <Select
+                          value={platformName}
+                          onValueChange={setPlatformName}
+                        >
+                          <SelectTrigger id="platform-name">
+                            <SelectValue placeholder="Select platform" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="YouTube">YouTube</SelectItem>
+                            <SelectItem value="TikTok">TikTok</SelectItem>
+                            <SelectItem value="Instagram">Instagram</SelectItem>
+                            <SelectItem value="Facebook">Facebook</SelectItem>
+                            <SelectItem value="Twitter">Twitter/X</SelectItem>
+                            <SelectItem value="Patreon">Patreon</SelectItem>
+                            <SelectItem value="OnlyFans">OnlyFans</SelectItem>
+                            <SelectItem value="Twitch">Twitch</SelectItem>
+                            <SelectItem value="Spotify">Spotify</SelectItem>
+                            <SelectItem value="Apple Music">Apple Music</SelectItem>
+                            <SelectItem value="Amazon">Amazon</SelectItem>
+                            <SelectItem value="Etsy">Etsy</SelectItem>
+                            <SelectItem value="Shopify">Shopify</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {platformName === 'Other' && (
+                          <Input
+                            placeholder="Enter platform name"
+                            value={platformAccountId}
+                            onChange={(e) => setPlatformAccountId(e.target.value)}
+                            className="mt-2"
+                          />
+                        )}
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <Label htmlFor="platform-type">Platform Type</Label>
+                        <Select
+                          value={platformType}
+                          onValueChange={(value) => setPlatformType(value as typeof platformType)}
+                        >
+                          <SelectTrigger id="platform-type">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="social">Social Media</SelectItem>
+                            <SelectItem value="subscription">Subscription</SelectItem>
+                            <SelectItem value="marketplace">Marketplace</SelectItem>
+                            <SelectItem value="streaming">Streaming</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    
+                    {platformName && platformName !== 'Other' && (
+                      <div className="space-y-2">
+                        <Label htmlFor="platform-account">Account ID/Username (Optional)</Label>
+                        <Input
+                          id="platform-account"
+                          placeholder="e.g., @yourusername or channel ID"
+                          value={platformAccountId}
+                          onChange={(e) => setPlatformAccountId(e.target.value)}
+                        />
+                      </div>
+                    )}
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="platform-url">Account URL (Optional)</Label>
+                      <Input
+                        id="platform-url"
+                        type="url"
+                        placeholder="https://..."
+                        value={platformAccountUrl}
+                        onChange={(e) => setPlatformAccountUrl(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
                 <Input
                   id="description"
-                  placeholder="e.g., Client payment for website design"
+                  placeholder={
+                    profile?.businessType === 'creator'
+                      ? formData.type === 'income'
+                        ? "e.g., Brand sponsorship payment from XYZ Company"
+                        : "e.g., Camera equipment purchase"
+                      : formData.type === 'income'
+                        ? "e.g., Client payment for website design"
+                        : "e.g., Software subscription"
+                  }
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   required
                 />
+                <p className="text-xs text-muted-foreground">You can add more details later</p>
               </div>
 
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="category">What is this for?</Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                      </TooltipTrigger>
+                      <TooltipContent className="max-w-xs">
+                        <p className="text-sm">Select the category that best describes this transaction. This helps us organize your finances and apply the right tax rules.</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <Select
+                  value={formData.category && !getBaseCategories().some(cat => cat.value === formData.category) ? 'Other' : formData.category}
+                  onValueChange={(value) => {
+                    if (value === 'Other') {
+                      // Open modal for custom category
+                      // If there's already a custom category, pre-fill it
+                      if (formData.category && formData.category !== 'Other' && !getBaseCategories().some(cat => cat.value === formData.category)) {
+                        setCustomCategory(formData.category)
+                      } else {
+                        setCustomCategory('')
+                      }
+                      setShowCustomCategoryModal(true)
+                    } else {
+                      setFormData(prev => ({ ...prev, category: value }))
+                    }
+                  }}
+                >
+                  <SelectTrigger id="category">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {getCategories().map((category) => (
+                      <SelectItem key={category.value} value={category.value}>
+                        {category.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {formData.category && formData.category !== 'Other' && !getBaseCategories().some(cat => cat.value === formData.category) && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Custom: {formData.category}
+                  </p>
+                )}
+              </div>
+
+              {/* Phase 1: Date separation for tax compliance */}
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="category">Category</Label>
-                  <Select
-                    value={formData.category}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
-                  >
-                    <SelectTrigger id="category">
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Services">Services</SelectItem>
-                      <SelectItem value="Consulting">Consulting</SelectItem>
-                      <SelectItem value="Projects">Projects</SelectItem>
-                      <SelectItem value="Rent">Rent</SelectItem>
-                      <SelectItem value="Software">Software</SelectItem>
-                      <SelectItem value="Utilities">Utilities</SelectItem>
-                      <SelectItem value="Marketing">Marketing</SelectItem>
-                      <SelectItem value="Food">Food</SelectItem>
-                      <SelectItem value="Transport">Transport</SelectItem>
-                      <SelectItem value="Entertainment">Entertainment</SelectItem>
-                      <SelectItem value="Healthcare">Healthcare</SelectItem>
-                      <SelectItem value="Education">Education</SelectItem>
-                      <SelectItem value="Other">Other</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="date">Date</Label>
+                  <Label htmlFor="transaction-date">
+                    Transaction Date
+                    <span className="text-xs text-muted-foreground ml-1">(When it occurred)</span>
+                  </Label>
                   <Input
-                    id="date"
+                    id="transaction-date"
                     type="date"
-                    value={formData.date}
-                    onChange={(e) => setFormData(prev => ({ ...prev, date: e.target.value }))}
+                    value={transactionDate}
+                    onChange={(e) => setTransactionDate(e.target.value)}
                     required
                   />
+                  <p className="text-xs text-muted-foreground">
+                    When the transaction occurred (invoice date, service date)
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="value-date">
+                    Payment Date
+                    <span className="text-xs text-muted-foreground ml-1">(When money moved)</span>
+                  </Label>
+                  <Input
+                    id="value-date"
+                    type="date"
+                    value={valueDate}
+                    onChange={(e) => setValueDate(e.target.value)}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    When money was actually received or paid
+                  </p>
                 </div>
               </div>
+
+              {/* Phase 1: Personal vs Business separation - Only for creators */}
+              {profile?.businessType === 'creator' && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="transaction-nature">Is this for business or personal use?</Label>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          <p className="text-sm">Business expenses can reduce your tax bill. Personal expenses cannot. If it's a mix (like a phone used for both), select "Mixed" and specify the percentage.</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                  <Select
+                    value={transactionNature}
+                    onValueChange={(value) => {
+                      setTransactionNature(value as TransactionNature)
+                      if (value !== 'mixed') {
+                        setBusinessPercentage(value === 'business' ? 100 : 0)
+                      }
+                    }}
+                  >
+                    <SelectTrigger id="transaction-nature">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="business">Business</SelectItem>
+                      <SelectItem value="personal">Personal</SelectItem>
+                      <SelectItem value="mixed">Mixed (Business & Personal)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  {transactionNature === 'mixed' && (
+                    <div className="space-y-2 mt-2">
+                      <Label htmlFor="business-percentage">
+                        Business Percentage: {businessPercentage}%
+                      </Label>
+                      <Input
+                        id="business-percentage"
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={businessPercentage}
+                        onChange={(e) => setBusinessPercentage(Number(e.target.value))}
+                        className="w-full"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Only {businessPercentage}% of this transaction is tax deductible
+                      </p>
+                    </div>
+                  )}
+                  <p className="text-xs text-muted-foreground">
+                    {transactionNature === 'business' 
+                      ? 'This is a business transaction and is fully tax deductible (if applicable)'
+                      : transactionNature === 'personal'
+                      ? 'This is a personal transaction and is not tax deductible'
+                      : `This is a mixed transaction. ${businessPercentage}% is business-related.`}
+                  </p>
+                </div>
+              )}
 
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -859,6 +1792,95 @@ export function AddTransactionDialog({
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="linked-invoice">Link to Invoice (Optional)</Label>
+                  <Select
+                    value={selectedInvoiceId || undefined}
+                    onValueChange={(value) => {
+                      if (value && value !== 'no-invoices') {
+                        setSelectedInvoiceId(value)
+                        // Auto-fill amount and description if invoice is selected
+                        const selectedInvoice = availableInvoices.find(inv => inv.id === value)
+                        if (selectedInvoice) {
+                          // Set amount to invoice total
+                          const invoiceAmount = selectedInvoice.total.toString()
+                          setFormData(prev => ({
+                            ...prev,
+                            amount: invoiceAmount,
+                            amountDisplay: formatCurrencyInput(invoiceAmount),
+                            description: prev.description || `${selectedInvoice.invoiceType === 'incoming' ? 'Bill' : 'Invoice'} ${selectedInvoice.invoiceNumber}${selectedInvoice.client?.name ? ` - ${selectedInvoice.client.name}` : selectedInvoice.supplier?.name ? ` - ${selectedInvoice.supplier.name}` : ''}`
+                          }))
+                          // Set currency if different
+                          if (selectedInvoice.currency && selectedInvoice.currency !== formData.currency) {
+                            handleCurrencyChange(selectedInvoice.currency as CurrencyCode)
+                          }
+                        }
+                      } else {
+                        setSelectedInvoiceId('')
+                      }
+                    }}
+                    disabled={loadingInvoices || !!transaction?.linkedInvoiceId}
+                  >
+                    <SelectTrigger id="linked-invoice">
+                      <SelectValue placeholder={loadingInvoices ? "Loading invoices..." : transaction?.linkedInvoiceId ? "Already linked to invoice" : "Select invoice (optional)"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableInvoices.length === 0 ? (
+                        <SelectItem value="no-invoices" disabled>
+                          No unlinked invoices available
+                        </SelectItem>
+                      ) : (
+                        availableInvoices.map((invoice) => {
+                          const clientOrSupplier = invoice.invoiceType === 'incoming' 
+                            ? invoice.supplier?.name 
+                            : invoice.client?.name
+                          return (
+                            <SelectItem key={invoice.id} value={invoice.id}>
+                              <div className="flex flex-col">
+                                <span className="font-medium">
+                                  {invoice.invoiceType === 'incoming' ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
+                                </span>
+                                <span className="text-xs text-muted-foreground">
+                                  {clientOrSupplier ? `${clientOrSupplier} • ` : ''}{invoice.currency} {invoice.total.toLocaleString()}
+                                  {invoice.issueDate && ` • ${new Date(invoice.issueDate).toLocaleDateString()}`}
+                                </span>
+                              </div>
+                            </SelectItem>
+                          )
+                        })
+                      )}
+                    </SelectContent>
+                  </Select>
+                  {selectedInvoiceId && (() => {
+                    const selectedInvoice = availableInvoices.find(inv => inv.id === selectedInvoiceId)
+                    if (!selectedInvoice) return null
+                    const amountMatch = Math.abs(parseFloat(formData.amount) - selectedInvoice.total) < 0.01
+                    return (
+                      <div className="space-y-1">
+                        <p className="text-xs text-muted-foreground">
+                          This transaction will be linked to the selected invoice
+                        </p>
+                        {!amountMatch && (
+                          <p className="text-xs text-amber-600 dark:text-amber-500">
+                            ⚠️ Transaction amount ({formData.currency} {formData.amount}) doesn't match invoice total ({selectedInvoice.currency} {selectedInvoice.total.toLocaleString()})
+                          </p>
+                        )}
+                      </div>
+                    )
+                  })()}
+                  {transaction?.linkedInvoiceId && (
+                    <div className="p-2 bg-muted rounded-md">
+                      <p className="text-xs text-muted-foreground">
+                        ✓ This transaction is already linked to an invoice
+                      </p>
+                    </div>
+                  )}
+                  {!selectedInvoiceId && !transaction?.linkedInvoiceId && (
+                    <p className="text-xs text-muted-foreground">
+                      Leave empty if this transaction is not related to an invoice
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-2">
@@ -872,6 +1894,341 @@ export function AddTransactionDialog({
                 />
               </div>
 
+              {/* Tax Classification Section (Gold+ only) */}
+              {hasTaxClassificationAccess && taxClassification && !skipTaxClassification && (
+                <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Label className="text-sm font-semibold">Tax Classification (Optional</Label>
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="sm"
+                          onClick={() => {
+                            setSkipTaxClassification(true)
+                            setTaxClassification(undefined)
+                          }}
+                          className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground underline"
+                        >
+                          - Skip for now
+                        </Button>
+                        <Label className="text-sm font-semibold">)</Label>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Auto-populated based on transaction details. You can edit or skip this section - you can always update it later.
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowTaxClassificationSection(!showTaxClassificationSection)}
+                      className="h-8 text-xs"
+                    >
+                      {showTaxClassificationSection ? 'Hide' : 'Edit'}
+                    </Button>
+                  </div>
+                  
+                  {/* Read-only summary */}
+                  {!showTaxClassificationSection && (
+                    <div className="space-y-2 text-sm">
+                      {formData.type === 'income' && taxClassification.incomeType && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Income Type:</span>
+                          <span className="font-medium capitalize">{taxClassification.incomeType}</span>
+                        </div>
+                      )}
+                      {formData.type === 'expense' && taxClassification.expenseType && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Expense Type:</span>
+                          <span className="font-medium capitalize">{taxClassification.expenseType}</span>
+                        </div>
+                      )}
+                      {taxClassification.isCapitalAsset && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Capital Asset:</span>
+                          <span className="font-medium">Yes ({taxClassification.capitalAllowanceRate}% allowance)</span>
+                        </div>
+                      )}
+                      {taxClassification.whtCreditable && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">WHT Creditable:</span>
+                          <span className="font-medium">Yes {taxClassification.whtRate && `(${taxClassification.whtRate}%)`}</span>
+                        </div>
+                      )}
+                      {/* VAT Applicable - only show for income transactions, not expenses */}
+                      {formData.type === 'income' && taxClassification.vatApplicable && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">VAT Applicable:</span>
+                          <span className="font-medium">Yes {taxClassification.vatRate && `(${taxClassification.vatRate}%)`}</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Editable form */}
+                  {showTaxClassificationSection && (
+                    <div className="space-y-4 pt-2 border-t">
+                      {formData.type === 'income' && (
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Label>Income Type</Label>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs">
+                                  <p className="text-sm mb-1"><strong>Taxable:</strong> Regular income subject to tax</p>
+                                  <p className="text-sm mb-1"><strong>Non-taxable:</strong> Income that doesn't count toward your tax (e.g., gifts, grants)</p>
+                                  <p className="text-sm"><strong>Exempt:</strong> Income that's legally exempt from tax</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          </div>
+                          <Select
+                            value={taxClassification.incomeType || 'taxable'}
+                            onValueChange={(value) => setTaxClassification(prev => ({
+                              ...prev,
+                              incomeType: value as 'taxable' | 'non-taxable' | 'exempt'
+                            }))}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="taxable">Taxable</SelectItem>
+                              <SelectItem value="non-taxable">Non-taxable</SelectItem>
+                              <SelectItem value="exempt">Exempt</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
+                      
+                      {formData.type === 'expense' && (
+                        <>
+                          <div className="space-y-2">
+                            <div className="flex items-center gap-2">
+                              <Label>Expense Type</Label>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p className="text-sm mb-1"><strong>Allowable:</strong> Regular business expenses you can deduct (e.g., internet, software, rent)</p>
+                                    <p className="text-sm mb-1"><strong>Disallowable:</strong> Expenses you cannot claim (e.g., personal expenses, fines)</p>
+                                    <p className="text-sm"><strong>Capital:</strong> Long-term assets eligible for depreciation (e.g., equipment, vehicles)</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                            <Select
+                              value={taxClassification.expenseType || 'allowable'}
+                              onValueChange={(value) => {
+                                const expenseType = value as 'allowable' | 'disallowable' | 'capital'
+                                setTaxClassification(prev => ({
+                                  ...prev,
+                                  expenseType
+                                }))
+                                // Auto-sync taxDeductible based on expenseType
+                                // Allowable and Capital are tax deductible, Disallowable is not
+                                setFormData(prev => ({
+                                  ...prev,
+                                  taxDeductible: expenseType === 'allowable' || expenseType === 'capital'
+                                }))
+                              }}
+                            >
+                              <SelectTrigger>
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="allowable">Allowable</SelectItem>
+                                <SelectItem value="disallowable">Disallowable</SelectItem>
+                                <SelectItem value="capital">Capital</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <div className="p-2.5 bg-muted/50 border border-border rounded-md">
+                              <p className="text-xs text-muted-foreground">
+                                <span className="font-medium">Allowable:</span> Tax-deductible expenses (e.g., internet, software subscriptions, office rent, business travel)
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                <span className="font-medium">Disallowable:</span> Not tax-deductible (e.g., personal expenses, fines, penalties)
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                <span className="font-medium">Capital:</span> Long-term assets eligible for capital allowances (e.g., equipment, vehicles, furniture)
+                              </p>
+                            </div>
+                          </div>
+                          
+                          <div className="space-y-2">
+                            <div className="flex items-center space-x-2">
+                              <Switch
+                                checked={taxClassification.isCapitalAsset || false}
+                                onCheckedChange={(checked) => setTaxClassification(prev => ({
+                                  ...prev,
+                                  isCapitalAsset: checked,
+                                  capitalAllowanceRate: checked ? (prev?.capitalAllowanceRate || 25) : undefined
+                                }))}
+                              />
+                              <div className="flex items-center gap-2 flex-1">
+                                <Label className="text-sm">Is this a long-term asset? (for depreciation)</Label>
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                                    </TooltipTrigger>
+                                    <TooltipContent className="max-w-xs">
+                                      <p className="text-sm">Long-term assets (like equipment or vehicles) can be depreciated over multiple years instead of claiming the full cost immediately. This can help spread out your tax benefits.</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            </div>
+                            <div className="p-3 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-md">
+                              <p className="text-xs font-medium text-blue-900 dark:text-blue-200 mb-1.5">
+                                What is a Capital Asset?
+                              </p>
+                              <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+                                A capital asset is a long-term asset used in your business that provides value over multiple years (not just one tax year). You can claim capital allowances (depreciation) over time instead of deducting the full cost immediately.
+                              </p>
+                              <div className="text-xs text-blue-700 dark:text-blue-300 space-y-1">
+                                <p className="font-medium">Examples:</p>
+                                <ul className="list-disc list-inside space-y-0.5 ml-2">
+                                  <li>Equipment: Cameras, computers, laptops, machinery</li>
+                                  <li>Vehicles: Cars, vans used for business</li>
+                                  <li>Furniture: Office furniture, desks, chairs</li>
+                                  <li>Software: One-time software license purchases</li>
+                                </ul>
+                                <p className="font-medium mt-1.5">NOT Capital Assets:</p>
+                                <ul className="list-disc list-inside space-y-0.5 ml-2">
+                                  <li>Rent, subscriptions, services, utilities, repairs</li>
+                                </ul>
+                              </div>
+                            </div>
+                          </div>
+                          
+                          {taxClassification.isCapitalAsset && (
+                            <div className="space-y-2">
+                              <Label>Capital Allowance Rate (%)</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                value={taxClassification.capitalAllowanceRate || 25}
+                                onChange={(e) => setTaxClassification(prev => ({
+                                  ...prev,
+                                  capitalAllowanceRate: parseFloat(e.target.value) || 25
+                                }))}
+                              />
+                            </div>
+                          )}
+                        </>
+                      )}
+                      
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          checked={taxClassification.whtCreditable || false}
+                          onCheckedChange={(checked) => setTaxClassification(prev => ({
+                            ...prev,
+                            whtCreditable: checked,
+                            whtRate: checked ? (prev?.whtRate || 5) : undefined
+                          }))}
+                        />
+                        <div className="flex items-center gap-2 flex-1">
+                          <Label className="text-sm">Was withholding tax deducted from this?</Label>
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                              </TooltipTrigger>
+                              <TooltipContent className="max-w-xs">
+                                <p className="text-sm">If tax was already deducted at source (withholding tax), you can claim it as a credit against your final tax bill. This reduces how much tax you need to pay.</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+                        </div>
+                      </div>
+                      
+                      {taxClassification.whtCreditable && (
+                        <div className="space-y-2">
+                          <Label>WHT Rate (%)</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            max="100"
+                            step="0.1"
+                            value={taxClassification.whtRate || 5}
+                            onChange={(e) => setTaxClassification(prev => ({
+                              ...prev,
+                              whtRate: parseFloat(e.target.value) || 5
+                            }))}
+                          />
+                        </div>
+                      )}
+                      
+                      {/* VAT Applicable - only show for income transactions, not expenses */}
+                      {formData.type === 'income' && (
+                        <>
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              checked={taxClassification.vatApplicable || false}
+                              onCheckedChange={(checked) => setTaxClassification(prev => ({
+                                ...prev,
+                                vatApplicable: checked,
+                                vatRate: checked ? (prev?.vatRate || 7.5) : undefined
+                              }))}
+                            />
+                            <div className="flex items-center gap-2 flex-1">
+                              <Label className="text-sm">Does this include VAT?</Label>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p className="text-sm">If you're VAT-registered and this income includes VAT, you'll need to remit the VAT amount to the government. The VAT portion will be excluded from your taxable income.</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          </div>
+                          
+                          {taxClassification.vatApplicable && (
+                            <div className="space-y-2">
+                              <Label>VAT Rate (%)</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                value={taxClassification.vatRate || 7.5}
+                                onChange={(e) => setTaxClassification(prev => ({
+                                  ...prev,
+                                  vatRate: parseFloat(e.target.value) || 7.5
+                                }))}
+                              />
+                              {formData.type === 'income' && (
+                            <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md">
+                              <p className="text-xs font-medium text-amber-900 dark:text-amber-200">
+                                ⚠️ VAT Remittance Required
+                              </p>
+                              <p className="text-xs text-amber-700 dark:text-amber-300 mt-1">
+                                For income with VAT, {taxClassification.vatRate || 7.5}% of the transaction amount must be remitted to the government. This VAT amount will be excluded from your taxable income to avoid double payment.
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                        </>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-2">
                 <Label>Tags (Optional)</Label>
                 <TagsInput
@@ -882,19 +2239,34 @@ export function AddTransactionDialog({
                 />
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-                <div className="space-y-0.5">
-                  <Label htmlFor="tax-deductible" className="cursor-pointer">
-                    Tax Deductible
-                  </Label>
-                  <p className="text-xs text-muted-foreground">Mark this expense as tax deductible</p>
+              {/* Tax Deductible switch - only show if Expense Type is not set (for non-Gold users or legacy compatibility) */}
+              {formData.type !== 'income' && !hasTaxClassificationAccess && (
+                <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
+                  <div className="space-y-0.5 flex-1">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="tax-deductible" className="cursor-pointer">
+                        Can I claim this for tax?
+                      </Label>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <p className="text-sm">If this expense is used for your business, you can claim it to reduce your tax bill. Personal expenses cannot be claimed.</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </div>
+                    <p className="text-xs text-muted-foreground">You can update this later if you're not sure</p>
+                  </div>
+                  <Switch
+                    id="tax-deductible"
+                    checked={formData.taxDeductible}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, taxDeductible: checked }))}
+                  />
                 </div>
-                <Switch
-                  id="tax-deductible"
-                  checked={formData.taxDeductible}
-                  onCheckedChange={(checked) => setFormData(prev => ({ ...prev, taxDeductible: checked }))}
-                />
-              </div>
+              )}
 
               <div className="flex gap-3 pt-4">
                 <Button
@@ -909,7 +2281,20 @@ export function AddTransactionDialog({
                       // Otherwise, go back to file upload or close
                       if (showFormFields && !transaction) {
                         setShowFormFields(false)
+                        setIsManualEntryMode(false) // Reset manual entry mode when going back
                         setOcrResult(null)
+                        // Clean up blob URLs before resetting
+                        uploadedImages.forEach(img => {
+                          if (img.url && img.url.startsWith('blob:')) {
+                            URL.revokeObjectURL(img.url)
+                          }
+                          if (img.thumbnailUrl && img.thumbnailUrl.startsWith('blob:')) {
+                            URL.revokeObjectURL(img.thumbnailUrl)
+                          }
+                        })
+                        setSelectedFiles([])
+                        setUploadedImages([])
+                        setUploadedFiles([])
                         setFormData({
                           type: defaultType ?? 'income',
                           description: defaultDescription ?? '',
@@ -922,7 +2307,8 @@ export function AddTransactionDialog({
                           notes: '',
                           taxDeductible: false,
                           tags: [],
-                          attachments: []
+                          attachments: [],
+                          documentId: undefined
                         })
                       } else {
                         onOpenChange(false)
@@ -948,6 +2334,62 @@ export function AddTransactionDialog({
           businessType={profile.businessType || 'freelancer'}
         />
       )}
+
+      {/* Custom Category Modal */}
+      <Dialog open={showCustomCategoryModal} onOpenChange={setShowCustomCategoryModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Enter Custom Category</DialogTitle>
+            <DialogDescription>
+              Please enter a custom category name for this transaction.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="custom-category-input">Category Name</Label>
+              <Input
+                id="custom-category-input"
+                placeholder="e.g., Custom expense type"
+                value={customCategory}
+                onChange={(e) => setCustomCategory(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && customCategory.trim()) {
+                    setFormData(prev => ({ ...prev, category: customCategory.trim() }))
+                    setShowCustomCategoryModal(false)
+                    setCustomCategory('')
+                  }
+                }}
+                autoFocus
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowCustomCategoryModal(false)
+                  setCustomCategory('')
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (customCategory.trim()) {
+                    setFormData(prev => ({ ...prev, category: customCategory.trim() }))
+                    setShowCustomCategoryModal(false)
+                    setCustomCategory('')
+                  } else {
+                    toast.error("Please enter a category name")
+                  }
+                }}
+                disabled={!customCategory.trim()}
+              >
+                Confirm
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }

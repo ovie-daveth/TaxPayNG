@@ -53,6 +53,9 @@ export default function PaymentSuccessPage() {
     timestamp: new Date().toISOString()
   }
 
+  // Check if this is a no-payment filing (balanceDue = 0)
+  const isNoPaymentFiling = paymentData.amount === 0 && !paymentData.rrr && !paymentData.transactionRef
+
   useEffect(() => {
     if (reportId && profile?.userId) {
       loadReport()
@@ -201,7 +204,7 @@ export default function PaymentSuccessPage() {
           userId: user.uid,
           state: selectedState,
           reportId: report.id,
-          rrr: paymentData.rrr,
+          rrr: paymentData.rrr || undefined,
           supportingDocuments: documentIds
         }),
       })
@@ -235,7 +238,7 @@ export default function PaymentSuccessPage() {
         body: JSON.stringify({
           state: selectedState,
           reportId: report.id,
-          rrr: paymentData.rrr,
+          rrr: paymentData.rrr || undefined,
           userInfo: {
             name: `${profile?.firstName} ${profile?.lastName}`,
             email: profile?.email || user?.email,
@@ -274,16 +277,30 @@ export default function PaymentSuccessPage() {
     <div className="min-h-screen bg-background">
       <main className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
         <div className="space-y-4 sm:space-y-5 md:space-y-6">
-          {/* Payment Success Alert */}
-          <Alert className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-3 sm:p-4">
-            <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600 dark:text-green-500 shrink-0" />
-            <AlertTitle className="text-xs sm:text-sm md:text-base text-green-800 dark:text-green-200 font-medium">Payment Successful!</AlertTitle>
-            <AlertDescription className="text-[11px] sm:text-xs md:text-sm text-green-700 dark:text-green-300 mt-1">
-              Your tax payment has been processed successfully. RRR: <span className="font-mono break-all">{paymentData.rrr}</span>
-            </AlertDescription>
-          </Alert>
+          {/* Payment Success Alert - Only show if there was a payment */}
+          {!isNoPaymentFiling && (
+            <Alert className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-3 sm:p-4">
+              <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-600 dark:text-green-500 shrink-0" />
+              <AlertTitle className="text-xs sm:text-sm md:text-base text-green-800 dark:text-green-200 font-medium">Payment Successful!</AlertTitle>
+              <AlertDescription className="text-[11px] sm:text-xs md:text-sm text-green-700 dark:text-green-300 mt-1">
+                Your tax payment has been processed successfully. RRR: <span className="font-mono break-all">{paymentData.rrr}</span>
+              </AlertDescription>
+            </Alert>
+          )}
 
-          {/* Receipt Section */}
+          {/* No Payment Alert - Show if balance is 0 */}
+          {isNoPaymentFiling && (
+            <Alert className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-3 sm:p-4">
+              <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-500 shrink-0" />
+              <AlertTitle className="text-xs sm:text-sm md:text-base text-blue-800 dark:text-blue-200 font-medium">Ready to File</AlertTitle>
+              <AlertDescription className="text-[11px] sm:text-xs md:text-sm text-blue-700 dark:text-blue-300 mt-1">
+                Your tax return is balanced (no additional payment required). Please select your state and filing method below to complete your tax return submission.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Receipt Section - Only show if there was a payment */}
+          {!isNoPaymentFiling && (
           <Card>
             <CardHeader className="p-3 sm:p-4 md:p-6">
               <CardTitle className="text-base sm:text-lg md:text-xl font-semibold">Payment Receipt</CardTitle>
@@ -352,6 +369,7 @@ export default function PaymentSuccessPage() {
               </div>
             </CardContent>
           </Card>
+          )}
 
           {/* IRS Submission Section */}
           <Card>
@@ -462,18 +480,11 @@ export default function PaymentSuccessPage() {
                           <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
                             <Button
                               onClick={handleEmailSubmission}
-                              disabled={submitting}
+                              disabled={true}
                               variant="outline"
-                              className="w-full h-9 sm:h-10 text-xs sm:text-sm"
+                              className="w-full h-9 sm:h-10 text-xs sm:text-sm opacity-60 cursor-not-allowed"
                             >
-                              {submitting ? (
-                                <>
-                                  <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
-                                  Sending...
-                                </>
-                              ) : (
-                                "Send via Email"
-                              )}
+                              Send via Email - Coming Soon
                             </Button>
                           </CardContent>
                         </Card>

@@ -5,9 +5,9 @@ import Link from "next/link"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Calculator } from "lucide-react"
-import { calculateNigerianTax } from "@/lib/tax-calculator"
-import { transactionService, taxPaymentService } from "@/lib/services"
+import { transactionService, taxPaymentService, reportService } from "@/lib/services"
 import { useAuth } from "@/lib/hooks/useAuth"
+import { useSubscription } from "@/lib/hooks/useSubscription"
 import { toast } from "sonner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ChevronDown, ChevronUp } from "lucide-react"
@@ -16,7 +16,6 @@ type DashboardBusinessType = "freelancer" | "creator" | "small-business"
 
 interface TaxSummaryProps {
   businessType?: DashboardBusinessType
-  useMockData?: boolean
 }
 
 const SMALL_BUSINESS_TURNOVER_THRESHOLD = 100_000_000
@@ -57,43 +56,30 @@ interface SummaryState {
   monthlySetAside: number
   isSmallBusinessExempt: boolean
   taxBrackets?: TaxBracket[]
+  capitalAllowanceDetails?: Array<{
+    transactionId: string
+    description: string
+    originalCost: number
+    purchaseYear: number
+    allowanceRate: number
+    allowanceAmount: number
+    bookValueAfter: number
+    yearsSincePurchase: number
+  }>
+  capitalAllowances?: number
 }
 
-export function TaxSummary({ businessType = "freelancer", useMockData = false }: TaxSummaryProps) {
+export function TaxSummary({ businessType = "freelancer" }: TaxSummaryProps) {
   const { user } = useAuth()
+  const { hasAccess } = useSubscription()
+  const hasGoldAccess = hasAccess('GOLD')
   const now = new Date()
   const currentYear = now.getFullYear()
   const [selectedYear, setSelectedYear] = useState<number>(currentYear)
   const [loading, setLoading] = useState(true)
   const [summary, setSummary] = useState<SummaryState | null>(null)
 
-  const mockSummary = useMemo<SummaryState>(
-    () => ({
-      yearLabel: "2025",
-      taxableIncome: 1_560_000,
-      totalReliefs: 200_000,
-      manualReliefs: 200_000,
-      deductions: 50_000,
-      grossIncome: 1_610_000,
-      taxPayable: 234_000,
-      totalPayments: 0,
-      monthlySetAside: 234_000 / 12,
-      isSmallBusinessExempt: false,
-      taxBrackets: [
-        { amount: 800_000, rate: 0, tax: 0 },
-        { amount: 760_000, rate: 15, tax: 114_000 },
-      ],
-    }),
-    []
-  )
-
   useEffect(() => {
-    if (useMockData) {
-      setSummary(mockSummary)
-      setLoading(false)
-      return
-    }
-
     if (!user) {
       setSummary(null)
       setLoading(false)
@@ -118,19 +104,20 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
       const yearEndIso = yearEndDate.toISOString()
 
       try {
-        // Fetch full year data for tax calculation (transactions only)
-        const [yearSummary, taxPayments] = await Promise.all([
-          transactionService.getTransactionSummary(
-            user.uid,
-            yearStartIso,
-            yearEndIso
-          ),
-          taxPaymentService.getUserPaymentsSimple(user.uid)
-        ])
+        // Fetch tax payments
+        const taxPayments = await taxPaymentService.getUserPaymentsSimple(user.uid)
 
-        const totalIncome = yearSummary?.totalIncome ?? 0
-        const totalExpenses = yearSummary?.totalExpenses ?? 0
-        const manualReliefs = yearSummary?.totalReliefs ?? 0
+        // Use unified tax calculation engine (same as self-assessment)
+        const taxData = await reportService.calculateTaxForPeriod(
+          user.uid,
+          yearInfo.start,
+          yearEndDate,
+          businessType === "small-business" ? "sme" : businessType
+        )
+
+        const totalIncome = taxData.grossIncome
+        const totalExpenses = taxData.totalExpenses
+        const manualReliefs = 0 // Manual reliefs are handled in self-assessment report
 
         // Filter payments for the selected year
         const yearPayments = taxPayments.filter(payment => {
@@ -140,24 +127,22 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
         })
         const totalPayments = yearPayments.reduce((sum, payment) => sum + (payment.amount || 0), 0)
 
-        const taxCalculation =
-          businessType === "small-business" && totalIncome <= SMALL_BUSINESS_TURNOVER_THRESHOLD
-            ? null
-            : calculateNigerianTax({
-                businessType: businessType === "small-business" ? "sme" : businessType,
-                period: "yearly",
-                income: totalIncome,
-                rentPaid: 0,
-                pensionContribution: 0,
-                healthInsurance: 0,
-                housingFund: 0,
-                lifeInsurance: 0,
-                charitableDonations: 0,
-                businessExpenses: totalExpenses,
-                dependents: 0,
-              })
-
-        const isSmallBusinessExempt = !taxCalculation && businessType === "small-business"
+        // Check if small business is exempt
+        const isSmallBusinessExempt = businessType === "small-business" && totalIncome <= SMALL_BUSINESS_TURNOVER_THRESHOLD
+        const taxCalculation = isSmallBusinessExempt ? null : {
+          grossIncome: taxData.grossIncome,
+          businessExpenses: taxData.totalExpenses,
+          adjustedGrossIncome: taxData.adjustedGrossIncome,
+          taxableIncome: taxData.taxableIncome,
+          totalTax: taxData.taxPayable,
+          taxBrackets: taxData.taxBrackets,
+          totalReliefs: taxData.totalReliefs,
+          monthlySetAside: taxData.taxPayable / 12,
+          capitalAllowances: taxData.capitalAllowances,
+          whtCredits: taxData.whtCredits,
+          vatOutput: taxData.taxClassification?.vatOutput || 0,
+          reliefs: taxData.reliefs
+        }
 
         // Taxable income is already calculated as (income - expenses) - reliefs in calculateNigerianTax
         // So we need to show: Gross Income, then deduct expenses and reliefs separately
@@ -187,12 +172,14 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
           monthlySetAside: monthlySetAside,
           isSmallBusinessExempt,
           taxBrackets: taxCalculation?.taxBrackets || [],
+          capitalAllowanceDetails: taxData.taxClassification?.capitalAllowanceDetails || [],
+          capitalAllowances: taxData.capitalAllowances || 0,
         })
       } catch (error) {
         console.error("Error loading tax summary:", error)
         if (isMounted) {
-          toast.error("Unable to load tax summary. Showing recent data instead.")
-          setSummary(mockSummary)
+          toast.error("Unable to load tax summary.")
+          setSummary(null)
         }
       } finally {
         if (isMounted) {
@@ -213,9 +200,9 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
       isMounted = false
       window.removeEventListener("transactionChanged", handleTransactionChanged)
     }
-  }, [businessType, mockSummary, useMockData, user, selectedYear])
+  }, [businessType, user, selectedYear])
 
-  const displaySummary = summary ?? mockSummary
+  const displaySummary = summary
   const [showTaxCalculation, setShowTaxCalculation] = useState(false)
 
   // Generate year options (current year and previous 2 years)
@@ -240,7 +227,7 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
           </Select>
         </div>
         <p className="text-xs sm:text-sm text-muted-foreground">
-          {loading ? "Loading..." : `${displaySummary.yearLabel} (Full Year)`}
+          {loading ? "Loading..." : displaySummary ? `${displaySummary.yearLabel} (Full Year)` : "No data"}
         </p>
       </div>
 
@@ -252,6 +239,10 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
               <span className="text-xs sm:text-sm bg-muted h-4 w-20 rounded" />
             </div>
           ))}
+        </div>
+      ) : !displaySummary ? (
+        <div className="text-center py-8 text-sm text-muted-foreground">
+          No data available. Please add transactions to see your tax summary.
         </div>
       ) : (
         <div className="space-y-3 sm:space-y-4">
@@ -265,6 +256,14 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
               -{formatCurrency(Math.abs(displaySummary.deductions))}
             </span>
           </div>
+          {(displaySummary.capitalAllowances ?? 0) > 0 && (
+            <div className="flex items-center justify-between py-2.5 sm:py-3 border-b border-border">
+              <span className="text-xs sm:text-sm text-muted-foreground">Capital Allowances (Depreciation)</span>
+              <span className="font-semibold text-xs sm:text-sm text-primary">
+                -{formatCurrency(displaySummary.capitalAllowances ?? 0)}
+              </span>
+            </div>
+          )}
           <div className="flex items-center justify-between py-2.5 sm:py-3 border-b border-border">
             <span className="text-xs sm:text-sm text-muted-foreground">Tax Relief</span>
             <span className="font-semibold text-xs sm:text-sm text-primary">
@@ -315,6 +314,59 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
               </button>
               {showTaxCalculation && (
                 <div className="mt-3 pt-3 border-t border-border space-y-2">
+                  {/* Capital Allowances Breakdown */}
+                  {displaySummary.capitalAllowanceDetails && displaySummary.capitalAllowanceDetails.length > 0 && (
+                    <>
+                      <div className="pb-2 border-b border-border">
+                        <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-2">
+                          Capital Allowances (Depreciation):
+                        </p>
+                        {displaySummary.capitalAllowanceDetails.map((detail, idx) => {
+                          // Calculate book value at start of current year
+                          let bookValueAtStartOfYear = detail.originalCost
+                          if (detail.yearsSincePurchase > 0) {
+                            // Calculate cumulative depreciation up to the start of this year using reducing balance method
+                            for (let year = 0; year < detail.yearsSincePurchase; year++) {
+                              const yearDepreciation = bookValueAtStartOfYear * (detail.allowanceRate / 100)
+                              bookValueAtStartOfYear -= yearDepreciation
+                            }
+                          }
+                          
+                          // Calculate Year 1 depreciation for clarity
+                          const year1Depreciation = detail.originalCost * (detail.allowanceRate / 100)
+                          const bookValueAfterYear1 = detail.originalCost - year1Depreciation
+                          
+                          return (
+                            <div key={idx} className="mb-2 pb-2 border-b border-border last:border-0">
+                              <div className="flex items-center justify-between text-[11px] sm:text-xs mb-1">
+                                <span className="font-medium">{detail.description}</span>
+                                <span className="text-primary">-{formatCurrency(detail.allowanceAmount)}</span>
+                              </div>
+                              <div className="text-[10px] sm:text-[11px] text-muted-foreground space-y-0.5 pl-2">
+                                <div>Purchased {detail.purchaseYear}: {formatCurrency(detail.originalCost)}</div>
+                                {detail.yearsSincePurchase > 0 && (
+                                  <>
+                                    <div className="text-blue-600 dark:text-blue-400 font-medium">Year 1 Depreciation ({detail.allowanceRate}% of {formatCurrency(detail.originalCost)}): <strong>{formatCurrency(year1Depreciation)}</strong></div>
+                                    <div className="text-blue-600 dark:text-blue-400">Book Value after Year 1: <strong>{formatCurrency(bookValueAfterYear1)}</strong></div>
+                                    <div>Book Value at start of Year {detail.yearsSincePurchase + 1}: {formatCurrency(bookValueAtStartOfYear)}</div>
+                                  </>
+                                )}
+                                <div>Year {detail.yearsSincePurchase + 1} Depreciation ({detail.allowanceRate}% of {formatCurrency(bookValueAtStartOfYear)}): <strong className="text-primary">{formatCurrency(detail.allowanceAmount)}</strong></div>
+                                <div>Remaining Book Value: {formatCurrency(detail.bookValueAfter)}</div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        <div className="flex items-center justify-between pt-1 border-t border-border mt-1">
+                          <span className="text-[11px] sm:text-xs font-medium">Total Capital Allowances</span>
+                          <span className="text-[11px] sm:text-xs font-bold text-primary">
+                            -{formatCurrency(displaySummary.capitalAllowances || 0)}
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                  
                   <p className="text-[10px] sm:text-xs text-muted-foreground mb-2">
                     Tax is calculated progressively on each bracket:
                   </p>
@@ -326,6 +378,7 @@ export function TaxSummary({ businessType = "freelancer", useMockData = false }:
                       <span className="font-medium">{formatCurrency(bracket.tax)}</span>
                     </div>
                   ))}
+                  
                   <div className="flex items-center justify-between pt-2 border-t border-border mt-2">
                     <span className="text-[11px] sm:text-xs font-medium">Total Tax</span>
                     <span className="text-xs sm:text-sm font-bold text-primary">

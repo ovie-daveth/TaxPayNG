@@ -27,9 +27,13 @@ export function RecentReports() {
   const [loading, setLoading] = useState(true)
   const [selectedReport, setSelectedReport] = useState<SavedReport | null>(null)
   const [showViewDialog, setShowViewDialog] = useState(false)
+  const [showEditDialog, setShowEditDialog] = useState(false)
+  const [editingReport, setEditingReport] = useState<SavedReport | null>(null)
+  const [editingReportData, setEditingReportData] = useState<any>(null)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [reportToDelete, setReportToDelete] = useState<SavedReport | null>(null)
   const [deleting, setDeleting] = useState(false)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (profile?.userId) {
@@ -58,24 +62,41 @@ export function RecentReports() {
   }
 
   const handleEdit = (report: SavedReport) => {
-    // Navigate to the appropriate edit page based on report type
-    const editRoutes: Record<string, string> = {
-      'Self-Assessment': '/dashboard/reports/generate/self-assessment',
-      'Income Statement': '/dashboard/reports/generate/income-statement',
-      'Expense Report': '/dashboard/reports/generate/expense-report',
-      'Tax Summary': '/dashboard/reports/generate/tax-summary'
+    setEditingReport(report)
+    setEditingReportData(report.reportData)
+    setShowEditDialog(true)
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editingReport || !editingReportData) return
+
+    try {
+      setSaving(true)
+      await reportService.updateReport(editingReport.id, editingReport.type, {
+        reportData: editingReportData
+      })
+      toast.success("Report updated successfully")
+      
+      // Update the report in the list
+      setReports(reports.map(r => 
+        r.id === editingReport.id 
+          ? { ...r, reportData: editingReportData }
+          : r
+      ))
+      
+      setShowEditDialog(false)
+      setEditingReport(null)
+      setEditingReportData(null)
+    } catch (error) {
+      console.error("Error saving report:", error)
+      toast.error("Failed to save report")
+    } finally {
+      setSaving(false)
     }
-    
-    const route = editRoutes[report.type]
-    if (route) {
-      // Store report data in sessionStorage to load in edit mode
-      sessionStorage.setItem('editingReport', JSON.stringify({
-        id: report.id,
-        reportData: report.reportData,
-        type: report.type
-      }))
-      router.push(route)
-    }
+  }
+
+  const handleEditDataChange = (data: any) => {
+    setEditingReportData(data)
   }
 
   const handleDeleteClick = (report: SavedReport) => {
@@ -272,6 +293,82 @@ export function RecentReports() {
                   Preview not yet implemented for {selectedReport.type}
                 </div>
               )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Report Dialog */}
+      <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+        <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-5xl max-h-[90vh] sm:max-h-[95vh] overflow-y-auto p-3 sm:p-4 md:p-6">
+          <DialogHeader className="pb-2 sm:pb-4">
+            <DialogTitle className="text-base sm:text-lg md:text-xl">Edit {editingReport?.title}</DialogTitle>
+          </DialogHeader>
+          {editingReport && editingReportData && (
+            <>
+              {editingReport.type === 'Self-Assessment' && (
+                <SelfAssessmentPreview
+                  reportData={editingReportData}
+                  formData={{
+                    includeIncome: true,
+                    includeExpenses: true,
+                    includeTax: true,
+                    includeReliefs: true
+                  }}
+                  isEditing={true}
+                  onDataChange={handleEditDataChange}
+                  reportId={editingReport.id}
+                  showFileButton={false}
+                  filingStatus={editingReport.filingStatus}
+                  filingMethod={editingReport.filingMethod}
+                />
+              )}
+              {editingReport.type === 'Income Statement' && (
+                <div className="p-8 text-center text-muted-foreground">
+                  Editing not yet implemented for Income Statement
+                </div>
+              )}
+              {editingReport.type === 'Expense Report' && (
+                <div className="p-8 text-center text-muted-foreground">
+                  Editing not yet implemented for Expense Report
+                </div>
+              )}
+              {editingReport.type === 'Tax Summary' && (
+                <div className="p-8 text-center text-muted-foreground">
+                  Editing not yet implemented for Tax Summary
+                </div>
+              )}
+              {editingReport.type !== 'Self-Assessment' && editingReport.type !== 'Income Statement' && editingReport.type !== 'Expense Report' && editingReport.type !== 'Tax Summary' && (
+                <div className="p-8 text-center text-muted-foreground">
+                  Editing not yet implemented for {editingReport.type}
+                </div>
+              )}
+              <div className="flex justify-end gap-2 mt-4 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowEditDialog(false)
+                    setEditingReport(null)
+                    setEditingReportData(null)
+                  }}
+                  disabled={saving}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleSaveEdit}
+                  disabled={saving}
+                >
+                  {saving ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Changes"
+                  )}
+                </Button>
+              </div>
             </>
           )}
         </DialogContent>

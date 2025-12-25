@@ -48,8 +48,13 @@ export function DashboardHeader() {
   }
 
   const getPageInfo = (path: string) => {
+    // Normalize path for matching (handle both /dashboard and /dashboard-creator)
+    const isCreator = path.startsWith("/dashboard-creator")
+    const normalizedPath = isCreator ? path.replace("/dashboard-creator", "/dashboard") : path
+    const basePath = isCreator ? "/dashboard-creator" : "/dashboard"
+    
     // Handle dynamic routes first
-    if (path.startsWith("/dashboard/filing-requests/") && path !== "/dashboard/filing-requests") {
+    if ((path.startsWith("/dashboard/filing-requests/") || path.startsWith("/dashboard-creator/filing-requests/")) && path !== "/dashboard/filing-requests" && path !== "/dashboard-creator/filing-requests") {
       return {
         title: "Filing Request Status",
         subtitle: "View status updates and communicate with your agent",
@@ -59,14 +64,14 @@ export function DashboardHeader() {
       }
     }
     
-    switch (path) {
+    switch (normalizedPath) {
       case "/dashboard":
         return {
           title: "Dashboard",
           subtitle: "Welcome back! Here's your financial overview.",
           buttonText: "Pay Tax",
           buttonIcon: Plus,
-          buttonAction: () => router.push("/dashboard/payment")
+          buttonAction: () => router.push(`${basePath}/payment`)
         }
       case "/dashboard/transactions":
         return {
@@ -119,7 +124,7 @@ export function DashboardHeader() {
           subtitle: "Generate tax reports and self-assessment filings for LIRS/FIRS",
           buttonText: "New Report",
           buttonIcon: Plus,
-          buttonAction: () => checkSubscription(() => router.push("/dashboard/reports/generate/self-assessment"))
+          buttonAction: () => checkSubscription(() => router.push(`${basePath}/reports/generate/self-assessment`))
         }
       case "/dashboard/filing-requests":
         return {
@@ -167,7 +172,7 @@ export function DashboardHeader() {
           subtitle: "Manage your tax payments and receipts",
           buttonText: "New Payment",
           buttonIcon: Plus,
-          buttonAction: () => router.push("/dashboard/payment/add")
+          buttonAction: () => router.push(`${basePath}/payment/add`)
         }
       case "/dashboard/settings":
         return {

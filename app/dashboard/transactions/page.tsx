@@ -5,11 +5,13 @@ import { useAuth } from "@/lib/hooks/useAuth"
 import { useTransactions } from "@/lib/hooks/useTransactions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Search, Filter, Download } from "lucide-react"
+import { Plus, Search, Filter, Download, FileText, ChevronDown } from "lucide-react"
 import { TransactionList } from "@/components/transactions/transaction-list"
 import { TransactionFilters } from "@/components/transactions/transaction-filters"
 import { TransactionsSkeleton } from "@/components/ui/skeletons"
 import { TransactionFilters as TransactionFiltersType } from "@/lib/types"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { GenerateReportModal } from "@/components/transactions/generate-report-modal"
 
 export default function TransactionsPage() {
   const { user } = useAuth()
@@ -17,6 +19,8 @@ export default function TransactionsPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [filters, setFilters] = useState<TransactionFiltersType>({})
   const [currentPage, setCurrentPage] = useState(1)
+  const [reportModalOpen, setReportModalOpen] = useState(false)
+  const [reportType, setReportType] = useState<'income' | 'expense' | 'self-assessment'>('income')
   
   const {
     transactions,
@@ -28,6 +32,14 @@ export default function TransactionsPage() {
     updateTransaction,
     deleteTransaction
   } = useTransactions(user?.uid || null)
+
+  // Update filters when search term changes
+  useEffect(() => {
+    setFilters(prev => ({
+      ...prev,
+      search: searchTerm || undefined
+    }))
+  }, [searchTerm])
 
   useEffect(() => {
     if (user) {
@@ -77,7 +89,47 @@ export default function TransactionsPage() {
                 <Filter className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
                 Filters
               </Button>
-           
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="h-9 sm:h-10 text-xs sm:text-sm">
+                    <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                    Reports
+                    <ChevronDown className="w-3 h-3 ml-1.5 sm:ml-2" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem 
+                    className="group cursor-pointer"
+                    onClick={() => {
+                      setReportType('income')
+                      setReportModalOpen(true)
+                    }}
+                  >
+                    <FileText className="w-4 h-4 mr-2 text-foreground group-hover:text-foreground dark:group-hover:text-gray-100" />
+                    Income Report
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className="group cursor-pointer"
+                    onClick={() => {
+                      setReportType('expense')
+                      setReportModalOpen(true)
+                    }}
+                  >
+                    <Download className="w-4 h-4 mr-2 text-foreground group-hover:text-foreground dark:group-hover:text-gray-100" />
+                    Expense Report
+                  </DropdownMenuItem>
+                  <DropdownMenuItem 
+                    className="group cursor-pointer"
+                    onClick={() => {
+                      setReportType('self-assessment')
+                      setReportModalOpen(true)
+                    }}
+                  >
+                    <FileText className="w-4 h-4 mr-2 text-foreground group-hover:text-foreground dark:group-hover:text-gray-100" />
+                    Self Assessment Report
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
 
             {/* Error Message */}
@@ -138,13 +190,13 @@ export default function TransactionsPage() {
           </div>
         </main>
 
-      {/* Add Transaction Dialog */}
-        {/* <AddTransactionDialog
-          open={isAddDialogOpen}
-          onOpenChange={setIsAddDialogOpen}
-          onSubmit={createTransaction}
-          transaction={null}
-        /> */}
+      {/* Report Generation Modal */}
+      <GenerateReportModal
+        open={reportModalOpen}
+        onOpenChange={setReportModalOpen}
+        reportType={reportType}
+        transactions={transactions}
+      />
     </div>
   )
 }

@@ -49,3 +49,22 @@ export function formatDateForInput(dateInput: any): string {
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
+
+/**
+ * Calculate tax period (year, quarter, month) from a date
+ * Used for time-based tax calculations and reporting
+ */
+export function calculateTaxPeriod(dateInput: any): { year: number; quarter: number; month: number } {
+  const date = toDate(dateInput)
+  const year = date.getFullYear()
+  const month = date.getMonth() + 1 // 1-12
+  
+  // Calculate quarter (1-4)
+  const quarter = Math.ceil(month / 3)
+  
+  return {
+    year,
+    quarter,
+    month
+  }
+}

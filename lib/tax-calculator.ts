@@ -11,6 +11,8 @@ interface TaxInput {
   businessExpenses: number
   dependents: number
   transportAllowance?: number // Transport allowance for exemption calculation
+  capitalAllowances?: number // Capital allowances from transactions (Gold+ feature)
+  whtCredits?: number // Withholding tax credits from transactions (Gold+ feature)
 }
 
 // Transport allowance exemption: Up to ₦30,000/month (₦360,000/year) is tax-exempt
@@ -105,7 +107,18 @@ export function calculateNigerianTax(input: TaxInput, includeInputs: boolean = f
   // Allowable expenses: things spent "wholly, exclusively, and necessarily" for business
   // Examples: internet/data, software, laptop, co-working rent, transport to client meetings
   // This gives us the "adjusted gross income" (income after business expenses)
-  const adjustedGrossIncome = grossIncome - annualBusinessExpenses
+  
+  // Convert capital allowances to annual amount if provided (Gold+ feature)
+  let annualCapitalAllowances = input.capitalAllowances || 0
+  if (input.period === "monthly" && input.capitalAllowances) {
+    annualCapitalAllowances = input.capitalAllowances * 12
+  } else if (input.period === "quarterly" && input.capitalAllowances) {
+    annualCapitalAllowances = input.capitalAllowances * 4
+  }
+  
+  // Capital allowances reduce taxable income (similar to business expenses)
+  // They are deducted from adjusted gross income
+  const adjustedGrossIncome = grossIncome - annualBusinessExpenses - annualCapitalAllowances
 
   // ============================================
   // STEP 3 & 4: APPLY RELIEFS/DEDUCTIONS
@@ -175,6 +188,21 @@ export function calculateNigerianTax(input: TaxInput, includeInputs: boolean = f
     }
   }
 
+  // ============================================
+  // STEP 7: APPLY WITHHOLDING TAX (WHT) CREDITS
+  // ============================================
+  // WHT credits reduce the total tax payable (Gold+ feature)
+  // Convert WHT credits to annual amount if provided
+  let annualWHTCredits = input.whtCredits || 0
+  if (input.period === "monthly" && input.whtCredits) {
+    annualWHTCredits = input.whtCredits * 12
+  } else if (input.period === "quarterly" && input.whtCredits) {
+    annualWHTCredits = input.whtCredits * 4
+  }
+  
+  // WHT credits are deducted from total tax payable (cannot go below 0)
+  totalTax = Math.max(totalTax - annualWHTCredits, 0)
+
   const monthlySetAside = totalTax / 12
 
   const quarterlyAmount = totalTax / 4
@@ -191,7 +219,8 @@ export function calculateNigerianTax(input: TaxInput, includeInputs: boolean = f
   const result: any = {
     grossIncome, // Step 1: Total income from all sources
     businessExpenses: annualBusinessExpenses, // Step 2: Allowable business expenses
-    adjustedGrossIncome, // Step 2: Income after business expenses
+    capitalAllowances: annualCapitalAllowances, // Step 2: Capital allowances (Gold+ feature)
+    adjustedGrossIncome, // Step 2: Income after business expenses and capital allowances
     reliefs: {
       rentRelief, // 20% of rent paid, capped at ₦500,000/year
       pension: pensionRelief, // Up to 8% of gross income
@@ -202,9 +231,10 @@ export function calculateNigerianTax(input: TaxInput, includeInputs: boolean = f
       transportAllowance: transportAllowanceRelief, // Up to ₦360,000/year exempt
     },
     totalReliefs, // Step 3 & 4: Total reliefs/deductions
-    taxableIncome, // Step 5: Final taxable income (after expenses and reliefs)
+    taxableIncome, // Step 5: Final taxable income (after expenses, capital allowances, and reliefs)
     taxBrackets, // Step 6: Tax calculation by bracket
-    totalTax: Math.round(totalTax), // Step 6: Total tax payable
+    whtCredits: annualWHTCredits, // Step 7: Withholding tax credits (Gold+ feature)
+    totalTax: Math.round(totalTax), // Step 6 & 7: Total tax payable (after WHT credits)
     monthlySetAside: Math.round(monthlySetAside), // Monthly amount to set aside
     quarterlyPayments: quarterlyPayments.map((q) => ({
       ...q,

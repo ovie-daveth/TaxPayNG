@@ -4,11 +4,14 @@ import { useState, useEffect } from "react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { ArrowUpRight, ArrowDownRight, MoreVertical, Pencil, Trash2, Paperclip } from "lucide-react"
+import { ArrowUpRight, ArrowDownRight, MoreVertical, Pencil, Trash2, Paperclip, FileText, Tag, Eye, Receipt } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { DeleteConfirmationModal } from "@/components/ui/delete-confirmation-modal"
 import { Transaction } from "@/lib/types"
 import { AddTransactionDialog } from "./add-transaction-dialog"
+import { ViewTransactionDialog } from "./view-transaction-dialog"
 import { ImageViewerModal } from "@/components/ui/image-viewer-modal"
 import { formatDate } from "@/lib/utils/date"
 import { useTransactions } from "@/lib/hooks/useTransactions"
@@ -37,6 +40,8 @@ export function TransactionList({
 }: TransactionListProps) {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
+  const [viewingTransaction, setViewingTransaction] = useState<Transaction | null>(null)
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [isImageViewerOpen, setIsImageViewerOpen] = useState(false)
   const [selectedImages, setSelectedImages] = useState<string[]>([])
   const [selectedTransactionTitle, setSelectedTransactionTitle] = useState('')
@@ -44,13 +49,30 @@ export function TransactionList({
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
   const [highlightedTransactionId, setHighlightedTransactionId] = useState<string | null>(null)
+  const [vatBreakdownTransaction, setVatBreakdownTransaction] = useState<Transaction | null>(null)
+  const [isVatDialogOpen, setIsVatDialogOpen] = useState(false)
 
   const { user } = useAuth()
   const { profile } = useUserProfile()
-  const { isSubscribed, loading: subscriptionLoading } = useSubscription()
+  const { isSubscribed, loading: subscriptionLoading, hasAccess } = useSubscription()
   const { sidebarCollapsed } = useSidebar()
   const { createTransaction } = useTransactions(user?.uid || null)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+
+  // Check if a transaction is incomplete (missing important information)
+  const isTransactionIncomplete = (transaction: Transaction): boolean => {
+    // Check for missing required fields
+    if (!transaction.description || !transaction.category || !transaction.amount) {
+      return true
+    }
+    
+    // For creators, check if transaction nature is missing
+    if (profile?.businessType === 'creator' && !transaction.transactionNature) {
+      return true
+    }
+    
+    return false
+  }
 
   // Listen for newly created transactions to highlight them
   useEffect(() => {
@@ -85,14 +107,50 @@ export function TransactionList({
     }).format(amount)
   }
 
+  // Get category badge color based on category type (for creators)
+  const getCategoryBadgeVariant = (category: string, type: Transaction['type']) => {
+    if (type === 'income') {
+      // Income categories - use primary colors
+      const incomeCategories = [
+        'Brand Sponsorship', 'Brand Deal', 'Ad Revenue', 'Affiliate Income',
+        'Content Licensing', 'Merchandise Sales', 'Subscription Revenue',
+        'Online Courses', 'Events & Speaking', 'Platform Payout'
+      ]
+      if (incomeCategories.some(cat => category.includes(cat) || cat.includes(category))) {
+        return 'default' // Primary color
+      }
+    } else {
+      // Expense categories - use secondary colors
+      const expenseCategories = [
+        'Equipment', 'Software & Subscriptions', 'Studio Rent', 'Co-working Space',
+        'Editing Services', 'Marketing & Promotion', 'Travel for Content'
+      ]
+      if (expenseCategories.some(cat => category.includes(cat) || cat.includes(category))) {
+        return 'secondary'
+      }
+    }
+    return 'outline' // Default for custom categories
+  }
+
+  const handleView = (transaction: Transaction) => {
+    setViewingTransaction(transaction)
+    setIsViewDialogOpen(true)
+  }
+
   const handleEdit = (transaction: Transaction) => {
     setEditingTransaction(transaction)
+    setIsViewDialogOpen(false) // Close view dialog if open
     setIsAddDialogOpen(true)
   }
 
   const handleDeleteClick = (id: string) => {
     setTransactionToDelete(id)
     setIsDeleteDialogOpen(true)
+  }
+
+  const handleVatBreakdownClick = (transaction: Transaction) => {
+    setVatBreakdownTransaction(transaction)
+    setIsVatDialogOpen(true)
   }
 
   const handleDeleteConfirm = async () => {
@@ -236,18 +294,25 @@ export function TransactionList({
 
   return (
     <Card className="overflow-hidden">
-      {/* Desktop View */}
-      <div className="hidden md:block overflow-x-auto w-full">
-        <table className={`w-full min-w-[900px]  ${!sidebarCollapsed ? 'lg:min-w-[1050px] md:min-w-[700px]' : 'lg:min-w-[800px] md:min-w-[580px]'}`}>
+      {/* Table View - Mobile and Desktop */}
+      <div className="overflow-x-auto w-full">
+        <table className={`w-full ${!sidebarCollapsed ? (profile?.businessType === 'creator' ? 'min-w-[1400px]' : 'min-w-[1200px]') : (profile?.businessType === 'creator' ? 'min-w-[1300px]' : 'min-w-[1100px]')}`}>
           <thead className="bg-muted/50 border-b border-border">
             <tr>
-              <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[140px] md:w-[160px]">Date</th>
-              <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground min-w-[180px] md:min-w-[200px] lg:min-w-[220px]">Description</th>
-              <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[140px] md:w-[160px]">Category</th>
-              <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground hidden lg:table-cell w-[160px]">Payment Method</th>
-              <th className="text-right py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[140px] md:w-[160px]">Amount</th>
-              <th className="text-center py-3 md:py-4 lg:py-4 px-3 md:px-4 lg:px-5 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground hidden lg:table-cell w-[180px] md:w-[200px]">Status</th>
-              <th className="text-right py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[100px]">Actions</th>
+              <th className="text-left py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs font-medium text-muted-foreground w-[50px] md:w-[120px]">Date</th>
+              <th className="text-left py-1.5 md:py-2 px-1.5 md:px-2 text-[10px] md:text-xs font-medium text-muted-foreground w-[20px] md:w-[130px]">Description</th>
+              <th className="text-left py-1.5 md:py-2 px-1.5 md:px-2 text-[10px] md:text-xs font-medium text-muted-foreground w-[20px] md:w-[120px]">Category</th>
+              <th className="text-left py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs font-medium text-muted-foreground w-[50px] md:w-[120px]">Payment Method</th>
+              <th className="text-left py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs font-medium text-muted-foreground w-[50px] md:w-[120px]">Amount</th>
+              <th className="text-center py-1.5 md:py-2 px-1.5 md:px-2 text-[10px] md:text-xs font-medium text-muted-foreground w-[50px] md:w-[140px]">
+                {profile?.businessType === 'creator' ? 'Type' : 'Status'}
+              </th>
+              {profile?.businessType === 'creator' && (
+                <th className="text-center py-1.5 md:py-2 px-1.5 md:px-2 text-[10px] md:text-xs font-medium text-muted-foreground w-[100px] md:w-[120px]">
+                  Status
+                </th>
+              )}
+              <th className="text-right py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs font-medium text-muted-foreground w-[70px] md:w-[80px]">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -264,46 +329,298 @@ export function TransactionList({
                     animation: 'highlightFade 3s ease-out forwards'
                   } : undefined}
                 >
-                  <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm align-top">{formatDate(transaction.date)}</td>
-                  <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 align-top">
-                    <div className="flex items-center gap-2 md:gap-2.5 min-w-0">
-                      <span className="text-xs md:text-sm lg:text-sm font-medium truncate">{transaction.description}</span>
+                  <td className="py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs align-middle">
+                    {formatDate(transaction.transactionDate || transaction.valueDate || transaction.date)}
+                  </td>
+                  <td className="py-1.5 md:py-2 px-1.5 md:px-2 align-middle">
+                    <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
+                      <span className="text-[10px] md:text-xs font-medium truncate">{transaction.description}</span>
                       {transaction.attachments && transaction.attachments.length > 0 && (
                         <button
                           onClick={() => handleViewImages(transaction)}
-                          className="hover:bg-muted rounded p-1 md:p-1.5 transition-colors cursor-pointer flex-shrink-0"
+                          className="hover:bg-muted rounded p-0.5 md:p-1 transition-colors cursor-pointer flex-shrink-0"
                           title={`View ${transaction.attachments.length} receipt(s)`}
                         >
-                          <Paperclip className="w-3.5 h-3.5 md:w-4 md:h-4 text-muted-foreground hover:text-primary" />
+                          <Paperclip className="w-3 h-3 md:w-3.5 md:h-3.5 text-muted-foreground hover:text-primary" />
                         </button>
+                      )}
+                      {isTransactionIncomplete(transaction) && (
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Badge variant="outline" className="text-[9px] md:text-[10px] px-1.5 md:px-2 py-0.5 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/20 flex-shrink-0">
+                                Incomplete
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <p className="text-sm">This transaction is missing some information. Click to edit and complete it.</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       )}
                     </div>
                   </td>
-                  <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 align-top">
-                    <Badge variant="secondary" className="text-xs md:text-sm">
-                      {transaction.category}
-                    </Badge>
-                  </td>
-                  <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-xs md:text-sm lg:text-sm text-muted-foreground hidden lg:table-cell align-top">{transaction.paymentMethod}</td>
-                  <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-right align-top">
-                    <span
-                      className={`text-xs md:text-sm lg:text-sm font-semibold whitespace-nowrap ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}
-                    >
-                      {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
-                    </span>
-                  </td>
-                  <td className="py-3 md:py-4 lg:py-4 px-3 md:px-4 lg:px-5 text-center hidden lg:table-cell align-top">
-                    {transaction.taxDeductible ? (
-                      <Badge variant="outline" className="text-xs md:text-sm">
-                        Deductible
+                  <td className="py-1.5 md:py-2 px-1.5 md:px-2 align-middle">
+                    <div className="flex flex-col gap-1">
+                      <Badge 
+                        variant={getCategoryBadgeVariant(transaction.category, transaction.type)} 
+                        className="text-[10px] md:text-xs px-2 md:px-2.5 py-0.5 md:py-1 w-fit font-medium"
+                      >
+                        {transaction.category}
                       </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-xs md:text-sm">
-                        Non-deductible
-                      </Badge>
-                    )}
+                      {transaction.tags && transaction.tags.length > 0 && (() => {
+                        // Filter out tags that conflict with transaction nature/status
+                        const excludedTags = ['personal', 'business', 'mixed', 'deductible', 'non-deductible', 'tax deductible']
+                        const filteredTags = transaction.tags.filter(tag => 
+                          !excludedTags.some(excluded => tag.toLowerCase() === excluded.toLowerCase())
+                        )
+                        return filteredTags.length > 0 && (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <Tag className="w-3 h-3 text-muted-foreground" />
+                            {filteredTags.slice(0, 2).map((tag, idx) => (
+                              <span key={idx} className="text-[10px] text-muted-foreground">
+                                {tag}
+                              </span>
+                            ))}
+                            {filteredTags.length > 2 && (
+                              <span className="text-[10px] text-muted-foreground">
+                                +{filteredTags.length - 2}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })()}
+                      {transaction.linkedInvoiceId && (
+                        <div className="flex items-center gap-1">
+                          <FileText className="w-3 h-3 text-primary" />
+                          <span className="text-[10px] text-primary">Linked to invoice</span>
+                        </div>
+                      )}
+                      {/* Phase 2: Platform info for creators */}
+                      {profile?.businessType === 'creator' && transaction.type === 'income' && transaction.platform && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-[10px] text-muted-foreground">
+                            {transaction.platform.name}
+                            {transaction.platform.accountId && ` (${transaction.platform.accountId})`}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </td>
-                  <td className="py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-right">
+                  <td className="py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs text-muted-foreground align-middle">{transaction.paymentMethod}</td>
+                  <td className="py-1.5 md:py-2 px-2 md:px-3 text-left align-top">
+                    <div className="flex flex-col items-start gap-1.5">
+                      <div className="flex items-center gap-2">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex flex-col items-start gap-0.5 cursor-help">
+                              <span
+                                className={`text-[10px] md:text-xs font-semibold whitespace-nowrap ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}
+                              >
+                                {transaction.type === "income" ? "+" : "-"}
+                                {/* Phase 2: Show netAmount if available for creators, otherwise show regular amount */}
+                                {profile?.businessType === 'creator' && transaction.type === 'income' && transaction.netAmount !== undefined
+                                  ? formatCurrency(transaction.netAmount)
+                                  : formatCurrency(transaction.amount)}
+                              </span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="left" className="max-w-xs">
+                            <div className="space-y-1.5 text-xs">
+                              <div className="font-semibold mb-2">Amount Breakdown</div>
+                              {(() => {
+                                const originalAmount = transaction.amount
+                                let currentAmount = originalAmount
+                                const breakdown: string[] = []
+                                
+                                // Original amount
+                                breakdown.push(`Original: ${formatCurrency(originalAmount)}`)
+                                
+                                // Platform fees (for creators)
+                                if (profile?.businessType === 'creator' && transaction.type === 'income' && transaction.grossAmount && transaction.platformFees) {
+                                  breakdown.push(`Gross: ${formatCurrency(transaction.grossAmount)}`)
+                                  breakdown.push(`Platform Fees: -${formatCurrency(transaction.platformFees)}`)
+                                  currentAmount = transaction.netAmount !== undefined ? transaction.netAmount : (transaction.grossAmount - transaction.platformFees)
+                                  breakdown.push(`After Fees: ${formatCurrency(currentAmount)}`)
+                                }
+                                
+                                // VAT deduction (for income)
+                                if (transaction.type === 'income' && transaction.taxClassification?.vatApplicable && transaction.taxClassification?.vatRate) {
+                                  const vatAmount = currentAmount * (transaction.taxClassification.vatRate / 100)
+                                  const afterVat = currentAmount * (1 - transaction.taxClassification.vatRate / 100)
+                                  breakdown.push(`VAT ${transaction.taxClassification.vatRate}%: -${formatCurrency(vatAmount)}`)
+                                  currentAmount = afterVat
+                                  breakdown.push(`After VAT: ${formatCurrency(afterVat)}`)
+                                }
+                                
+                                // WHT Credit (for expenses)
+                                if (transaction.type === 'expense' && transaction.taxClassification?.whtCreditable) {
+                                  const whtAmount = transaction.taxClassification.whtAmount !== undefined
+                                    ? transaction.taxClassification.whtAmount
+                                    : transaction.taxClassification.whtRate
+                                      ? currentAmount * (transaction.taxClassification.whtRate / 100)
+                                      : 0
+                                  if (whtAmount > 0) {
+                                    breakdown.push(`WHT Credit ${transaction.taxClassification.whtRate ? `${transaction.taxClassification.whtRate}%` : ''}: +${formatCurrency(whtAmount)}`)
+                                    breakdown.push(`(Tax credit available to reduce tax liability)`)
+                                  }
+                                }
+                                
+                                // Capital Allowance (for expenses)
+                                if (transaction.type === 'expense' && transaction.taxClassification?.isCapitalAsset && transaction.taxClassification?.capitalAllowanceRate) {
+                                  const allowanceAmount = currentAmount * (transaction.taxClassification.capitalAllowanceRate / 100)
+                                  breakdown.push(`Capital Allowance ${transaction.taxClassification.capitalAllowanceRate}%: ${formatCurrency(allowanceAmount)}`)
+                                  breakdown.push(`(Annual depreciation claim - reduces taxable income)`)
+                                }
+                                
+                                // Business percentage (for mixed transactions - both income and expense)
+                                if (transaction.transactionNature === 'mixed' && transaction.businessPercentage !== undefined) {
+                                  const businessAmount = currentAmount * (transaction.businessPercentage / 100)
+                                  breakdown.push(`Business ${transaction.businessPercentage}%: ${formatCurrency(businessAmount)}`)
+                                  breakdown.push(`Personal ${100 - transaction.businessPercentage}%: ${formatCurrency(currentAmount - businessAmount)} (excluded)`)
+                                  currentAmount = businessAmount
+                                } else if (transaction.transactionNature === 'personal') {
+                                  breakdown.push(`Personal transaction: ${formatCurrency(currentAmount)} (excluded)`)
+                                  currentAmount = 0
+                                }
+                                
+                                // Final taxable amount
+                                breakdown.push(`Final Taxable: ${formatCurrency(currentAmount)}`)
+                                
+                                return breakdown.map((line, idx) => (
+                                  <div key={idx} className={line.startsWith('Final') ? 'font-semibold pt-1 border-t' : ''}>
+                                    {line}
+                                  </div>
+                                ))
+                              })()}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                       {/* VAT Indicator */}
+                       {transaction.taxClassification?.vatApplicable && transaction.taxClassification?.vatRate && (
+                        <button
+                          onClick={() => handleVatBreakdownClick(transaction)}
+                          className="hover:bg-muted rounded p-1 transition-colors cursor-pointer flex-shrink-0"
+                          title="View VAT breakdown"
+                        >
+                          <Receipt className="w-3.5 h-3.5 md:w-4 md:h-4 text-amber-600 dark:text-amber-400" />
+                        </button>
+                      )}
+                      </div>
+                      <div className="flex flex-col items-start gap-0.5">
+                        {/* VAT Calculation Display for Income Transactions */}
+                        {transaction.type === 'income' && transaction.taxClassification?.vatApplicable && transaction.taxClassification?.vatRate && (
+                          <div className="text-[9px] text-amber-700 dark:text-amber-300 space-y-0.5">
+                            <div className="flex items-center gap-1">
+                              <span>VAT {transaction.taxClassification.vatRate}%:</span>
+                              <span className="font-medium">
+                                -{formatCurrency(transaction.amount * (transaction.taxClassification.vatRate / 100))}
+                              </span>
+                            </div>
+                            <div className="text-muted-foreground font-bold text-[10px]">
+                              Taxable: {formatCurrency(transaction.amount * (1 - transaction.taxClassification.vatRate / 100))}
+                            </div>
+                          </div>
+                        )}
+                        {/* WHT Credit Display for Expense Transactions */}
+                        {transaction.type === 'expense' && transaction.taxClassification?.whtCreditable && (
+                          <div className="text-[9px] text-green-700 dark:text-green-300 space-y-0.5">
+                            <div className="flex items-center gap-1">
+                              <span>WHT Credit {transaction.taxClassification.whtRate ? `${transaction.taxClassification.whtRate}%` : ''}:</span>
+                              <span className="font-medium">
+                                +{formatCurrency(
+                                  transaction.taxClassification.whtAmount !== undefined
+                                    ? transaction.taxClassification.whtAmount
+                                    : transaction.taxClassification.whtRate
+                                      ? transaction.amount * (transaction.taxClassification.whtRate / 100)
+                                      : 0
+                                )}
+                              </span>
+                            </div>
+                            <div className="text-muted-foreground font-bold text-[10px]">
+                              Tax Credit Available
+                            </div>
+                          </div>
+                        )}
+                        {/* Capital Allowance Display for Expense Transactions */}
+                        {transaction.type === 'expense' && transaction.taxClassification?.isCapitalAsset && transaction.taxClassification?.capitalAllowanceRate && (
+                          <div className="text-[9px] text-blue-700 dark:text-blue-300 space-y-0.5">
+                            <div className="flex items-center gap-1">
+                              <span>Capital Allowance {transaction.taxClassification.capitalAllowanceRate}%:</span>
+                              <span className="font-medium">
+                                {formatCurrency(transaction.amount * (transaction.taxClassification.capitalAllowanceRate / 100))}
+                              </span>
+                            </div>
+                            <div className="text-muted-foreground font-bold text-[10px]">
+                              Annual Depreciation Claim
+                            </div>
+                          </div>
+                        )}
+                        {/* Phase 2: Show platform fees breakdown for creators */}
+                        {profile?.businessType === 'creator' && transaction.type === 'income' && transaction.grossAmount && transaction.platformFees && (
+                          <div className="flex flex-col gap-0.5 text-[10px] text-muted-foreground font-bold">
+                            <span>Gross: {formatCurrency(transaction.grossAmount)}</span>
+                            <span>Fees: -{formatCurrency(transaction.platformFees)}</span>
+                          </div>
+                        )}
+                      
+                      </div>
+                    </div>
+                  </td>
+                  <td className="py-1.5 md:py-2 px-1.5 md:px-2 text-center">
+                    <div className="flex items-center justify-center">
+                      {profile?.businessType === 'creator' ? (
+                        // For creators: Show transaction nature (Business/Personal/Mixed)
+                        transaction.transactionNature ? (
+                          <Badge 
+                            variant={transaction.transactionNature === 'business' ? 'default' : transaction.transactionNature === 'personal' ? 'secondary' : 'outline'} 
+                            className="text-[10px] md:text-xs px-2 md:px-2.5 py-0.5 md:py-1"
+                          >
+                            {transaction.transactionNature === 'business' ? 'Business' : transaction.transactionNature === 'personal' ? 'Personal' : transaction.transactionNature === 'mixed' && transaction.businessPercentage !== undefined ? `Mixed (${transaction.businessPercentage}%)` : 'Mixed'}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px] md:text-xs px-2 md:px-2.5 py-0.5 md:py-1">
+                            Business
+                          </Badge>
+                        )
+                      ) : (
+                        // For freelancers: Show tax deductible status
+                        <Badge 
+                          variant={transaction.taxDeductible ? 'default' : 'secondary'} 
+                          className="text-[10px] md:text-xs px-2 md:px-2.5 py-0.5 md:py-1"
+                        >
+                          {transaction.taxDeductible ? 'Tax Deductible' : 'Non-deductible'}
+                        </Badge>
+                      )}
+                    </div>
+                  </td>
+                  {profile?.businessType === 'creator' && (
+                    <td className="py-1.5 md:py-2 px-1.5 md:px-2 text-center">
+                      <div className="flex items-center justify-center">
+                        {(() => {
+                          // Determine if transaction is tax deductible
+                          // Business transactions (income or expense) are tax deductible
+                          // Personal transactions are non-deductible
+                          // Mixed transactions are tax deductible (have business component)
+                          const isTaxDeductible = transaction.transactionNature === 'business' || 
+                                                  transaction.transactionNature === 'mixed' ||
+                                                  (!transaction.transactionNature && transaction.type === 'income') // Default income is tax deductible
+                          
+                          return (
+                            <Badge 
+                              variant={isTaxDeductible ? 'default' : 'secondary'} 
+                              className="text-[10px] md:text-xs px-2 md:px-2.5 py-0.5 md:py-1"
+                            >
+                              {isTaxDeductible ? 'Tax Deductible' : 'Non-deductible'}
+                            </Badge>
+                          )
+                        })()}
+                      </div>
+                    </td>
+                  )}
+                  <td className="py-1.5 md:py-2 px-2 md:px-3 text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-7 w-7 md:h-8 md:w-8">
@@ -311,15 +628,19 @@ export function TransactionList({
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem className="cursor-pointer" onClick={() => handleEdit(transaction)}>
-                          <Pencil className="w-4 h-4 mr-2" />
+                        <DropdownMenuItem className="group cursor-pointer" onClick={() => handleView(transaction)}>
+                          <Eye className="w-4 h-4 mr-2 text-foreground group-hover:text-foreground dark:group-hover:text-gray-100" />
+                          View
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="group cursor-pointer" onClick={() => handleEdit(transaction)}>
+                          <Pencil className="w-4 h-4 mr-2 text-foreground group-hover:text-foreground dark:group-hover:text-gray-100" />
                           Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          className="text-destructive cursor-pointer"
+                          className="text-destructive group cursor-pointer"
                           onClick={() => handleDeleteClick(transaction.id)}
                         >
-                          <Trash2 className="w-4 h-4 mr-2" />
+                          <Trash2 className="w-4 h-4 mr-2 text-destructive group-hover:text-destructive dark:group-hover:text-red-400" />
                           Delete
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -332,94 +653,30 @@ export function TransactionList({
         </table>
       </div>
 
-      {/* Mobile View */}
-      <div className="md:hidden divide-y divide-border">
-        {transactions.map((transaction) => {
-          const isHighlighted = highlightedTransactionId === transaction.id
-          return (
-            <div
-              key={`mobile-${transaction.id}-${transaction.updatedAt || transaction.createdAt}`}
-              className={`p-4 transition-all duration-500 ${isHighlighted
-                  ? 'bg-primary/15 border-l-4 border-primary shadow-lg'
-                  : ''
-                }`}
-              style={isHighlighted ? {
-                animation: 'highlightFade 3s ease-out'
-              } : undefined}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div
-                    className={`w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0 ${transaction.type === "income" ? "bg-primary/10 text-primary" : "bg-destructive/10 text-destructive"
-                      }`}
-                  >
-                    {transaction.type === "income" ? (
-                      <ArrowUpRight className="w-5 h-5" />
-                    ) : (
-                      <ArrowDownRight className="w-5 h-5" />
-                    )}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-sm">{transaction.description}</p>
-                      {transaction.attachments && transaction.attachments.length > 0 && (
-                        <button
-                          onClick={() => handleViewImages(transaction)}
-                          className="hover:bg-muted rounded p-1 transition-colors"
-                          title={`View ${transaction.attachments.length} receipt(s)`}
-                        >
-                          <Paperclip className="w-3 h-3 text-muted-foreground hover:text-primary" />
-                        </button>
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1">{formatDate(transaction.date)}</p>
-                  </div>
-                </div>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon">
-                      <MoreVertical className="w-4 h-4" />
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuItem className="cursor-pointer" onClick={() => handleEdit(transaction)}>
-                      <Pencil className="w-4 h-4 mr-2" />
-                      Edit
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-destructive cursor-pointer"
-                      onClick={() => handleDeleteClick(transaction.id)}
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Badge variant="secondary" className="text-xs">
-                    {transaction.category}
-                  </Badge>
-                  {transaction.taxDeductible && (
-                    <Badge variant="outline" className="text-xs">
-                      Tax Deductible
-                    </Badge>
-                  )}
-                </div>
-                <span className={`font-semibold ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}>
-                  {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
-                </span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+
+      {/* View Transaction Dialog */}
+      <ViewTransactionDialog
+        open={isViewDialogOpen}
+        onOpenChange={setIsViewDialogOpen}
+        transaction={viewingTransaction}
+        onEdit={() => {
+          if (viewingTransaction) {
+            setEditingTransaction(viewingTransaction)
+            setIsViewDialogOpen(false)
+            setIsAddDialogOpen(true)
+          }
+        }}
+      />
 
       {/* Add Transaction Dialog */}
       <AddTransactionDialog
         open={isAddDialogOpen}
-        onOpenChange={setIsAddDialogOpen}
+        onOpenChange={(open) => {
+          setIsAddDialogOpen(open)
+          if (!open) {
+            setEditingTransaction(null)
+          }
+        }}
         onSubmit={handleSubmit}
         transaction={editingTransaction || null}
       />
@@ -431,6 +688,53 @@ export function TransactionList({
         images={selectedImages}
         title={selectedTransactionTitle}
       />
+
+      {/* VAT Breakdown Dialog */}
+      <Dialog open={isVatDialogOpen} onOpenChange={setIsVatDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>VAT Breakdown</DialogTitle>
+            <DialogDescription>
+              VAT details for this transaction
+            </DialogDescription>
+          </DialogHeader>
+          {vatBreakdownTransaction && vatBreakdownTransaction.taxClassification?.vatApplicable && vatBreakdownTransaction.taxClassification?.vatRate && (
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">Transaction Amount:</span>
+                  <span className="text-sm font-medium">{formatCurrency(vatBreakdownTransaction.amount)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">VAT Rate:</span>
+                  <span className="text-sm font-medium">{vatBreakdownTransaction.taxClassification.vatRate}%</span>
+                </div>
+                <div className="border-t pt-2 mt-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">VAT Amount (to remit):</span>
+                    <span className="text-sm font-semibold text-amber-600 dark:text-amber-400">
+                      {formatCurrency(vatBreakdownTransaction.amount * (vatBreakdownTransaction.taxClassification.vatRate / 100))}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center mt-2">
+                    <span className="text-sm text-muted-foreground">Taxable Income (after VAT):</span>
+                    <span className="text-sm font-semibold text-primary">
+                      {formatCurrency(vatBreakdownTransaction.amount * (1 - vatBreakdownTransaction.taxClassification.vatRate / 100))}
+                    </span>
+                  </div>
+                </div>
+                {vatBreakdownTransaction.type === 'income' && (
+                  <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md mt-4">
+                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                      <strong>Note:</strong> For income with VAT, {vatBreakdownTransaction.taxClassification.vatRate}% of the transaction amount ({formatCurrency(vatBreakdownTransaction.amount * (vatBreakdownTransaction.taxClassification.vatRate / 100))}) must be remitted to the government. This VAT amount is excluded from your taxable income to avoid double payment.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Modal */}
       <DeleteConfirmationModal

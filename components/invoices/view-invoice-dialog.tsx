@@ -643,6 +643,15 @@ export function ViewInvoiceDialog({
         setReceiptUploadResult(null)
         setTaxDeductible(true) // Reset to default
         onInvoiceUpdated?.()
+        
+        // Dispatch event to refresh transaction list
+        window.dispatchEvent(new CustomEvent('transactionChanged', {
+          detail: {
+            action: 'created',
+            invoiceId: invoice.id
+          }
+        }))
+        
         onOpenChange(false)
       } else {
         toast.error(result.error || "Failed to mark bill as paid")
@@ -768,6 +777,15 @@ export function ViewInvoiceDialog({
         toast.success("Payment confirmed and transaction created")
         setShouldSaveReceipt(false)
         onInvoiceUpdated?.()
+        
+        // Dispatch event to refresh transaction list
+        window.dispatchEvent(new CustomEvent('transactionChanged', {
+          detail: {
+            action: 'created',
+            invoiceId: invoice.id
+          }
+        }))
+        
         // Close confirmation modal first
         setShowConfirmDialog(false)
         // Wait for confirmation modal to fully close before closing main dialog
@@ -1666,6 +1684,122 @@ export function ViewInvoiceDialog({
                   </div>
                 )}
                 </div>
+
+                {/* Creator-Specific Information */}
+                {profile?.businessType === 'creator' && (currentInvoice || invoice).invoiceType === 'outgoing' && (
+                  ((currentInvoice || invoice).platform || (currentInvoice || invoice).transactionNature || (currentInvoice || invoice).tags?.length || (currentInvoice || invoice).paymentMethod) && (
+                    <div className="mt-4 pt-4 border-t">
+                      <h3 className="text-sm font-semibold mb-3 text-muted-foreground">Additional Information</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                        {/* Platform Information */}
+                        {(currentInvoice || invoice).platform && (
+                          <>
+                            {(currentInvoice || invoice).platform?.name && (
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Platform</p>
+                                <p className="text-sm font-medium">{(currentInvoice || invoice).platform?.name}</p>
+                              </div>
+                            )}
+                            {(currentInvoice || invoice).platform?.platformType && (
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Platform Type</p>
+                                <p className="text-sm font-medium capitalize">{(currentInvoice || invoice).platform?.platformType?.replace('_', ' ')}</p>
+                              </div>
+                            )}
+                            {(currentInvoice || invoice).platform?.accountId && (
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Account ID</p>
+                                <p className="text-sm font-medium">{(currentInvoice || invoice).platform?.accountId}</p>
+                              </div>
+                            )}
+                            {(currentInvoice || invoice).platform?.accountUrl && (
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">Account URL</p>
+                                <a 
+                                  href={(currentInvoice || invoice).platform?.accountUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="text-sm font-medium text-primary hover:underline flex items-center gap-1"
+                                >
+                                  {(currentInvoice || invoice).platform?.accountUrl}
+                                  <ExternalLink className="w-3 h-3" />
+                                </a>
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {/* Transaction Nature */}
+                        {(currentInvoice || invoice).transactionNature && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Transaction Nature</p>
+                            <p className="text-sm font-medium capitalize">{(currentInvoice || invoice).transactionNature}</p>
+                            {(currentInvoice || invoice).transactionNature === 'mixed' && (currentInvoice || invoice).businessPercentage && (
+                              <p className="text-xs text-muted-foreground mt-1">
+                                Business: {(currentInvoice || invoice).businessPercentage}%
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Payment Method */}
+                        {(currentInvoice || invoice).paymentMethod && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Expected Payment Method</p>
+                            <p className="text-sm font-medium">{(currentInvoice || invoice).paymentMethod}</p>
+                          </div>
+                        )}
+
+                        {/* Exchange Rate Info */}
+                        {((currentInvoice || invoice).currency !== 'NGN' && (currentInvoice || invoice).exchangeRate) && (
+                          <>
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Exchange Rate</p>
+                              <p className="text-sm font-medium">
+                                {(currentInvoice || invoice).exchangeRate?.toFixed(4)} 
+                                {((currentInvoice || invoice).exchangeRateDate && (
+                                  <span className="text-xs text-muted-foreground ml-1">
+                                    (as of {format(new Date((currentInvoice || invoice).exchangeRateDate!), "MMM dd, yyyy")})
+                                  </span>
+                                ))}
+                              </p>
+                            </div>
+                            {(currentInvoice || invoice).ngnEquivalent && (
+                              <div>
+                                <p className="text-xs text-muted-foreground mb-1">NGN Equivalent</p>
+                                <p className="text-sm font-medium">{formatCurrencyAmount((currentInvoice || invoice).ngnEquivalent!, 'NGN')}</p>
+                              </div>
+                            )}
+                          </>
+                        )}
+
+                        {/* Tax Period */}
+                        {(currentInvoice || invoice).taxPeriod && (
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Tax Period</p>
+                            <p className="text-sm font-medium">
+                              {(currentInvoice || invoice).taxPeriod?.year} - Q{(currentInvoice || invoice).taxPeriod?.quarter}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Tags */}
+                      {(currentInvoice || invoice).tags && (currentInvoice || invoice).tags!.length > 0 && (
+                        <div className="mt-4">
+                          <p className="text-xs text-muted-foreground mb-2">Tags</p>
+                          <div className="flex flex-wrap gap-2">
+                            {(currentInvoice || invoice).tags!.map((tag, index) => (
+                              <Badge key={index} variant="secondary" className="text-xs">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                )}
               </Card>
             </div>
 
@@ -2132,33 +2266,83 @@ export function ViewInvoiceDialog({
                               <th className="text-left p-2 sm:p-3 text-xs sm:text-sm font-semibold">Description</th>
                               <th className="text-center p-2 sm:p-3 text-xs sm:text-sm font-semibold">Quantity</th>
                               <th className="text-right p-2 sm:p-3 text-xs sm:text-sm font-semibold">Unit Price</th>
+                              {profile?.businessType === 'creator' && (currentInvoice || invoice).invoiceType === 'outgoing' && (
+                                <>
+                                  <th className="text-right p-2 sm:p-3 text-xs sm:text-sm font-semibold">Gross</th>
+                                  <th className="text-right p-2 sm:p-3 text-xs sm:text-sm font-semibold">Platform Fees</th>
+                                </>
+                              )}
                               <th className="text-right p-2 sm:p-3 text-xs sm:text-sm font-semibold">Amount</th>
                               <th className="text-center p-2 sm:p-3 text-xs sm:text-sm font-semibold">Vatable</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {(currentInvoice?.items || invoice.items).map((item, index) => (
-                              <tr key={item.id || index} className="border-t hover:bg-muted/30 transition-colors">
-                                <td className="p-2 sm:p-3 text-xs sm:text-sm break-words">{item.description}</td>
-                                <td className="p-2 sm:p-3 text-center text-xs sm:text-sm">{item.quantity}</td>
-                                <td className="p-2 sm:p-3 text-right text-xs sm:text-sm">
-                                  <span className="text-muted-foreground">
-                                    {item.currency ? getCurrencySymbol(item.currency as any) : currencySymbol}
-                                  </span>
-                                  {item.unitPrice.toLocaleString()}
-                                </td>
-                                <td className="p-2 sm:p-3 text-right font-semibold text-xs sm:text-sm">
-                                  {formatCurrencyAmount(calculateItemAmount(item), currentInvoice?.currency as any || invoice?.currency as any)}
-                                </td>
-                                <td className="p-2 sm:p-3 text-center">
-                                  {item.vatable ? (
-                                    <Badge variant="default" className="text-xs">Yes</Badge>
-                                  ) : (
-                                    <Badge variant="secondary" className="text-xs">No</Badge>
+                            {(currentInvoice?.items || invoice.items).map((item, index) => {
+                              const isCreatorInvoice = profile?.businessType === 'creator' && (currentInvoice || invoice).invoiceType === 'outgoing'
+                              const grossAmount = item.grossAmount || (item.quantity * item.unitPrice)
+                              const platformFees = item.platformFees || 0
+                              const netAmount = item.netAmount || (grossAmount - platformFees)
+                              const displayAmount = isCreatorInvoice && platformFees > 0 ? netAmount : grossAmount
+                              
+                              return (
+                                <>
+                                  <tr key={item.id || index} className="border-t hover:bg-muted/30 transition-colors">
+                                    <td className="p-2 sm:p-3 text-xs sm:text-sm break-words">{item.description}</td>
+                                    <td className="p-2 sm:p-3 text-center text-xs sm:text-sm">{item.quantity}</td>
+                                    <td className="p-2 sm:p-3 text-right text-xs sm:text-sm">
+                                      <span className="text-muted-foreground">
+                                        {item.currency ? getCurrencySymbol(item.currency as any) : currencySymbol}
+                                      </span>
+                                      {item.unitPrice.toLocaleString()}
+                                    </td>
+                                    {isCreatorInvoice && (
+                                      <>
+                                        <td className="p-2 sm:p-3 text-right text-xs sm:text-sm">
+                                          {formatCurrencyAmount(grossAmount, currentInvoice?.currency as any || invoice?.currency as any)}
+                                        </td>
+                                        <td className="p-2 sm:p-3 text-right text-xs sm:text-sm text-destructive">
+                                          {platformFees > 0 ? (
+                                            <>-{formatCurrencyAmount(platformFees, currentInvoice?.currency as any || invoice?.currency as any)}</>
+                                          ) : (
+                                            <span className="text-muted-foreground">—</span>
+                                          )}
+                                        </td>
+                                      </>
+                                    )}
+                                    <td className="p-2 sm:p-3 text-right font-semibold text-xs sm:text-sm">
+                                      {formatCurrencyAmount(displayAmount, currentInvoice?.currency as any || invoice?.currency as any)}
+                                    </td>
+                                    <td className="p-2 sm:p-3 text-center">
+                                      {item.vatable ? (
+                                        <Badge variant="default" className="text-xs">Yes</Badge>
+                                      ) : (
+                                        <Badge variant="secondary" className="text-xs">No</Badge>
+                                      )}
+                                    </td>
+                                  </tr>
+                                  {isCreatorInvoice && platformFees > 0 && (
+                                    <tr className="bg-muted/20">
+                                      <td colSpan={isCreatorInvoice ? 7 : 5} className="p-2 sm:p-3 text-xs text-muted-foreground">
+                                        <div className="flex flex-col gap-1">
+                                          <div className="flex justify-between">
+                                            <span>Gross Amount:</span>
+                                            <span className="font-medium">{formatCurrencyAmount(grossAmount, currentInvoice?.currency as any || invoice?.currency as any)}</span>
+                                          </div>
+                                          <div className="flex justify-between text-destructive">
+                                            <span>Platform Fees:</span>
+                                            <span>-{formatCurrencyAmount(platformFees, currentInvoice?.currency as any || invoice?.currency as any)}</span>
+                                          </div>
+                                          <div className="flex justify-between font-semibold border-t pt-1 mt-1">
+                                            <span>Net Amount:</span>
+                                            <span>{formatCurrencyAmount(netAmount, currentInvoice?.currency as any || invoice?.currency as any)}</span>
+                                          </div>
+                                        </div>
+                                      </td>
+                                    </tr>
                                   )}
-                                </td>
-                              </tr>
-                            ))}
+                                </>
+                              )
+                            })}
                           </tbody>
                         </table>
                       </div>
@@ -2210,17 +2394,17 @@ export function ViewInvoiceDialog({
         }
       }
     }}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Confirm Payment Received</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            Are you sure you have received payment for this invoice? This will mark the invoice as paid and create a transaction record.
+            Please review the payment receipt below. Once confirmed, this will mark the invoice as paid and create a transaction record.
           </p>
           
-          {/* Show existing receipt if available */}
-          {invoice?.clientReceiptUrl && (
+          {/* Receipt Section */}
+          {invoice?.clientReceiptUrl ? (
             <div className="space-y-2">
               <Label className="text-xs font-semibold">Payment Receipt</Label>
               <div className="border rounded-lg p-3 space-y-2">
@@ -2236,7 +2420,7 @@ export function ViewInvoiceDialog({
                     className="h-7 text-xs"
                   >
                     <ExternalLink className="h-3 w-3 mr-1" />
-                    View
+                    View Receipt
                   </Button>
                 </div>
                 {invoice.clientPaymentMethod && (
@@ -2262,6 +2446,12 @@ export function ViewInvoiceDialog({
                 </div>
               </div>
             </div>
+          ) : (
+            <div className="border rounded-lg p-3">
+              <p className="text-xs text-muted-foreground">
+                No receipt uploaded by client yet. Please wait for the client to upload a receipt before confirming payment.
+              </p>
+            </div>
           )}
           
           <div className="flex gap-3 justify-end pt-4">
@@ -2279,7 +2469,7 @@ export function ViewInvoiceDialog({
             </Button>
             <Button
               onClick={handleConfirmPaymentReceived}
-              disabled={isMarkingPaid || isSavingReceipt}
+              disabled={isMarkingPaid || isSavingReceipt || !invoice?.clientReceiptUrl}
             >
               {isMarkingPaid || isSavingReceipt ? (
                 <>

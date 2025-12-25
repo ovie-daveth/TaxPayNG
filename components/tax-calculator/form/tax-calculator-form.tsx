@@ -14,6 +14,10 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { TaxRatesInfo } from "../tax-rates-info"
 import { calculateNigerianTax } from "@/lib/tax-calculator"
 import { calculateDevelopmentLevy } from "@/lib/tax/development-levy-calculator"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { useSubscription } from "@/lib/hooks/useSubscription"
+import { calculateTaxClassificationBenefits } from "@/lib/utils/tax-classification-calculator"
+import { calculateTaxPeriod } from "@/lib/utils/date"
 import { SMEExemptionModal } from "../sme-exemption-modal"
 import { VATForm } from "../vat-form"
 import { CITForm } from "../cit-form"
@@ -174,6 +178,10 @@ export function TaxCalculatorForm({
   lockUserType = false,
   onViewHistory,
 }: TaxCalculatorFormProps) {
+  const { user } = useAuth()
+  const { hasAccess } = useSubscription()
+  const hasGoldAccess = hasAccess('GOLD')
+  
   const [userType, setUserType] = useState<SupportedUserType>(defaultUserType)
   const [showSMEModal, setShowSMEModal] = useState(false)
   const [calculationType, setCalculationType] = useState<string | null>(null) // "paye", "vat", null
@@ -931,6 +939,38 @@ export function TaxCalculatorForm({
         return
       }
 
+      // Calculate tax classification benefits (capital allowances and WHT credits) if user has Gold+ access
+      let capitalAllowances = 0
+      let whtCredits = 0
+      let taxClassificationSummary = null
+      
+      if (hasGoldAccess && user?.uid) {
+        try {
+          // Determine tax period from the selected period
+          const now = new Date()
+          const currentYear = now.getFullYear()
+          let taxPeriod: { year: number; quarter?: number; month?: number }
+          
+          if (period === "yearly") {
+            taxPeriod = { year: currentYear }
+          } else if (period === "quarterly") {
+            // For quarterly, we'll use the current quarter
+            const currentQuarter = Math.ceil((now.getMonth() + 1) / 3)
+            taxPeriod = { year: currentYear, quarter: currentQuarter }
+          } else {
+            // For monthly, use current month
+            taxPeriod = { year: currentYear, month: now.getMonth() + 1 }
+          }
+          
+          taxClassificationSummary = await calculateTaxClassificationBenefits(user.uid, taxPeriod)
+          capitalAllowances = taxClassificationSummary.capitalAllowances
+          whtCredits = taxClassificationSummary.whtCredits
+        } catch (error) {
+          console.error('Error calculating tax classification benefits:', error)
+          // Continue with calculation even if tax classification fetch fails
+        }
+      }
+
       // Regular calculation for non-business or when no calculation type selected
       const result = calculateNigerianTax({
         businessType: calculationType === "paye" ? "freelancer" : userType, // Use freelancer for PAYE calculations
@@ -945,7 +985,14 @@ export function TaxCalculatorForm({
         charitableDonations: Number.parseFloat(charitableDonations) || 0,
         businessExpenses: totalBusinessExp,
         dependents: Number.parseInt(dependents) || 0,
+        capitalAllowances: capitalAllowances > 0 ? capitalAllowances : undefined,
+        whtCredits: whtCredits > 0 ? whtCredits : undefined,
       })
+      
+      // Add tax classification summary to result if available
+      if (taxClassificationSummary) {
+        result.taxClassificationSummary = taxClassificationSummary
+      }
 
       // Add income breakdown with currency information and original input amounts
       result.incomeBreakdown = annualizedIncomeSources.map((source) => ({

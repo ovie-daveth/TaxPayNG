@@ -129,7 +129,8 @@ export class BaseService {
     
     if (includeTimestamps) {
       prepared.updatedAt = serverTimestamp()
-      if (!prepared.id) {
+      // Only set createdAt if it doesn't already exist (to preserve explicit ISO strings)
+      if (!prepared.id && !prepared.createdAt) {
         prepared.createdAt = serverTimestamp()
       }
     }

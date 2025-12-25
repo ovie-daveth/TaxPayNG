@@ -56,10 +56,55 @@ export interface UserProfile {
   agentStates?: string[] // States the agent can handle
   agentCertification?: string // URL to certification document
   agentKycCompleted?: boolean // Whether agent has completed KYC
+  // Creator-specific fields
+  platformConnections?: PlatformConnection[] // Saved platform connections for creators
+}
+
+// Platform connection for creators
+export interface PlatformConnection {
+  id: string // Unique ID for this connection
+  name: string // Platform name (e.g., "YouTube", "TikTok", "Instagram")
+  platformType: 'social' | 'subscription' | 'marketplace' | 'streaming' | 'other'
+  accountId?: string // Creator's account ID/username on the platform
+  accountUrl?: string // URL to creator's profile/page on platform
+  createdAt: string
+  updatedAt: string
 }
 
 // Transaction Types
 export type TransactionType = 'income' | 'expense' | 'relief'
+
+// Transaction Nature - for personal vs business separation
+export type TransactionNature = 'business' | 'personal' | 'mixed'
+
+// Tax Classification - comprehensive tax tagging
+export interface TaxClassification {
+  // For income transactions
+  incomeType?: 'taxable' | 'non-taxable' | 'exempt'
+  
+  // For expense transactions
+  expenseType?: 'allowable' | 'disallowable' | 'capital'
+  
+  // Capital asset tracking (for capital allowances)
+  isCapitalAsset?: boolean
+  capitalAllowanceRate?: number // e.g., 25% for annual allowance
+  
+  // VAT handling (future)
+  vatApplicable?: boolean
+  vatRate?: number
+  
+  // Withholding Tax (WHT) credits
+  whtCreditable?: boolean
+  whtRate?: number
+  whtAmount?: number
+}
+
+// Tax Period - for time-based tax calculations
+export interface TaxPeriod {
+  year: number
+  quarter?: number // 1-4
+  month?: number // 1-12
+}
 
 export interface Transaction {
   id: string
@@ -68,12 +113,51 @@ export interface Transaction {
   category: string
   amount: number
   description: string
-  date: string
+  date: string // Legacy field - kept for backward compatibility
+  
+  // Phase 1: Date separation for tax compliance
+  transactionDate?: string // When transaction occurred (invoice date, service date)
+  valueDate?: string // When money actually moved (payment date, receipt date)
+  taxPeriod?: TaxPeriod // Calculated tax period (year, quarter, month)
+  
+  // Phase 1: Personal vs Business separation
+  transactionNature?: TransactionNature // 'business' | 'personal' | 'mixed'
+  businessPercentage?: number // For mixed transactions (0-100)
+  
+  // Phase 1: Locked exchange rates
+  currency?: string // Original currency code (e.g., 'USD', 'NGN')
+  exchangeRate?: number // Exchange rate used at transaction date (locked)
+  exchangeRateDate?: string // Date when exchange rate was locked
+  ngnEquivalent?: number // Locked NGN equivalent amount
+  
   paymentMethod: string
-  taxDeductible: boolean
+  taxDeductible: boolean // Legacy field - kept for backward compatibility
+  
+  // Phase 1: Comprehensive tax classification
+  taxClassification?: TaxClassification
+  
+  // Invoice linking - bidirectional connection
+  linkedInvoiceId?: string // Reference to the invoice that created this transaction
+  invoiceStatus?: 'pending' | 'completed' // Status if transaction is from an invoice
+  isFromInvoice?: boolean // Quick flag to identify invoice-generated transactions
+  
+  // Phase 2: Platform fees tracking (for income transactions)
+  grossAmount?: number // Gross amount before platform fees
+  platformFees?: number // Platform commission/fees deducted
+  netAmount?: number // Net amount after platform fees (grossAmount - platformFees)
+  
+  // Phase 2: Platform-specific tracking
+  platform?: {
+    name: string // "YouTube", "TikTok", "Instagram", "Patreon", "OnlyFans", etc.
+    platformType: 'social' | 'subscription' | 'marketplace' | 'streaming' | 'other'
+    accountId?: string // Creator's account ID/username on the platform
+    accountUrl?: string // URL to creator's profile/page on platform
+  }
+  
   notes?: string
   tags?: string[]
-  attachments?: string[]
+  attachments?: string[] // Array of attachment URLs
+  attachmentFileIds?: string[] // Array of ImageKit fileIds corresponding to attachments (same order)
   receiptUrl?: string
   documentId?: string
   createdAt: string
@@ -84,6 +168,7 @@ export interface TransactionFilters {
   type?: TransactionType
   category?: string
   paymentMethod?: string
+  platform?: string // Platform name filter (for creators)
   startDate?: string
   endDate?: string
   dateRange?: {
@@ -95,6 +180,7 @@ export interface TransactionFilters {
     max: number
   }
   tags?: string[]
+  search?: string // Search term to filter by description, category, notes, tags
 }
 
 // Document Types
@@ -270,6 +356,10 @@ export interface InvoiceItem {
   currency?: string // Currency code for this item (if different from invoice currency)
   vatable?: boolean // Whether this item is subject to VAT (default: false)
   amount: number // quantity * unitPrice (converted to invoice currency if needed)
+  // Platform fees breakdown (for creator income items)
+  grossAmount?: number // Gross amount before platform fees
+  platformFees?: number // Platform commission/fees deducted
+  netAmount?: number // Net amount after platform fees (grossAmount - platformFees)
 }
 
 export interface InvoiceClient {
@@ -389,6 +479,44 @@ export interface Invoice {
   
   // Attachments
   pdfUrl?: string
+  
+  // Phase 2: Platform-specific tracking (for creators - especially for income invoices)
+  platform?: {
+    name: string // "YouTube", "TikTok", "Instagram", "Patreon", "OnlyFans", etc.
+    platformType: 'social' | 'subscription' | 'marketplace' | 'streaming' | 'other'
+    accountId?: string // Creator's account ID/username on the platform
+    accountUrl?: string // URL to creator's profile/page on platform
+  }
+  
+  // Phase 2: Platform fees breakdown (for creator income invoices)
+  grossAmount?: number // Gross amount before platform fees
+  platformFees?: number // Platform commission/fees deducted
+  netAmount?: number // Net amount after platform fees (grossAmount - platformFees)
+  
+  // Phase 2: Transaction nature (for creators - business/personal/mixed)
+  transactionNature?: TransactionNature // 'business' | 'personal' | 'mixed'
+  businessPercentage?: number // For mixed transactions (0-100)
+  
+  // Phase 2: Tax period tracking
+  taxPeriod?: TaxPeriod // Calculated tax period (year, quarter, month)
+  
+  // Phase 2: Exchange rate locking (for foreign currency invoices)
+  exchangeRate?: number // Exchange rate used at invoice date (locked)
+  exchangeRateDate?: string // Date when exchange rate was locked
+  ngnEquivalent?: number // Locked NGN equivalent amount
+  
+  // Phase 2: Payment method tracking
+  paymentMethod?: string // Expected or actual payment method
+  
+  // Phase 2: Tags for organization
+  tags?: string[] // Tags for categorizing and searching invoices
+  
+  // Phase 2: Additional attachments (beyond PDF)
+  attachments?: string[] // Array of attachment URLs
+  attachmentFileIds?: string[] // Array of ImageKit fileIds corresponding to attachments
+  
+  // Phase 2: Value date (when payment is actually received/made)
+  valueDate?: string // When money actually moved (payment date, receipt date)
   
   createdAt: string
   updatedAt: string
