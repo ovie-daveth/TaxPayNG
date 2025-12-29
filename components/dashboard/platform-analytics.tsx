@@ -365,18 +365,18 @@ export function PlatformAnalytics({ startDate, endDate }: PlatformAnalyticsProps
                 )}
                 <div className="flex items-start justify-between flex-1">
                   <div className="flex-1 min-w-0">
-                    <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground mb-0.5 sm:mb-1">{stat.label}</p>
-                    <p className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold mb-1 sm:mb-1.5 md:mb-2 truncate">{stat.value}</p>
+                    <p className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground mb-0.5 sm:mb-1">{stat.label}</p>
+                    <p className="text-sm sm:text-base md:text-lg lg:text-xl font-bold mb-1 sm:mb-1.5 md:mb-2 truncate">{stat.value}</p>
                     {stat.change && (
-                      <p className={`text-[10px] sm:text-xs font-medium ${stat.trend === "up" ? "text-primary" : stat.trend === "down" ? "text-destructive" : "text-muted-foreground"}`}>
+                      <p className={`text-[9px] sm:text-[10px] font-medium ${stat.trend === "up" ? "text-primary" : stat.trend === "down" ? "text-destructive" : "text-muted-foreground"}`}>
                         {stat.change}
                       </p>
                     )}
                   </div>
                   <div
-                    className={`w-8 h-8 sm:w-9 sm:h-9 md:w-10 md:h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 ml-2 ${stat.color}`}
+                    className={`w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 lg:w-10 lg:h-10 rounded-lg bg-muted flex items-center justify-center flex-shrink-0 ml-2 ${stat.color}`}
                   >
-                    <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5" />
+                    <Icon className="w-3 h-3 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4 lg:w-5 lg:h-5" />
                   </div>
                 </div>
               </Card>
@@ -387,18 +387,18 @@ export function PlatformAnalytics({ startDate, endDate }: PlatformAnalyticsProps
                   onMouseEnter={() => isHoverEnabled && handleCardHover(stat.id)}
                   onMouseLeave={() => isHoverEnabled && !isOpen && handleCardHover(null)}
                 >
-                  <h4 className="font-semibold text-xs sm:text-sm mb-2 sm:mb-3">{stat.label} Breakdown</h4>
+                  <h4 className="font-semibold text-[10px] sm:text-xs md:text-sm mb-2 sm:mb-3">{stat.label} Breakdown</h4>
                   <div className="space-y-2 sm:space-y-3">
                     {stat.breakdown.map((item, itemIndex) => (
                       <div key={itemIndex} className="space-y-1 sm:space-y-1.5">
-                        <div className="flex items-center justify-between text-xs sm:text-sm">
+                        <div className="flex items-center justify-between text-[10px] sm:text-xs md:text-sm">
                           <span className="text-muted-foreground">{item.label}</span>
                           <span className="font-medium">{item.value}</span>
                         </div>
                         <div className="w-full bg-muted rounded-full h-2">
                           <div className={`h-2 rounded-full ${stat.barColor}`} style={{ width: `${item.percentage}%` }} />
                         </div>
-                        <p className="text-[10px] sm:text-xs text-muted-foreground">{item.percentage}%</p>
+                        <p className="text-[9px] sm:text-[10px] md:text-xs text-muted-foreground">{item.percentage}%</p>
                       </div>
                     ))}
                   </div>
@@ -417,14 +417,14 @@ export function PlatformAnalytics({ startDate, endDate }: PlatformAnalyticsProps
             Income, expenses, and profitability by platform
           </p>
         </div>
-        <div className="w-full h-[250px] sm:h-[280px] md:h-[300px] -ml-2 sm:ml-0 relative">
+        <div className="w-full h-[250px] sm:h-[280px] md:h-[300px] relative">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
-              margin={{ top: 10, right: 5, left: 0, bottom: 60 }}
+              margin={{ top: 10, right: 5, left: -10, bottom: 60 }}
               className="sm:!ml-0"
               barGap={8}
-              barCategoryGap="20%"
+              barCategoryGap="15%"
             >
               <defs>
                 <linearGradient id="incomeGradient" x1="0" y1="0" x2="0" y2="1">
@@ -449,16 +449,18 @@ export function PlatformAnalytics({ startDate, endDate }: PlatformAnalyticsProps
                 textAnchor="end"
                 height={80}
                 tick={{
-                  className: "fill-muted-foreground",
+                  className: "fill-muted-foreground text-[9px] sm:text-[10px]",
                   fontSize: 10,
                   fontWeight: 500,
                 }}
+                interval={0}
               />
               <YAxis
                 axisLine={false}
                 tickLine={false}
+                width={50}
                 tick={{
-                  className: "fill-muted-foreground",
+                  className: "fill-muted-foreground text-[9px] sm:text-[10px]",
                   fontSize: 10,
                   fontWeight: 500,
                 }}
@@ -539,10 +541,12 @@ export function PlatformAnalytics({ startDate, endDate }: PlatformAnalyticsProps
         </div>
       </Card>
 
-      {/* Recent Transactions per Platform - Table View */}
+      {/* Recent Transactions per Platform - Responsive View */}
       <Card className="p-4 sm:p-5 md:p-6">
         <h3 className="text-base sm:text-lg font-semibold mb-4">Recent Transactions by Platform</h3>
-        <div className="overflow-x-auto">
+        
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full">
             <thead className="bg-muted/50 border-b border-border">
               <tr>
@@ -661,6 +665,118 @@ export function PlatformAnalytics({ startDate, endDate }: PlatformAnalyticsProps
               })}
             </tbody>
           </table>
+        </div>
+
+        {/* Mobile Card View */}
+        <div className="md:hidden space-y-3">
+          {analytics.platforms.map((platform, platformIndex) => {
+            const recentTransactions = getRecentTransactions(platform)
+            if (recentTransactions.length === 0) return null
+
+            return recentTransactions.map((transaction) => {
+              const transactionDate = transaction.date || transaction.createdAt
+              const displayAmount = transaction.netAmount !== undefined 
+                ? transaction.netAmount 
+                : (typeof transaction.amount === 'number' 
+                  ? transaction.amount 
+                  : Number(String(transaction.amount).replace(/[\u20A6,]/g, '').trim()) || 0)
+              
+              // Handle foreign currency
+              let originalAmount: number | null = null
+              if (transaction.currency && transaction.currency !== 'NGN' && transaction.exchangeRate) {
+                if (transaction.ngnEquivalent) {
+                  originalAmount = transaction.ngnEquivalent / transaction.exchangeRate
+                } else {
+                  originalAmount = displayAmount / transaction.exchangeRate
+                }
+              }
+
+              return (
+                <Card
+                  key={transaction.id}
+                  className="p-3 cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => handleViewTransaction(transaction)}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      {/* Platform and Type */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <div 
+                          className="w-2.5 h-2.5 rounded-full flex-shrink-0" 
+                          style={{ backgroundColor: colors[platformIndex % colors.length] }}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-semibold truncate">{platform.platformName}</span>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 capitalize flex-shrink-0">
+                              {platform.platformType}
+                            </Badge>
+                            <Badge 
+                              variant={transaction.type === 'income' ? 'default' : 'destructive'}
+                              className="text-[10px] px-1.5 py-0 flex-shrink-0"
+                            >
+                              {transaction.type === 'income' ? 'Income' : 'Expense'}
+                            </Badge>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Description */}
+                      <div className="text-sm font-medium mb-1.5 line-clamp-2">
+                        {transaction.description || 'Untitled transaction'}
+                      </div>
+
+                      {/* Category and Date */}
+                      <div className="flex items-center gap-2 flex-wrap mb-2">
+                        {transaction.category && (
+                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                            {transaction.category}
+                          </Badge>
+                        )}
+                        {transactionDate && (
+                          <span className="text-xs text-muted-foreground">
+                            {formatDate(transactionDate)}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Amount */}
+                      <div className="flex items-center justify-between">
+                        <span className={`text-base font-bold ${
+                          transaction.type === 'income' ? 'text-primary' : 'text-destructive'
+                        }`}>
+                          {transaction.type === 'income' ? '+' : '-'}
+                          {formatCurrency(displayAmount)}
+                        </span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 flex-shrink-0"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleViewTransaction(transaction)
+                          }}
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                      </div>
+
+                      {/* Foreign Currency */}
+                      {originalAmount !== null && transaction.currency && (
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {transaction.currency} {new Intl.NumberFormat('en-US', {
+                            style: 'currency',
+                            currency: transaction.currency,
+                            minimumFractionDigits: 0,
+                          }).format(originalAmount)}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </Card>
+              )
+            })
+          })}
         </div>
       </Card>
 

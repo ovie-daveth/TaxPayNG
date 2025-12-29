@@ -676,21 +676,21 @@ export function AnalyticsInsights({
   }
 
   return (
-    <Card className="p-4 sm:p-5 md:p-6 space-y-4">
-      <div className="flex items-center justify-between gap-2">
+    <Card className="p-4 sm:p-5 md:p-6 space-y-3 sm:space-y-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-2">
         <div>
           <div className="flex items-center gap-2">
             <Sparkles className="h-4 w-4 text-primary" />
-            <h3 className="text-base sm:text-lg font-semibold">Analytics insights</h3>
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold">Analytics insights</h3>
           </div>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">{headerText}</p>
+          <p className="text-[11px] sm:text-xs md:text-sm text-muted-foreground mt-1">{headerText}</p>
         </div>
-        <Badge variant="outline" className="text-xs sm:text-sm">
+        <Badge variant="outline" className="text-[10px] sm:text-xs w-fit">
           {periodType === "year" ? "Year view" : `Q${effectiveQuarter} ${effectiveYear}`}
         </Badge>
       </div>
 
-      <div className={`grid gap-3 sm:gap-4 ${!sidebarCollapsed ? 'md:grid-cols-1' : 'md:grid-cols-2'}`}>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
         {loading
           ? Array.from({ length: 4 }).map((_, index) => (
               <div key={index} className="border border-border rounded-xl p-4 space-y-3 animate-pulse">
@@ -703,15 +703,15 @@ export function AnalyticsInsights({
           : insights.map((insight) => {
               const tone = toneStyles[insight.tone]
               return (
-                <div key={insight.id} className="border border-border rounded-xl p-4 space-y-3 relative">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="secondary" className={`gap-2 ${tone.badge}`}>
+                <div key={insight.id} className="border border-border rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3 relative">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <Badge variant="secondary" className={`gap-2 w-fit ${tone.badge}`}>
                       {tone.icon}
                       <span className="text-[10px] sm:text-xs uppercase tracking-wide">{insight.title}</span>
                     </Badge>
-                    <span className="text-sm font-semibold">{insight.metric}</span>
+                    <span className="text-xs sm:text-sm font-semibold">{insight.metric}</span>
                   </div>
-                  <div className="text-xs sm:text-sm text-muted-foreground">{insight.description}</div>
+                  <div className="text-[11px] sm:text-xs md:text-sm text-muted-foreground">{insight.description}</div>
                   {insight.action && (
                     <Button
                       variant="link"
