@@ -1,12 +1,14 @@
+import Image from 'next/image'
 import React from 'react'
 
 const OtaxLogo = () => {
   return (
-    <div className="flex items-center gap-2">
-    <div className="w-8 h-8 bg-primary text-primary-foreground font-bold rounded-lg flex items-center justify-center">
-      O
-    </div>
-    <span className="font-semibold text-xl">OTax</span>
+    <div className="flex items-center gap-2 relative">
+      <div className="relative">
+        <Image className="dark:hidden" src="/logootax_bg.png" alt="OTax Logo" width={50} height={100} />
+        <Image className="hidden dark:block" src="/darklogo-bg.png" alt="OTax Logo" width={50} height={100} />
+        <sup className="absolute -top-1 -right-1 text-[12px] font-bold leading-none opacity-70">™</sup>
+      </div>
   </div>
   )
 }

@@ -153,8 +153,9 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
   const [userType, setUserType] = useState("freelancer")
   const [showSMEModal, setShowSMEModal] = useState(false)
   const [calculationType, setCalculationType] = useState<string | null>(null) // "paye", "vat", null
-  const [showExplanations, setShowExplanations] = useState(false) // Mobile-only toggle for explanations
+  const [showExplanations, setShowExplanations] = useState(false) // Mobile-only toggle for explanations (kept for backward compatibility but not used)
   const [showRatesSheet, setShowRatesSheet] = useState(false) // Control sheet visibility
+  const [showInfoSheet, setShowInfoSheet] = useState(false) // Control info sheet visibility
   const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([
     { id: "1", type: "freelance", amount: "", currency: "NGN" },
   ])
@@ -984,8 +985,8 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
         <div className="mb-4 sm:mb-6">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
-              <h2 className="text-lg sm:text-xl font-semibold">Calculate Your Tax</h2>
-              <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+              <h2 className="text-base sm:text-xl font-semibold">Calculate Your Tax</h2>
+              <p className="text-[11px] sm:text-sm text-muted-foreground mt-1">
                 Enter your multiple income streams and expenses - we'll calculate everything automatically
               </p>
             </div>
@@ -1002,26 +1003,16 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
                 <Calculator className="w-4 h-4" />
                 <span className="hidden sm:inline">Tax Rates</span>
               </Button>
-              {/* Mobile-only toggle for explanations */}
+              {/* Mobile-only Info button - opens Sheet from right */}
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setShowExplanations(!showExplanations)}
+                onClick={() => setShowInfoSheet(true)}
                 className="md:hidden flex items-center gap-1.5 shrink-0"
               >
                 <Info className="w-4 h-4" />
-                {showExplanations ? (
-                  <>
-                    <span className="hidden sm:inline">Hide Info</span>
-                    <ChevronUp className="w-4 h-4" />
-                  </>
-                ) : (
-                  <>
-                    <span className="hidden sm:inline">Show Info</span>
-                    <ChevronDown className="w-4 h-4" />
-                  </>
-                )}
+                <span className="hidden sm:inline">Info</span>
                 <span className="sm:hidden">Info</span>
               </Button>
             </div>
@@ -1244,6 +1235,85 @@ export function TaxCalculatorForm({ onCalculate }: TaxCalculatorFormProps) {
           </SheetHeader>
           <div className="mt-6">
             <TaxRatesInfo />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Info Sheet - shows explanations on mobile, slides from right */}
+      <Sheet open={showInfoSheet} onOpenChange={setShowInfoSheet}>
+        <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Information & Help</SheetTitle>
+            <SheetDescription>
+              Helpful information about tax calculations
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6 space-y-6">
+            {/* Tax-Deductible Expenses Info */}
+            {!calculationType && userType !== "creator" && (
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <p className="text-sm text-blue-700 dark:text-blue-300 font-semibold mb-2">
+                  💡 Allowable Business Expenses for Freelancers/Self-Employed
+                </p>
+                <p className="text-xs text-blue-600 dark:text-blue-400 mb-3 leading-relaxed">
+                  Enter expenses that are <strong>wholly, exclusively, and necessarily</strong> incurred in producing your income. These will be deducted from your gross income before calculating tax.
+                </p>
+                <p className="text-xs text-blue-600 dark:text-blue-400 font-semibold mb-2">Examples of allowable expenses:</p>
+                <ul className="text-xs text-blue-600 dark:text-blue-400 list-disc list-inside space-y-1">
+                  <li>Internet/data costs</li>
+                  <li>Software subscriptions and licenses</li>
+                  <li>Laptop, computer equipment, and tools</li>
+                  <li>Co-working space rent</li>
+                  <li>Transport to client meetings</li>
+                  <li>Professional fees (accountants, lawyers)</li>
+                  <li>Marketing and promotion costs</li>
+                  <li>Training and professional development</li>
+                </ul>
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-3">
+                  💰 Enter expenses for the selected period ({getPeriodLabel().toLowerCase()}) - they will be automatically converted to annual amounts for tax calculation
+                </p>
+              </div>
+            )}
+
+            {/* VAT Info */}
+            {calculationType === "vat" && (
+              <>
+                <div className="bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 sm:w-5 sm:h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div className="text-xs sm:text-sm text-blue-800 dark:text-blue-200 min-w-0 flex-1">
+                      <p className="font-semibold mb-2">VAT Exemptions:</p>
+                      <ul className="list-disc list-inside space-y-1 text-xs leading-relaxed">
+                        <li>Basic food items (bread, milk, etc.)</li>
+                        <li>Medical and pharmaceutical products</li>
+                        <li>Books and educational materials</li>
+                        <li>Agricultural products</li>
+                        <li>Exports of goods and services</li>
+                        <li>Financial services</li>
+                        <li>Residential rent</li>
+                        <li>Public transportation</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <Info className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                    <div className="text-xs sm:text-sm text-amber-800 dark:text-amber-200 min-w-0 flex-1">
+                      <p className="font-semibold mb-2">Zero-Rated Supplies:</p>
+                      <ul className="list-disc list-inside space-y-1 text-xs leading-relaxed">
+                        <li>Agricultural equipment and inputs</li>
+                        <li>Pharmaceutical products</li>
+                        <li>Medical equipment</li>
+                        <li>Educational materials</li>
+                        <li>Baby products</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         </SheetContent>
       </Sheet>

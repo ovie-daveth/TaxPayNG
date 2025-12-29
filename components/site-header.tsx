@@ -70,7 +70,7 @@ export function SiteHeader({
           )}
 
           {navItems.length > 0 && (
-            <nav className="hidden md:flex flex-1 items-center justify-center gap-4 lg:gap-6">
+            <nav className="hidden md:flex flex-1 md:-mr-32 items-center justify-center gap-4 lg:gap-6">
               {navItems.map((item) => {
                 const isActive = highlightHref && item.href === highlightHref
                 return (
@@ -102,6 +102,7 @@ export function SiteHeader({
 
           <div className="flex md:hidden items-center gap-2 ml-auto">
             <ThemeToggle />
+           
             {cta?.showOnMobile && (
               <Link href={cta.href}>
                 <Button size="sm" className="px-3">
@@ -143,14 +144,12 @@ export function SiteHeader({
                 })}
               </nav>
             )}
-            {cta && !cta.showOnMobile && (
-              <Link href={cta.href} className="block" onClick={handleNavClick}>
-                <Button className="w-full">
-                  {cta.label}
-                </Button>
-              </Link>
-            )}
-            {cta && cta.showOnMobile && (
+            <Link href="/tax-calculator" className="block" onClick={handleNavClick}>
+              <Button variant="outline" className="w-full">
+                Tax Calculator
+              </Button>
+            </Link>
+            {cta && (
               <Link href={cta.href} className="block" onClick={handleNavClick}>
                 <Button className="w-full">
                   {cta.label}

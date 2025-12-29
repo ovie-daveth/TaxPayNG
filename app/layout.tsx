@@ -7,19 +7,19 @@ import { Toaster } from '@/components/ui/toaster'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'OTax App',
+  title: 'OTax - Simplifying tax processes',
   metadataBase: new URL('https://otaxng.com'),
   keywords: ['Nigeria tax filing', 'SME tax management', 'Freelancer tax management', 'Tax filing', 'Tax management', 'Tax preparation', 'Tax calculation', 'Tax return', 'Tax return preparation', 'Tax return calculation', 'Tax return filing', 'Tax return filing preparation', 'Tax return filing calculation', 'Tax filing software', 'Tax management software', 'Tax preparation software', 'Tax calculation software', 'Tax return software', 'Tax return preparation software', 'Tax return calculation software', 'Tax return filing software', 'Tax return filing preparation software', 'Tax return filing calculation software, Tax, Tax filing, Tax management, Tax preparation, Tax calculation, Tax return, Tax return preparation, Tax return calculation, Tax return filing, Tax return filing preparation, Tax return filing calculation', 'NTA 2025', 'OTax'],
   alternates: { canonical: 'https://otaxng.com' },
   description: 'Simplifying tax processes with OTax App.',
   openGraph: {
-    title: 'OTax App',
+    title: 'OTax - Simplifying tax processes',
     description: 'Simplifying tax processes with OTax App.',
     url: 'https://otaxng.com',
     siteName: 'OTax',
     images: [
       {
-        url: '/otax_dark.png',
+        url: '/darklogo.jpeg',
         width: 800,
         height: 600,
         alt: 'OTax Logo',
@@ -30,14 +30,14 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'OTax App',
+    title: 'OTax - Simplifying tax processes',
     description: 'Simplifying tax processes with OTax App.',
-    images: ['/otax_dark.png'],
+    images: ['/darklogo.jpeg'],
   },
   icons: {
-    icon: '/otax_dark.png',
-    shortcut: '/otax_dark.png',
-    apple: '/otax_dark.png',
+    icon: '/darklogo.jpeg',
+    shortcut: '/darklogo.jpeg',
+    apple: '/darklogo.jpeg',
   },
 }
 

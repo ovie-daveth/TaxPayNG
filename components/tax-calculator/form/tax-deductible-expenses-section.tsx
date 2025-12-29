@@ -60,7 +60,7 @@ export function TaxDeductibleExpensesSection({
   return (
     <div className="border-t border-border pt-4 sm:pt-6">
       <div className="flex items-center gap-2 mb-3 sm:mb-4">
-        <h3 className="text-base sm:text-lg font-semibold">Tax-Deductible Expenses</h3>
+        <h3 className="text-sm sm:text-lg font-semibold">Tax-Deductible Expenses</h3>
         <Info className="w-4 h-4 text-muted-foreground flex-shrink-0" />
       </div>
       

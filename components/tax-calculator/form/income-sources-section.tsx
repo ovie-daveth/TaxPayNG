@@ -44,8 +44,8 @@ export function IncomeSourcesSection({
     <div className="border-t border-border pt-4 sm:pt-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-3 sm:mb-4">
         <div className="flex-1 min-w-0">
-          <h3 className="text-base sm:text-lg font-semibold">Income Sources</h3>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+          <h3 className="text-sm sm:text-lg font-semibold">Income Sources</h3>
+          <p className="text-[11px] sm:text-sm text-muted-foreground mt-0.5">
             Add all your income streams - we'll automatically calculate the total
           </p>
         </div>

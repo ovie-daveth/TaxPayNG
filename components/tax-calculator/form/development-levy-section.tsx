@@ -27,11 +27,11 @@ export function DevelopmentLevySection({
     <div className="space-y-4">
       <div className="flex items-center gap-2 mb-4">
         <TrendingUp className="w-5 h-5 text-primary" />
-        <h3 className="font-semibold">Development Levy Information</h3>
+        <h3 className="text-sm sm:text-base font-semibold">Development Levy Information</h3>
       </div>
       <div className="grid sm:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="annualTurnover">Annual Turnover (₦)</Label>
+          <Label htmlFor="annualTurnover" className="text-xs sm:text-sm">Annual Turnover (₦)</Label>
           <Input
             id="annualTurnover"
             type="text"
@@ -50,7 +50,7 @@ export function DevelopmentLevySection({
           </p>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="totalFixedAssets">Total Fixed Assets (₦)</Label>
+          <Label htmlFor="totalFixedAssets" className="text-xs sm:text-sm">Total Fixed Assets (₦)</Label>
           <Input
             id="totalFixedAssets"
             type="text"
@@ -70,7 +70,7 @@ export function DevelopmentLevySection({
         </div>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="assessableProfit">
+        <Label htmlFor="assessableProfit" className="text-xs sm:text-sm">
           Assessable Profit (₦)
           <Tooltip>
             <TooltipTrigger asChild>

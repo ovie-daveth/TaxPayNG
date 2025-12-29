@@ -30,14 +30,15 @@ export default function Footer() {
   ]
 
   return (
-    <footer className="border-t border-border py-8 sm:py-10 md:py-12">
+    <footer className="border-t border-border py-6 md:py-12">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-start text-center gap-8">
+        {/* Desktop Layout */}
+        <div className="hidden md:flex justify-between items-start gap-8">
           <Link href="/" className="flex-shrink-0">
             <OtaxLogo />
           </Link>
 
-          <nav className="hidden md:flex flex-wrap justify-center gap-8 text-sm text-muted-foreground">
+          <nav className="flex flex-wrap justify-center gap-8 text-sm text-muted-foreground">
             {navigation.map((section) => (
               <div key={section.title} className="space-y-3 min-w-[140px]">
                 <span className="font-medium text-foreground/80 uppercase tracking-wide block">
@@ -62,15 +63,24 @@ export default function Footer() {
             © 2025 OTax. All rights reserved.
           </p>
         </div>
-      </div>
-      <nav className="flex md:hidden flex-wrap justify-center gap-8 text-sm text-muted-foreground mt-10 px-5">
+
+        {/* Mobile Layout */}
+        <div className="md:hidden space-y-6">
+          {/* Logo */}
+          <div className="flex justify-start">
+            <Link href="/" className="flex-shrink-0">
+              <OtaxLogo />
+            </Link>
+          </div>
+
+          {/* Navigation Links - Grid Layout */}
+          <nav className="grid grid-cols-2 gap-6 text-xs text-muted-foreground">
             {navigation.map((section) => (
-              section.title === "Legal" && (
-                <div key={section.title} className="space-y-3 min-w-[140px]">
-                <span className="font-medium text-foreground/80 uppercase tracking-wide block">
+              <div key={section.title} className="space-y-2">
+                <span className="font-semibold text-foreground text-[11px] uppercase tracking-wide block">
                   {section.title}
                 </span>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1.5">
                   {section.links.map((link) => (
                     <Link
                       key={link.name}
@@ -82,9 +92,17 @@ export default function Footer() {
                   ))}
                 </div>
               </div>
-              )
             ))}
           </nav>
+
+          {/* Copyright */}
+          <div className="text-center pt-2 border-t border-border">
+            <p className="text-[11px] text-muted-foreground">
+              © 2025 OTax. All rights reserved.
+            </p>
+          </div>
+        </div>
+      </div>
     </footer>
   )
 }

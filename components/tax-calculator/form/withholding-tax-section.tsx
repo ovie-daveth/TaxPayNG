@@ -62,13 +62,13 @@ export function WithholdingTaxSection({
     <div className="space-y-6">
       <div className="flex items-center gap-2 mb-4">
         <FileText className="w-5 h-5 text-primary" />
-        <h3 className="font-semibold">Withholding Tax Information</h3>
+        <h3 className="text-sm sm:text-base font-semibold">Withholding Tax Information</h3>
       </div>
       
       {/* Small Company Check */}
       <div className="grid sm:grid-cols-2 gap-4">
         <div className="space-y-2">
-          <Label htmlFor="annualTurnover">Annual Turnover (₦)</Label>
+          <Label htmlFor="annualTurnover" className="text-xs sm:text-sm">Annual Turnover (₦)</Label>
           <Input
             id="annualTurnover"
             type="text"
@@ -87,7 +87,7 @@ export function WithholdingTaxSection({
           </p>
         </div>
         <div className="space-y-2">
-          <Label htmlFor="totalFixedAssets">Total Fixed Assets (₦)</Label>
+          <Label htmlFor="totalFixedAssets" className="text-xs sm:text-sm">Total Fixed Assets (₦)</Label>
           <Input
             id="totalFixedAssets"
             type="text"

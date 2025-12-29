@@ -191,6 +191,12 @@ export default function HomePage() {
                 <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform relative z-10" />
               </Button>
             </a>
+            <a href="/tax-calculator" className="w-full sm:w-auto">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto text-base sm:text-lg h-12 sm:h-14 px-6 sm:px-8 group relative bg-transparent border-2">
+                <span className="relative z-10">Calculate Taxes</span>
+                <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform relative z-10" />
+              </Button>
+            </a>
        
           </div>
 
