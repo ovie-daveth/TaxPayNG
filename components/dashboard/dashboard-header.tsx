@@ -69,10 +69,10 @@ export function DashboardHeader() {
         return {
           title: "Dashboard",
           subtitle: "Welcome back! Here's your financial overview.",
-          buttonText: "Pay Tax",
-          buttonIcon: Plus,
-          buttonAction: () => router.push(`${basePath}/payment`)
-        }
+          buttonText: undefined,
+          buttonIcon: undefined,
+          buttonAction: undefined
+        } 
       case "/dashboard/transactions":
         return {
           title: "Transactions",
@@ -251,7 +251,7 @@ export function DashboardHeader() {
                 size="sm"
                 className="h-8 md:h-8 lg:h-10 text-xs md:text-xs lg:text-sm whitespace-nowrap px-1.5 md:px-2 lg:px-3"
               >
-                <ButtonIcon className="w-3.5 h-3.5 md:w-3.5 md:h-3.5 lg:w-4 lg:h-4 md:mr-0 lg:mr-2" />
+                {ButtonIcon && <ButtonIcon className="w-3.5 h-3.5 md:w-3.5 md:h-3.5 lg:w-4 lg:h-4 md:mr-0 lg:mr-2" />}
                 <span className="hidden lg:inline">{pageInfo.buttonText}</span>
                 <span className="lg:hidden">{pageInfo.buttonText.split(' ')[0]}</span>
               </Button>

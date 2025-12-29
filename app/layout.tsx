@@ -36,9 +36,9 @@ export const metadata: Metadata = {
     images: ['/otax_dark.png'],
   },
   icons: {
-    icon: '/otax_dark.png',
-    shortcut: '/otax_dark.png',
-    apple: '/otax_dark.png',
+    icon: 'logootax.jpg',
+    shortcut: '/logootax.jpg',
+    apple: '/logootax.jpg',
   },
 }
 
