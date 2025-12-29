@@ -75,7 +75,7 @@ export function SiteHeader({
           )}
 
           {navItems.length > 0 && (
-            <nav className="hidden md:flex flex-1 items-center justify-center gap-4 lg:gap-6">
+            <nav className="hidden md:flex flex-1 items-center lg:-mr-48 justify-center gap-4 lg:gap-6">
               {navItems.map((item) => {
                 const isActive = highlightHref && item.href === highlightHref
                 return (
