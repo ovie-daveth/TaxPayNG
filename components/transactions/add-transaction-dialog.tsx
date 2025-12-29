@@ -979,7 +979,7 @@ export function AddTransactionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-2xl max-h-[90vh] sm:max-h-[95vh] overflow-y-auto p-3 sm:p-4 md:p-6">
         <DialogHeader className="pb-2 sm:pb-4">
-          <DialogTitle className="text-base sm:text-lg md:text-xl">{transaction ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
+          <DialogTitle className="text-sm sm:text-lg md:text-xl">{transaction ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 mt-2 sm:mt-4">
           {!isSubscribed && !transaction && (
@@ -992,8 +992,8 @@ export function AddTransactionDialog({
           {!showFormFields && !transaction && (
             <div className="space-y-4">
               <div className="text-center space-y-2">
-                <h3 className="text-lg font-semibold">Upload Receipt or Invoice</h3>
-                <p className="text-sm text-muted-foreground">
+                <h3 className="text-base sm:text-lg font-semibold">Upload Receipt or Invoice</h3>
+                <p className="text-xs sm:text-sm text-muted-foreground">
                   Upload a receipt image or enter details manually
                 </p>
               </div>
@@ -1044,7 +1044,7 @@ export function AddTransactionDialog({
                   }`}
               >
                 <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
-                <p className="text-sm font-medium mb-1">
+                <p className="text-xs sm:text-sm font-medium mb-1">
                   {isScanning ? 'Scanning...' : 'Click to upload or drag and drop'}
                 </p>
                 <p className="text-xs text-muted-foreground">Images or PDF up to 10MB</p>
@@ -1058,7 +1058,7 @@ export function AddTransactionDialog({
                     setIsManualEntryMode(true) // Disable OCR when manual entry is selected
                     setShowFormFields(true)
                   }}
-                  className="text-sm"
+                  className="text-xs sm:text-sm"
                 >
                   Or enter details manually
                 </Button>
@@ -1072,7 +1072,7 @@ export function AddTransactionDialog({
               {/* File upload section (shown when form is visible) */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label>Attach Receipt/Invoice</Label>
+                  <Label className="text-xs sm:text-sm">Attach Receipt/Invoice</Label>
                   {isOcrEnabled && (
                     <Button
                       type="button"
@@ -1239,7 +1239,7 @@ export function AddTransactionDialog({
 
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="type">Transaction Type</Label>
+                  <Label htmlFor="type" className="text-xs sm:text-sm">Transaction Type</Label>
                   <Select
                     value={formData.type}
                     onValueChange={(value) => {
@@ -1251,7 +1251,7 @@ export function AddTransactionDialog({
                       }))
                     }}
                   >
-                    <SelectTrigger id="type">
+                    <SelectTrigger id="type" className="text-xs sm:text-sm">
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1262,12 +1262,12 @@ export function AddTransactionDialog({
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="currency">Currency</Label>
+                  <Label htmlFor="currency" className="text-xs sm:text-sm">Currency</Label>
                   <Select
                     value={formData.currency}
                     onValueChange={(value) => handleCurrencyChange(value as CurrencyCode)}
                   >
-                    <SelectTrigger id="currency">
+                    <SelectTrigger id="currency" className="text-xs sm:text-sm">
                       <SelectValue placeholder="Select currency" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1283,7 +1283,7 @@ export function AddTransactionDialog({
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <Label htmlFor="amount">
+                  <Label htmlFor="amount" className="text-xs sm:text-sm">
                     {profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown
                       ? `Net Amount (${getCurrencySymbol(formData.currency)})` 
                       : `Amount (${getCurrencySymbol(formData.currency)})`}
@@ -1334,7 +1334,7 @@ export function AddTransactionDialog({
                   readOnly={!!(profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown)}
                   disabled={!!(profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown)}
                   required
-                  className="text-lg font-medium"
+                  className="text-base sm:text-lg font-medium"
                 />
                 {formData.currency !== 'NGN' && convertedAmountNGN !== null && (
                   <div className="text-xs text-muted-foreground space-y-1 mt-2 p-2 bg-muted/50 rounded-md">
@@ -1378,7 +1378,7 @@ export function AddTransactionDialog({
               {profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && (
                 <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
                   <div className="space-y-2">
-                    <Label className="text-sm font-semibold">Platform Fees (Optional)</Label>
+                    <Label className="text-xs sm:text-sm font-semibold">Platform Fees (Optional)</Label>
                     <p className="text-xs text-muted-foreground">
                       Track platform commissions and fees for accurate net income calculation
                     </p>
@@ -1386,7 +1386,7 @@ export function AddTransactionDialog({
                   
                   <div className="grid sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="gross-amount">
+                      <Label htmlFor="gross-amount" className="text-xs sm:text-sm">
                         Gross Amount ({getCurrencySymbol(formData.currency)})
                         <span className="text-xs text-muted-foreground ml-1">(Before fees)</span>
                       </Label>
@@ -1395,6 +1395,7 @@ export function AddTransactionDialog({
                         type="text"
                         placeholder="0.00"
                         value={grossAmountDisplay}
+                        className="text-xs sm:text-sm"
                       onChange={(e) => {
                         const formatted = formatCurrencyInput(e.target.value)
                         setGrossAmountDisplay(formatted)
@@ -1442,7 +1443,7 @@ export function AddTransactionDialog({
                     </div>
                     
                     <div className="space-y-2">
-                      <Label htmlFor="platform-fees">
+                      <Label htmlFor="platform-fees" className="text-xs sm:text-sm">
                         Platform Fees ({getCurrencySymbol(formData.currency)})
                       </Label>
                       <Input
@@ -1450,6 +1451,7 @@ export function AddTransactionDialog({
                         type="text"
                         placeholder="0.00"
                         value={platformFeesDisplay}
+                        className="text-xs sm:text-sm"
                       onChange={(e) => {
                         const formatted = formatCurrencyInput(e.target.value)
                         setPlatformFeesDisplay(formatted)
@@ -1497,8 +1499,8 @@ export function AddTransactionDialog({
                   {netAmount !== null && (grossAmount || platformFees) && (
                     <div className="p-3 bg-background rounded-md border">
                       <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">Net Amount:</span>
-                        <span className="text-lg font-semibold text-primary">
+                        <span className="text-xs sm:text-sm font-medium">Net Amount:</span>
+                        <span className="text-base sm:text-lg font-semibold text-primary">
                           {getCurrencySymbol(formData.currency)}{netAmount.toLocaleString('en-NG', {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
@@ -1519,17 +1521,17 @@ export function AddTransactionDialog({
                   {/* Platform Info */}
                   <div className="space-y-4 pt-2 border-t">
                     <div className="space-y-2">
-                      <Label className="text-sm font-semibold">Platform Information (Optional)</Label>
+                      <Label className="text-xs sm:text-sm font-semibold">Platform Information (Optional)</Label>
                     </div>
                     
                     <div className="grid sm:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label htmlFor="platform-name">Platform Name</Label>
+                        <Label htmlFor="platform-name" className="text-xs sm:text-sm">Platform Name</Label>
                         <Select
                           value={platformName}
                           onValueChange={setPlatformName}
                         >
-                          <SelectTrigger id="platform-name">
+                          <SelectTrigger id="platform-name" className="text-xs sm:text-sm">
                             <SelectValue placeholder="Select platform" />
                           </SelectTrigger>
                           <SelectContent>
@@ -1554,18 +1556,18 @@ export function AddTransactionDialog({
                             placeholder="Enter platform name"
                             value={platformAccountId}
                             onChange={(e) => setPlatformAccountId(e.target.value)}
-                            className="mt-2"
+                            className="mt-2 text-xs sm:text-sm"
                           />
                         )}
                       </div>
                       
                       <div className="space-y-2">
-                        <Label htmlFor="platform-type">Platform Type</Label>
+                        <Label htmlFor="platform-type" className="text-xs sm:text-sm">Platform Type</Label>
                         <Select
                           value={platformType}
                           onValueChange={(value) => setPlatformType(value as typeof platformType)}
                         >
-                          <SelectTrigger id="platform-type">
+                          <SelectTrigger id="platform-type" className="text-xs sm:text-sm">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -1581,24 +1583,26 @@ export function AddTransactionDialog({
                     
                     {platformName && platformName !== 'Other' && (
                       <div className="space-y-2">
-                        <Label htmlFor="platform-account">Account ID/Username (Optional)</Label>
+                        <Label htmlFor="platform-account" className="text-xs sm:text-sm">Account ID/Username (Optional)</Label>
                         <Input
                           id="platform-account"
                           placeholder="e.g., @yourusername or channel ID"
                           value={platformAccountId}
                           onChange={(e) => setPlatformAccountId(e.target.value)}
+                          className="text-xs sm:text-sm"
                         />
                       </div>
                     )}
                     
                     <div className="space-y-2">
-                      <Label htmlFor="platform-url">Account URL (Optional)</Label>
+                      <Label htmlFor="platform-url" className="text-xs sm:text-sm">Account URL (Optional)</Label>
                       <Input
                         id="platform-url"
                         type="url"
                         placeholder="https://..."
                         value={platformAccountUrl}
                         onChange={(e) => setPlatformAccountUrl(e.target.value)}
+                        className="text-xs sm:text-sm"
                       />
                     </div>
                   </div>
@@ -1606,7 +1610,7 @@ export function AddTransactionDialog({
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="description">Description</Label>
+                <Label htmlFor="description" className="text-xs sm:text-sm">Description</Label>
                 <Input
                   id="description"
                   placeholder={
@@ -1621,13 +1625,14 @@ export function AddTransactionDialog({
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
                   required
+                  className="text-xs sm:text-sm"
                 />
                 <p className="text-xs text-muted-foreground">You can add more details later</p>
               </div>
 
               <div className="space-y-2">
                 <div className="flex items-center gap-2">
-                  <Label htmlFor="category">What is this for?</Label>
+                  <Label htmlFor="category" className="text-xs sm:text-sm">What is this for?</Label>
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -1656,7 +1661,7 @@ export function AddTransactionDialog({
                     }
                   }}
                 >
-                  <SelectTrigger id="category">
+                  <SelectTrigger id="category" className="text-xs sm:text-sm">
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1677,7 +1682,7 @@ export function AddTransactionDialog({
               {/* Phase 1: Date separation for tax compliance */}
               <div className="grid sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="transaction-date">
+                  <Label htmlFor="transaction-date" className="text-xs sm:text-sm">
                     Transaction Date
                     <span className="text-xs text-muted-foreground ml-1">(When it occurred)</span>
                   </Label>
@@ -1687,13 +1692,14 @@ export function AddTransactionDialog({
                     value={transactionDate}
                     onChange={(e) => setTransactionDate(e.target.value)}
                     required
+                    className="text-xs sm:text-sm"
                   />
                   <p className="text-xs text-muted-foreground">
                     When the transaction occurred (invoice date, service date)
                   </p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="value-date">
+                  <Label htmlFor="value-date" className="text-xs sm:text-sm">
                     Payment Date
                     <span className="text-xs text-muted-foreground ml-1">(When money moved)</span>
                   </Label>
@@ -1703,6 +1709,7 @@ export function AddTransactionDialog({
                     value={valueDate}
                     onChange={(e) => setValueDate(e.target.value)}
                     required
+                    className="text-xs sm:text-sm"
                   />
                   <p className="text-xs text-muted-foreground">
                     When money was actually received or paid
@@ -1735,7 +1742,7 @@ export function AddTransactionDialog({
                       }
                     }}
                   >
-                    <SelectTrigger id="transaction-nature">
+                    <SelectTrigger id="transaction-nature" className="text-xs sm:text-sm">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -1780,7 +1787,7 @@ export function AddTransactionDialog({
                     value={formData.paymentMethod}
                     onValueChange={(value) => setFormData(prev => ({ ...prev, paymentMethod: value }))}
                   >
-                    <SelectTrigger id="payment-method">
+                    <SelectTrigger id="payment-method" className="text-xs sm:text-sm">
                       <SelectValue placeholder="Select method" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1821,7 +1828,7 @@ export function AddTransactionDialog({
                     }}
                     disabled={loadingInvoices || !!transaction?.linkedInvoiceId}
                   >
-                    <SelectTrigger id="linked-invoice">
+                    <SelectTrigger id="linked-invoice" className="text-xs sm:text-sm">
                       <SelectValue placeholder={loadingInvoices ? "Loading invoices..." : transaction?.linkedInvoiceId ? "Already linked to invoice" : "Select invoice (optional)"} />
                     </SelectTrigger>
                     <SelectContent>
@@ -1884,13 +1891,14 @@ export function AddTransactionDialog({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="notes">Notes (Optional)</Label>
+                <Label htmlFor="notes" className="text-xs sm:text-sm">Notes (Optional)</Label>
                 <Textarea
                   id="notes"
                   placeholder="Add any additional notes..."
                   rows={3}
                   value={formData.notes}
                   onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  className="text-xs sm:text-sm"
                 />
               </div>
 
@@ -1900,7 +1908,7 @@ export function AddTransactionDialog({
                   <div className="flex items-center justify-between">
                     <div>
                       <div className="flex items-center gap-2">
-                        <Label className="text-sm font-semibold">Tax Classification (Optional</Label>
+                        <Label className="text-xs sm:text-sm font-semibold">Tax Classification (Optional</Label>
                         <Button
                           type="button"
                           variant="link"
@@ -1913,7 +1921,7 @@ export function AddTransactionDialog({
                         >
                           - Skip for now
                         </Button>
-                        <Label className="text-sm font-semibold">)</Label>
+                        <Label className="text-xs sm:text-sm font-semibold">)</Label>
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">
                         Auto-populated based on transaction details. You can edit or skip this section - you can always update it later.
@@ -1994,7 +2002,7 @@ export function AddTransactionDialog({
                               incomeType: value as 'taxable' | 'non-taxable' | 'exempt'
                             }))}
                           >
-                            <SelectTrigger>
+                            <SelectTrigger className="text-xs sm:text-sm">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -2346,7 +2354,7 @@ export function AddTransactionDialog({
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label htmlFor="custom-category-input">Category Name</Label>
+              <Label htmlFor="custom-category-input" className="text-xs sm:text-sm">Category Name</Label>
               <Input
                 id="custom-category-input"
                 placeholder="e.g., Custom expense type"

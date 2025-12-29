@@ -300,8 +300,8 @@ export function TransactionList({
           <thead className="bg-muted/50 border-b border-border">
             <tr>
               <th className="text-left py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs font-medium text-muted-foreground w-[50px] md:w-[120px]">Date</th>
-              <th className="text-left py-1.5 md:py-2 px-1.5 md:px-2 text-[10px] md:text-xs font-medium text-muted-foreground w-[20px] md:w-[130px]">Description</th>
-              <th className="text-left py-1.5 md:py-2 px-1.5 md:px-2 text-[10px] md:text-xs font-medium text-muted-foreground w-[20px] md:w-[120px]">Category</th>
+              <th className="text-left py-1.5 md:py-2 px-1 md:px-2 text-[10px] md:text-xs font-medium text-muted-foreground w-[20px] md:w-[130px]">Description</th>
+              <th className="text-left py-1.5 md:py-2 px-1 md:px-2 text-[10px] md:text-xs font-medium text-muted-foreground w-[20px] md:w-[120px]">Category</th>
               <th className="text-left py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs font-medium text-muted-foreground w-[50px] md:w-[120px]">Payment Method</th>
               <th className="text-left py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs font-medium text-muted-foreground w-[50px] md:w-[120px]">Amount</th>
               <th className="text-center py-1.5 md:py-2 px-1.5 md:px-2 text-[10px] md:text-xs font-medium text-muted-foreground w-[50px] md:w-[140px]">
@@ -332,9 +332,9 @@ export function TransactionList({
                   <td className="py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs align-middle">
                     {formatDate(transaction.transactionDate || transaction.valueDate || transaction.date)}
                   </td>
-                  <td className="py-1.5 md:py-2 px-1.5 md:px-2 align-middle">
-                    <div className="flex items-center gap-1.5 md:gap-2 min-w-0">
-                      <span className="text-[10px] md:text-xs font-medium truncate">{transaction.description}</span>
+                  <td className="py-1.5 md:py-2 px-1 md:px-2 align-middle max-w-[100px] md:max-w-[150px] lg:max-w-[200px]">
+                    <div className="flex items-center gap-1 md:gap-2 min-w-0 w-full">
+                      <span className="text-[10px] md:text-xs font-medium truncate w-full">{transaction.description}</span>
                       {transaction.attachments && transaction.attachments.length > 0 && (
                         <button
                           onClick={() => handleViewImages(transaction)}
@@ -360,7 +360,7 @@ export function TransactionList({
                       )}
                     </div>
                   </td>
-                  <td className="py-1.5 md:py-2 px-1.5 md:px-2 align-middle">
+                  <td className="py-1.5 md:py-2 px-1 md:px-2">
                     <div className="flex flex-col gap-1">
                       <Badge 
                         variant={getCategoryBadgeVariant(transaction.category, transaction.type)} 
