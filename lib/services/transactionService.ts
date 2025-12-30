@@ -453,42 +453,49 @@ export class TransactionService extends BaseService {
       const end = endDate ? new Date(endDate) : null
       const filteredTransactions = transactions
         .map((transaction) => {
+          // Use ngnEquivalent if available (for foreign currency transactions), otherwise use amount
+          const baseAmount = transaction.ngnEquivalent !== undefined && transaction.ngnEquivalent !== null
+            ? transaction.ngnEquivalent
+            : transaction.amount
+          
           const coercedAmount =
-            typeof transaction.amount === 'number'
-              ? transaction.amount
-              : Number(String(transaction.amount).replace(/[\u20A6,]/g, '').trim()) || 0
+            typeof baseAmount === 'number'
+              ? baseAmount
+              : Number(String(baseAmount).replace(/[\u20A6,]/g, '').trim()) || 0
 
-          const dateString = transaction.date || transaction.createdAt
-          const txnDate = dateString ? new Date(dateString) : null
+          // For income stats, filter by createdAt (when transaction was recorded)
+          // This ensures transactions are included in the period they were recorded,
+          // regardless of their transaction date (which may be in the future)
+          const recordDate = transaction.createdAt ? new Date(transaction.createdAt) : null
 
           return {
             ...transaction,
             amount: coercedAmount,
             category: transaction.category || 'uncategorized',
-            txnDate,
+            recordDate,
           }
         })
         .filter((transaction) => {
-          if (!transaction.txnDate || Number.isNaN(transaction.txnDate.getTime())) {
+          if (!transaction.recordDate || Number.isNaN(transaction.recordDate.getTime())) {
             return false
           }
 
           if (!start && !end) return true
           
           // Normalize dates to start/end of day for comparison
-          const txnDateOnly = new Date(transaction.txnDate)
-          txnDateOnly.setHours(0, 0, 0, 0)
+          const recordDateOnly = new Date(transaction.recordDate)
+          recordDateOnly.setHours(0, 0, 0, 0)
           
           if (start) {
             const startDateOnly = new Date(start)
             startDateOnly.setHours(0, 0, 0, 0)
-            if (txnDateOnly < startDateOnly) return false
+            if (recordDateOnly < startDateOnly) return false
           }
           
           if (end) {
             const endDateOnly = new Date(end)
             endDateOnly.setHours(23, 59, 59, 999)
-            if (transaction.txnDate > endDateOnly) return false
+            if (transaction.recordDate > endDateOnly) return false
           }
           
           return true
@@ -542,14 +549,21 @@ export class TransactionService extends BaseService {
       ])
 
       if (!startDate && !endDate) {
-        return transactions.map((transaction) => ({
-          ...transaction,
-          amount:
-            typeof transaction.amount === 'number'
-              ? transaction.amount
-              : Number(String(transaction.amount).replace(/[\u20A6,]/g, '').trim()) || 0,
-          category: transaction.category || 'uncategorized',
-        }))
+        return transactions.map((transaction) => {
+          // Use ngnEquivalent if available (for foreign currency transactions), otherwise use amount
+          const baseAmount = transaction.ngnEquivalent !== undefined && transaction.ngnEquivalent !== null
+            ? transaction.ngnEquivalent
+            : transaction.amount
+          
+          return {
+            ...transaction,
+            amount:
+              typeof baseAmount === 'number'
+                ? baseAmount
+                : Number(String(baseAmount).replace(/[\u20A6,]/g, '').trim()) || 0,
+            category: transaction.category || 'uncategorized',
+          }
+        })
       }
 
       const start = startDate ? new Date(startDate) : null
@@ -557,29 +571,38 @@ export class TransactionService extends BaseService {
 
       return transactions
         .map((transaction) => {
+          // Use ngnEquivalent if available (for foreign currency transactions), otherwise use amount
+          const baseAmount = transaction.ngnEquivalent !== undefined && transaction.ngnEquivalent !== null
+            ? transaction.ngnEquivalent
+            : transaction.amount
+          
           const coercedAmount =
-            typeof transaction.amount === 'number'
-              ? transaction.amount
-              : Number(String(transaction.amount).replace(/[\u20A6,]/g, '').trim()) || 0
-          const dateString = transaction.date || transaction.createdAt
-          const txnDate = dateString ? new Date(dateString) : null
+            typeof baseAmount === 'number'
+              ? baseAmount
+              : Number(String(baseAmount).replace(/[\u20A6,]/g, '').trim()) || 0
+          
+          // For period filtering, use createdAt (when transaction was recorded)
+          // This ensures transactions are included in the period they were recorded,
+          // regardless of their transaction date (which may be in the future)
+          const recordDate = transaction.createdAt ? new Date(transaction.createdAt) : null
+          
           return {
             ...transaction,
             amount: coercedAmount,
             category: transaction.category || 'uncategorized',
-            txnDate,
+            recordDate,
           }
         })
         .filter((transaction) => {
-          if (!transaction.txnDate || Number.isNaN(transaction.txnDate.getTime())) {
+          if (!transaction.recordDate || Number.isNaN(transaction.recordDate.getTime())) {
             return false
           }
 
-          if (start && transaction.txnDate < start) return false
-          if (end && transaction.txnDate > end) return false
+          if (start && transaction.recordDate < start) return false
+          if (end && transaction.recordDate > end) return false
           return true
         })
-        .map(({ txnDate, ...rest }) => rest)
+        .map(({ recordDate, ...rest }) => rest)
     } catch (error) {
       console.error('Error getting transactions for period:', error)
       throw error

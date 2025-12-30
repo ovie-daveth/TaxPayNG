@@ -11,13 +11,15 @@ import { Card } from "@/components/ui/card"
 import { AnalyticsInsights } from "@/components/dashboard/insights/analytics-insights"
 import { SubscriptionSuccessModal } from "@/components/subscription/subscription-success-modal"
 import { PlatformAnalytics } from "@/components/dashboard/platform-analytics"
-import { Switch } from "@/components/ui/switch"
-import { Label } from "@/components/ui/label"
-import { BarChart3, LayoutDashboard } from "lucide-react"
+import { AdvancedAnalytics } from "@/components/dashboard/analytics/advanced-analytics"
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
+import { BarChart3, LayoutDashboard, Sparkles } from "lucide-react"
+
+type DashboardView = "dashboard" | "platform" | "advanced"
 
 export default function CreatorDashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
-  const [showPlatformAnalytics, setShowPlatformAnalytics] = useState(false)
+  const [activeView, setActiveView] = useState<DashboardView>("dashboard")
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoading(false), 1000)
@@ -39,40 +41,43 @@ export default function CreatorDashboardPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div className="space-y-2 flex-1">
               <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
-                {showPlatformAnalytics ? 'Platform Analytics' : 'Creator Performance Overview'}
+                {activeView === 'platform' ? 'Platform Analytics' 
+                  : activeView === 'advanced' ? 'Advanced Analytics'
+                  : 'Creator Performance Overview'}
               </h1>
               <p className="text-xs sm:text-sm md:text-base text-muted-foreground max-w-2xl">
-                {showPlatformAnalytics 
+                {activeView === 'platform' 
                   ? 'Track income, expenses, and profitability by platform'
+                  : activeView === 'advanced'
+                  ? 'Unlock powerful financial insights, trend analysis, forecasting, and comparative analytics'
                   : 'Track income from partnered brands, platform payouts, and deductible expenses in one place. Stay ahead of quarterly tax obligations with automated reminders tailored for Nigerian creators.'
                 }
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="flex items-center gap-2">
-                <LayoutDashboard className="w-4 h-4 text-muted-foreground" />
-                <Label htmlFor="platform-toggle" className="text-sm font-medium cursor-pointer">
-                  Dashboard
-                </Label>
-              </div>
-              <Switch
-                id="platform-toggle"
-                checked={showPlatformAnalytics}
-                onCheckedChange={setShowPlatformAnalytics}
-              />
-              <div className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-muted-foreground" />
-                <Label htmlFor="platform-toggle" className="text-sm font-medium cursor-pointer">
-                  Platform Analytics
-                </Label>
-              </div>
-            </div>
+            <Tabs value={activeView} onValueChange={(value) => setActiveView(value as DashboardView)}>
+              <TabsList className="grid grid-cols-3 w-auto">
+                <TabsTrigger value="dashboard" className="flex items-center gap-2">
+                  <LayoutDashboard className="w-4 h-4" />
+                  <span className="hidden sm:inline">Dashboard</span>
+                </TabsTrigger>
+                <TabsTrigger value="platform" className="flex items-center gap-2">
+                  <BarChart3 className="w-4 h-4" />
+                  <span className="hidden sm:inline">Platform</span>
+                </TabsTrigger>
+                <TabsTrigger value="advanced" className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4" />
+                  <span className="hidden sm:inline">Advanced</span>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
         </Card>
 
         <div className="space-y-3 sm:space-y-4 md:space-y-5 lg:space-y-6">
-          {showPlatformAnalytics ? (
+          {activeView === 'platform' ? (
             <PlatformAnalytics />
+          ) : activeView === 'advanced' ? (
+            <AdvancedAnalytics />
           ) : (
             <>
               <StatsCards businessType="creator" />

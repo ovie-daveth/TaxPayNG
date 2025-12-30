@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { SubscriptionExpiryChecker } from "@/components/subscription/subscription-expiry-checker"
 import { cn } from "@/lib/utils"
+import { FloatingSupportButton } from "@/components/support/floating-support-button"
 
 function LayoutContent({
   children,
@@ -118,6 +119,7 @@ function LayoutContent({
         <DashboardHeader />
         <div className="pt-8 pb-16 md:pt-0 md:pb-0 -mt-7 md:-mt-0 overflow-x-hidden">{children}</div>
         <SubscriptionExpiryChecker />
+        <FloatingSupportButton />
       </div>
     </div>
   )

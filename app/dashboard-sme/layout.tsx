@@ -8,6 +8,7 @@ import { SidebarProvider, useSidebar } from "@/lib/contexts/sidebar-context"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { SubscriptionExpiryChecker } from "@/components/subscription/subscription-expiry-checker"
+import { FloatingSupportButton } from "@/components/support/floating-support-button"
 import { cn } from "@/lib/utils"
 
 function LayoutContent({
@@ -77,6 +78,7 @@ function LayoutContent({
         <DashboardHeader />
         <div className="pt-8 pb-16 md:pt-0 md:pb-0 overflow-x-hidden">{children}</div>
         <SubscriptionExpiryChecker />
+        <FloatingSupportButton />
       </div>
     </div>
   )

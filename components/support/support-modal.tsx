@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator"
 import { Mail, MessageSquare, Send, Loader2, ExternalLink, HelpCircle } from "lucide-react"
 import { toast } from "sonner"
 import { auth } from "@/firebase/firebase"
+import { useSubscription } from "@/lib/hooks/useSubscription"
 
 interface SupportModalProps {
   open: boolean
@@ -18,6 +19,7 @@ interface SupportModalProps {
 }
 
 export function SupportModal({ open, onOpenChange }: SupportModalProps) {
+  const { subscriptionType } = useSubscription()
   const [supportForm, setSupportForm] = useState({
     subject: '',
     message: '',
@@ -49,7 +51,8 @@ export function SupportModal({ open, onOpenChange }: SupportModalProps) {
         body: JSON.stringify({
           subject: supportForm.subject,
           message: supportForm.message,
-          category: supportForm.category
+          category: supportForm.category,
+          subscriptionType: subscriptionType || 'None'
         })
       })
 
@@ -76,10 +79,12 @@ export function SupportModal({ open, onOpenChange }: SupportModalProps) {
 
   const handleWhatsAppClick = () => {
     const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '2348128543248'
+    const subscriptionInfo = subscriptionType ? `Subscription: ${subscriptionType}` : 'Subscription: None'
     const whatsappMessage = encodeURIComponent(
       `Hello! I need support with OTax.\n\n` +
       `My email: ${auth.currentUser?.email || 'N/A'}\n` +
-      `User ID: ${auth.currentUser?.uid || 'N/A'}\n\n` +
+      `User ID: ${auth.currentUser?.uid || 'N/A'}\n` +
+      `${subscriptionInfo}\n\n` +
       `How can you help me?`
     )
     const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`
