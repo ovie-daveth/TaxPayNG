@@ -71,7 +71,7 @@ export function RecentTransactions() {
     return formatCurrencyAmount(amount, 'NGN')
   }
   return (
-    <Card className="p-3 sm:p-5 md:p-6 overflow-hidden">
+    <Card className="p-3 sm:p-5 md:p-6 overflow-hidden w-full max-w-full">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mb-3 sm:mb-5 md:mb-6">
         <div className="min-w-0 flex-1">
           <h3 className="text-sm sm:text-base md:text-lg font-semibold truncate">Recent Transactions</h3>
@@ -118,7 +118,13 @@ export function RecentTransactions() {
                     <div className="flex-1 min-w-0 overflow-hidden">
                       <div className="flex items-start justify-between gap-1.5 min-w-0 w-full">
                         <div className="flex-1 min-w-0 overflow-hidden pr-1">
-                          <p className="text-xs font-medium text-foreground truncate">{transaction.description || "No description"}</p>
+                          <p className="text-xs font-medium text-foreground truncate">
+                            {(() => {
+                              const desc = transaction.description || "No description"
+                              // Truncate to 15 chars max on mobile
+                              return desc.length > 15 ? desc.substring(0, 15) + '...' : desc
+                            })()}
+                          </p>
                           <p className="text-[10px] text-muted-foreground mt-0.5 truncate">
                             {formatDate(transaction.transactionDate || transaction.valueDate || transaction.date)}
                           </p>

@@ -109,14 +109,14 @@ function LayoutContent({
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background overflow-x-hidden">
       <DashboardNav />
       <div className={cn(
-        "flex-1 transition-all duration-300 ease-in-out",
+        "flex-1 transition-all duration-300 ease-in-out overflow-x-hidden",
         sidebarCollapsed ? "md:ml-16" : "md:ml-64"
       )}>
         <DashboardHeader />
-        <div className="pt-8 pb-16 md:pt-0 md:pb-0 -mt-7 md:-mt-0">{children}</div>
+        <div className="pt-8 pb-16 md:pt-0 md:pb-0 -mt-7 md:-mt-0 overflow-x-hidden">{children}</div>
         <SubscriptionExpiryChecker />
       </div>
     </div>
