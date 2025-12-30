@@ -749,7 +749,8 @@ export class ReportService extends BaseService {
     userId: string,
     startDate: Date,
     endDate: Date,
-    businessType: string = 'freelancer'
+    businessType: string = 'freelancer',
+    entityId?: string
   ): Promise<TaxData & { taxClassification?: TaxClassificationSummary }> {
     // Fetch user profile
     const profile = await userService.getProfile(userId)
@@ -761,6 +762,7 @@ export class ReportService extends BaseService {
     
     // Filter transactions by period
     const filteredTransactions = allTransactions.filter(txn => {
+      if (entityId && txn.entityId !== entityId) return false
       const txnDate = txn.date ? new Date(txn.date) : new Date(txn.createdAt)
       return txnDate >= startDate && txnDate <= endDate
     })

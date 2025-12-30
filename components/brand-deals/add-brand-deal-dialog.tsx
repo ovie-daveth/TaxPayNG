@@ -15,6 +15,7 @@ import { brandDealService } from "@/lib/services"
 import { toast } from "sonner"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useBusiness } from "@/lib/contexts/business-context"
 import { SUPPORTED_CURRENCIES, CurrencyCode, formatCurrencyInput, parseCurrencyInput, formatCurrencyAmount, fetchExchangeRate, convertCurrency } from "@/lib/utils/currency"
 import { formatDateForInput } from "@/lib/utils/date"
 
@@ -33,6 +34,7 @@ export function AddBrandDealDialog({
 }: AddBrandDealDialogProps) {
   const { user } = useAuth()
   const { profile } = useUserProfile()
+  const { activeEntityId } = useBusiness()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [amountDisplay, setAmountDisplay] = useState("")
   const [ngnEquivalent, setNgnEquivalent] = useState<number | null>(null)
@@ -203,6 +205,7 @@ export function AddBrandDealDialog({
       }
 
       const dealData = {
+        entityId: activeEntityId || undefined,
         brandName: formData.brandName,
         brandContact: Object.values(formData.brandContact).some(v => v) ? formData.brandContact : undefined,
         dealType: formData.dealType,

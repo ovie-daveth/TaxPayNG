@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Calendar, Filter } from "lucide-react"
+import { useBusiness } from "@/lib/contexts/business-context"
 
 type DashboardBusinessType = "freelancer" | "creator" | "small-business"
 type TrendDirection = "up" | "down" | "neutral"
@@ -391,6 +392,7 @@ export function StatsCards({
 }: StatsCardsProps) {
   const { user } = useAuth()
   const { hasAccess } = useSubscription()
+  const { activeEntityId } = useBusiness()
   const hasGoldAccess = hasAccess('GOLD')
   const now = new Date()
   const currentYear = now.getFullYear()
@@ -565,9 +567,9 @@ export function StatsCards({
       }
 
       Promise.all([
-        transactionService.getTransactionSummary(user.uid, periodStartIso, periodEndIso), // Selected period
-        transactionService.getTransactionSummary(user.uid, monthStartIso, nowIso), // Current month
-        transactionService.getTransactionSummary(user.uid, yearStartIso, yearEndIso), // Full year for tax
+        transactionService.getTransactionSummary(user.uid, periodStartIso, periodEndIso, activeEntityId || undefined), // Selected period
+        transactionService.getTransactionSummary(user.uid, monthStartIso, nowIso, activeEntityId || undefined), // Current month
+        transactionService.getTransactionSummary(user.uid, yearStartIso, yearEndIso, activeEntityId || undefined), // Full year for tax
         taxPaymentService.getUserPaymentsSimple(user.uid), // Tax payments
       ])
         .then(async ([periodSummary, monthSummary, yearSummary, taxPayments]) => {
@@ -598,7 +600,8 @@ export function StatsCards({
                 user.uid,
                 yearInfo.start,
                 yearEndDate,
-                calculatedBusinessType
+                calculatedBusinessType,
+                activeEntityId || undefined
               )
               periodTaxData = yearTaxData
               
@@ -619,7 +622,8 @@ export function StatsCards({
                 user.uid,
                 qStart,
                 qEnd,
-                calculatedBusinessType
+                calculatedBusinessType,
+                activeEntityId || undefined
               )
               
               // Also calculate full year for context
@@ -627,7 +631,8 @@ export function StatsCards({
                 user.uid,
                 yearInfo.start,
                 yearEndDate,
-                calculatedBusinessType
+                calculatedBusinessType,
+                activeEntityId || undefined
               )
               
               if (periodTaxData && periodTaxData.taxPayable > 0) {

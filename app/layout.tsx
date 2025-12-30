@@ -5,6 +5,7 @@ import { Analytics } from '@vercel/analytics/next'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
 import { UserProfileProvider } from '@/lib/contexts/user-profile-context'
+import { BusinessProvider } from '@/lib/contexts/business-context'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -58,8 +59,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <UserProfileProvider>
-            {children}
-            <Toaster />
+            <BusinessProvider>
+              {children}
+              <Toaster />
+            </BusinessProvider>
           </UserProfileProvider>
         </ThemeProvider>
         <Analytics />

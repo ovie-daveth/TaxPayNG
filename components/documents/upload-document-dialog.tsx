@@ -15,6 +15,7 @@ import { uploadToImageKit, ImageUploadResult } from "@/lib/utils/imagekit"
 import { toast } from "sonner"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { transactionService } from "@/lib/services"
+import { useBusiness } from "@/lib/contexts/business-context"
 import { Transaction } from "@/lib/types"
 
 interface UploadDocumentDialogProps {
@@ -25,6 +26,7 @@ interface UploadDocumentDialogProps {
 
 export function UploadDocumentDialog({ open, onOpenChange, onUpload }: UploadDocumentDialogProps) {
   const { user } = useAuth()
+  const { activeEntityId } = useBusiness()
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadedImage, setUploadedImage] = useState<ImageUploadResult | null>(null)
   const [uploadingImage, setUploadingImage] = useState(false)
@@ -46,7 +48,7 @@ export function UploadDocumentDialog({ open, onOpenChange, onUpload }: UploadDoc
       
       setLoadingTransactions(true)
       try {
-        const recentTransactions = await transactionService.getRecentTransactions(user.uid, 50)
+        const recentTransactions = await transactionService.getRecentTransactions(user.uid, 50, activeEntityId || undefined)
         setTransactions(recentTransactions)
       } catch (error) {
         console.error('Failed to load transactions:', error)
@@ -56,7 +58,7 @@ export function UploadDocumentDialog({ open, onOpenChange, onUpload }: UploadDoc
     }
 
     loadTransactions()
-  }, [user, open])
+  }, [user, open, activeEntityId])
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {

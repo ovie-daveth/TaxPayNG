@@ -22,6 +22,7 @@ import { INVOICE_TEMPLATES, getDefaultTemplate } from "@/lib/utils/invoiceTempla
 import { formatDateForInput } from "@/lib/utils/date"
 import { SUPPORTED_CURRENCIES, CurrencyCode, getCurrencySymbol, formatCurrencyInput, parseCurrencyInput, formatCurrencyAmount, fetchExchangeRate, convertCurrency } from "@/lib/utils/currency"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { useBusiness } from "@/lib/contexts/business-context"
 
 interface AddInvoiceDialogProps {
   open: boolean
@@ -39,6 +40,7 @@ export function AddInvoiceDialog({
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { isSubscribed } = useSubscription()
+  const { activeEntityId } = useBusiness()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [isSearchingUser, setIsSearchingUser] = useState(false)
@@ -695,6 +697,7 @@ export function AddInvoiceDialog({
       })
   
       const invoiceData = {
+        entityId: activeEntityId || undefined,
         invoiceType: formData.invoiceType,
         template: formData.template,
         supplier: cleanedSupplier,

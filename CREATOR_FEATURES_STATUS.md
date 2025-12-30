@@ -77,11 +77,13 @@ Based on analysis of the pricing page vs. actual implementation, here's what rem
 
 ### ❌ Not Implemented:
 1. **Multi-Entity Business Management**
-   - ❌ No multiple business entity management
-   - ❌ No entity switching/selection
-   - ❌ No separate financial tracking per entity
+   - 🚧 **Coming Soon (PLATINUM roadmap)**: Not implemented yet
+   - ❌ No multiple business entity management (create/manage multiple businesses under one account)
+   - ❌ No entity switching/selection (active business context)
+   - ❌ No separate financial tracking per entity (transactions/invoices/docs scoped to an entity)
    - ❌ No consolidated reporting across entities
    - **Current State**: Single business entity per user
+   - **Implementation Notes (future)**: Introduce `businessEntities` + `activeEntityId`, add `entityId` to core financial collections, migrate existing records to a default entity, and enforce rules/queries by `(userId, entityId)`.
 
 2. **Custom Report Templates**
    - ❌ No custom report template builder

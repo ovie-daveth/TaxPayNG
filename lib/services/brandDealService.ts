@@ -26,6 +26,9 @@ export class BrandDealService extends BaseService {
       })
 
       // Apply filters
+      if (filters?.entityId) {
+        deals = deals.filter(deal => deal.entityId === filters.entityId)
+      }
       if (filters?.status) {
         deals = deals.filter(deal => deal.status === filters.status)
       }
@@ -54,14 +57,17 @@ export class BrandDealService extends BaseService {
       const startIndex = (page - 1) * pageSize
       const endIndex = startIndex + pageSize
       const paginatedDeals = deals.slice(startIndex, endIndex)
+      const totalPages = Math.ceil(total / pageSize)
 
       return {
         data: paginatedDeals,
         pagination: {
           page,
-          pageSize,
+          limit: pageSize,
           total,
-          totalPages: Math.ceil(total / pageSize)
+          totalPages,
+          hasPrev: page > 1,
+          hasNext: page < totalPages,
         }
       }
     } catch (error) {
@@ -70,9 +76,11 @@ export class BrandDealService extends BaseService {
         data: [],
         pagination: {
           page,
-          pageSize,
+          limit: pageSize,
           total: 0,
-          totalPages: 0
+          totalPages: 0,
+          hasPrev: false,
+          hasNext: false,
         }
       }
     }

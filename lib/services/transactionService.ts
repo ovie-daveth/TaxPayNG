@@ -35,6 +35,11 @@ export class TransactionService extends BaseService {
       
       // Apply all filters client-side
       let filtered = allTransactions
+
+      // Scope to active business entity if provided
+      if (filters?.entityId) {
+        filtered = filtered.filter(t => t.entityId === filters.entityId)
+      }
       
       if (filters?.type) {
         filtered = filtered.filter(t => t.type === filters.type)
@@ -435,7 +440,7 @@ export class TransactionService extends BaseService {
   }
 
   // Get transaction summary for a user
-  async getTransactionSummary(userId: string, startDate?: string, endDate?: string): Promise<{
+  async getTransactionSummary(userId: string, startDate?: string, endDate?: string, entityId?: string): Promise<{
     totalIncome: number
     totalExpenses: number
     totalReliefs: number
@@ -476,6 +481,9 @@ export class TransactionService extends BaseService {
           }
         })
         .filter((transaction) => {
+          if (entityId && transaction.entityId !== entityId) {
+            return false
+          }
           if (!transaction.recordDate || Number.isNaN(transaction.recordDate.getTime())) {
             return false
           }
@@ -542,7 +550,7 @@ export class TransactionService extends BaseService {
     }
   }
 
-  async getTransactionsForPeriod(userId: string, startDate?: string, endDate?: string): Promise<Transaction[]> {
+  async getTransactionsForPeriod(userId: string, startDate?: string, endDate?: string, entityId?: string): Promise<Transaction[]> {
     try {
       const transactions = await this.getAll([
         { field: 'userId', operator: '==', value: userId }
@@ -594,6 +602,7 @@ export class TransactionService extends BaseService {
           }
         })
         .filter((transaction) => {
+          if (entityId && transaction.entityId !== entityId) return false
           if (!transaction.recordDate || Number.isNaN(transaction.recordDate.getTime())) {
             return false
           }
@@ -623,16 +632,20 @@ export class TransactionService extends BaseService {
   }
 
   // Get recent transactions
-  async getRecentTransactions(userId: string, limit: number = 10): Promise<Transaction[]> {
+  async getRecentTransactions(userId: string, limit: number = 10, entityId?: string): Promise<Transaction[]> {
     try {
-      const { data } = await this.getPaginated(
-        1,
-        limit,
-        [{ field: 'userId', operator: '==', value: userId }],
-        'date',
-        'desc'
-      )
-      return data
+      // Fetch all (user-scoped), then filter client-side to avoid composite indexes.
+      const all = await this.getAll([{ field: 'userId', operator: '==', value: userId }])
+      const filtered = entityId ? all.filter((t: any) => t.entityId === entityId) : all
+
+      // Sort by createdAt (newest first). Fallback to date.
+      const sorted = filtered.sort((a: any, b: any) => {
+        const aTime = new Date(a.createdAt || a.date || 0).getTime()
+        const bTime = new Date(b.createdAt || b.date || 0).getTime()
+        return bTime - aTime
+      })
+
+      return sorted.slice(0, limit)
     } catch (error) {
       console.error('Error getting recent transactions:', error)
       throw error

@@ -184,6 +184,7 @@ export function ViewBrandDealDialog({
       }
       
       const transactionData = {
+        entityId: currentDeal.entityId,
         type: 'income' as const,
         description: `${currentDeal.title} - ${currentDeal.brandName}`,
         amount: currentDeal.amount,

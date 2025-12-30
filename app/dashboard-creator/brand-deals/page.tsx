@@ -19,11 +19,13 @@ import { AddBrandDealDialog } from "@/components/brand-deals/add-brand-deal-dial
 import { ViewBrandDealDialog } from "@/components/brand-deals/view-brand-deal-dialog"
 import { format } from "date-fns"
 import { formatCurrencyAmount, fetchExchangeRate, CurrencyCode } from "@/lib/utils/currency"
+import { useBusiness } from "@/lib/contexts/business-context"
 
 export default function BrandDealsPage() {
   const router = useRouter()
   const { user } = useAuth()
   const { profile } = useUserProfile()
+  const { activeEntityId } = useBusiness()
   const { isSubscribed } = useSubscription()
   const [brandDeals, setBrandDeals] = useState<BrandDeal[]>([])
   const [loading, setLoading] = useState(true)
@@ -42,6 +44,9 @@ export default function BrandDealsPage() {
     try {
       setLoading(true)
       const filters: any = {}
+      if (activeEntityId) {
+        filters.entityId = activeEntityId
+      }
       if (statusFilter !== "all") {
         filters.status = statusFilter
       }
@@ -64,7 +69,7 @@ export default function BrandDealsPage() {
 
   useEffect(() => {
     loadBrandDeals()
-  }, [profile?.userId, currentPage, statusFilter, typeFilter, searchTerm])
+  }, [profile?.userId, activeEntityId, currentPage, statusFilter, typeFilter, searchTerm])
 
   // Listen for create brand deal event from header
   useEffect(() => {
