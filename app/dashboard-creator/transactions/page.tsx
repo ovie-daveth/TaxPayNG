@@ -75,7 +75,7 @@ export default function TransactionsPage() {
         <main className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
           <div className="space-y-4 sm:space-y-6">
             {/* Search and Filter Bar */}
-            <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+            <div className="flex flex-row gap-2 sm:gap-3">
               <div className="relative flex-1">
                 <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground" />
                 <Input 
@@ -85,16 +85,16 @@ export default function TransactionsPage() {
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
               </div>
-              <Button variant="outline" onClick={() => setIsFilterOpen(!isFilterOpen)} className="h-9 sm:h-10 text-xs sm:text-sm">
-                <Filter className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-                Filters
+              <Button variant="outline" onClick={() => setIsFilterOpen(!isFilterOpen)} className="h-9 sm:h-10 px-2 sm:px-3">
+                <Filter className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Filters</span>
               </Button>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="h-9 sm:h-10 text-xs sm:text-sm">
-                    <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-                    Reports
-                    <ChevronDown className="w-3 h-3 ml-1.5 sm:ml-2" />
+                  <Button variant="outline" className="h-9 sm:h-10 px-2 sm:px-3">
+                    <FileText className="w-4 h-4 sm:mr-2" />
+                    <span className="hidden sm:inline">Reports</span>
+                    <ChevronDown className="w-3 h-3 sm:ml-2 hidden sm:inline" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">

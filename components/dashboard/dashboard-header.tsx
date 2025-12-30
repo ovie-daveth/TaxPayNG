@@ -198,7 +198,7 @@ export function DashboardHeader() {
   const showBackButton = pathname !== "/dashboard" && pathname !== "/dashboard/"
 
   return (
-    <div className="border-b border-border bg-card w-full">
+    <div className="border-b border-border bg-card w-full hidden md:block">
       <div className="w-full px-3 sm:px-4 md:px-4 lg:px-8 py-2.5 sm:py-3 md:py-3 lg:py-4">
         <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-2 lg:gap-4">
           <div className="flex-1 min-w-0">

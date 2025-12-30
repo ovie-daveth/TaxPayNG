@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Calculator, LayoutDashboard, Receipt, FileText, Bell, Settings, LogOut, Menu, X, ChevronLeft, ChevronRight, IdCardIcon, FileCheck, BarChart3, MessageSquare, Plus } from "lucide-react"
+import { Calculator, LayoutDashboard, Receipt, FileText, Bell, Settings, LogOut, ChevronLeft, ChevronRight, IdCardIcon, FileCheck, BarChart3, MessageSquare, Plus, Menu } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { useAuth } from "@/lib/hooks/useAuth"
@@ -18,6 +18,7 @@ import { AddTransactionDialog } from "../transactions/add-transaction-dialog"
 import { useTransactions } from "@/lib/hooks/useTransactions"
 import { useSubscription } from "@/lib/hooks/useSubscription"
 import { SubscriptionRequiredModal } from "../subscription/subscription-required-modal"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -35,13 +36,13 @@ const navItems = [
 export function DashboardNav() {
   const pathname = usePathname()
   const router = useRouter()
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const { sidebarCollapsed, toggleSidebar } = useSidebar()
   const { logout, user } = useAuth()
   const { profile } = useUserProfile()
   const [hasFilingRequests, setHasFilingRequests] = useState(false)
   const [isAddTransactionDialogOpen, setIsAddTransactionDialogOpen] = useState(false)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   
   const { isSubscribed, isExpired, loading: subscriptionLoading } = useSubscription()
   const { createTransaction } = useTransactions(user?.uid || null)
@@ -128,6 +129,20 @@ export function DashboardNav() {
       return hasFilingRequests
     }
     return true
+  })
+
+  // Items shown in bottom nav - 5 items: Dashboard, Invoice, Tax Calculator, Transaction, Report
+  const bottomNavItems = [
+    "/dashboard",
+    "/dashboard/invoices",
+    "/dashboard/tax-calculator",
+    "/dashboard/transactions",
+    "/dashboard/reports"
+  ]
+
+  // Items to show in the sidebar menu (all items except those in bottom nav)
+  const menuNavItems = filteredNavItems.filter(item => {
+    return !bottomNavItems.includes(item.href)
   })
 
   return (
@@ -247,69 +262,206 @@ export function DashboardNav() {
         </div>
       </aside>
 
-      {/* Mobile Header */}
-      <header className="md:hidden sticky top-0 z-50 bg-card border-b border-border">
-        <div className="flex items-center justify-between p-3 sm:p-4">
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <OtaxLogo />
-          </Link>
-          <div className="flex items-center gap-1.5">
-            <NotificationBell />
-            <ThemeToggle />
+      {/* Mobile Header - Headless: Menu icon left, Add button right */}
+      <header className="md:hidden sticky top-0 z-50 bg-transparent">
+        <div className="flex items-center justify-between px-3 py-1">
+          <button 
+            onClick={() => setIsMobileMenuOpen(true)}
+            className="p-2 rounded-lg hover:bg-muted transition-colors"
+          >
+            <Menu className="w-5 h-5 text-foreground" />
+          </button>
+          <div className="flex items-center gap-1 flex-shrink-0">
             {mobileAddButton.show && (
               <Button 
                 variant="default"
                 size="icon"
                 onClick={mobileAddButton.action}
-                className="h-8 w-8 p-0"
+                className="h-8 w-8"
               >
                 <AddButtonIcon className="w-4 h-4" />
               </Button>
             )}
-            <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} className="h-10 w-10">
-              {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
-            </Button>
           </div>
         </div>
+      </header>
 
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <nav className="border-t border-border p-4 space-y-1">
-            {filteredNavItems.map((item) => {
+      {/* Mobile Bottom Navigation - 5 items: Dashboard, Invoice, Tax Calculator, Transaction, Report */}
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border safe-area-inset-bottom">
+        <div className="flex items-center justify-around px-2 py-2">
+          <Link href="/dashboard" className={cn(
+            "flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] transition-colors",
+            (pathname === "/dashboard" || pathname === "/dashboard/") 
+              ? "min-w-[70px] -mt-4" 
+              : "rounded-lg"
+          )}>
+            {(pathname === "/dashboard" || pathname === "/dashboard/") ? (
+              <div className="w-12 h-12 rounded-full flex items-center justify-center bg-primary text-primary-foreground shadow-lg">
+                <LayoutDashboard className="w-6 h-6" />
+              </div>
+            ) : (
+              <LayoutDashboard className="w-5 h-5 text-muted-foreground" />
+            )}
+            <span className={cn(
+              "text-[10px] font-medium",
+              (pathname === "/dashboard" || pathname === "/dashboard/") 
+                ? "text-primary" 
+                : "text-muted-foreground"
+            )}>
+              Dashboard
+            </span>
+          </Link>
+
+          <Link href="/dashboard/invoices" className={cn(
+            "flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] transition-colors",
+            (pathname === "/dashboard/invoices" || pathname?.startsWith("/dashboard/invoices/")) 
+              ? "min-w-[70px] -mt-4" 
+              : "rounded-lg"
+          )}>
+            {(pathname === "/dashboard/invoices" || pathname?.startsWith("/dashboard/invoices/")) ? (
+              <div className="w-12 h-12 rounded-full flex items-center justify-center bg-primary text-primary-foreground shadow-lg">
+                <FileCheck className="w-6 h-6" />
+              </div>
+            ) : (
+              <FileCheck className="w-5 h-5 text-muted-foreground" />
+            )}
+            <span className={cn(
+              "text-[10px] font-medium",
+              (pathname === "/dashboard/invoices" || pathname?.startsWith("/dashboard/invoices/")) 
+                ? "text-primary" 
+                : "text-muted-foreground"
+            )}>
+              Invoices
+            </span>
+          </Link>
+
+          {/* Tax Calculator - Center, Round, Bigger when active */}
+          <Link href="/dashboard/tax-calculator" className={cn(
+            "flex flex-col items-center justify-center gap-1 px-3 py-2 transition-colors",
+            (pathname === "/dashboard/tax-calculator" || pathname?.startsWith("/dashboard/tax-calculator/")) 
+              ? "min-w-[70px] -mt-4" 
+              : "min-w-[60px] rounded-lg"
+          )}>
+            {(pathname === "/dashboard/tax-calculator" || pathname?.startsWith("/dashboard/tax-calculator/")) ? (
+              <div className="w-12 h-12 rounded-full flex items-center justify-center bg-primary text-primary-foreground shadow-lg">
+                <Calculator className="w-6 h-6" />
+              </div>
+            ) : (
+              <Calculator className="w-5 h-5 text-muted-foreground" />
+            )}
+            <span className={cn(
+              "text-[10px] font-medium",
+              (pathname === "/dashboard/tax-calculator" || pathname?.startsWith("/dashboard/tax-calculator/")) 
+                ? "text-primary" 
+                : "text-muted-foreground"
+            )}>
+              Calculator
+            </span>
+          </Link>
+
+          <Link href="/dashboard/transactions" className={cn(
+            "flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] transition-colors",
+            (pathname === "/dashboard/transactions" || pathname?.startsWith("/dashboard/transactions/")) 
+              ? "min-w-[70px] -mt-4" 
+              : "rounded-lg"
+          )}>
+            {(pathname === "/dashboard/transactions" || pathname?.startsWith("/dashboard/transactions/")) ? (
+              <div className="w-12 h-12 rounded-full flex items-center justify-center bg-primary text-primary-foreground shadow-lg">
+                <Receipt className="w-6 h-6" />
+              </div>
+            ) : (
+              <Receipt className="w-5 h-5 text-muted-foreground" />
+            )}
+            <span className={cn(
+              "text-[10px] font-medium",
+              (pathname === "/dashboard/transactions" || pathname?.startsWith("/dashboard/transactions/")) 
+                ? "text-primary" 
+                : "text-muted-foreground"
+            )}>
+              Transactions
+            </span>
+          </Link>
+
+          <Link href="/dashboard/reports" className={cn(
+            "flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] transition-colors",
+            (pathname === "/dashboard/reports" || pathname?.startsWith("/dashboard/reports/")) 
+              ? "min-w-[70px] -mt-4" 
+              : "rounded-lg"
+          )}>
+            {(pathname === "/dashboard/reports" || pathname?.startsWith("/dashboard/reports/")) ? (
+              <div className="w-12 h-12 rounded-full flex items-center justify-center bg-primary text-primary-foreground shadow-lg">
+                <BarChart3 className="w-6 h-6" />
+              </div>
+            ) : (
+              <BarChart3 className="w-5 h-5 text-muted-foreground" />
+            )}
+            <span className={cn(
+              "text-[10px] font-medium",
+              (pathname === "/dashboard/reports" || pathname?.startsWith("/dashboard/reports/")) 
+                ? "text-primary" 
+                : "text-muted-foreground"
+            )}>
+              Reports
+            </span>
+          </Link>
+        </div>
+      </nav>
+
+      {/* Mobile Menu Sheet - Slides from left, full screen */}
+      <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+        <SheetContent side="left" className="!w-full !max-w-full p-0">
+          {/* User Profile Section */}
+          <div className="p-4 border-b border-border">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <User className="w-6 h-6 text-primary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-base font-semibold text-foreground truncate">
+                  {profile?.firstName && profile?.lastName 
+                    ? `${profile.firstName} ${profile.lastName}`
+                    : profile?.firstName || profile?.lastName || profile?.email?.split('@')[0] || 'User'
+                  }
+                </p>
+                {profile?.email && (
+                  <p className="text-sm text-muted-foreground truncate">
+                    {profile.email}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Menu Items */}
+          <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
+            {menuNavItems.map((item) => {
               const Icon = item.icon
-              // For Dashboard, only match exact path (not sub-routes)
-              // For other routes, match exact path or sub-routes
               const isActive = item.href === "/dashboard"
                 ? pathname === item.href || pathname === item.href + "/"
                 : pathname === item.href || pathname?.startsWith(item.href + "/")
               return (
-                <Link key={item.href} href={item.href} onClick={() => setMobileMenuOpen(false)}>
-                  <div
-                    className={cn(
-                      "flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
-                      isActive
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                    )}
-                  >
-                    <Icon className="w-5 h-5" />
-                    {item.label}
-                  </div>
+                <Link 
+                  key={item.href} 
+                  href={item.href}
+                  onClick={() => setIsMobileMenuOpen(false)}
+                  className={cn(
+                    "flex items-center gap-4 px-4 py-3 rounded-lg text-base font-bold transition-colors",
+                    isActive
+                      ? "bg-primary text-white"
+                      : "text-primary hover:bg-primary/10"
+                  )}
+                >
+                  <Icon className={cn(
+                    "w-5 h-5 flex-shrink-0",
+                    isActive ? "text-white" : "text-black dark:text-white"
+                  )} strokeWidth={2.5} />
+                  {item.label}
                 </Link>
               )
             })}
-            <Button 
-              variant="ghost" 
-              className="w-full justify-start text-muted-foreground mt-4" 
-              size="sm"
-              onClick={handleLogout}
-            >
-              <LogOut className="w-4 h-4 mr-2" />
-              Log out
-            </Button>
           </nav>
-        )}
-      </header>
+        </SheetContent>
+      </Sheet>
 
       {/* Add Transaction Dialog */}
       <AddTransactionDialog 

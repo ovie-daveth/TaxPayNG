@@ -293,11 +293,56 @@ export function TransactionList({
   }
 
   return (
-    <Card className="overflow-hidden">
-      {/* Table View - Mobile and Desktop */}
-      <div className="overflow-x-auto w-full">
-        <table className={`w-full ${!sidebarCollapsed ? (profile?.businessType === 'creator' ? 'min-w-[1400px]' : 'min-w-[1200px]') : (profile?.businessType === 'creator' ? 'min-w-[1300px]' : 'min-w-[1100px]')}`}>
-          <thead className="bg-muted/50 border-b border-border">
+    <>
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-2">
+        {transactions.map((transaction) => {
+          const isHighlighted = highlightedTransactionId === transaction.id
+          const isIncome = transaction.type === 'income'
+          return (
+            <div
+              key={`${transaction.id}-${transaction.updatedAt || transaction.createdAt}`}
+              onClick={() => handleView(transaction)}
+              className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-muted/50 ${isHighlighted ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'}`}
+            >
+              {/* Icon */}
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isIncome ? 'bg-primary/10' : 'bg-destructive/10'}`}>
+                {isIncome ? (
+                  <ArrowUpRight className="w-5 h-5 text-primary" />
+                ) : (
+                  <ArrowDownRight className="w-5 h-5 text-destructive" />
+                )}
+              </div>
+              
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{transaction.description}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {formatDate(transaction.transactionDate || transaction.valueDate || transaction.date)}
+                    </p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <p className={`text-sm font-semibold ${isIncome ? 'text-primary' : 'text-foreground'}`}>
+                      {isIncome ? '+' : '-'}{formatCurrency(Math.abs(transaction.amount))}
+                    </p>
+                    <span className="text-xs text-green-500">
+                      Successful
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Desktop Table View */}
+      <Card className="hidden md:block overflow-hidden border-0 shadow-none md:border md:shadow-sm">
+        <div className="overflow-x-auto w-full">
+          <table className={`w-full ${!sidebarCollapsed ? (profile?.businessType === 'creator' ? 'min-w-[1400px]' : 'min-w-[1200px]') : (profile?.businessType === 'creator' ? 'min-w-[1300px]' : 'min-w-[1100px]')}`}>
+            <thead className="bg-muted/50 border-b-0 md:border-b border-border">
             <tr>
               <th className="text-left py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs font-medium text-muted-foreground w-[50px] md:w-[120px]">Date</th>
               <th className="text-left py-1.5 md:py-2 px-1 md:px-2 text-[10px] md:text-xs font-medium text-muted-foreground w-[20px] md:w-[130px]">Description</th>
@@ -321,8 +366,8 @@ export function TransactionList({
               return (
                 <tr
                   key={`${transaction.id}-${transaction.updatedAt || transaction.createdAt}`}
-                  className={`border-b border-border last:border-0 hover:bg-muted/30 transition-all duration-500 ${isHighlighted
-                      ? 'bg-primary/15 border-l-4 border-primary shadow-lg'
+                  className={`border-b-0 md:border-b border-border last:border-0 hover:bg-muted/30 transition-all duration-500 ${isHighlighted
+                      ? 'bg-primary/15 md:border-l-4 border-primary md:shadow-lg'
                       : ''
                     }`}
                   style={isHighlighted ? {
@@ -652,7 +697,7 @@ export function TransactionList({
           </tbody>
         </table>
       </div>
-
+      </Card>
 
       {/* View Transaction Dialog */}
       <ViewTransactionDialog
@@ -750,6 +795,6 @@ export function TransactionList({
         onOpenChange={setShowSubscriptionModal}
         businessType={profile?.businessType || 'freelancer'}
       />
-    </Card>
+    </>
   )
 }
