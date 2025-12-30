@@ -21,19 +21,27 @@ export class UserService extends BaseService {
     }
   }
 
-  // Check if a TIN is already registered to another user
-  async isTinTaken(taxId: string, currentUserId: string): Promise<boolean> {
+  // Check if a Tax ID is already registered to another user
+  async isTaxIdTaken(taxId: string, currentUserId: string): Promise<boolean> {
     try {
       const profiles = await this.getAll([
         { field: 'taxId', operator: '==', value: taxId }
       ])
       
-      // Return true if TIN is found and belongs to a different user
+      // Return true if Tax ID is found and belongs to a different user
       return profiles.some(profile => profile.userId !== currentUserId)
     } catch (error) {
-      console.error('Error checking if TIN is taken:', error)
+      console.error('Error checking if Tax ID is taken:', error)
       return false
     }
+  }
+
+  /**
+   * Backward-compatible alias (legacy naming).
+   * Prefer `isTaxIdTaken`.
+   */
+  async isTinTaken(taxId: string, currentUserId: string): Promise<boolean> {
+    return this.isTaxIdTaken(taxId, currentUserId)
   }
 
   // Get storage limit based on subscription type (in bytes)
