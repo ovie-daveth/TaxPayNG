@@ -185,8 +185,9 @@ export function TaxCalculatorForm({
   const [userType, setUserType] = useState<SupportedUserType>(defaultUserType)
   const [showSMEModal, setShowSMEModal] = useState(false)
   const [calculationType, setCalculationType] = useState<string | null>(null) // "paye", "vat", null
-  const [showExplanations, setShowExplanations] = useState(false) // Mobile-only toggle for explanations
+  const [showExplanations, setShowExplanations] = useState(false) // Mobile-only toggle for explanations (deprecated - kept for backwards compatibility)
   const [showRatesSheet, setShowRatesSheet] = useState(false) // Control sheet visibility
+  const [showInfoSheet, setShowInfoSheet] = useState(false) // Control info/explanations sheet visibility
   const [incomeSources, setIncomeSources] = useState<IncomeSource[]>(() => getDefaultIncomeSources(defaultUserType))
   const [converting, setConverting] = useState(false)
   const [period, setPeriod] = useState<"monthly" | "quarterly" | "yearly">("yearly")
@@ -1119,26 +1120,16 @@ export function TaxCalculatorForm({
                 <Calculator className="w-4 h-4" />
                 <span className="hidden sm:inline">Tax Rates</span>
               </Button>
-              {/* Mobile-only toggle for explanations */}
+              {/* Info button - opens explanations sheet */}
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
-                onClick={() => setShowExplanations(!showExplanations)}
+                onClick={() => setShowInfoSheet(true)}
                 className="md:hidden flex items-center gap-1.5 shrink-0"
               >
                 <Info className="w-4 h-4" />
-                {showExplanations ? (
-                  <>
-                    <span className="hidden sm:inline">Hide Info</span>
-                    <ChevronUp className="w-4 h-4" />
-                  </>
-                ) : (
-                  <>
-                    <span className="hidden sm:inline">Show Info</span>
-                    <ChevronDown className="w-4 h-4" />
-                  </>
-                )}
+                <span className="hidden sm:inline">Info</span>
                 <span className="sm:hidden">Info</span>
               </Button>
             </div>
@@ -1377,6 +1368,114 @@ export function TaxCalculatorForm({
           </SheetHeader>
           <div className="mt-6">
             <TaxRatesInfo />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* Info/Explanations Sheet - shows deductible expenses, VAT exemptions, etc. */}
+      <Sheet open={showInfoSheet} onOpenChange={setShowInfoSheet}>
+        <SheetContent side="right" className="w-full sm:max-w-2xl overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Tax Information & Guidelines</SheetTitle>
+            <SheetDescription>
+              Important information about deductible expenses, exemptions, and tax calculations
+            </SheetDescription>
+          </SheetHeader>
+          <div className="mt-6 space-y-6">
+            {/* Business Expenses Info (for freelancers/self-employed) */}
+            {userType !== "creator" && userType !== "business" && (
+              <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                <div className="flex items-start gap-2 mb-3">
+                  <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">
+                      💡 Allowable Business Expenses for Freelancers/Self-Employed
+                    </h3>
+                    <p className="text-xs text-blue-800 dark:text-blue-200 mb-3 leading-relaxed">
+                      Enter expenses that are <strong>wholly, exclusively, and necessarily</strong> incurred in producing your income. These will be deducted from your gross income before calculating tax.
+                    </p>
+                    <p className="text-xs text-blue-800 dark:text-blue-200 font-semibold mb-2">Examples of allowable expenses:</p>
+                    <ul className="text-xs text-blue-700 dark:text-blue-300 list-disc list-inside space-y-1">
+                      <li>Internet/data costs</li>
+                      <li>Software subscriptions and licenses</li>
+                      <li>Laptop, computer equipment, and tools</li>
+                      <li>Co-working space rent</li>
+                      <li>Transport to client meetings</li>
+                      <li>Professional fees (accountants, lawyers)</li>
+                      <li>Marketing and promotion costs</li>
+                      <li>Training and professional development</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* VAT Exemptions Info (for VAT calculations) */}
+            {userType === "business" && calculationType === "vat" && (
+              <>
+                <div className="bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+                  <div className="flex items-start gap-2 mb-3">
+                    <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-2">VAT Exemptions</h3>
+                      <p className="text-xs text-blue-800 dark:text-blue-200 mb-2">The following goods and services are exempt from VAT:</p>
+                      <ul className="text-xs text-blue-700 dark:text-blue-300 list-disc list-inside space-y-1">
+                        <li>Basic food items (bread, milk, etc.)</li>
+                        <li>Medical and pharmaceutical products</li>
+                        <li>Books and educational materials</li>
+                        <li>Agricultural products</li>
+                        <li>Exports of goods and services</li>
+                        <li>Financial services</li>
+                        <li>Residential rent</li>
+                        <li>Public transportation</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 rounded-lg p-4">
+                  <div className="flex items-start gap-2 mb-3">
+                    <Info className="w-5 h-5 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h3 className="text-sm font-semibold text-amber-900 dark:text-amber-100 mb-2">Important: Input VAT vs CIT</h3>
+                      <p className="text-xs text-amber-800 dark:text-amber-200 leading-relaxed">
+                        • <strong>Input VAT</strong> (VAT paid on purchases) can be claimed as a <strong>credit against Output VAT</strong> only. It reduces the Net VAT you pay.<br/>
+                        • <strong>Input VAT does NOT reduce CIT</strong>. CIT (Company Income Tax) is calculated separately on your assessable profit, and input VAT is not deductible for CIT purposes.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Creator Expenses Info (for creators) */}
+            {userType === "creator" && (
+              <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
+                <div className="flex items-start gap-2 mb-3">
+                  <Info className="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <h3 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-2">
+                      💡 Creator-Specific Deductible Expenses
+                    </h3>
+                    <p className="text-xs text-green-800 dark:text-green-200 mb-3 leading-relaxed">
+                      As a content creator, you can deduct expenses directly related to your content creation and monetization activities.
+                    </p>
+                    <p className="text-xs text-green-800 dark:text-green-200 font-semibold mb-2">Examples of deductible creator expenses:</p>
+                    <ul className="text-xs text-green-700 dark:text-green-300 list-disc list-inside space-y-1">
+                      <li>Camera equipment and accessories</li>
+                      <li>Video editing software and tools</li>
+                      <li>Lighting and audio equipment</li>
+                      <li>Content creation subscriptions (Adobe, Canva, etc.)</li>
+                      <li>Studio or workspace rent</li>
+                      <li>Props and set design materials</li>
+                      <li>Marketing and promotion costs</li>
+                      <li>Travel expenses for content creation</li>
+                      <li>Professional services (editors, designers)</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </SheetContent>
       </Sheet>

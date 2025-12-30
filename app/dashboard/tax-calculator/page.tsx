@@ -374,23 +374,23 @@ export default function TaxCalculatorPage() {
         }}
       >
         <DialogContent className="w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] sm:max-w-2xl md:max-w-4xl max-h-[90vh] overflow-y-auto p-0">
+          <DialogHeader className="px-3 sm:px-4 md:px-6 pt-3 sm:pt-4 md:pt-6 pb-2 sm:pb-3 md:pb-4 border-b border-border">
+            <DialogTitle className="text-lg sm:text-xl md:text-2xl font-bold">Tax Calculation Results</DialogTitle>
+            {(taxResult || selectedCalculation?.result) && (
+              <DialogDescription className="text-xs sm:text-sm">
+                Detailed breakdown of your tax computation for the selected period.
+                {selectedCalculation && (
+                  <span className="block mt-1 text-xs">
+                    Calculated on: {format(new Date(selectedCalculation.createdAt), "dd MMM yyyy 'at' HH:mm")}
+                  </span>
+                )}
+              </DialogDescription>
+            )}
+          </DialogHeader>
           {(taxResult || selectedCalculation?.result) && (
-            <>
-              <DialogHeader className="px-3 sm:px-4 md:px-6 pt-3 sm:pt-4 md:pt-6 pb-2 sm:pb-3 md:pb-4 border-b border-border">
-                <DialogTitle className="text-lg sm:text-xl md:text-2xl font-bold">Tax Calculation Results</DialogTitle>
-                <DialogDescription className="text-xs sm:text-sm">
-                  Detailed breakdown of your tax computation for the selected period.
-                  {selectedCalculation && (
-                    <span className="block mt-1 text-xs">
-                      Calculated on: {format(new Date(selectedCalculation.createdAt), "dd MMM yyyy 'at' HH:mm")}
-                    </span>
-                  )}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
-                <TaxBreakdown result={taxResult || selectedCalculation?.result} />
-              </div>
-            </>
+            <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
+              <TaxBreakdown result={taxResult || selectedCalculation?.result} />
+            </div>
           )}
         </DialogContent>
       </Dialog>

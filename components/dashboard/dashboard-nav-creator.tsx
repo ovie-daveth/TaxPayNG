@@ -266,7 +266,7 @@ export function DashboardNavCreator() {
       </aside>
 
       {/* Mobile Header - Headless: Menu icon left, Add button right */}
-      <header className="md:hidden sticky top-0 z-50 bg-transparent">
+      <header className="md:hidden sticky top-0 z-50 bg-background">
         <div className="flex items-center justify-between px-3 py-1">
           <button 
             onClick={() => setIsMobileMenuOpen(true)}
@@ -274,7 +274,8 @@ export function DashboardNavCreator() {
           >
             <Menu className="w-5 h-5 text-foreground" />
           </button>
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <NotificationBell />
             {mobileAddButton.show && (
               <Button 
                 variant="default"
@@ -413,6 +414,9 @@ export function DashboardNavCreator() {
       {/* Mobile Menu Sheet - Slides from left, full screen */}
       <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
         <SheetContent side="left" className="!w-full !max-w-full p-0">
+          <SheetHeader>
+            <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
+          </SheetHeader>
           {/* User Profile Section */}
           <div className="p-4 border-b border-border">
             <div className="flex items-center gap-3">

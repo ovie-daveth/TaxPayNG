@@ -90,16 +90,14 @@ export default function DashboardPage() {
             <TaxSummary businessType="freelancer" />
           </div>
 
-          {/* Analytics Insights - Hidden on mobile to reduce clutter */}
-          <div className="hidden sm:block">
-            <AnalyticsInsights 
-              businessType="freelancer"
-              periodType={periodType}
-              selectedYear={selectedYear}
-              selectedQuarter={selectedQuarter}
-              sidebarCollapsed={false}
-            />
-          </div>
+          {/* Analytics Insights */}
+          <AnalyticsInsights 
+            businessType="freelancer"
+            periodType={periodType}
+            selectedYear={selectedYear}
+            selectedQuarter={selectedQuarter}
+            sidebarCollapsed={false}
+          />
 
           {/* Recent Activity */}
           <div className="grid md:grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5 lg:gap-6">

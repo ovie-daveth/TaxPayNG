@@ -382,41 +382,41 @@ export function TaxBreakdown({ result, calculationInputs }: TaxBreakdownProps) {
 
   return (
     <Card className="p-6">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4 sm:mb-6">
         <div>
-          <h2 className="text-xl font-semibold">Tax Breakdown</h2>
-          <p className="text-sm text-muted-foreground mt-1">
+          <h2 className="text-base sm:text-lg md:text-xl font-semibold">Tax Breakdown</h2>
+          <p className="text-[11px] sm:text-xs md:text-sm text-muted-foreground mt-1">
             All amounts shown are annual. Monthly equivalents are provided where applicable.
           </p>
         </div>
-        <Badge variant="secondary">2025</Badge>
+        <Badge variant="secondary" className="text-[10px] sm:text-xs">2025</Badge>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {/* Monthly Set-Aside Card */}
-        <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg p-4 border-2 border-primary/30">
-          <div className="flex items-center gap-2 mb-2">
-            <Wallet className="w-4 h-4 text-primary" />
-            <h3 className="font-semibold text-sm">Monthly Set-Aside</h3>
+        <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-lg p-3 sm:p-4 border-2 border-primary/30">
+          <div className="flex items-center gap-1.5 sm:gap-2 mb-1.5 sm:mb-2">
+            <Wallet className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary" />
+            <h3 className="font-semibold text-xs sm:text-sm">Monthly Set-Aside</h3>
           </div>
-          <p className="text-2xl font-bold text-primary">₦{result.monthlySetAside.toLocaleString()}</p>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-lg sm:text-xl md:text-2xl font-bold text-primary">₦{result.monthlySetAside.toLocaleString()}</p>
+          <p className="text-[10px] sm:text-xs text-muted-foreground mt-1">
             Save this amount each month for tax payments
-            <span className="block mt-1 text-[10px]">
+            <span className="block mt-1 text-[9px] sm:text-[10px]">
               (Annual tax: ₦{result.totalTax.toLocaleString()})
             </span>
           </p>
         </div>
 
         {/* Income Section */}
-        <div className="bg-muted/50 rounded-lg p-4">
-          <h3 className="font-semibold text-sm mb-3">Income (Annual)</h3>
+        <div className="bg-muted/50 rounded-lg p-3 sm:p-4">
+          <h3 className="font-semibold text-xs sm:text-sm mb-2 sm:mb-3">Income (Annual)</h3>
           <div className="space-y-2">
             {/* Income Breakdown by Source */}
             {result.incomeBreakdown && result.incomeBreakdown.length > 0 && (
               <div className="mb-3 pb-3 border-b border-border">
-                <p className="text-xs text-muted-foreground mb-2">Income Sources (Annual):</p>
-                <div className="space-y-1.5">
+                <p className="text-[10px] sm:text-xs text-muted-foreground mb-1.5 sm:mb-2">Income Sources (Annual):</p>
+                <div className="space-y-1 sm:space-y-1.5">
                   {result.incomeBreakdown.map((source: any, index: number) => {
                     // Get readable label for income type
                     const allTypes = [
@@ -447,18 +447,18 @@ export function TaxBreakdown({ result, calculationInputs }: TaxBreakdownProps) {
                     const monthlyAmount = getMonthlyEquivalent(source.amount)
                     
                     return (
-                      <div key={index} className="flex flex-col gap-1 text-xs">
+                      <div key={index} className="flex flex-col gap-0.5 sm:gap-1 text-[11px] sm:text-xs">
                         <div className="flex items-center justify-between">
                           <span className="text-muted-foreground">
                             {typeLabel}
                           </span>
                           <div className="flex flex-col items-end">
                             <span className="font-medium">₦{source.amount.toLocaleString()} (Annual)</span>
-                            <span className="text-muted-foreground text-[10px]">
+                            <span className="text-muted-foreground text-[9px] sm:text-[10px]">
                               ≈ ₦{monthlyAmount.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/month
                             </span>
                             {hasCurrencyConversion && source.originalAmount && (
-                              <span className="text-muted-foreground text-[10px]">
+                              <span className="text-muted-foreground text-[9px] sm:text-[10px]">
                                 {formatCurrencyAmount(source.originalAmount, source.originalCurrency)} converted
                               </span>
                             )}
@@ -470,31 +470,31 @@ export function TaxBreakdown({ result, calculationInputs }: TaxBreakdownProps) {
                 </div>
               </div>
             )}
-            <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center justify-between text-xs sm:text-sm">
               <span className="text-muted-foreground">Gross Income (Annual)</span>
               <div className="flex flex-col items-end">
                 <span className="font-medium">₦{result.grossIncome.toLocaleString()}</span>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-[10px] sm:text-xs text-muted-foreground">
                   ≈ ₦{getMonthlyEquivalent(result.grossIncome).toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/month
                 </span>
               </div>
             </div>
             {result.businessExpenses > 0 && (
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between text-xs sm:text-sm">
                 <span className="text-muted-foreground">Business Expenses (Annual)</span>
                 <div className="flex flex-col items-end">
                   <span className="font-medium text-red-600">-₦{result.businessExpenses.toLocaleString()}</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-[10px] sm:text-xs text-muted-foreground">
                     ≈ -₦{getMonthlyEquivalent(result.businessExpenses).toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/month
                   </span>
                 </div>
               </div>
             )}
-            <div className="flex items-center justify-between text-sm pt-2 border-t border-border">
+            <div className="flex items-center justify-between text-xs sm:text-sm pt-2 border-t border-border">
               <span className="font-medium">Adjusted Gross Income (Annual)</span>
               <div className="flex flex-col items-end">
                 <span className="font-semibold">₦{result.adjustedGrossIncome.toLocaleString()}</span>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-[10px] sm:text-xs text-muted-foreground">
                   ≈ ₦{getMonthlyEquivalent(result.adjustedGrossIncome).toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/month
                 </span>
               </div>
@@ -503,91 +503,91 @@ export function TaxBreakdown({ result, calculationInputs }: TaxBreakdownProps) {
         </div>
 
         {/* Reliefs & Deductions */}
-        <div className="bg-muted/50 rounded-lg p-4">
-          <h3 className="font-semibold text-sm mb-3">Tax Reliefs & Deductions (Annual)</h3>
-          <div className="space-y-2">
+        <div className="bg-muted/50 rounded-lg p-3 sm:p-4">
+          <h3 className="font-semibold text-xs sm:text-sm mb-2 sm:mb-3">Tax Reliefs & Deductions (Annual)</h3>
+          <div className="space-y-1.5 sm:space-y-2">
             {result.reliefs.rentRelief > 0 && (
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between text-xs sm:text-sm">
                 <span className="text-muted-foreground">Rent Relief (20%)</span>
                 <div className="flex flex-col items-end">
                   <span className="font-medium text-green-600">-₦{result.reliefs.rentRelief.toLocaleString()} (Annual)</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-[10px] sm:text-xs text-muted-foreground">
                     ≈ -₦{getMonthlyEquivalent(result.reliefs.rentRelief).toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/month
                   </span>
                 </div>
               </div>
             )}
             {result.reliefs.pension > 0 && (
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between text-xs sm:text-sm">
                 <span className="text-muted-foreground">Pension Contribution</span>
                 <div className="flex flex-col items-end">
                   <span className="font-medium text-green-600">-₦{result.reliefs.pension.toLocaleString()} (Annual)</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-[10px] sm:text-xs text-muted-foreground">
                     ≈ -₦{getMonthlyEquivalent(result.reliefs.pension).toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/month
                   </span>
                 </div>
               </div>
             )}
             {result.reliefs.healthInsurance > 0 && (
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between text-xs sm:text-sm">
                 <span className="text-muted-foreground">Health Insurance</span>
                 <div className="flex flex-col items-end">
                   <span className="font-medium text-green-600">-₦{result.reliefs.healthInsurance.toLocaleString()} (Annual)</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-[10px] sm:text-xs text-muted-foreground">
                     ≈ -₦{getMonthlyEquivalent(result.reliefs.healthInsurance).toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/month
                   </span>
                 </div>
               </div>
             )}
             {result.reliefs.housingFund > 0 && (
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between text-xs sm:text-sm">
                 <span className="text-muted-foreground">National Housing Fund (NHF)</span>
                 <div className="flex flex-col items-end">
                   <span className="font-medium text-green-600">-₦{result.reliefs.housingFund.toLocaleString()} (Annual)</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-[10px] sm:text-xs text-muted-foreground">
                     ≈ -₦{getMonthlyEquivalent(result.reliefs.housingFund).toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/month
                   </span>
                 </div>
               </div>
             )}
             {result.reliefs.transportAllowance > 0 && (
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between text-xs sm:text-sm">
                 <span className="text-muted-foreground">Transport Allowance Exemption</span>
                 <div className="flex flex-col items-end">
                   <span className="font-medium text-green-600">-₦{result.reliefs.transportAllowance.toLocaleString()} (Annual)</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-[10px] sm:text-xs text-muted-foreground">
                     ≈ -₦{getMonthlyEquivalent(result.reliefs.transportAllowance).toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/month
                   </span>
                 </div>
               </div>
             )}
             {result.reliefs.lifeInsurance > 0 && (
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between text-xs sm:text-sm">
                 <span className="text-muted-foreground">Life Insurance</span>
                 <div className="flex flex-col items-end">
                   <span className="font-medium text-green-600">-₦{result.reliefs.lifeInsurance.toLocaleString()} (Annual)</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-[10px] sm:text-xs text-muted-foreground">
                     ≈ -₦{getMonthlyEquivalent(result.reliefs.lifeInsurance).toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/month
                   </span>
                 </div>
               </div>
             )}
             {result.reliefs.charitable > 0 && (
-              <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center justify-between text-xs sm:text-sm">
                 <span className="text-muted-foreground">Charitable Donations</span>
                 <div className="flex flex-col items-end">
                   <span className="font-medium text-green-600">-₦{result.reliefs.charitable.toLocaleString()} (Annual)</span>
-                  <span className="text-xs text-muted-foreground">
+                  <span className="text-[10px] sm:text-xs text-muted-foreground">
                     ≈ -₦{getMonthlyEquivalent(result.reliefs.charitable).toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/month
                   </span>
                 </div>
               </div>
             )}
-            <div className="flex items-center justify-between text-sm pt-2 border-t border-border">
+            <div className="flex items-center justify-between text-xs sm:text-sm pt-2 border-t border-border">
               <span className="font-medium">Total Reliefs (Annual)</span>
               <div className="flex flex-col items-end">
                 <span className="font-semibold text-green-600">-₦{result.totalReliefs.toLocaleString()}</span>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-[10px] sm:text-xs text-muted-foreground">
                   ≈ -₦{getMonthlyEquivalent(result.totalReliefs).toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/month
                 </span>
               </div>
@@ -596,34 +596,34 @@ export function TaxBreakdown({ result, calculationInputs }: TaxBreakdownProps) {
         </div>
 
         {/* Tax Calculation */}
-        <div className="bg-primary/5 rounded-lg p-4 border-2 border-primary/20">
-          <h3 className="font-semibold text-sm mb-3">Tax Calculation</h3>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-sm">
+        <div className="bg-primary/5 rounded-lg p-3 sm:p-4 border-2 border-primary/20">
+          <h3 className="font-semibold text-xs sm:text-sm mb-2 sm:mb-3">Tax Calculation</h3>
+          <div className="space-y-1.5 sm:space-y-2">
+            <div className="flex items-center justify-between text-xs sm:text-sm">
               <span className="text-muted-foreground">Taxable Income (Annual)</span>
               <div className="flex flex-col items-end">
                 <span className="font-medium">₦{result.taxableIncome.toLocaleString()}</span>
-                <span className="text-xs text-muted-foreground">
+                <span className="text-[10px] sm:text-xs text-muted-foreground">
                   ≈ ₦{getMonthlyEquivalent(result.taxableIncome).toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}/month
                 </span>
               </div>
             </div>
             {result.taxBrackets.map((bracket: any, index: number) => (
-              <div key={index} className="flex items-center justify-between text-sm">
+              <div key={index} className="flex items-center justify-between text-xs sm:text-sm">
                 <span className="text-muted-foreground">
                   {bracket.rate === 0 ? "Tax-free" : `${bracket.rate}% on`} ₦{bracket.amount.toLocaleString()} (Annual)
                 </span>
                 <span className="font-medium">{bracket.rate === 0 ? "₦0" : `₦${bracket.tax.toLocaleString()}`}</span>
               </div>
             ))}
-            <div className="flex items-center justify-between pt-3 border-t-2 border-primary/20">
+            <div className="flex items-center justify-between pt-2 sm:pt-3 border-t-2 border-primary/20">
               <div className="flex flex-col">
-                <span className="font-semibold text-base">Total Tax Payable (Annual)</span>
-                <span className="text-xs text-muted-foreground">≈ ₦{result.monthlySetAside.toLocaleString()}/month</span>
+                <span className="font-semibold text-sm sm:text-base">Total Tax Payable (Annual)</span>
+                <span className="text-[10px] sm:text-xs text-muted-foreground">≈ ₦{result.monthlySetAside.toLocaleString()}/month</span>
               </div>
               <div className="flex flex-col items-end">
-                <span className="font-bold text-xl text-primary">₦{result.totalTax.toLocaleString()}</span>
-                <span className="text-xs text-muted-foreground">
+                <span className="font-bold text-lg sm:text-xl text-primary">₦{result.totalTax.toLocaleString()}</span>
+                <span className="text-[10px] sm:text-xs text-muted-foreground">
                   Monthly: ₦{result.monthlySetAside.toLocaleString()}
                 </span>
               </div>
@@ -632,56 +632,59 @@ export function TaxBreakdown({ result, calculationInputs }: TaxBreakdownProps) {
         </div>
 
         {/* Quarterly Breakdown */}
-        <div className="bg-muted/50 rounded-lg p-4">
-          <h3 className="font-semibold text-sm mb-3">Quarterly Payment Schedule (Annual Total: ₦{result.totalTax.toLocaleString()})</h3>
-          <div className="grid grid-cols-2 gap-3">
+        <div className="bg-muted/50 rounded-lg p-3 sm:p-4">
+          <h3 className="font-semibold text-xs sm:text-sm mb-2 sm:mb-3">Quarterly Payment Schedule (Annual Total: ₦{result.totalTax.toLocaleString()})</h3>
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
             {result.quarterlyPayments.map((payment: any, index: number) => (
-              <div key={index} className="bg-background rounded p-3 text-center">
-                <p className="text-xs text-muted-foreground mb-1">{payment.quarter}</p>
-                <p className="font-semibold">₦{payment.amount.toLocaleString()}</p>
-                <p className="text-xs text-muted-foreground mt-1">Quarterly payment</p>
+              <div key={index} className="bg-background rounded p-2 sm:p-3 text-center">
+                <p className="text-[10px] sm:text-xs text-muted-foreground mb-0.5 sm:mb-1">{payment.quarter}</p>
+                <p className="font-semibold text-xs sm:text-sm">₦{payment.amount.toLocaleString()}</p>
+                <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5 sm:mt-1">Quarterly payment</p>
               </div>
             ))}
           </div>
-          <p className="text-xs text-muted-foreground mt-3 text-center">
+          <p className="text-[10px] sm:text-xs text-muted-foreground mt-2 sm:mt-3 text-center">
             💡 Each quarterly payment is 25% of your annual tax (₦{result.totalTax.toLocaleString()})
           </p>
         </div>
       </div>
 
-      <div className="flex gap-3 mt-6 pt-6 border-t border-border">
+      <div className="flex gap-2 sm:gap-3 mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-border">
         <Button
           variant="outline"
-          className="flex-1 bg-transparent"
+          className="flex-1 bg-transparent text-xs sm:text-sm h-8 sm:h-10"
           onClick={handlePrint}
           disabled={isPrinting}
         >
           {isPrinting ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Preparing...
+              <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
+              <span className="hidden sm:inline">Preparing...</span>
+              <span className="sm:hidden">Preparing</span>
             </>
           ) : (
             <>
-              <Printer className="w-4 h-4 mr-2" />
+              <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
               Print
             </>
           )}
         </Button>
         <Button
-          className="flex-1"
+          className="flex-1 text-xs sm:text-sm h-8 sm:h-10"
           onClick={handleSaveCalculation}
           disabled={isSaving || !user}
         >
           {isSaving ? (
             <>
-              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              Saving...
+              <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
+              <span className="hidden sm:inline">Saving...</span>
+              <span className="sm:hidden">Saving</span>
             </>
           ) : (
             <>
-              <FileText className="w-4 h-4 mr-2" />
-              Save Calculation
+              <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+              <span className="hidden sm:inline">Save Calculation</span>
+              <span className="sm:hidden">Save</span>
             </>
           )}
         </Button>
