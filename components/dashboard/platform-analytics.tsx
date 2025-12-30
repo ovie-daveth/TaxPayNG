@@ -539,12 +539,67 @@ export function PlatformAnalytics({ startDate, endDate }: PlatformAnalyticsProps
         </div>
       </Card>
 
-      {/* Recent Transactions per Platform - Table View */}
+      {/* Recent Transactions per Platform */}
       <Card className="p-4 sm:p-5 md:p-6">
         <h3 className="text-base sm:text-lg font-semibold mb-4">Recent Transactions by Platform</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-muted/50 border-b border-border">
+        
+        {/* Mobile Card View */}
+        <div className="md:hidden space-y-2">
+          {analytics.platforms.flatMap((platform, platformIndex) => {
+            const recentTransactions = getRecentTransactions(platform)
+            return recentTransactions.map((transaction) => {
+              const transactionDate = transaction.date || transaction.createdAt
+              const displayAmount = transaction.netAmount !== undefined 
+                ? transaction.netAmount 
+                : (typeof transaction.amount === 'number' 
+                  ? transaction.amount 
+                  : Number(String(transaction.amount).replace(/[\u20A6,]/g, '').trim()) || 0)
+              const isIncome = transaction.type === 'income'
+              
+              return (
+                <div
+                  key={transaction.id}
+                  onClick={() => handleViewTransaction(transaction)}
+                  className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-muted/50 bg-card"
+                >
+                  {/* Icon */}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isIncome ? 'bg-primary/10' : 'bg-destructive/10'}`}>
+                    {isIncome ? (
+                      <ArrowUpRight className="w-5 h-5 text-primary" />
+                    ) : (
+                      <ArrowDownRight className="w-5 h-5 text-destructive" />
+                    )}
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{transaction.description || 'Untitled transaction'}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {transactionDate ? formatDate(transactionDate) : 'N/A'}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <p className={`text-sm font-semibold ${isIncome ? 'text-primary' : 'text-foreground'}`}>
+                          {isIncome ? '+' : '-'}{formatCurrency(Math.abs(displayAmount))}
+                        </p>
+                        <span className="text-xs text-green-500">
+                          Successful
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })
+          })}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto">
+          <table className="w-full border-0 shadow-none md:border md:shadow-sm">
+            <thead className="bg-muted/50 border-b-0 md:border-b border-border">
               <tr>
                 <th className="text-left py-1.5 px-2 text-xs font-medium text-muted-foreground">Platform</th>
                 <th className="text-left py-1.5 px-2 text-xs font-medium text-muted-foreground">Date</th>
@@ -581,7 +636,7 @@ export function PlatformAnalytics({ startDate, endDate }: PlatformAnalyticsProps
                   return (
                     <tr
                       key={transaction.id}
-                      className="hover:bg-muted/30 transition-colors cursor-pointer"
+                      className="border-b-0 md:border-b border-border hover:bg-muted/30 transition-colors cursor-pointer"
                       onClick={() => handleViewTransaction(transaction)}
                     >
                       <td className="py-2 px-2 align-top">

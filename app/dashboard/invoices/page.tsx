@@ -9,7 +9,7 @@ import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Search, Filter, Download, FileText, Eye, Edit, Trash2, Send, CheckCircle2, Clock, AlertCircle, LayoutGrid, Table2, Receipt, Info, Save, Loader2 } from "lucide-react"
+import { Plus, Search, Filter, Download, FileText, Eye, Edit, Trash2, Send, CheckCircle2, Clock, AlertCircle, LayoutGrid, Table2, Receipt, Info, Save, Loader2, ArrowUpRight, ArrowDownRight } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -650,10 +650,64 @@ console.log("invoices", invoices)
           })}
         </div>
       ) : (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto w-full -mx-3 sm:-mx-4 md:mx-0 px-3 sm:px-4 md:px-0">
-            <table className={`w-full min-w-[600px] sm:min-w-[700px] md:min-w-[900px] ${!sidebarCollapsed ? 'lg:min-w-[1050px] md:min-w-[700px]' : 'lg:min-w-[800px] md:min-w-[580px]'}`}>
-              <thead className="bg-muted/50 border-b border-border">
+        <>
+          {/* Mobile Card View */}
+          <div className="md:hidden space-y-2">
+            {invoices.map((invoice) => {
+              const isIncoming = invoice.recipientUserId === profile?.userId
+              const paymentStatus = isIncoming 
+                ? (invoice.clientPaymentStatus || 'Pending')
+                : (invoice.supplierPaymentStatus || 'Pending')
+              
+              return (
+                <div
+                  key={invoice.id}
+                  onClick={() => {
+                    setSelectedInvoice(invoice)
+                    setIsViewDialogOpen(true)
+                  }}
+                  className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-muted/50 bg-card"
+                >
+                  {/* Icon */}
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isIncoming ? 'bg-destructive/10' : 'bg-primary/10'}`}>
+                    {isIncoming ? (
+                      <ArrowDownRight className="w-5 h-5 text-destructive" />
+                    ) : (
+                      <ArrowUpRight className="w-5 h-5 text-primary" />
+                    )}
+                  </div>
+                  
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {isIncoming ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {format(new Date(invoice.issueDate), "MMM dd, yyyy")}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <p className="text-sm font-semibold text-foreground">
+                          {invoice.currency} {invoice.total.toLocaleString()}
+                        </p>
+                        <span className={`text-xs ${paymentStatus === 'paid' ? 'text-green-500' : 'text-red-500'}`}>
+                          {paymentStatus}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Desktop Table View */}
+          <Card className="hidden md:block overflow-hidden border-0 shadow-none md:border md:shadow-sm">
+            <div className="overflow-x-auto w-full -mx-3 sm:-mx-4 md:mx-0 px-3 sm:px-4 md:px-0">
+              <table className={`w-full min-w-[600px] sm:min-w-[700px] md:min-w-[900px] ${!sidebarCollapsed ? 'lg:min-w-[1050px] md:min-w-[700px]' : 'lg:min-w-[800px] md:min-w-[580px]'}`}>
+                <thead className="bg-muted/50 border-b-0 md:border-b border-border">
                 <tr>
                   <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-[10px] sm:text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[140px] md:w-[160px]">Document</th>
                   <th className="text-left py-3 md:py-4 lg:py-4 px-4 md:px-5 lg:px-6 text-[10px] sm:text-xs md:text-sm lg:text-sm font-medium text-muted-foreground w-[120px] md:w-[140px]">Type</th>
@@ -673,7 +727,7 @@ console.log("invoices", invoices)
                     : (invoice.supplierPaymentStatus || 'Pending')
                   
                   return (
-                    <tr key={invoice.id} className="border-b border-border hover:bg-muted/30 transition-colors">
+                    <tr key={invoice.id} className="border-b-0 md:border-b border-border hover:bg-muted/30 transition-colors">
                       <td className="p-2 sm:p-3 md:py-3 md:py-4 lg:py-4 px-2 sm:px-3 md:px-4 md:px-5 lg:px-6 align-top max-w-[120px] sm:max-w-none">
                         <div className="font-semibold text-[10px] sm:text-xs md:text-sm lg:text-sm truncate font-medium" title={`${isIncoming ? 'Bill' : 'Invoice'} ${invoice.invoiceNumber}`}>
                           {isIncoming ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
@@ -801,8 +855,9 @@ console.log("invoices", invoices)
                 })}
               </tbody>
             </table>
-        </div>
-        </Card>
+            </div>
+          </Card>
+        </>
       )}
 
       {pagination.totalPages > 1 && (

@@ -676,21 +676,21 @@ export function AnalyticsInsights({
   }
 
   return (
-    <Card className="p-4 sm:p-5 md:p-6 space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <h3 className="text-base sm:text-lg font-semibold">Analytics insights</h3>
+    <Card className="p-3 sm:p-5 md:p-6 space-y-3 sm:space-y-4 overflow-hidden">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold truncate">Analytics insights</h3>
           </div>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">{headerText}</p>
+          <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground mt-0.5 sm:mt-1">{headerText}</p>
         </div>
-        <Badge variant="outline" className="text-xs sm:text-sm">
+        <Badge variant="outline" className="text-[10px] sm:text-xs md:text-sm self-start sm:self-auto flex-shrink-0">
           {periodType === "year" ? "Year view" : `Q${effectiveQuarter} ${effectiveYear}`}
         </Badge>
       </div>
 
-      <div className={`grid gap-3 sm:gap-4 ${!sidebarCollapsed ? 'md:grid-cols-1' : 'md:grid-cols-2'}`}>
+      <div className={`grid gap-2 sm:gap-3 md:gap-4 ${!sidebarCollapsed ? 'md:grid-cols-1' : 'md:grid-cols-2'}`}>
         {loading
           ? Array.from({ length: 4 }).map((_, index) => (
               <div key={index} className="border border-border rounded-xl p-4 space-y-3 animate-pulse">
@@ -703,38 +703,38 @@ export function AnalyticsInsights({
           : insights.map((insight) => {
               const tone = toneStyles[insight.tone]
               return (
-                <div key={insight.id} className="border border-border rounded-xl p-4 space-y-3 relative">
-                  <div className="flex items-center justify-between">
-                    <Badge variant="secondary" className={`gap-2 ${tone.badge}`}>
-                      {tone.icon}
-                      <span className="text-[10px] sm:text-xs uppercase tracking-wide">{insight.title}</span>
+                <div key={insight.id} className="border border-border rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3 relative overflow-hidden">
+                  <div className="flex items-start sm:items-center justify-between gap-2 min-w-0">
+                    <Badge variant="secondary" className={`gap-1 sm:gap-2 flex-shrink-0 ${tone.badge}`}>
+                      <span className="flex-shrink-0">{tone.icon}</span>
+                      <span className="text-[9px] sm:text-[10px] md:text-xs uppercase tracking-wide whitespace-nowrap">{insight.title}</span>
                     </Badge>
-                    <span className="text-sm font-semibold">{insight.metric}</span>
+                    <span className="text-xs sm:text-sm font-semibold whitespace-nowrap flex-shrink-0 ml-1">{insight.metric}</span>
                   </div>
-                  <div className="text-xs sm:text-sm text-muted-foreground">{insight.description}</div>
+                  <div className="text-[11px] sm:text-xs md:text-sm text-muted-foreground break-words leading-relaxed">{insight.description}</div>
                   {insight.action && (
                     <Button
                       variant="link"
                       size="sm"
-                      className="h-auto px-0 text-xs sm:text-sm font-medium"
+                      className="h-auto px-0 text-[10px] sm:text-xs md:text-sm font-medium justify-start"
                       onClick={() => handleActionClick(insight)}
                     >
-                      <Lightbulb className="h-3.5 w-3.5 mr-1 text-primary" />
-                      {insight.action}
+                      <Lightbulb className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 text-primary flex-shrink-0" />
+                      <span className="break-words">{insight.action}</span>
                     </Button>
                   )}
                   {insight.calculationDetails && (
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="absolute bottom-2 right-2 h-6 w-6 p-0 text-muted-foreground hover:text-foreground"
+                      className="absolute bottom-1.5 sm:bottom-2 right-1.5 sm:right-2 h-5 w-5 sm:h-6 sm:w-6 p-0 text-muted-foreground hover:text-foreground flex-shrink-0"
                       onClick={() => {
                         setCalculationDetails(insight.calculationDetails || null)
                         setCalculationDialogOpen(true)
                       }}
                       title="View calculation breakdown"
                     >
-                      <Info className="h-3.5 w-3.5" />
+                      <Info className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                     </Button>
                   )}
                 </div>
@@ -742,9 +742,9 @@ export function AnalyticsInsights({
             })}
       </div>
 
-      <p className="text-[11px] sm:text-xs text-muted-foreground flex items-center gap-2 pt-2 border-t border-border">
-        <ShieldCheck className="h-3.5 w-3.5 text-primary" />
-        Insights combine your logged income, expenses, and tax reliefs to surface growth and compliance opportunities.
+      <p className="text-[10px] sm:text-[11px] md:text-xs text-muted-foreground flex items-start gap-1.5 sm:gap-2 pt-2 border-t border-border">
+        <ShieldCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-primary flex-shrink-0 mt-0.5" />
+        <span className="break-words leading-relaxed">Insights combine your logged income, expenses, and tax reliefs to surface growth and compliance opportunities.</span>
       </p>
 
       <AuditSubscriptionsDialog

@@ -64,7 +64,7 @@ function LayoutContent({
         sidebarCollapsed ? "md:ml-16" : "md:ml-64"
       )}>
         <DashboardHeader />
-        <div>{children}</div>
+        <div className="pt-8 pb-16 md:pt-0 md:pb-0 -mt-7 md:-mt-0">{children}</div>
         <SubscriptionExpiryChecker />
       </div>
     </div>

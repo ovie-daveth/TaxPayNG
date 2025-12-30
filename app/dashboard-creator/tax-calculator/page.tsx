@@ -352,7 +352,7 @@ export default function CreatorTaxCalculatorPage() {
 
   return (
     <main className="px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-      <Card className="relative overflow-hidden border-primary/10 bg-gradient-to-br from-primary/5 via-transparent to-primary/5 px-6 sm:px-8 py-6 sm:py-8">
+      <Card className="hidden md:block relative overflow-hidden border-primary/10 bg-gradient-to-br from-primary/5 via-transparent to-primary/5 px-6 sm:px-8 py-6 sm:py-8">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-primary/15 flex items-center justify-center text-primary">
             <Sparkles className="w-6 h-6 sm:w-7 sm:h-7" />
@@ -363,7 +363,7 @@ export default function CreatorTaxCalculatorPage() {
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
               Estimate PAYE, personal income tax, and deductibles for your creator business. Track sponsorships, ad
-              revenue, affiliate payouts, and creator-specific expenses in one calculation designed for Nigeria’s 2025 tax rules.
+              revenue, affiliate payouts, and creator-specific expenses in one calculation designed for Nigeria's 2025 tax rules.
             </p>
             <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1">
@@ -398,23 +398,23 @@ export default function CreatorTaxCalculatorPage() {
         }}
       >
         <DialogContent className="w-[calc(100vw-1rem)] sm:w-[calc(100vw-2rem)] sm:max-w-2xl md:max-w-4xl max-h-[90vh] overflow-y-auto p-0">
+          <DialogHeader className="px-3 sm:px-4 md:px-6 pt-2 sm:pt-3 md:pt-4 pb-1.5 sm:pb-2 md:pb-3 border-b border-border">
+            <DialogTitle className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold">Tax Calculation Results</DialogTitle>
+            {(taxResult || selectedCalculation?.result) && (
+              <DialogDescription className="text-[10px] sm:text-xs md:text-sm">
+                Detailed breakdown of your tax computation for the selected period.
+                {selectedCalculation && (
+                  <span className="block mt-0.5 sm:mt-1 text-[9px] sm:text-xs">
+                    Calculated on: {format(new Date(selectedCalculation.createdAt), "dd MMM yyyy 'at' HH:mm")}
+                  </span>
+                )}
+              </DialogDescription>
+            )}
+          </DialogHeader>
           {(taxResult || selectedCalculation?.result) && (
-            <>
-              <DialogHeader className="px-3 sm:px-4 md:px-6 pt-3 sm:pt-4 md:pt-6 pb-2 sm:pb-3 md:pb-4 border-b border-border">
-                <DialogTitle className="text-lg sm:text-xl md:text-2xl font-bold">Tax Calculation Results</DialogTitle>
-                <DialogDescription className="text-xs sm:text-sm">
-                  Detailed breakdown of your tax computation for the selected period.
-                  {selectedCalculation && (
-                    <span className="block mt-1 text-xs">
-                      Calculated on: {format(new Date(selectedCalculation.createdAt), "dd MMM yyyy 'at' HH:mm")}
-                    </span>
-                  )}
-                </DialogDescription>
-              </DialogHeader>
-              <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
-                <TaxBreakdown result={taxResult || selectedCalculation?.result} />
-              </div>
-            </>
+            <div className="px-2 sm:px-3 md:px-4 lg:px-6 py-2 sm:py-3 md:py-4 lg:py-6">
+              <TaxBreakdown result={taxResult || selectedCalculation?.result} />
+            </div>
           )}
         </DialogContent>
       </Dialog>
