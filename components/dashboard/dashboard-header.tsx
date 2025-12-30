@@ -94,6 +94,18 @@ export function DashboardHeader() {
             window.dispatchEvent(event)
           })
         }
+      case "/dashboard/brand-deals":
+        return {
+          title: "Brand Deals & Sponsorships",
+          subtitle: "Manage your brand partnerships, sponsorships, and collaborations",
+          buttonText: "Add Brand Deal",
+          buttonIcon: Plus,
+          buttonAction: () => checkSubscription(() => {
+            // Trigger brand deal creation - will be handled by the brand deals page
+            const event = new CustomEvent('createBrandDeal')
+            window.dispatchEvent(event)
+          })
+        }
       case "/dashboard/tax-calculator":
         return {
           title: "Tax Calculator",

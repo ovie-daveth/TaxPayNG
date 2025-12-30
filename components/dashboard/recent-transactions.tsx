@@ -131,7 +131,7 @@ export function RecentTransactions() {
                         </div>
                         <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
                           <p className={`text-xs font-semibold whitespace-nowrap ${isIncome ? 'text-primary' : 'text-foreground'}`}>
-                            {isIncome ? '+' : '-'}{formatCurrency(Math.abs(transaction.amount))}
+                            {isIncome ? '+' : '-'}{formatCurrency(Math.abs(transaction.ngnEquivalent !== undefined && transaction.ngnEquivalent !== null ? transaction.ngnEquivalent : transaction.amount))}
                           </p>
                           <span className="text-[10px] text-green-500 whitespace-nowrap">
                             Successful
@@ -170,7 +170,7 @@ export function RecentTransactions() {
                   </div>
                   <div className="text-right flex-shrink-0 ml-2">
                     <p className={`font-semibold text-xs sm:text-sm whitespace-nowrap ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}>
-                      {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
+                      {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.ngnEquivalent !== undefined && transaction.ngnEquivalent !== null ? transaction.ngnEquivalent : transaction.amount)}
                     </p>
                   </div>
                 </div>

@@ -319,13 +319,18 @@ export function TransactionList({
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{transaction.description}</p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {formatDate(transaction.transactionDate || transaction.valueDate || transaction.date)}
-                    </p>
+                    <div className="flex flex-col gap-0.5 mt-0.5">
+                      <p className="text-xs text-muted-foreground">
+                        Created: {transaction.createdAt ? formatDate(transaction.createdAt) : '-'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        Transaction: {formatDate(transaction.transactionDate || transaction.valueDate || transaction.date)}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
                     <p className={`text-sm font-semibold ${isIncome ? 'text-primary' : 'text-foreground'}`}>
-                      {isIncome ? '+' : '-'}{formatCurrency(Math.abs(transaction.amount))}
+                      {isIncome ? '+' : '-'}{formatCurrency(Math.abs(transaction.ngnEquivalent !== undefined && transaction.ngnEquivalent !== null ? transaction.ngnEquivalent : transaction.amount))}
                     </p>
                     <span className="text-xs text-green-500">
                       Successful
@@ -341,10 +346,11 @@ export function TransactionList({
       {/* Desktop Table View */}
       <Card className="hidden md:block overflow-hidden border-0 shadow-none md:border md:shadow-sm">
         <div className="overflow-x-auto w-full">
-          <table className={`w-full ${!sidebarCollapsed ? (profile?.businessType === 'creator' ? 'min-w-[1400px]' : 'min-w-[1200px]') : (profile?.businessType === 'creator' ? 'min-w-[1300px]' : 'min-w-[1100px]')}`}>
+          <table className={`w-full ${!sidebarCollapsed ? (profile?.businessType === 'creator' ? 'min-w-[1500px]' : 'min-w-[1300px]') : (profile?.businessType === 'creator' ? 'min-w-[1400px]' : 'min-w-[1200px]')}`}>
             <thead className="bg-muted/50 border-b-0 md:border-b border-border">
             <tr>
-              <th className="text-left py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs font-medium text-muted-foreground w-[50px] md:w-[120px]">Date</th>
+              <th className="text-left py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs font-medium text-muted-foreground w-[50px] md:w-[120px]">Date Created</th>
+              <th className="text-left py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs font-medium text-muted-foreground w-[50px] md:w-[120px]">Transaction Date</th>
               <th className="text-left py-1.5 md:py-2 px-1 md:px-2 text-[10px] md:text-xs font-medium text-muted-foreground w-[20px] md:w-[130px]">Description</th>
               <th className="text-left py-1.5 md:py-2 px-1 md:px-2 text-[10px] md:text-xs font-medium text-muted-foreground w-[20px] md:w-[120px]">Category</th>
               <th className="text-left py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs font-medium text-muted-foreground w-[50px] md:w-[120px]">Payment Method</th>
@@ -374,6 +380,9 @@ export function TransactionList({
                     animation: 'highlightFade 3s ease-out forwards'
                   } : undefined}
                 >
+                  <td className="py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs align-middle">
+                    {transaction.createdAt ? formatDate(transaction.createdAt) : '-'}
+                  </td>
                   <td className="py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs align-middle">
                     {formatDate(transaction.transactionDate || transaction.valueDate || transaction.date)}
                   </td>
@@ -465,9 +474,19 @@ export function TransactionList({
                               >
                                 {transaction.type === "income" ? "+" : "-"}
                                 {/* Phase 2: Show netAmount if available for creators, otherwise show regular amount */}
-                                {profile?.businessType === 'creator' && transaction.type === 'income' && transaction.netAmount !== undefined
-                                  ? formatCurrency(transaction.netAmount)
-                                  : formatCurrency(transaction.amount)}
+                                {(() => {
+                                  // Use ngnEquivalent if available, otherwise use amount
+                                  const baseAmount = transaction.ngnEquivalent !== undefined && transaction.ngnEquivalent !== null 
+                                    ? transaction.ngnEquivalent 
+                                    : transaction.amount
+                                  // For creators, show netAmount if available, otherwise use baseAmount
+                                  if (profile?.businessType === 'creator' && transaction.type === 'income' && transaction.netAmount !== undefined) {
+                                    // If netAmount is based on foreign currency, we need to convert it
+                                    // For now, use netAmount directly (assuming it's already in the correct currency)
+                                    return formatCurrency(transaction.netAmount)
+                                  }
+                                  return formatCurrency(baseAmount)
+                                })()}
                               </span>
                             </div>
                           </TooltipTrigger>

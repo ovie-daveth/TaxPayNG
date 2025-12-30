@@ -43,7 +43,7 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     if (user) {
-      loadTransactions(currentPage, 20, filters)
+      loadTransactions(currentPage, 10, filters)
     }
   }, [user, currentPage, filters, loadTransactions])
 
@@ -51,7 +51,7 @@ export default function TransactionsPage() {
   useEffect(() => {
     const handleTransactionChanged = () => {
       if (user) {
-        loadTransactions(currentPage, 20, filters)
+        loadTransactions(currentPage, 10, filters)
       }
     }
 
@@ -153,7 +153,7 @@ export default function TransactionsPage() {
               loading={loading}
               onUpdateTransaction={updateTransaction}
               onDeleteTransaction={deleteTransaction}
-              onRefresh={() => loadTransactions(currentPage, 20, filters)}
+              onRefresh={() => loadTransactions(currentPage, 10, filters)}
             />
 
             {/* Pagination */}
