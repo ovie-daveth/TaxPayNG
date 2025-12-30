@@ -248,7 +248,7 @@ export function DashboardNavSME() {
 
       {/* Mobile Menu Sheet - Slides from left, full screen */}
       <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-        <SheetContent side="left" className="!w-full !max-w-full p-0">
+        <SheetContent side="left" className="!w-full !max-w-full p-0 flex flex-col">
           <SheetHeader>
             <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
           </SheetHeader>
@@ -302,6 +302,21 @@ export function DashboardNavSME() {
               )
             })}
           </nav>
+
+          {/* Logout Button */}
+          <div className="p-4 border-t border-border">
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setIsMobileMenuOpen(false)
+                handleLogout()
+              }}
+              className="w-full justify-start gap-4 px-4 py-3 text-base font-bold text-destructive hover:bg-destructive/10 hover:text-destructive"
+            >
+              <LogOut className="w-5 h-5 flex-shrink-0" strokeWidth={2.5} />
+              Log out
+            </Button>
+          </div>
         </SheetContent>
       </Sheet>
     </>
