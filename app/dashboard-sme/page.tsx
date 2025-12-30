@@ -25,7 +25,7 @@ export default function SMEDashboardPage() {
   ]
 
   return (
-    <div className="container mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 space-y-4 sm:space-y-6 md:space-y-8">
+    <div className="container mx-auto px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 space-y-4 sm:space-y-6 md:space-y-8 overflow-x-hidden max-w-full">
       {/* Header */}
       <div>
         <h1 className="text-xl sm:text-2xl md:text-3xl font-bold mb-1 sm:mb-2">Business Dashboard</h1>
