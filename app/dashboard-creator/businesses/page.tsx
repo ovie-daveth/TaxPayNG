@@ -46,9 +46,9 @@ export default function BusinessesPage() {
   return (
     <div className="px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-5 lg:py-6 overflow-x-hidden max-w-full">
       <Card className="p-4 sm:p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+          <div className="space-y-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
               <Building2 className="w-5 h-5 text-primary" />
               <h2 className="text-lg font-semibold">Businesses</h2>
               {isPlatinum ? (
@@ -66,7 +66,7 @@ export default function BusinessesPage() {
             <DialogTrigger asChild>
               <Button
                 size="sm"
-                className="h-9"
+                className="h-9 w-full sm:w-auto"
                 disabled={!canCreateMore || loading}
                 onClick={() => {
                   if (!isPlatinum) {
@@ -79,7 +79,7 @@ export default function BusinessesPage() {
                 New Business
               </Button>
             </DialogTrigger>
-            <DialogContent>
+            <DialogContent className="max-w-[95vw] sm:max-w-lg">
               <DialogHeader>
                 <DialogTitle>Create Business</DialogTitle>
               </DialogHeader>
@@ -108,7 +108,7 @@ export default function BusinessesPage() {
             <Card key={entity.id} className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <p className="font-semibold text-sm truncate">{entity.name}</p>
                     {isActive && (
                       <Badge variant="secondary" className="text-[10px] flex items-center gap-1">
@@ -123,11 +123,11 @@ export default function BusinessesPage() {
                 </div>
               </div>
 
-              <div className="mt-4 flex items-center gap-2">
+              <div className="mt-4 flex items-center justify-between gap-2">
                 <Button
                   variant={isActive ? "secondary" : "outline"}
                   size="sm"
-                  className="h-8"
+                  className="h-8 flex-1"
                   onClick={() => setActiveEntityId(entity.id)}
                   disabled={loading || isActive}
                 >

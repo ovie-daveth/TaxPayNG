@@ -19,6 +19,8 @@ import { useTransactions } from "@/lib/hooks/useTransactions"
 import { useSubscription } from "@/lib/hooks/useSubscription"
 import { SubscriptionRequiredModal } from "../subscription/subscription-required-modal"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { BusinessSwitcher } from "@/components/business/business-switcher"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 const navItems = [
   { href: "/dashboard-creator", label: "Dashboard", icon: LayoutDashboard },
@@ -45,6 +47,7 @@ export function DashboardNavCreator() {
   const [isAddTransactionDialogOpen, setIsAddTransactionDialogOpen] = useState(false)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [isBusinessSwitcherOpen, setIsBusinessSwitcherOpen] = useState(false)
   
   const { isSubscribed, isExpired, loading: subscriptionLoading } = useSubscription()
   const { createTransaction } = useTransactions(user?.uid || null)
@@ -277,6 +280,17 @@ export function DashboardNavCreator() {
             <Menu className="w-5 h-5 text-foreground" />
           </button>
           <div className="flex items-center gap-1.5 flex-shrink-0">
+            {profile?.subscriptionType === "PLATINUM" && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setIsBusinessSwitcherOpen(true)}
+                className="h-8 w-8"
+                aria-label="Switch business"
+              >
+                <Building2 className="w-4 h-4" />
+              </Button>
+            )}
             <NotificationBell />
             {mobileAddButton.show && (
               <Button 
@@ -439,6 +453,31 @@ export function DashboardNavCreator() {
                 )}
               </div>
             </div>
+
+            {/* PLATINUM: Business Switcher */}
+            {profile?.subscriptionType === "PLATINUM" && (
+              <div className="mt-4">
+                <p className="text-xs font-medium text-muted-foreground mb-2">Business</p>
+                <div className="flex flex-col gap-2">
+                  <BusinessSwitcher
+                    className="w-full"
+                    triggerClassName="w-full"
+                    showManageLink={false}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-center"
+                    onClick={() => {
+                      setIsMobileMenuOpen(false)
+                      router.push("/dashboard-creator/businesses")
+                    }}
+                  >
+                    Manage Businesses
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Menu Items */}
@@ -494,6 +533,33 @@ export function DashboardNavCreator() {
         onSubmit={createTransaction}
         transaction={null}
       />
+
+      {/* Mobile Business Switcher Modal (PLATINUM) */}
+      <Dialog open={isBusinessSwitcherOpen} onOpenChange={setIsBusinessSwitcherOpen}>
+        <DialogContent className="max-w-[95vw] sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base">Switch Business</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <BusinessSwitcher
+              className="w-full"
+              triggerClassName="w-full"
+              showManageLink={false}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              onClick={() => {
+                setIsBusinessSwitcherOpen(false)
+                router.push("/dashboard-creator/businesses")
+              }}
+            >
+              Manage Businesses
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       
       {/* Subscription Required Modal */}
       {(profile?.businessType !== 'agent' || !profile) && (

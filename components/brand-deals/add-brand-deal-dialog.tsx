@@ -15,6 +15,7 @@ import { brandDealService } from "@/lib/services"
 import { toast } from "sonner"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useSubscription } from "@/lib/hooks/useSubscription"
 import { useBusiness } from "@/lib/contexts/business-context"
 import { SUPPORTED_CURRENCIES, CurrencyCode, formatCurrencyInput, parseCurrencyInput, formatCurrencyAmount, fetchExchangeRate, convertCurrency } from "@/lib/utils/currency"
 import { formatDateForInput } from "@/lib/utils/date"
@@ -24,16 +25,19 @@ interface AddBrandDealDialogProps {
   onOpenChange: (open: boolean) => void
   onSuccess?: () => void
   brandDeal?: BrandDeal | null
+  onSubscriptionRequired?: () => void
 }
 
 export function AddBrandDealDialog({
   open,
   onOpenChange,
   onSuccess,
-  brandDeal
+  brandDeal,
+  onSubscriptionRequired
 }: AddBrandDealDialogProps) {
   const { user } = useAuth()
   const { profile } = useUserProfile()
+  const { isSubscribed, isExpired, loading: subscriptionLoading } = useSubscription()
   const { activeEntityId } = useBusiness()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [amountDisplay, setAmountDisplay] = useState("")
@@ -175,6 +179,14 @@ export function AddBrandDealDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Enforce subscription requirement (applies to create and update)
+    if (subscriptionLoading) return
+    if (!isSubscribed || isExpired) {
+      onSubscriptionRequired?.()
+      return
+    }
+
     if (!user?.uid || !profile?.userId) {
       toast.error("User not authenticated")
       return

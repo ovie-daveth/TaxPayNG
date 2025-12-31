@@ -26,7 +26,7 @@ export default function BrandDealsPage() {
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { activeEntityId } = useBusiness()
-  const { isSubscribed } = useSubscription()
+  const { isSubscribed, isExpired, loading: subscriptionLoading } = useSubscription()
   const [brandDeals, setBrandDeals] = useState<BrandDeal[]>([])
   const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
@@ -71,18 +71,23 @@ export default function BrandDealsPage() {
     loadBrandDeals()
   }, [profile?.userId, activeEntityId, currentPage, statusFilter, typeFilter, searchTerm])
 
+  const requireSubscription = (action: () => void) => {
+    if (subscriptionLoading) return
+    if (!isSubscribed || isExpired) {
+      setShowSubscriptionModal(true)
+      return
+    }
+    action()
+  }
+
   // Listen for create brand deal event from header
   useEffect(() => {
     const handleCreateBrandDeal = () => {
-      if (!isSubscribed) {
-        setShowSubscriptionModal(true)
-        return
-      }
-      setIsAddDialogOpen(true)
+      requireSubscription(() => setIsAddDialogOpen(true))
     }
     window.addEventListener('createBrandDeal', handleCreateBrandDeal)
     return () => window.removeEventListener('createBrandDeal', handleCreateBrandDeal)
-  }, [isSubscribed])
+  }, [isSubscribed, isExpired, subscriptionLoading])
 
   const handleDelete = async (dealId: string) => {
     if (!profile?.userId) return
@@ -154,14 +159,9 @@ export default function BrandDealsPage() {
             </p>
           </div>
           <Button
-            onClick={() => {
-              if (!isSubscribed) {
-                setShowSubscriptionModal(true)
-                return
-              }
-              setIsAddDialogOpen(true)
-            }}
+            onClick={() => requireSubscription(() => setIsAddDialogOpen(true))}
             className="w-full sm:w-auto"
+            disabled={subscriptionLoading}
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Brand Deal
@@ -228,7 +228,7 @@ export default function BrandDealsPage() {
                   : "Get started by adding your first brand deal or sponsorship"}
               </p>
               {!searchTerm && statusFilter === "all" && typeFilter === "all" && (
-                <Button onClick={() => setIsAddDialogOpen(true)}>
+                <Button onClick={() => requireSubscription(() => setIsAddDialogOpen(true))} disabled={subscriptionLoading}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Brand Deal
                 </Button>
@@ -379,8 +379,10 @@ export default function BrandDealsPage() {
                                 variant="ghost"
                                 size="sm"
                                 onClick={() => {
-                                  setSelectedBrandDeal(deal)
-                                  setIsAddDialogOpen(true)
+                                  requireSubscription(() => {
+                                    setSelectedBrandDeal(deal)
+                                    setIsAddDialogOpen(true)
+                                  })
                                 }}
                               >
                                 <Edit className="w-4 h-4" />
@@ -420,6 +422,7 @@ export default function BrandDealsPage() {
           setSelectedBrandDeal(null)
         }}
         brandDeal={selectedBrandDeal}
+        onSubscriptionRequired={() => setShowSubscriptionModal(true)}
       />
 
       {/* View Dialog */}
@@ -428,8 +431,10 @@ export default function BrandDealsPage() {
         onOpenChange={setIsViewDialogOpen}
         brandDeal={selectedBrandDeal}
         onEdit={selectedBrandDeal?.status !== "completed" && selectedBrandDeal?.status !== "cancelled" ? () => {
-          setIsViewDialogOpen(false)
-          setIsAddDialogOpen(true)
+          requireSubscription(() => {
+            setIsViewDialogOpen(false)
+            setIsAddDialogOpen(true)
+          })
         } : undefined}
         onDelete={handleDelete}
         onUpdate={loadBrandDeals}

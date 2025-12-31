@@ -505,7 +505,7 @@ console.log("invoices", invoices)
               : (invoice.supplierPaymentStatus || 'Pending')
             
             return (
-            <Card key={invoice.id} className="p-3 sm:p-4 md:p-6 hover:shadow-md transition-shadow">
+            <Card key={invoice.id} className="p-2.5 sm:p-4 md:p-6 hover:shadow-md transition-shadow">
                 <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-3 sm:gap-4">
                   <div className="flex-1 min-w-0 w-full">
                     {/* Header with document type, ID, and badges */}
@@ -531,17 +531,17 @@ console.log("invoices", invoices)
                           </TooltipContent>
                         </Tooltip>
                       )}
-                    <h3 className="text-base sm:text-lg font-semibold break-words">
+                    <h3 className="text-sm sm:text-lg font-semibold break-words">
                         {isIncoming ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
                     </h3>
                       {invoice.status === "sent" && (
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-[10px] sm:text-xs">
                           {isIncoming ? 'Incoming' : 'Outgoing'}
                   </Badge>
                       )}
                       <Badge 
                         variant="outline" 
-                        className={`text-xs capitalize ${
+                        className={`text-[10px] sm:text-xs capitalize ${
                           paymentStatus === 'paid' 
                             ? 'bg-green-500/10 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-500/20 dark:border-green-800/50' 
                             : 'bg-red-500/10 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-500/20 dark:border-red-800/50'
@@ -555,17 +555,17 @@ console.log("invoices", invoices)
                     <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-5">
                       {/* Client/From */}
                     <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
+                        <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wide">
                           {isIncoming ? 'From' : 'Client'}
                         </p>
-                        <p className="text-sm font-medium text-foreground">
+                        <p className="text-xs sm:text-sm font-medium text-foreground">
                           {isIncoming 
                             ? (invoice.supplier?.name || 'Unknown')
                             : invoice.client.name
                           }
                         </p>
                         {(isIncoming ? invoice.supplier?.email : invoice.client.email) && (
-                          <p className="text-xs text-muted-foreground mt-0.5">
+                          <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
                             {isIncoming ? invoice.supplier?.email : invoice.client.email}
                           </p>
                       )}
@@ -573,23 +573,23 @@ console.log("invoices", invoices)
                       
                       {/* Dates */}
                     <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
+                        <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wide">
                           Dates
                         </p>
-                        <p className="text-sm text-foreground">
+                        <p className="text-xs sm:text-sm text-foreground">
                           Issue: <span className="font-medium">{format(new Date(invoice.issueDate), "MMM dd, yyyy")}</span>
                         </p>
-                        <p className="text-sm text-foreground">
+                        <p className="text-xs sm:text-sm text-foreground">
                           Due: <span className="font-medium">{format(new Date(invoice.dueDate), "MMM dd, yyyy")}</span>
                         </p>
                     </div>
                       
                       {/* Amount */}
                     <div>
-                        <p className="text-xs font-medium text-muted-foreground mb-1.5 uppercase tracking-wide">
+                        <p className="text-[10px] sm:text-xs font-medium text-muted-foreground mb-1 uppercase tracking-wide">
                           Amount
                         </p>
-                        <p className="text-lg sm:text-xl font-semibold text-foreground">
+                        <p className="text-base sm:text-xl font-semibold text-foreground">
                         {invoice.currency} {invoice.total.toLocaleString()}
                       </p>
                     </div>
@@ -671,14 +671,14 @@ console.log("invoices", invoices)
                     setSelectedInvoice(invoice)
                     setIsViewDialogOpen(true)
                   }}
-                  className="flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-muted/50 bg-card"
+                  className="flex items-center gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all duration-200 hover:bg-muted/50 bg-card"
                 >
                   {/* Icon */}
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isIncoming ? 'bg-destructive/10' : 'bg-primary/10'}`}>
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${isIncoming ? 'bg-destructive/10' : 'bg-primary/10'}`}>
                     {isIncoming ? (
-                      <ArrowDownRight className="w-5 h-5 text-destructive" />
+                      <ArrowDownRight className="w-4 h-4 text-destructive" />
                     ) : (
-                      <ArrowUpRight className="w-5 h-5 text-primary" />
+                      <ArrowUpRight className="w-4 h-4 text-primary" />
                     )}
                   </div>
                   
@@ -686,18 +686,18 @@ console.log("invoices", invoices)
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-foreground truncate">
+                        <p className="text-xs font-semibold text-foreground truncate">
                           {isIncoming ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
                         </p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
+                        <p className="text-[10px] text-muted-foreground mt-0.5">
                           {format(new Date(invoice.issueDate), "MMM dd, yyyy")}
                         </p>
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        <p className="text-sm font-semibold text-foreground">
+                        <p className="text-xs font-semibold text-foreground whitespace-nowrap">
                           {invoice.currency} {invoice.total.toLocaleString()}
                         </p>
-                        <span className={`text-xs ${paymentStatus === 'paid' ? 'text-green-500' : 'text-red-500'}`}>
+                        <span className={`text-[10px] ${paymentStatus === 'paid' ? 'text-green-500' : 'text-red-500'}`}>
                           {paymentStatus}
                         </span>
                       </div>

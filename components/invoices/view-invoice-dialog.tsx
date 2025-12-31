@@ -2258,9 +2258,85 @@ export function ViewInvoiceDialog({
                       ))}
                     </div>
                   ) : (
-                    <div className="border rounded-lg overflow-hidden">
-                      <div className="overflow-x-auto -mx-2 sm:-mx-3 md:mx-0 px-2 sm:px-3 md:px-0">
-                        <table className="w-full min-w-[500px] sm:min-w-[600px]">
+                    <>
+                      {/* Mobile/Tablet (Opay-style): Card list */}
+                      <div className="lg:hidden space-y-2">
+                        {(currentInvoice?.items || invoice.items).map((item, index) => {
+                          const isCreatorInvoice = profile?.businessType === 'creator' && (currentInvoice || invoice).invoiceType === 'outgoing'
+                          const grossAmount = item.grossAmount || (item.quantity * item.unitPrice)
+                          const platformFees = item.platformFees || 0
+                          const netAmount = item.netAmount || (grossAmount - platformFees)
+                          const displayAmount = isCreatorInvoice && platformFees > 0 ? netAmount : grossAmount
+                          const itemCurrencySymbol = item.currency ? getCurrencySymbol(item.currency as any) : currencySymbol
+
+                          return (
+                            <div
+                              key={item.id || index}
+                              className="border rounded-lg p-3 bg-card"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-semibold text-foreground truncate">
+                                    {item.description || "Item"}
+                                  </p>
+                                  <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                    <span>Qty: <span className="text-foreground font-medium">{item.quantity}</span></span>
+                                    <span>
+                                      Unit: <span className="text-foreground font-medium">{itemCurrencySymbol}{item.unitPrice.toLocaleString()}</span>
+                                    </span>
+                                    {item.vatable ? (
+                                      <Badge variant="default" className="text-[10px] h-5">Vatable</Badge>
+                                    ) : (
+                                      <Badge variant="secondary" className="text-[10px] h-5">Non‑vatable</Badge>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                  <p className="text-sm font-bold text-primary whitespace-nowrap">
+                                    {formatCurrencyAmount(displayAmount, currentInvoice?.currency as any || invoice?.currency as any)}
+                                  </p>
+                                  {isCreatorInvoice && platformFees > 0 && (
+                                    <p className="text-[11px] text-muted-foreground whitespace-nowrap">
+                                      Fees: -{formatCurrencyAmount(platformFees, currentInvoice?.currency as any || invoice?.currency as any)}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Creator platform-fee breakdown */}
+                              {isCreatorInvoice && (
+                                <div className="mt-2 pt-2 border-t text-[11px] text-muted-foreground">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="truncate">Gross</span>
+                                    <span className="font-medium text-foreground whitespace-nowrap">
+                                      {formatCurrencyAmount(grossAmount, currentInvoice?.currency as any || invoice?.currency as any)}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="truncate">Platform Fees</span>
+                                    <span className={`font-medium whitespace-nowrap ${platformFees > 0 ? "text-destructive" : "text-muted-foreground"}`}>
+                                      {platformFees > 0
+                                        ? `-${formatCurrencyAmount(platformFees, currentInvoice?.currency as any || invoice?.currency as any)}`
+                                        : "—"}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="truncate">Net</span>
+                                    <span className="font-semibold text-foreground whitespace-nowrap">
+                                      {formatCurrencyAmount(netAmount, currentInvoice?.currency as any || invoice?.currency as any)}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+
+                      {/* Desktop: Table */}
+                      <div className="hidden lg:block border rounded-lg overflow-hidden">
+                        <div className="overflow-x-auto -mx-2 sm:-mx-3 md:mx-0 px-2 sm:px-3 md:px-0">
+                          <table className="w-full min-w-[500px] sm:min-w-[600px]">
                           <thead className="bg-muted/50">
                             <tr>
                               <th className="text-left p-2 sm:p-3 text-xs sm:text-sm font-semibold">Description</th>
@@ -2347,6 +2423,7 @@ export function ViewInvoiceDialog({
                         </table>
                       </div>
                     </div>
+                    </>
                   )}
               </Card>
           </div>
