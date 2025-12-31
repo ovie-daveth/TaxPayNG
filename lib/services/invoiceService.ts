@@ -138,6 +138,10 @@ export class InvoiceService extends BaseService {
       // Apply all filters client-side
       let filtered = allInvoices
 
+      if (filters?.entityId) {
+        filtered = filtered.filter(inv => inv.entityId === filters.entityId)
+      }
+
       if (filters?.status) {
         filtered = filtered.filter(inv => inv.status === filters.status)
       }
@@ -584,6 +588,7 @@ export class InvoiceService extends BaseService {
         const description = `Bill payment made: ${invoice.invoiceNumber}`
         
         const transactionData: any = {
+          entityId: invoice.entityId,
           type: 'expense' as const,
           category: 'purchases',
           amount: invoice.total,
@@ -739,6 +744,7 @@ export class InvoiceService extends BaseService {
         const clientReceiptUrl = invoice.clientReceiptUrl
         
         const transactionData: any = {
+          entityId: invoice.entityId,
           type: 'income' as const,
           category: invoice.items[0]?.description || 'sales',
           amount: invoice.netAmount || invoice.total, // Use net amount if platform fees exist

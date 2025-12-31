@@ -3,8 +3,10 @@
 import { useState, useEffect, useCallback } from 'react'
 import { transactionService } from '@/lib/services'
 import { Transaction, TransactionFilters, PaginatedResponse } from '@/lib/types'
+import { useBusiness } from '@/lib/contexts/business-context'
 
 export function useTransactions(userId: string | null) {
+  const { activeEntityId } = useBusiness()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -21,7 +23,11 @@ export function useTransactions(userId: string | null) {
     setError(null)
 
     try {
-      const result = await transactionService.getUserTransactions(userId, filters, page, pageSize)
+      const effectiveFilters: TransactionFilters | undefined = {
+        ...(filters || {}),
+        entityId: activeEntityId || undefined,
+      }
+      const result = await transactionService.getUserTransactions(userId, effectiveFilters, page, pageSize)
       console.log("result from loadTransactions:", result)
       setTransactions(result.data)
       setPagination(result.pagination)
@@ -30,7 +36,7 @@ export function useTransactions(userId: string | null) {
     } finally {
       setLoading(false)
     }
-  }, [userId])
+  }, [userId, activeEntityId])
 
   const createTransaction = useCallback(async (transactionData: Omit<Transaction, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
     if (!userId) return { success: false, error: 'User not authenticated' }
@@ -40,7 +46,11 @@ export function useTransactions(userId: string | null) {
     setError(null)
 
     try {
-      const result = await transactionService.createTransaction(userId, transactionData)
+      const payload = {
+        ...transactionData,
+        entityId: (transactionData as any).entityId ?? activeEntityId ?? undefined,
+      } as any
+      const result = await transactionService.createTransaction(userId, payload)
       if (result.success && result.data) {
         // Add new transaction to the beginning of the list
         setTransactions(prev => {
@@ -63,7 +73,7 @@ export function useTransactions(userId: string | null) {
     } finally {
       setLoading(false)
     }
-  }, [userId])
+  }, [userId, activeEntityId])
 
   const updateTransaction = useCallback(async (transactionId: string, updateData: Partial<Transaction>) => {
     console.log("updateData from updateTransaction:", updateData)
@@ -120,23 +130,23 @@ export function useTransactions(userId: string | null) {
     if (!userId) return null
 
     try {
-      return await transactionService.getTransactionSummary(userId, startDate, endDate)
+      return await transactionService.getTransactionSummary(userId, startDate, endDate, activeEntityId || undefined)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get transaction summary')
       return null
     }
-  }, [userId])
+  }, [userId, activeEntityId])
 
   const getRecentTransactions = useCallback(async (limit: number = 10) => {
     if (!userId) return []
 
     try {
-      return await transactionService.getRecentTransactions(userId, limit)
+      return await transactionService.getRecentTransactions(userId, limit, activeEntityId || undefined)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to get recent transactions')
       return []
     }
-  }, [userId])
+  }, [userId, activeEntityId])
 
   useEffect(() => {
     if (userId) {

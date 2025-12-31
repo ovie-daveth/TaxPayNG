@@ -21,7 +21,6 @@ import { toast } from "sonner"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
 import { User, Building2, CreditCard, Bell, Shield, Upload, X, CheckCircle2, Loader2, ExternalLink, HelpCircle, MessageSquare, Mail, Send } from "lucide-react"
-import { SupportModal } from "@/components/support/support-modal"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
 import { useSubscription } from "@/lib/hooks/useSubscription"
 import { subscriptionService } from "@/lib/services/subscriptionService"
@@ -108,7 +107,6 @@ export default function SettingsPage() {
     category: 'general'
   })
   const [isSendingSupport, setIsSendingSupport] = useState(false)
-  const [showSupportModal, setShowSupportModal] = useState(false)
 
   // Loading state: show skeleton while auth or profile is loading
   const isLoading = authLoading || profileLoading
@@ -1820,10 +1818,12 @@ export default function SettingsPage() {
                           onClick={() => {
                             // Get WhatsApp number from environment or use default
                             const whatsappNumber = process.env.NEXT_PUBLIC_WHATSAPP_NUMBER || '2348128543248'
+                            const subscriptionInfo = subscriptionType ? `Subscription: ${subscriptionType}` : 'Subscription: None'
                             const whatsappMessage = encodeURIComponent(
                               `Hello! I need support with OTax.\n\n` +
                               `My email: ${user?.email || 'N/A'}\n` +
-                              `User ID: ${user?.uid || 'N/A'}\n\n` +
+                              `User ID: ${user?.uid || 'N/A'}\n` +
+                              `${subscriptionInfo}\n\n` +
                               `How can you help me?`
                             )
                             const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`
@@ -1885,20 +1885,6 @@ export default function SettingsPage() {
         />
       )}
 
-      {/* Support Modal (Mobile) */}
-      <SupportModal 
-        open={showSupportModal} 
-        onOpenChange={setShowSupportModal} 
-      />
-
-      {/* Floating Support Button (Mobile & Tablet Only) */}
-      <button
-        onClick={() => setShowSupportModal(true)}
-        className="fixed bottom-20 right-4 z-50 md:hidden w-10 h-10 bg-primary text-primary-foreground rounded-full shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center hover:scale-110 active:scale-95"
-        aria-label="Get Support"
-      >
-        <HelpCircle className="w-4 h-4" />
-      </button>
     </>
   )
 }

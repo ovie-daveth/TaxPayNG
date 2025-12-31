@@ -24,11 +24,20 @@ Based on analysis of the pricing page vs. actual implementation, here's what rem
 
 ### ❌ Not Implemented:
 1. **Sponsorship & Brand Deal Management**
-   - ❌ No dedicated brand deal tracking system
-   - ❌ No sponsorship contract management
-   - ❌ No brand deal calendar/timeline
+   - ✅ Dedicated brand deal tracking system implemented
+   - ✅ Sponsorship contract management (contract URL, signed status, signed date)
+   - ⚠️ Brand deal calendar/timeline (dates tracked but no calendar view)
    - ❌ No brand deal-specific reporting
-   - **Current State**: Categories exist ("Brand Sponsorship", "Brand Deal") but no dedicated management interface
+   - **Current State**: Full brand deal management interface with:
+     - Create, read, update, delete operations
+     - Payment milestone tracking
+     - Brand contact information management
+     - Contract management
+     - Transaction linking (can create transaction from completed brand deal)
+     - Status tracking (pending, in_progress, completed, cancelled)
+     - Multiple deal types (sponsorship, collaboration, endorsement, affiliate, other)
+     - Currency conversion support
+     - Available in creator dashboard navigation
 
 2. **SMS Reminders**
    - ❌ No SMS notification service integration (Twilio, Termii, etc.)
@@ -68,11 +77,13 @@ Based on analysis of the pricing page vs. actual implementation, here's what rem
 
 ### ❌ Not Implemented:
 1. **Multi-Entity Business Management**
-   - ❌ No multiple business entity management
-   - ❌ No entity switching/selection
-   - ❌ No separate financial tracking per entity
+   - 🚧 **Coming Soon (PLATINUM roadmap)**: Not implemented yet
+   - ❌ No multiple business entity management (create/manage multiple businesses under one account)
+   - ❌ No entity switching/selection (active business context)
+   - ❌ No separate financial tracking per entity (transactions/invoices/docs scoped to an entity)
    - ❌ No consolidated reporting across entities
    - **Current State**: Single business entity per user
+   - **Implementation Notes (future)**: Introduce `businessEntities` + `activeEntityId`, add `entityId` to core financial collections, migrate existing records to a default entity, and enforce rules/queries by `(userId, entityId)`.
 
 2. **Custom Report Templates**
    - ❌ No custom report template builder

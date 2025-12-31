@@ -6,6 +6,7 @@ import { Bar, BarChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Responsive
 import { useAuth } from "@/lib/hooks/useAuth"
 import { transactionService } from "@/lib/services/transactionService"
 import { toast } from "sonner"
+import { useBusiness } from "@/lib/contexts/business-context"
 
 interface IncomeExpenseChartProps {
   periodType?: PeriodType
@@ -104,6 +105,7 @@ export function IncomeExpenseChart({
   selectedQuarter
 }: IncomeExpenseChartProps) {
   const { user } = useAuth()
+  const { activeEntityId } = useBusiness()
   const now = new Date()
   const currentYear = now.getFullYear()
   const currentQuarter = Math.floor(now.getMonth() / 3) + 1
@@ -150,7 +152,8 @@ export function IncomeExpenseChart({
         const transactions = await transactionService.getTransactionsForPeriod(
           user.uid,
           periodStart.toISOString(),
-          periodEnd.toISOString()
+          periodEnd.toISOString(),
+          activeEntityId || undefined
         )
 
         const buckets = buildEmptyChartDataForPeriod(periodStart, periodEnd).reduce<Record<string, ChartPoint>>((acc, point) => {
@@ -159,16 +162,19 @@ export function IncomeExpenseChart({
         }, {})
 
         transactions.forEach((transaction) => {
-          const txnDate = new Date(transaction.date)
+          const dateString = transaction.transactionDate || transaction.valueDate || transaction.date
+          const txnDate = new Date(dateString)
           const bucketKey = `${txnDate.getFullYear()}-${txnDate.getMonth()}`
           const bucket = buckets[bucketKey]
 
           if (!bucket) return
 
           if (transaction.type === "income") {
-            bucket.income += Number(transaction.amount) || 0
+            const amt = transaction.ngnEquivalent ?? transaction.amount
+            bucket.income += Number(amt) || 0
           } else if (transaction.type === "expense") {
-            bucket.expenses += Number(transaction.amount) || 0
+            const amt = transaction.ngnEquivalent ?? transaction.amount
+            bucket.expenses += Number(amt) || 0
           }
         })
 
@@ -205,7 +211,7 @@ export function IncomeExpenseChart({
       isMounted = false
       window.removeEventListener("transactionChanged", handleTransactionChanged)
     }
-  }, [user?.uid, periodType, effectiveYear, effectiveQuarter])
+  }, [user?.uid, periodType, effectiveYear, effectiveQuarter, activeEntityId])
 
   const chartDescription = useMemo(() => {
     if (periodType === "year") {

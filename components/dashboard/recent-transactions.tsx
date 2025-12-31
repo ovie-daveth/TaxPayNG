@@ -14,11 +14,13 @@ import { format } from "date-fns"
 import { ViewTransactionDialog } from "@/components/transactions/view-transaction-dialog"
 import { formatCurrencyAmount } from "@/lib/utils/currency"
 import { formatDate } from "@/lib/utils/date"
+import { useBusiness } from "@/lib/contexts/business-context"
 
 export function RecentTransactions() {
   const { user } = useAuth()
   const pathname = usePathname()
   const { getRecentTransactions } = useTransactions(user?.uid || null)
+  const { activeEntityId } = useBusiness()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
@@ -60,7 +62,7 @@ export function RecentTransactions() {
     return () => {
       window.removeEventListener("transactionChanged", handleTransactionChanged)
     }
-  }, [user, getRecentTransactions])
+  }, [user, getRecentTransactions, activeEntityId])
 
   const handleView = (transaction: Transaction) => {
     setViewingTransaction(transaction)
@@ -131,7 +133,7 @@ export function RecentTransactions() {
                         </div>
                         <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
                           <p className={`text-xs font-semibold whitespace-nowrap ${isIncome ? 'text-primary' : 'text-foreground'}`}>
-                            {isIncome ? '+' : '-'}{formatCurrency(Math.abs(transaction.amount))}
+                            {isIncome ? '+' : '-'}{formatCurrency(Math.abs(transaction.ngnEquivalent !== undefined && transaction.ngnEquivalent !== null ? transaction.ngnEquivalent : transaction.amount))}
                           </p>
                           <span className="text-[10px] text-green-500 whitespace-nowrap">
                             Successful
@@ -170,7 +172,7 @@ export function RecentTransactions() {
                   </div>
                   <div className="text-right flex-shrink-0 ml-2">
                     <p className={`font-semibold text-xs sm:text-sm whitespace-nowrap ${transaction.type === "income" ? "text-primary" : "text-destructive"}`}>
-                      {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.amount)}
+                      {transaction.type === "income" ? "+" : "-"}{formatCurrency(transaction.ngnEquivalent !== undefined && transaction.ngnEquivalent !== null ? transaction.ngnEquivalent : transaction.amount)}
                     </p>
                   </div>
                 </div>

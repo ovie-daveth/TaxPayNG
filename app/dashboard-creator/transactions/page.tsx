@@ -12,9 +12,11 @@ import { TransactionsSkeleton } from "@/components/ui/skeletons"
 import { TransactionFilters as TransactionFiltersType } from "@/lib/types"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { GenerateReportModal } from "@/components/transactions/generate-report-modal"
+import { useBusiness } from "@/lib/contexts/business-context"
 
 export default function TransactionsPage() {
   const { user } = useAuth()
+  const { activeEntityId } = useBusiness()
   const [isFilterOpen, setIsFilterOpen] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [filters, setFilters] = useState<TransactionFiltersType>({})
@@ -43,7 +45,7 @@ export default function TransactionsPage() {
 
   useEffect(() => {
     if (user) {
-      loadTransactions(currentPage, 20, filters)
+      loadTransactions(currentPage, 10, filters)
     }
   }, [user, currentPage, filters, loadTransactions])
 
@@ -51,7 +53,7 @@ export default function TransactionsPage() {
   useEffect(() => {
     const handleTransactionChanged = () => {
       if (user) {
-        loadTransactions(currentPage, 20, filters)
+        loadTransactions(currentPage, 10, filters)
       }
     }
 
@@ -61,6 +63,14 @@ export default function TransactionsPage() {
       window.removeEventListener('transactionChanged', handleTransactionChanged)
     }
   }, [user, currentPage, filters, loadTransactions])
+
+  // Reload when business changes
+  useEffect(() => {
+    if (user) {
+      loadTransactions(currentPage, 10, filters)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeEntityId])
 
   if (loading && transactions.length === 0) {
     return (
@@ -153,7 +163,7 @@ export default function TransactionsPage() {
               loading={loading}
               onUpdateTransaction={updateTransaction}
               onDeleteTransaction={deleteTransaction}
-              onRefresh={() => loadTransactions(currentPage, 20, filters)}
+              onRefresh={() => loadTransactions(currentPage, 10, filters)}
             />
 
             {/* Pagination */}

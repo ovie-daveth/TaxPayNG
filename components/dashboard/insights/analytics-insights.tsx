@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/hooks/useAuth"
 import { transactionService } from "@/lib/services/transactionService"
 import type { Transaction } from "@/lib/types"
 import { toast } from "sonner"
+import { useBusiness } from "@/lib/contexts/business-context"
 import { AddTransactionDialog } from "@/components/transactions/add-transaction-dialog"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { faqData } from "@/app/faq/components/data"
@@ -132,6 +133,7 @@ export function AnalyticsInsights({
   sidebarCollapsed = true
 }: AnalyticsInsightsProps) {
   const { user } = useAuth()
+  const { activeEntityId } = useBusiness()
   const now = new Date()
   const currentYear = now.getFullYear()
   const currentQuarter = Math.floor(now.getMonth() / 3) + 1
@@ -515,18 +517,21 @@ export function AnalyticsInsights({
           transactionService.getTransactionsForPeriod(
             user.uid,
             currentPeriodStart.toISOString(),
-            currentPeriodEnd.toISOString()
+            currentPeriodEnd.toISOString(),
+            activeEntityId || undefined
           ),
           transactionService.getTransactionsForPeriod(
             user.uid,
             previousPeriodStart.toISOString(),
-            previousPeriodEnd.toISOString()
+            previousPeriodEnd.toISOString(),
+            activeEntityId || undefined
           ),
           // Fetch all transactions from the start of the year to now for accurate projections
           transactionService.getTransactionsForPeriod(
             user.uid,
             yearStart.toISOString(),
-            yearEnd.toISOString()
+            yearEnd.toISOString(),
+            activeEntityId || undefined
           )
         ])
         
@@ -578,7 +583,10 @@ export function AnalyticsInsights({
       return { success: false, error: "Not authenticated" }
     }
 
-    const result = await transactionService.createTransaction(user.uid, data)
+    const result = await transactionService.createTransaction(user.uid, {
+      ...data,
+      entityId: (data as any).entityId ?? activeEntityId ?? undefined,
+    } as any)
     if (result.success) {
       setTransactionDialogOpen(false)
       setTransactionPreset(null)
@@ -616,7 +624,8 @@ export function AnalyticsInsights({
       const transactions = await transactionService.getTransactionsForPeriod(
         uid,
         periodStart.toISOString(),
-        periodEnd.toISOString()
+        periodEnd.toISOString(),
+        activeEntityId || undefined
       )
 
       const subscriptionTransactions = transactions.filter(

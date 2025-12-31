@@ -128,9 +128,12 @@ export class BaseService {
     const prepared = { ...data }
     
     if (includeTimestamps) {
-      prepared.updatedAt = serverTimestamp()
-      // Only set createdAt if it doesn't already exist (to preserve explicit ISO strings)
-      if (!prepared.id && !prepared.createdAt) {
+      // Only set updatedAt to serverTimestamp if it's not already provided as a string (preserve ISO strings)
+      if (typeof prepared.updatedAt !== 'string') {
+        prepared.updatedAt = serverTimestamp()
+      }
+      // Only set createdAt to serverTimestamp if it doesn't already exist as a string (preserve ISO strings)
+      if (!prepared.id && typeof prepared.createdAt !== 'string') {
         prepared.createdAt = serverTimestamp()
       }
     }

@@ -153,8 +153,17 @@ export function PlatformAnalytics({ startDate, endDate }: PlatformAnalyticsProps
     )
   }
 
-  if (!analytics || analytics.platforms.length === 0) {
-    return null // Don't show empty state on main dashboard
+  if (!analytics || analytics.platforms.length === 0 || analytics.totalTransactions === 0) {
+    return (
+      <Card className="p-4 sm:p-5 md:p-6">
+        <div className="py-10 sm:py-12 text-center">
+          <h3 className="text-sm sm:text-base font-semibold">No data available yet</h3>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-1 max-w-md mx-auto">
+            Once you start recording income/expenses and selecting a platform, your platform analytics will show here.
+          </p>
+        </div>
+      </Card>
+    )
   }
 
   // Prepare chart data

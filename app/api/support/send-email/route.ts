@@ -6,6 +6,7 @@ interface SupportEmailRequest {
   subject: string
   message: string
   category?: string
+  subscriptionType?: string
 }
 
 export async function POST(request: NextRequest) {
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest) {
     const userName = userRecord.displayName || userEmail.split('@')[0]
 
     const body: SupportEmailRequest = await request.json()
-    const { subject, message, category } = body
+    const { subject, message, category, subscriptionType } = body
 
     if (!subject || !message) {
       return NextResponse.json(
@@ -66,6 +67,7 @@ User Information:
 - Name: ${userName}
 - Email: ${userEmail}
 - User ID: ${userId}
+- Subscription: ${subscriptionType || 'None'}
 ${category ? `- Category: ${category}` : ''}
 
 Subject: ${subject}
@@ -96,6 +98,7 @@ Reply directly to this email to respond to the user.
             <p><strong>Name:</strong> ${userName}</p>
             <p><strong>Email:</strong> <a href="mailto:${userEmail}">${userEmail}</a></p>
             <p><strong>User ID:</strong> ${userId}</p>
+            <p><strong>Subscription:</strong> ${subscriptionType || 'None'}</p>
             ${category ? `<p><strong>Category:</strong> ${category}</p>` : ''}
           </div>
           

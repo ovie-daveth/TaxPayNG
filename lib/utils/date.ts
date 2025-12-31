@@ -6,22 +6,24 @@
  * Convert a Firestore timestamp or date string to a JavaScript Date object
  */
 export function toDate(dateInput: any): Date {
-  // Handle Firestore Timestamp object
-  if (dateInput && typeof dateInput === 'object' && dateInput.seconds) {
-    return new Date(dateInput.seconds * 1000)
-  } 
+  // Handle Firestore Timestamp object with toDate method
+  if (dateInput && typeof dateInput === 'object' && typeof dateInput.toDate === 'function') {
+    return dateInput.toDate()
+  }
+  // Handle Firestore Timestamp object with seconds property
+  if (dateInput && typeof dateInput === 'object' && dateInput.seconds !== undefined) {
+    return new Date(dateInput.seconds * 1000 + (dateInput.nanoseconds || 0) / 1000000)
+  }
   // Handle ISO string or regular date string
-  else if (typeof dateInput === 'string') {
+  if (typeof dateInput === 'string') {
     return new Date(dateInput)
   }
   // Handle Date object
-  else if (dateInput instanceof Date) {
+  if (dateInput instanceof Date) {
     return dateInput
   }
   // Fallback to current date
-  else {
-    return new Date()
-  }
+  return new Date()
 }
 
 /**

@@ -16,6 +16,7 @@ import { useReminders } from "@/lib/hooks/useReminders"
 import { useSubscription } from "@/lib/hooks/useSubscription"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { SubscriptionRequiredModal } from "../subscription/subscription-required-modal"
+import { BusinessSwitcher } from "@/components/business/business-switcher"
 
 export function DashboardHeader() {
   const pathname = usePathname()
@@ -93,6 +94,26 @@ export function DashboardHeader() {
             const event = new CustomEvent('createInvoice')
             window.dispatchEvent(event)
           })
+        }
+      case "/dashboard/brand-deals":
+        return {
+          title: "Brand Deals & Sponsorships",
+          subtitle: "Manage your brand partnerships, sponsorships, and collaborations",
+          buttonText: "Add Brand Deal",
+          buttonIcon: Plus,
+          buttonAction: () => checkSubscription(() => {
+            // Trigger brand deal creation - will be handled by the brand deals page
+            const event = new CustomEvent('createBrandDeal')
+            window.dispatchEvent(event)
+          })
+        }
+      case "/dashboard/businesses":
+        return {
+          title: "Businesses",
+          subtitle: "Create and switch between your businesses. Data is scoped to the active business.",
+          buttonText: undefined,
+          buttonIcon: undefined,
+          buttonAction: undefined
         }
       case "/dashboard/tax-calculator":
         return {
@@ -229,6 +250,7 @@ export function DashboardHeader() {
             )}
           </div>
           <div className="hidden md:flex md:flex-row items-center gap-1 md:gap-1 lg:gap-2 flex-shrink-0 justify-end md:justify-start">
+            <BusinessSwitcher className="mr-2" />
             <div className="hidden md:flex items-center gap-1">
               <NotificationBell />
               <ThemeToggle />

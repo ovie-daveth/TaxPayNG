@@ -45,6 +45,19 @@ export interface UserProfile {
   isSubscribe?: boolean
   subscriptionType?: SubscriptionType
   subscriptionExpiryDate?: string // ISO string - when subscription expires (31 days from payment)
+  /**
+   * Multi-Entity Business Management (PLATINUM):
+   * The currently active business entity context for this user.
+   */
+  activeEntityId?: string
+  /**
+   * The default/initial entity created for this user (used for one-time migrations).
+   */
+  defaultEntityId?: string
+  /**
+   * Multi-Entity migration flag/version. Increment when changing migration logic.
+   */
+  entityMigrationVersion?: number
   subscriptionStartDate?: string // ISO string - when user first subscribed (for tracking loyal customers)
   lastSubscriptionDate?: string // ISO string - when user last renewed subscription
   renewalCount?: number // Number of times user has renewed (for tracking loyal customers)
@@ -58,6 +71,27 @@ export interface UserProfile {
   agentKycCompleted?: boolean // Whether agent has completed KYC
   // Creator-specific fields
   platformConnections?: PlatformConnection[] // Saved platform connections for creators
+}
+
+// Business Entity (Multi-Entity Business Management)
+export interface BusinessEntity {
+  id: string
+  userId: string
+  name: string
+  /**
+   * Optional notes/description shown in UI.
+   */
+  description?: string
+  /**
+   * If set, used as default currency for this business context.
+   */
+  currency?: string
+  /**
+   * Helps with UX; does not change access rules.
+   */
+  isDefault?: boolean
+  createdAt: string
+  updatedAt: string
 }
 
 // Platform connection for creators
@@ -109,6 +143,11 @@ export interface TaxPeriod {
 export interface Transaction {
   id: string
   userId: string
+  /**
+   * Multi-Entity Business Management:
+   * All transactions belong to a business entity.
+   */
+  entityId?: string
   type: TransactionType
   category: string
   amount: number
@@ -165,6 +204,7 @@ export interface Transaction {
 }
 
 export interface TransactionFilters {
+  entityId?: string
   type?: TransactionType
   category?: string
   paymentMethod?: string
@@ -397,6 +437,11 @@ export interface InvoiceSupplier {
 export interface Invoice {
   id: string
   userId: string // Owner of the invoice (who created it)
+  /**
+   * Multi-Entity Business Management:
+   * All invoices belong to a business entity.
+   */
+  entityId?: string
   invoiceNumber: string // Auto-generated (e.g., INV-2024-001)
   invoiceType: InvoiceType // 'outgoing' = you send to clients, 'incoming' = received from another OTax user
   status: InvoiceStatus
@@ -541,6 +586,7 @@ export interface WHTCreditNote {
 }
 
 export interface InvoiceFilters {
+  entityId?: string
   status?: InvoiceStatus
   invoiceType?: InvoiceType
   clientId?: string
@@ -627,6 +673,84 @@ export interface SavedReport {
 
 // Filing Request Types
 export type FilingRequestStatus = 'pending' | 'assigned' | 'in_progress' | 'completed' | 'cancelled'
+
+// Brand Deal Types
+export type BrandDealStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled'
+export type BrandDealType = 'sponsorship' | 'collaboration' | 'endorsement' | 'affiliate' | 'other'
+
+export interface BrandDeal {
+  id: string
+  userId: string
+  /**
+   * Multi-Entity Business Management:
+   * All brand deals belong to a business entity.
+   */
+  entityId?: string
+  brandName: string
+  brandContact?: {
+    name?: string
+    email?: string
+    phone?: string
+    company?: string
+  }
+  dealType: BrandDealType
+  status: BrandDealStatus
+  title: string
+  description?: string
+  
+  // Financial details
+  amount: number
+  currency: string
+  exchangeRate?: number // Exchange rate used to convert to NGN (locked at deal creation)
+  ngnEquivalent?: number // NGN equivalent amount (locked at deal creation)
+  paymentTerms?: string // e.g., "Net 30", "50% upfront, 50% on completion"
+  paymentSchedule?: {
+    type: 'single' | 'milestone' | 'recurring'
+    milestones?: Array<{
+      label: string
+      amount: number
+      dueDate: string
+      paid: boolean
+      paidDate?: string
+    }>
+  }
+  
+  // Dates
+  startDate: string
+  endDate?: string
+  deliveryDate?: string // When content needs to be delivered
+  paymentDate?: string // When payment was received
+  
+  // Content/Service details
+  deliverables?: string[] // List of deliverables (e.g., "3 Instagram posts", "1 YouTube video")
+  contentRequirements?: string // Requirements or guidelines for content
+  platform?: string[] // Platforms where content will be published (e.g., ["Instagram", "YouTube"])
+  
+  // Contract & documents
+  contractUrl?: string // Link to contract document
+  contractSigned?: boolean
+  contractSignedDate?: string
+  
+  // Linked transaction (if deal payment was recorded as income)
+  linkedTransactionId?: string
+  
+  // Additional information
+  notes?: string
+  tags?: string[]
+  
+  // Tracking
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BrandDealFilters {
+  entityId?: string
+  status?: BrandDealStatus
+  dealType?: BrandDealType
+  brandName?: string
+  startDate?: string
+  endDate?: string
+}
 
 export interface FilingRequest {
   id: string
