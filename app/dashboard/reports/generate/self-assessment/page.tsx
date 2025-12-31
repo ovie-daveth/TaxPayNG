@@ -16,6 +16,7 @@ import { ArrowLeft, FileText, Download, Loader2, Info, Calculator, Shield } from
 import { SelfAssessmentPreview } from "@/components/reports/self-assessment-preview"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useBusiness } from "@/lib/contexts/business-context"
 import { useSubscription } from "@/lib/hooks/useSubscription"
 import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { reportService, ReportData } from "@/lib/services"
@@ -26,6 +27,7 @@ export default function GenerateSelfAssessmentPage() {
   const searchParams = useSearchParams()
   const { user } = useAuth()
   const { profile } = useUserProfile()
+  const { activeEntityId } = useBusiness()
   const { isSubscribed } = useSubscription()
   const [showPreview, setShowPreview] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -168,12 +170,16 @@ export default function GenerateSelfAssessmentPage() {
             profile.userId,
             selectedPlatform,
             period,
-            false // includeInvoices = false (use only transactions)
+            false, // includeInvoices = false (use only transactions)
+            activeEntityId || undefined,
+            profile.defaultEntityId
           )
         : await reportService.generateReportData(
             profile.userId,
             period,
-            false // includeInvoices = false (use only transactions)
+            false, // includeInvoices = false (use only transactions)
+            activeEntityId || undefined,
+            profile.defaultEntityId
           )
 
       // Generate report title
@@ -250,7 +256,8 @@ export default function GenerateSelfAssessmentPage() {
           title,
           'Self-Assessment',
           reportDataToSave,
-          'draft' // Save as draft initially
+          'draft', // Save as draft initially
+          activeEntityId || undefined
         )
         setReportId(savedReportId)
         toast.success("Report saved successfully")

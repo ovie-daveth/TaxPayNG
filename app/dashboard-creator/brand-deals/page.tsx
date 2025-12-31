@@ -168,45 +168,47 @@ export default function BrandDealsPage() {
           </Button>
         </div>
 
-        {/* Filters */}
+        {/* Filters (match invoices mobile layout) */}
         <Card className="p-3 sm:p-4">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                <Input
-                  placeholder="Search by brand name, title..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+            <div className="relative flex-1 min-w-0">
+              <Search className="absolute left-2.5 sm:left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              <Input
+                placeholder="Search by brand name, title..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-8 sm:pl-10 h-9 sm:h-10 text-xs sm:text-sm"
+              />
             </div>
-            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as BrandDealStatus | "all")}>
-              <SelectTrigger className="w-full sm:w-[150px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="in_progress">In Progress</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="cancelled">Cancelled</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as BrandDealType | "all")}>
-              <SelectTrigger className="w-full sm:w-[150px]">
-                <SelectValue placeholder="Type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="sponsorship">Sponsorship</SelectItem>
-                <SelectItem value="collaboration">Collaboration</SelectItem>
-                <SelectItem value="endorsement">Endorsement</SelectItem>
-                <SelectItem value="affiliate">Affiliate</SelectItem>
-                <SelectItem value="other">Other</SelectItem>
-              </SelectContent>
-            </Select>
+
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-2 sm:flex-shrink-0">
+              <Select value={typeFilter} onValueChange={(value) => setTypeFilter(value as BrandDealType | "all")}>
+                <SelectTrigger className="h-9 sm:h-10 text-xs sm:text-sm w-full sm:w-[150px]">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="sponsorship">Sponsorship</SelectItem>
+                  <SelectItem value="collaboration">Collaboration</SelectItem>
+                  <SelectItem value="endorsement">Endorsement</SelectItem>
+                  <SelectItem value="affiliate">Affiliate</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as BrandDealStatus | "all")}>
+                <SelectTrigger className="h-9 sm:h-10 text-xs sm:text-sm w-full sm:w-[150px]">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </Card>
 
@@ -240,20 +242,20 @@ export default function BrandDealsPage() {
             {/* Mobile Card View */}
             <div className="md:hidden space-y-3">
               {filteredDeals.map((deal) => (
-                <Card key={deal.id} className="p-4">
-                  <div className="flex items-start justify-between gap-3 mb-3">
+                <Card key={deal.id} className="p-2.5">
+                  <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-semibold text-sm truncate">{deal.brandName}</h3>
-                        {getStatusBadge(deal.status)}
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <h3 className="text-xs font-semibold truncate">{deal.brandName}</h3>
+                        <div className="scale-[0.92] origin-left">{getStatusBadge(deal.status)}</div>
                       </div>
-                      <p className="text-xs text-muted-foreground truncate">{deal.title}</p>
+                      <p className="text-[10px] text-muted-foreground truncate">{deal.title}</p>
                       <div className="flex items-center gap-2 mt-2">
-                        <Badge variant="outline" className="text-xs">
+                        <Badge variant="outline" className="text-[10px]">
                           {getTypeLabel(deal.dealType)}
                         </Badge>
                         <div className="flex flex-col">
-                          <span className="text-xs font-semibold text-primary">
+                          <span className="text-xs font-semibold text-primary whitespace-nowrap">
                             {formatCurrencyAmount(
                               deal.ngnEquivalent !== undefined 
                                 ? deal.ngnEquivalent 
@@ -270,7 +272,7 @@ export default function BrandDealsPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 pt-3 border-t">
+                  <div className="flex items-center gap-2 pt-2 border-t">
                     <Button
                       variant="outline"
                       size="sm"
@@ -278,7 +280,7 @@ export default function BrandDealsPage() {
                         setSelectedBrandDeal(deal)
                         setIsViewDialogOpen(true)
                       }}
-                      className="flex-1 text-xs"
+                      className="flex-1 text-xs h-8"
                     >
                       <Eye className="w-3 h-3 mr-1" />
                       View
@@ -291,7 +293,7 @@ export default function BrandDealsPage() {
                           setSelectedBrandDeal(deal)
                           setIsAddDialogOpen(true)
                         }}
-                        className="flex-1 text-xs"
+                        className="flex-1 text-xs h-8"
                       >
                         <Edit className="w-3 h-3 mr-1" />
                         Edit
@@ -301,7 +303,7 @@ export default function BrandDealsPage() {
                       variant="outline"
                       size="sm"
                       onClick={() => handleDelete(deal.id)}
-                      className="text-destructive"
+                      className="text-destructive h-8 px-2.5"
                     >
                       <Trash2 className="w-3 h-3" />
                     </Button>

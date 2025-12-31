@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useBusiness } from "@/lib/contexts/business-context"
 import { toast } from "sonner"
 import { format } from "date-fns"
 import { 
@@ -29,6 +30,7 @@ export default function FilingRequestsPage() {
   const router = useRouter()
   const { user } = useAuth()
   const { profile } = useUserProfile()
+  const { activeEntityId } = useBusiness()
   const [requests, setRequests] = useState<FilingRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -44,7 +46,10 @@ export default function FilingRequestsPage() {
 
     try {
       setLoading(true)
-      const response = await fetch(`/api/filing-requests?userId=${user.uid}`)
+      const params = new URLSearchParams({ userId: user.uid })
+      if (activeEntityId) params.set("entityId", activeEntityId)
+      if (profile?.defaultEntityId) params.set("defaultEntityId", profile.defaultEntityId)
+      const response = await fetch(`/api/filing-requests?${params.toString()}`)
       const result = await response.json()
 
       if (result.success) {

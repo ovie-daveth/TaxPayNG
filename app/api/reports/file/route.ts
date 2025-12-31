@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
     }
 
     const report = { id: reportDoc.id, ...reportDoc.data() } as any
+    const reportEntityId: string | undefined = report?.entityId || undefined
 
     // Calculate taxes already paid during the year
     // This should match Part D of the self-assessment (Tax Already Paid/Credits)
@@ -43,7 +44,10 @@ export async function POST(request: NextRequest) {
       .get()
     
     const allInvoices = invoicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-    const whtFromInvoices = allInvoices
+    const scopedInvoices = reportEntityId
+      ? allInvoices.filter((inv: any) => inv.entityId === reportEntityId)
+      : allInvoices
+    const whtFromInvoices = scopedInvoices
       .filter((inv: any) => 
         inv.invoiceType === 'outgoing' && 
         inv.whtDeducted && 
@@ -58,7 +62,10 @@ export async function POST(request: NextRequest) {
       .get()
     
     const allTransactions = transactionsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-    const whtFromTransactions = allTransactions
+    const scopedTransactions = reportEntityId
+      ? allTransactions.filter((txn: any) => txn.entityId === reportEntityId)
+      : allTransactions
+    const whtFromTransactions = scopedTransactions
       .filter((txn: any) => {
         if (!txn.txnDate) return false
         const txnDate = txn.txnDate?.toDate ? txn.txnDate.toDate() : new Date(txn.txnDate)
@@ -77,7 +84,10 @@ export async function POST(request: NextRequest) {
       .get()
     
     const allPayments = paymentsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }))
-    const periodPayments = allPayments.filter((payment: any) => {
+    const scopedPayments = reportEntityId
+      ? allPayments.filter((p: any) => p.entityId === reportEntityId)
+      : allPayments
+    const periodPayments = scopedPayments.filter((payment: any) => {
       if (payment.status !== 'completed') return false
       const paymentDate = payment.createdAt?.toDate ? payment.createdAt.toDate() : new Date(payment.createdAt)
       return paymentDate >= periodStart && paymentDate <= periodEnd

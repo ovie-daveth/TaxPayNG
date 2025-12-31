@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { CheckCircle2, Download, FileText, Mail, UserCheck, Loader2, ArrowLeft, FileCheck } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useBusiness } from "@/lib/contexts/business-context"
 import { reportService, documentService } from "@/lib/services"
 import { SavedReport } from "@/lib/types"
 import { toast } from "sonner"
@@ -36,6 +37,7 @@ export default function PaymentSuccessPage() {
   const reportId = params?.reportId as string
   const { user } = useAuth()
   const { profile, loading: profileLoading } = useUserProfile()
+  const { activeEntityId } = useBusiness()
   const [report, setReport] = useState<SavedReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [savingReceipt, setSavingReceipt] = useState(false)
@@ -205,7 +207,8 @@ export default function PaymentSuccessPage() {
           state: selectedState,
           reportId: report.id,
           rrr: paymentData.rrr || undefined,
-          supportingDocuments: documentIds
+          supportingDocuments: documentIds,
+          entityId: activeEntityId || undefined
         }),
       })
 

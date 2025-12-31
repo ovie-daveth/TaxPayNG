@@ -6,6 +6,8 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
+    const entityId = searchParams.get('entityId')
+    const defaultEntityId = searchParams.get('defaultEntityId')
 
     if (!userId) {
       return NextResponse.json(
@@ -30,6 +32,12 @@ export async function GET(request: NextRequest) {
           ...data,
           createdAt: data.createdAt || new Date().toISOString()
         } as { id: string; createdAt: string; [key: string]: any }
+      })
+      .filter((r) => {
+        if (!entityId) return true
+        // Backwards compatibility: legacy requests without entityId belong to the default entity.
+        const isLegacyDefault = !r.entityId && defaultEntityId && entityId === defaultEntityId
+        return r.entityId === entityId || isLegacyDefault
       })
       .sort((a, b) => {
         const dateA = new Date(a.createdAt).getTime()

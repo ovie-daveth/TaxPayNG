@@ -14,6 +14,7 @@ import { ArrowLeft, FileText, Download, Loader2, Info, Calculator, Shield } from
 import { SelfAssessmentPreview } from "@/components/reports/self-assessment-preview"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useBusiness } from "@/lib/contexts/business-context"
 import { useSubscription } from "@/lib/hooks/useSubscription"
 import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { reportService, ReportData } from "@/lib/services"
@@ -24,6 +25,7 @@ export default function GenerateSelfAssessmentPageContent() {
   const searchParams = useSearchParams()
   const { user } = useAuth()
   const { profile } = useUserProfile()
+  const { activeEntityId } = useBusiness()
   const { isSubscribed } = useSubscription()
   const [showPreview, setShowPreview] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -158,12 +160,16 @@ export default function GenerateSelfAssessmentPageContent() {
             profile.userId,
             selectedPlatform,
             period,
-            false
+            false,
+            activeEntityId || undefined,
+            profile.defaultEntityId
           )
         : await reportService.generateReportData(
             profile.userId,
             period,
-            false
+            false,
+            activeEntityId || undefined,
+            profile.defaultEntityId
           )
 
       const periodLabel = period.periodType === 'annual' 
@@ -233,7 +239,8 @@ export default function GenerateSelfAssessmentPageContent() {
           title,
           'Self-Assessment',
           reportDataToSave,
-          'draft'
+          'draft',
+          activeEntityId || undefined
         )
         setReportId(savedReportId)
         toast.success("Report saved successfully")

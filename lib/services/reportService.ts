@@ -104,7 +104,9 @@ export class ReportService extends BaseService {
     userId: string,
     platformName: string,
     period: ReportPeriod,
-    includeInvoices: boolean = true
+    includeInvoices: boolean = true,
+    entityId?: string,
+    defaultEntityId?: string
   ): Promise<ReportData> {
     // Get all transactions for the user
     const allTransactions = await transactionService.getAll([
@@ -117,8 +119,12 @@ export class ReportService extends BaseService {
     const periodEnd = new Date(period.endDate)
     periodEnd.setHours(23, 59, 59, 999)
 
-    // Filter transactions by platform and period
+    // Filter transactions by platform, entity and period
     const filteredTransactions = allTransactions.filter((txn) => {
+      if (entityId) {
+        const isLegacyDefault = !txn.entityId && defaultEntityId && entityId === defaultEntityId
+        if (txn.entityId !== entityId && !isLegacyDefault) return false
+      }
       const txnDate = txn.date ? new Date(txn.date) : new Date(txn.createdAt)
       const inPeriod = txnDate >= periodStart && txnDate <= periodEnd
       const matchesPlatform = txn.platform?.name === platformName
@@ -130,10 +136,18 @@ export class ReportService extends BaseService {
     if (includeInvoices) {
       const invoicesResponse = await invoiceService.getUserInvoices(userId)
       const allInvoices = invoicesResponse.data || []
-      invoices = allInvoices.filter((inv) => {
-        const invDate = new Date(inv.issueDate)
-        return invDate >= periodStart && invDate <= periodEnd
-      })
+      invoices = allInvoices
+        .filter((inv) => {
+          if (entityId) {
+            const isLegacyDefault = !inv.entityId && defaultEntityId && entityId === defaultEntityId
+            if (inv.entityId !== entityId && !isLegacyDefault) return false
+          }
+          return true
+        })
+        .filter((inv) => {
+          const invDate = new Date(inv.issueDate)
+          return invDate >= periodStart && invDate <= periodEnd
+        })
     }
 
     // Calculate income and expense data (only for this platform)
@@ -220,7 +234,9 @@ export class ReportService extends BaseService {
   async generateReportData(
     userId: string,
     period: ReportPeriod,
-    includeInvoices: boolean = true
+    includeInvoices: boolean = true,
+    entityId?: string,
+    defaultEntityId?: string
   ): Promise<ReportData> {
     try {
       // Get user profile
@@ -253,6 +269,10 @@ export class ReportService extends BaseService {
       // Filter transactions by period
       // BUT: Include capital asset transactions from previous years (for depreciation calculation)
       const filteredTransactions = allTransactions.filter((txn) => {
+        if (entityId) {
+          const isLegacyDefault = !txn.entityId && defaultEntityId && entityId === defaultEntityId
+          if (txn.entityId !== entityId && !isLegacyDefault) return false
+        }
         const txnDate = txn.date ? new Date(txn.date) : new Date(txn.createdAt)
         const isInPeriod = txnDate >= periodStart && txnDate <= periodEnd
         
@@ -289,10 +309,18 @@ export class ReportService extends BaseService {
       if (includeInvoices) {
         const invoicesResponse = await invoiceService.getUserInvoices(userId)
         const allInvoices = invoicesResponse.data || []
-        invoices = allInvoices.filter((inv) => {
-          const invDate = new Date(inv.issueDate)
-          return invDate >= periodStart && invDate <= periodEnd
-        })
+        invoices = allInvoices
+          .filter((inv) => {
+            if (entityId) {
+              const isLegacyDefault = !inv.entityId && defaultEntityId && entityId === defaultEntityId
+              if (inv.entityId !== entityId && !isLegacyDefault) return false
+            }
+            return true
+          })
+          .filter((inv) => {
+            const invDate = new Date(inv.issueDate)
+            return invDate >= periodStart && invDate <= periodEnd
+          })
       }
 
       // Calculate income data
@@ -863,10 +891,12 @@ export class ReportService extends BaseService {
     title: string,
     type: 'Self-Assessment' | 'Income Statement' | 'Expense Report' | 'Tax Summary',
     reportData: ReportData,
-    status: 'draft' | 'completed' | 'submitted' = 'completed'
+    status: 'draft' | 'completed' | 'submitted' = 'completed',
+    entityId?: string
   ): Promise<string> {
     try {
       const report = {
+        entityId,
         userId,
         title,
         type,
@@ -890,7 +920,7 @@ export class ReportService extends BaseService {
   }
 
   // Get all reports for a user from all collections
-  async getUserReports(userId: string): Promise<SavedReport[]> {
+  async getUserReports(userId: string, entityId?: string, defaultEntityId?: string): Promise<SavedReport[]> {
     try {
       const allReports: SavedReport[] = []
       
@@ -901,7 +931,13 @@ export class ReportService extends BaseService {
         try {
           const baseService = new BaseService(collectionName)
           const reports = await baseService.getAll([{ field: 'userId', operator: '==', value: userId }])
-          allReports.push(...reports)
+          const filtered = entityId
+            ? (reports as any[]).filter((r) => {
+                const isLegacyDefault = !r.entityId && defaultEntityId && entityId === defaultEntityId
+                return r.entityId === entityId || isLegacyDefault
+              })
+            : reports
+          allReports.push(...(filtered as any))
         } catch (error) {
           // Collection might not exist yet, skip it
           console.log(`Collection ${collectionName} not found or empty, skipping`)
