@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useRef, useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Card } from "@/components/ui/card"
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ArrowLeft, FileText, Download, Loader2, Info, Calculator, Shield } from "lucide-react"
-import { SelfAssessmentPreview } from "@/components/reports/self-assessment-preview"
+import { SelfAssessmentPreview, type SelfAssessmentPreviewHandle } from "@/components/reports/self-assessment-preview"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { useBusiness } from "@/lib/contexts/business-context"
@@ -33,6 +33,7 @@ export default function GenerateSelfAssessmentPageContent() {
   const [reportId, setReportId] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const selfAssessmentRef = useRef<SelfAssessmentPreviewHandle | null>(null)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -202,7 +203,11 @@ export default function GenerateSelfAssessmentPageContent() {
 
     setIsSaving(true)
     try {
-      const period = reportData.period
+      const prepared = await selfAssessmentRef.current?.prepareForSave?.()
+      const dataToSave = prepared || reportData
+      if (prepared) setReportData(prepared)
+
+      const period = dataToSave.period
       const periodLabel = period.periodType === 'annual' 
         ? `Annual ${period.year}`
         : period.quarter 
@@ -212,15 +217,15 @@ export default function GenerateSelfAssessmentPageContent() {
       const title = `Self-Assessment Filing${platformLabel} - ${periodLabel}`
 
       const reportDataToSave = {
-        ...reportData,
+        ...dataToSave,
         metadata: {
-          ...(reportData as any).metadata,
-          personalInfo: (reportData as any).metadata?.personalInfo || {},
-          attachments: (reportData as any).metadata?.attachments || {},
-          reliefEvidence: (reportData as any).metadata?.reliefEvidence || {},
-          reliefNotes: (reportData as any).metadata?.reliefNotes || {},
-          manualTaxCredits: (reportData as any).metadata?.manualTaxCredits || [],
-          declarationInfo: (reportData as any).metadata?.declarationInfo || {}
+          ...(dataToSave as any).metadata,
+          personalInfo: (dataToSave as any).metadata?.personalInfo || {},
+          attachments: (dataToSave as any).metadata?.attachments || {},
+          reliefEvidence: (dataToSave as any).metadata?.reliefEvidence || {},
+          reliefNotes: (dataToSave as any).metadata?.reliefNotes || {},
+          manualTaxCredits: (dataToSave as any).metadata?.manualTaxCredits || [],
+          declarationInfo: (dataToSave as any).metadata?.declarationInfo || {}
         }
       }
 
@@ -466,6 +471,7 @@ export default function GenerateSelfAssessmentPageContent() {
               </Card>
               {reportData ? (
                 <SelfAssessmentPreview 
+                  ref={selfAssessmentRef}
                   reportData={reportData} 
                   formData={formData}
                   isEditing={isEditing}

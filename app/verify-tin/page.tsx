@@ -149,64 +149,43 @@ export default function VerifyTaxIdPage() {
     setIsVerifying(true)
 
     try {
-      // Mock API call to validate Tax ID format.
-      // In production, replace with actual verification API call if/when available.
-      const mockVerifyTaxId = async (taxIdValue: string) => {
-        // Simulate API call delay
-        await new Promise(resolve => setTimeout(resolve, 1500))
-        
-        // Mock: Accept Tax ID if it's 13 digits (common format in Nigeria)
-        if (taxIdValue.length === 13 && /^\d+$/.test(taxIdValue)) {
-          return { valid: true, data: { name: profile?.firstName + " " + profile?.lastName } }
-        }
-        return { valid: false, message: 'Invalid Tax ID format' }
+      // Check if Tax ID is already taken by another user
+      const isTaken = await userService.isTaxIdTaken(taxId, user.uid)
+
+      if (isTaken) {
+        toast.error('This Tax ID has already been registered by another user. Please contact support if you believe this is an error.')
+        return
       }
 
-      const verificationResult = await mockVerifyTaxId(taxId)
-      
-      if (verificationResult.valid) {
-        // Check if Tax ID is already taken by another user
-        const isTaken = await userService.isTaxIdTaken(taxId, user.uid)
-        
-        if (isTaken) {
-          toast.error('This Tax ID has already been registered by another user. Please contact support if you believe this is an error.')
-          setIsVerifying(false)
-          return
-        }
-        
-        // Update user profile with Tax ID
-        setIsLoading(true)
-        const result = await userService.upsertProfile(user.uid, {
-          taxId
-        })
+      // Save Tax ID to profile (no mock verification)
+      setIsLoading(true)
+      const result = await userService.upsertProfile(user.uid, { taxId })
+      setIsLoading(false)
 
-        setIsLoading(false)
+      if (!result.success) {
+        toast.error(result.error || 'Failed to save Tax ID. Please try again.')
+        return
+      }
 
-        if (result.success) {
-          toast.success('Tax ID saved successfully!')
-          // Refetch profile to get updated data
-          await refetchProfile()
-          
-          // Get updated profile data
-          const updatedProfile = await userService.getProfile(user.uid)
-          
-          // Check if user is SME - they need to upload documents
-          if (updatedProfile?.businessType === 'sme') {
-            setTinVerified(true)
-            setShowDocumentUpload(true)
-          } else {
-            // Freelancer - go directly to dashboard
-            router.push("/dashboard")
-          }
-        } else {
-          toast.error('Failed to save Tax ID. Please try again.')
-        }
+      toast.success('Tax ID saved successfully!')
+
+      // Refetch profile to get updated data
+      await refetchProfile()
+
+      // Get updated profile data
+      const updatedProfile = await userService.getProfile(user.uid)
+
+      // Check if user is SME - they need to upload documents
+      if (updatedProfile?.businessType === 'sme') {
+        setTinVerified(true)
+        setShowDocumentUpload(true)
       } else {
-        toast.error(verificationResult.message || 'Invalid Tax ID. Please check and try again.')
+        // Freelancer - go directly to dashboard
+        router.push("/dashboard")
       }
     } catch (error) {
       toast.error('An error occurred while saving your Tax ID. Please try again.')
-      console.error('Tax ID save/validation error:', error)
+      console.error('Tax ID save error:', error)
     } finally {
       setIsVerifying(false)
     }
@@ -434,18 +413,8 @@ export default function VerifyTaxIdPage() {
                     maxLength={13}
                     required 
                     disabled={isVerifying || isLoading}
-                    className="text-base sm:text-lg flex-1"
+                    className="h-10 sm:h-11 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm flex-1"
                   />
-                  <button
-                    type="button"
-                    onClick={handleVerifyTaxIdPortal}
-                    disabled={isVerifying || isLoading}
-                    className="flex-shrink-0 w-10 h-10 sm:w-11 sm:h-11 flex items-center justify-center rounded-lg border-2 border-border hover:border-primary hover:bg-primary/5 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    aria-label="Open FIRS Tax ID portal"
-                    title="Open FIRS Tax ID portal"
-                  >
-                    <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground hover:text-primary transition-colors" />
-                  </button>
                 </div>
                 <p className="text-xs text-muted-foreground">
                   Tax ID is typically an 13-digit number used for tax identification in Nigeria.
@@ -483,26 +452,27 @@ export default function VerifyTaxIdPage() {
             </div>
 
             {/* Get Tax ID Section */}
-            {/* <div className="bg-muted/50 border border-border rounded-lg p-4 sm:p-6">
+            <div className="bg-muted/50 border border-border rounded-lg p-4 sm:p-6">
               <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
                 <div className="w-10 h-10 bg-accent/10 rounded-lg flex items-center justify-center flex-shrink-0">
                   <ExternalLink className="w-5 h-5 text-accent" />
                 </div>
                 <div className="flex-1 w-full">
-                  <h3 className="font-semibold mb-2 text-sm sm:text-base">Don't have a Tax ID yet?</h3>
+                  <h3 className="font-semibold mb-2 text-sm sm:text-base">Don't have know your Tax ID?</h3>
                   <p className="text-xs sm:text-sm text-muted-foreground mb-4">
-                    You can request a Tax ID using the official FIRS Tax ID portal.
+                    You can retrieve your Tax ID using the official FIRS Tax ID portal.
                   </p>
-                  <Button 
+                  <button
                     type="button"
-                    variant="outline" 
-                    onClick={handleGetTaxId}
+                    onClick={handleVerifyTaxIdPortal}
                     disabled={isVerifying || isLoading}
-                    className="w-full sm:w-auto"
+                    className="w-full sm:w-auto text-xs sm:text-sm font-semibold border border-border rounded-lg p-2 sm:p-3 flex items-center justify-center gap-2 cursor-pointer"
+                    aria-label="Open FIRS Tax ID portal"
+                    title="Open FIRS Tax ID portal"
                   >
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    Get Tax ID (FIRS Portal)
-                  </Button>
+                    Retrieve Tax ID (FIRS Portal)
+                    <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground hover:text-primary transition-colors" />
+                  </button>
                   <p className="text-xs text-muted-foreground mt-3 sm:hidden">
                     Having trouble on mobile? Allow pop-ups for OTax so the portal can open in a new window.
                   </p>
@@ -520,7 +490,7 @@ export default function VerifyTaxIdPage() {
                   )}
                 </div>
               </div>
-            </div> */}
+            </div>
 
             {/* Skip Option - Only show for freelancers */}
             {profile?.businessType !== 'sme' && (

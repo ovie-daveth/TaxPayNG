@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -13,14 +13,14 @@ import { reportService, ReportData } from "@/lib/services"
 import { toast } from "sonner"
 import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { IncomeStatementPreview } from "@/components/reports/income-statement-preview"
-import { SelfAssessmentPreview } from "@/components/reports/self-assessment-preview"
+import { SelfAssessmentPreview, type SelfAssessmentPreviewHandle } from "@/components/reports/self-assessment-preview"
 import { ExpenseReportPreview } from "@/components/reports/expense-report-preview"
 
 interface GenerateReportModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   reportType: 'income' | 'expense' | 'self-assessment'
-  transactions?: any[] // For expense, we can use current transactions
+  transactions?: any[]
 }
 
 export function GenerateReportModal({
@@ -39,23 +39,23 @@ export function GenerateReportModal({
   const [savedReportId, setSavedReportId] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const selfAssessmentRef = useRef<SelfAssessmentPreviewHandle | null>(null)
   const [formData, setFormData] = useState({
     taxYear: new Date().getFullYear().toString(),
     period: 'annual' as 'annual' | 'q1' | 'q2' | 'q3' | 'q4',
-    includeInvoices: reportType === 'income' // Only for income report
+    includeInvoices: reportType === 'income'
   })
 
-  // Calculate period dates based on year and period
   const getPeriodDates = (year: number, period: string) => {
     const now = new Date()
     const currentYear = now.getFullYear()
-    const currentMonth = now.getMonth() + 1 // 1-12
+    const currentMonth = now.getMonth() + 1
 
     if (period === 'annual') {
       return {
         startDate: `${year}-01-01`,
         endDate: year === currentYear 
-          ? now.toISOString().split('T')[0] // Today's date
+          ? now.toISOString().split('T')[0]
           : `${year}-12-31`,
         periodType: 'annual' as const
       }
@@ -69,9 +69,8 @@ export function GenerateReportModal({
     }
 
     const quarter = quarters[period]
-    // If current year and current quarter, use today as end date; otherwise use quarter end
     const endDate = (year === currentYear && currentMonth <= quarter.endMonth)
-      ? now.toISOString().split('T')[0] // Today's date
+      ? now.toISOString().split('T')[0]
       : quarter.end
     
     return {
@@ -82,14 +81,12 @@ export function GenerateReportModal({
     }
   }
 
-  const handleGenerate = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleGenerate = async () => {
     if (!user?.uid || !profile?.userId) {
       toast.error("Please log in to generate reports")
       return
     }
 
-    // Check subscription
     if (!isSubscribed) {
       setShowSubscriptionModal(true)
       return
@@ -108,15 +105,12 @@ export function GenerateReportModal({
         periodType: periodInfo.periodType
       }
 
-      // Generate report data
-      // For expense report, use only transaction data (no invoices)
       const data = await reportService.generateReportData(
         profile.userId,
         period,
         reportType === 'income' ? formData.includeInvoices : false
       )
 
-      // Generate report title
       const periodLabel = period.periodType === 'annual' 
         ? `Annual ${period.year}`
         : period.quarter 
@@ -129,7 +123,6 @@ export function GenerateReportModal({
         ? `Expense Report - ${periodLabel}`
         : `Self-Assessment Filing - ${periodLabel}`
 
-      // Save the report and show preview
       let reportId: string | null = null
       if (reportType === 'income') {
         reportId = await reportService.saveReport(
@@ -141,7 +134,6 @@ export function GenerateReportModal({
         )
         toast.success("Income statement generated and saved successfully")
       } else if (reportType === 'expense') {
-        // For expense report, save as Expense Report type
         reportId = await reportService.saveReport(
           profile.userId,
           title,
@@ -151,16 +143,12 @@ export function GenerateReportModal({
         )
         toast.success("Expense report generated and saved")
       } else {
-        // For self-assessment, don't save yet - wait for user to edit and click save
-        // reportId will remain null until user clicks "Save Report"
         toast.success("Self-assessment report generated. Please review and save when ready.")
       }
       
-      // Show preview instead of closing
       setReportData(data)
       setSavedReportId(reportId)
       setShowPreview(true)
-      // For self-assessment, start in editing mode
       if (reportType === 'self-assessment') {
         setIsEditing(true)
       }
@@ -171,78 +159,6 @@ export function GenerateReportModal({
       setIsGenerating(false)
     }
   }
-
-  const handleExport = async () => {
-    if (!reportData) {
-      toast.error("No report data available")
-      return
-    }
-
-    try {
-      setIsGenerating(true)
-      
-      // Combine all transactions from income and expenses
-      const allTransactions = [
-        ...(reportData.income.transactions || []),
-        ...(reportData.expenses.transactions || [])
-      ]
-      
-      // Remove duplicates based on transaction ID
-      const uniqueTransactions = Array.from(
-        new Map(allTransactions.map(t => [t.id, t])).values()
-      )
-      
-      const exportData = uniqueTransactions.map(t => ({
-        date: t.transactionDate || t.valueDate || t.date || '',
-        description: t.description || '',
-        category: t.category || '',
-        amount: typeof t.amount === 'number' ? t.amount : Number(String(t.amount).replace(/[\u20A6,]/g, '').trim()) || 0,
-        type: t.type || '',
-        paymentMethod: t.paymentMethod || '',
-        currency: t.currency || 'NGN',
-        ngnEquivalent: t.ngnEquivalent || (typeof t.amount === 'number' ? t.amount : Number(String(t.amount).replace(/[\u20A6,]/g, '').trim()) || 0),
-        notes: t.notes || ''
-      }))
-      
-      const csv = [
-        ['Date', 'Description', 'Category', 'Amount', 'Currency', 'NGN Equivalent', 'Type', 'Payment Method', 'Notes'],
-        ...exportData.map(t => [
-          t.date || '',
-          `"${(t.description || '').replace(/"/g, '""')}"`,
-          t.category || '',
-          t.amount.toString(),
-          t.currency,
-          t.ngnEquivalent.toString(),
-          t.type,
-          t.paymentMethod || '',
-          `"${(t.notes || '').replace(/"/g, '""')}"`
-        ])
-      ].map(row => row.join(',')).join('\n')
-      
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-      const url = window.URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      const periodLabel = reportData.period.periodType === 'annual' 
-        ? `Annual-${reportData.period.year}`
-        : reportData.period.quarter 
-        ? `Q${reportData.period.quarter}-${reportData.period.year}`
-        : `${reportData.period.startDate}-${reportData.period.endDate}`
-      a.download = `transactions-export-${periodLabel}-${new Date().toISOString().split('T')[0]}.csv`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      window.URL.revokeObjectURL(url)
-      
-      toast.success("Transactions exported successfully")
-    } catch (error) {
-      console.error('Error exporting transactions:', error)
-      toast.error("Failed to export transactions")
-    } finally {
-      setIsGenerating(false)
-    }
-  }
-
 
   const getReportTitle = () => {
     switch (reportType) {
@@ -270,7 +186,6 @@ export function GenerateReportModal({
     }
   }
 
-  // Handle saving self-assessment report
   const handleSave = async () => {
     if (!reportData || !profile?.userId) {
       toast.error("Missing report information")
@@ -279,40 +194,41 @@ export function GenerateReportModal({
 
     setIsSaving(true)
     try {
-      // Generate report title
-      const periodLabel = reportData.period.periodType === 'annual' 
-        ? `Annual ${reportData.period.year}`
-        : reportData.period.quarter 
-        ? `Q${reportData.period.quarter} ${reportData.period.year}`
-        : `${new Date(reportData.period.startDate).toLocaleDateString()} - ${new Date(reportData.period.endDate).toLocaleDateString()}`
+      // Upload signature (if any) only at save time
+      const prepared = await selfAssessmentRef.current?.prepareForSave?.()
+      const dataToSave = prepared || reportData
+      if (prepared) setReportData(prepared)
+
+      const periodLabel = dataToSave.period.periodType === 'annual' 
+        ? `Annual ${dataToSave.period.year}`
+        : dataToSave.period.quarter 
+        ? `Q${dataToSave.period.quarter} ${dataToSave.period.year}`
+        : `${new Date(dataToSave.period.startDate).toLocaleDateString()} - ${new Date(dataToSave.period.endDate).toLocaleDateString()}`
       
       const title = `Self-Assessment Filing - ${periodLabel}`
 
       if (savedReportId) {
-        // Update existing report
         await reportService.updateReport(
           savedReportId,
           'Self-Assessment',
           {
-            reportData,
+            reportData: dataToSave,
             updatedAt: new Date().toISOString()
           }
         )
         toast.success("Report updated successfully")
       } else {
-        // Create new report (first time saving)
         const reportId = await reportService.saveReport(
           profile.userId,
           title,
           'Self-Assessment',
-          reportData,
+          dataToSave,
           'draft'
         )
         setSavedReportId(reportId)
         toast.success("Report saved successfully")
       }
 
-      // Exit editing mode and show file button
       setIsEditing(false)
     } catch (error) {
       console.error("Error saving report:", error)
@@ -322,12 +238,10 @@ export function GenerateReportModal({
     }
   }
 
-  // Handle data changes from self-assessment preview
   const handleDataChange = (updatedData: ReportData) => {
     setReportData(updatedData)
   }
 
-  // Reset preview when modal closes
   const handleClose = (open: boolean) => {
     if (!open) {
       setShowPreview(false)
@@ -341,17 +255,31 @@ export function GenerateReportModal({
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className={`${showPreview ? 'max-w-5xl' : 'max-w-2xl'} max-h-[90vh] overflow-y-auto`}>
+        <DialogContent
+          className={[
+            "left-0 top-0 translate-x-0 translate-y-0 w-screen h-[100dvh] rounded-none",
+            "sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:w-full sm:h-auto sm:rounded-lg",
+            showPreview ? "sm:max-w-5xl" : "sm:max-w-2xl",
+            "overflow-hidden p-0 gap-0",
+          ].join(" ")}
+        >
           {showPreview && reportData ? (
-            // Show preview
-            <div className="px-6 py-4">
-              <DialogHeader className="mb-4">
-                <DialogTitle className="flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
-                  {getReportTitle()} - Preview
-                </DialogTitle>
-              </DialogHeader>
-              <div className="max-h-[calc(90vh-120px)] overflow-y-auto">
+            <div className="flex flex-col h-[100dvh] sm:max-h-[90vh]">
+              <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur px-3 py-2.5 sm:px-6 sm:py-4 pr-10 sm:pr-12">
+                <div className="flex items-center justify-between gap-2 sm:gap-3">
+                  <div className="min-w-0 flex-1">
+                    <DialogTitle className="text-sm sm:text-lg font-semibold truncate">
+                      {getReportTitle()} - Preview
+                    </DialogTitle>
+                    <DialogDescription className="text-[10px] sm:text-sm line-clamp-1 sm:line-clamp-2">
+                      Review your report. You can edit fields and file when ready.
+                    </DialogDescription>
+                  </div>
+                  <FileText className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-muted-foreground" />
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-auto px-3 py-3 sm:px-6 sm:pb-4">
                 {reportType === 'income' ? (
                   <IncomeStatementPreview
                     reportData={reportData}
@@ -373,8 +301,9 @@ export function GenerateReportModal({
                     }}
                   />
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     <SelfAssessmentPreview
+                      ref={selfAssessmentRef}
                       reportData={reportData}
                       reportId={savedReportId || undefined}
                       isEditing={isEditing}
@@ -387,35 +316,39 @@ export function GenerateReportModal({
                       showFileButton={!isEditing && !!savedReportId}
                     />
                     {isEditing && (
-                      <div className="flex justify-end gap-3 pt-4 border-t">
-                        <Button
-                          variant="outline"
-                          onClick={() => {
-                            setShowPreview(false)
-                            setReportData(null)
-                            setIsEditing(false)
-                            setSavedReportId(null)
-                          }}
-                          disabled={isSaving}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          onClick={handleSave}
-                          disabled={isSaving}
-                        >
-                          {isSaving ? (
-                            <>
-                              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                              Saving...
-                            </>
-                          ) : (
-                            <>
-                              <FileText className="w-4 h-4 mr-2" />
-                              Save Report
-                            </>
-                          )}
-                        </Button>
+                      <div className="sticky bottom-0 z-10 border-t bg-background/95 backdrop-blur px-3 py-2.5 sm:px-6 sm:py-3 -mx-3 sm:-mx-6">
+                        <div className="grid grid-cols-2 gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => {
+                              setShowPreview(false)
+                              setReportData(null)
+                              setIsEditing(false)
+                              setSavedReportId(null)
+                            }}
+                            disabled={isSaving}
+                            className="h-9 sm:h-10 text-xs sm:text-sm"
+                          >
+                            Cancel
+                          </Button>
+                          <Button
+                            onClick={handleSave}
+                            disabled={isSaving}
+                            className="h-9 sm:h-10 text-xs sm:text-sm"
+                          >
+                            {isSaving ? (
+                              <>
+                                <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              <>
+                                <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                                Save Report
+                              </>
+                            )}
+                          </Button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -423,96 +356,110 @@ export function GenerateReportModal({
               </div>
             </div>
           ) : (
-            // Show form
             <>
-              <DialogHeader className="px-6 pt-6 pb-4">
-                <DialogTitle className="flex items-center gap-2">
-                  <FileText className="w-5 h-5" />
-                  {getReportTitle()}
-                </DialogTitle>
-                <DialogDescription>
-                  {getReportDescription()}
-                </DialogDescription>
-              </DialogHeader>
-
-            <form onSubmit={handleGenerate} className="space-y-6 px-6 pb-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="tax-year">Tax Year</Label>
-                  <Select 
-                    value={formData.taxYear}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, taxYear: value }))}
-                  >
-                    <SelectTrigger id="tax-year">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map(year => (
-                        <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="period">Period</Label>
-                  <Select 
-                    value={formData.period}
-                    onValueChange={(value) => setFormData(prev => ({ ...prev, period: value as any }))}
-                  >
-                    <SelectTrigger id="period">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="annual">Annual</SelectItem>
-                      <SelectItem value="q1">Q1 (Jan - Mar)</SelectItem>
-                      <SelectItem value="q2">Q2 (Apr - Jun)</SelectItem>
-                      <SelectItem value="q3">Q3 (Jul - Sep)</SelectItem>
-                      <SelectItem value="q4">Q4 (Oct - Dec)</SelectItem>
-                    </SelectContent>
-                  </Select>
+              <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur px-3 py-2.5 sm:px-6 sm:py-4 pr-10 sm:pr-12">
+                <div className="flex items-center justify-between gap-2 sm:gap-3">
+                  <div className="min-w-0 flex-1">
+                    <DialogTitle className="text-sm sm:text-lg font-semibold truncate">
+                      {getReportTitle()}
+                    </DialogTitle>
+                    <DialogDescription className="text-[10px] sm:text-sm line-clamp-2">
+                      {getReportDescription()}
+                    </DialogDescription>
+                  </div>
+                  <FileText className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-muted-foreground" />
                 </div>
               </div>
 
-              {reportType === 'income' && (
-                <div className="space-y-4">
-                  <Label className="text-base font-semibold">Include in Report</Label>
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        id="include-invoices"
-                        checked={formData.includeInvoices}
-                        onChange={(e) => setFormData(prev => ({ ...prev, includeInvoices: e.target.checked }))}
-                        className="w-4 h-4 rounded border-gray-300"
-                      />
-                      <Label htmlFor="include-invoices" className="font-normal cursor-pointer">
-                        Include Invoice Income
-                      </Label>
+              <div className="flex flex-col h-[calc(100dvh-56px)] sm:h-auto">
+                <div className="flex-1 overflow-auto px-3 py-3 sm:px-6 sm:py-6 space-y-3 sm:space-y-4">
+                  <div className="rounded-lg border bg-muted/20 p-3 sm:p-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                      <div className="space-y-1.5 sm:space-y-2">
+                        <Label htmlFor="tax-year" className="text-xs sm:text-sm">Tax Year</Label>
+                        <Select 
+                          value={formData.taxYear}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, taxYear: value }))}
+                        >
+                          <SelectTrigger id="tax-year" className="h-10 sm:h-11 text-xs sm:text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map(year => (
+                              <SelectItem key={year} value={year.toString()}>{year}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="space-y-1.5 sm:space-y-2">
+                        <Label htmlFor="period" className="text-xs sm:text-sm">Period</Label>
+                        <Select 
+                          value={formData.period}
+                          onValueChange={(value) => setFormData(prev => ({ ...prev, period: value as any }))}
+                        >
+                          <SelectTrigger id="period" className="h-10 sm:h-11 text-xs sm:text-sm">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="annual">Annual</SelectItem>
+                            <SelectItem value="q1">Q1 (Jan - Mar)</SelectItem>
+                            <SelectItem value="q2">Q2 (Apr - Jun)</SelectItem>
+                            <SelectItem value="q3">Q3 (Jul - Sep)</SelectItem>
+                            <SelectItem value="q4">Q4 (Oct - Dec)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
 
-              <div className="flex justify-end gap-3 pt-4">
-                <Button variant="outline" type="button" onClick={() => onOpenChange(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={isGenerating}>
-                  {isGenerating ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <FileText className="w-4 h-4 mr-2" />
-                      Generate Report
-                    </>
+                  {reportType === 'income' && (
+                    <div className="rounded-lg border p-3 sm:p-4">
+                      <Label className="text-xs sm:text-sm font-semibold">Include in Report</Label>
+                      <div className="mt-2 sm:mt-3">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id="include-invoices"
+                            checked={formData.includeInvoices}
+                            onChange={(e) => setFormData(prev => ({ ...prev, includeInvoices: e.target.checked }))}
+                            className="w-4 h-4 rounded border-gray-300"
+                          />
+                          <Label htmlFor="include-invoices" className="font-normal cursor-pointer text-xs sm:text-sm">
+                            Include Invoice Income
+                          </Label>
+                        </div>
+                      </div>
+                    </div>
                   )}
-                </Button>
+                </div>
+
+                <div className="sticky bottom-0 z-10 border-t bg-background/95 backdrop-blur px-3 py-2.5 sm:px-6 sm:py-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={() => onOpenChange(false)}
+                      className="h-9 sm:h-11 text-xs sm:text-sm"
+                    >
+                      Cancel
+                    </Button>
+                    <Button onClick={handleGenerate} disabled={isGenerating} className="h-9 sm:h-11 text-xs sm:text-sm">
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
+                          Generating...
+                        </>
+                      ) : (
+                        <>
+                          <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                          Generate
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
               </div>
-            </form>
             </>
           )}
         </DialogContent>
@@ -528,4 +475,3 @@ export function GenerateReportModal({
     </>
   )
 }
-

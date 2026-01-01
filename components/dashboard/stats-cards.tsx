@@ -256,6 +256,8 @@ const buildStatsFromSummary = (
   const monthExpenses = monthSummary?.totalExpenses ?? 0
   const monthNet = monthSummary?.netIncome ?? monthIncome - monthExpenses
 
+  const isNetLoss = netIncome < 0
+
   const incomeTransactions = Object.values(periodSummary.categories || {}).reduce(
     (acc, cat) => (cat.income > 0 ? acc + cat.count : acc),
     0
@@ -356,14 +358,14 @@ const buildStatsFromSummary = (
     },
     {
       id: "net-profit",
-      label: "Net Profit",
+      label: isNetLoss ? "Net Loss" : "Net Profit",
       value: formatCurrency(netIncome),
       change: `${periodDisplay} • ${monthDisplay}: ${formatCurrency(monthNet)}`,
       trend: getTrend(netIncome),
-      icon: TrendingUp,
-      color: "text-chart-3",
-      barColor: "bg-green-500",
-      breakdown: [{ label: "After Expenses", value: formatCurrency(netIncome), percentage: 100 }],
+      icon: isNetLoss ? ArrowDownRight : TrendingUp,
+      color: isNetLoss ? "text-destructive" : "text-chart-3",
+      barColor: isNetLoss ? "bg-destructive" : "bg-green-500",
+      breakdown: [{ label: isNetLoss ? "After Expenses (Loss)" : "After Expenses", value: formatCurrency(netIncome), percentage: 100 }],
     },
     {
       id: "tax-payable",

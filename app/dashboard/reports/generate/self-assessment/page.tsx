@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useRef, useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { DashboardNav } from "@/components/dashboard/dashboard-nav"
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { ArrowLeft, FileText, Download, Loader2, Info, Calculator, Shield } from "lucide-react"
-import { SelfAssessmentPreview } from "@/components/reports/self-assessment-preview"
+import { SelfAssessmentPreview, type SelfAssessmentPreviewHandle } from "@/components/reports/self-assessment-preview"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { useBusiness } from "@/lib/contexts/business-context"
@@ -35,6 +35,7 @@ export default function GenerateSelfAssessmentPage() {
   const [reportId, setReportId] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(true) // Start in edit mode by default
   const [isSaving, setIsSaving] = useState(false)
+  const selfAssessmentRef = useRef<SelfAssessmentPreviewHandle | null>(null)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -214,8 +215,13 @@ export default function GenerateSelfAssessmentPage() {
 
     setIsSaving(true)
     try {
+      // Upload signature (if any) only at save time
+      const prepared = await selfAssessmentRef.current?.prepareForSave?.()
+      const dataToSave = prepared || reportData
+      if (prepared) setReportData(prepared)
+
       // Generate report title if not already set
-      const period = reportData.period
+      const period = dataToSave.period
       const periodLabel = period.periodType === 'annual' 
         ? `Annual ${period.year}`
         : period.quarter 
@@ -226,16 +232,16 @@ export default function GenerateSelfAssessmentPage() {
       // Include any additional metadata in reportData
       // The reportData should already have all metadata from the preview component via onDataChange
       const reportDataToSave = {
-        ...reportData,
+        ...dataToSave,
         // Ensure metadata exists and includes all fields
         metadata: {
-          ...(reportData as any).metadata,
-          personalInfo: (reportData as any).metadata?.personalInfo || {},
-          attachments: (reportData as any).metadata?.attachments || {},
-          reliefEvidence: (reportData as any).metadata?.reliefEvidence || {},
-          reliefNotes: (reportData as any).metadata?.reliefNotes || {},
-          manualTaxCredits: (reportData as any).metadata?.manualTaxCredits || [],
-          declarationInfo: (reportData as any).metadata?.declarationInfo || {}
+          ...(dataToSave as any).metadata,
+          personalInfo: (dataToSave as any).metadata?.personalInfo || {},
+          attachments: (dataToSave as any).metadata?.attachments || {},
+          reliefEvidence: (dataToSave as any).metadata?.reliefEvidence || {},
+          reliefNotes: (dataToSave as any).metadata?.reliefNotes || {},
+          manualTaxCredits: (dataToSave as any).metadata?.manualTaxCredits || [],
+          declarationInfo: (dataToSave as any).metadata?.declarationInfo || {}
         }
       }
 
@@ -483,6 +489,7 @@ export default function GenerateSelfAssessmentPage() {
               </Card>
               {reportData ? (
                 <SelfAssessmentPreview 
+                  ref={selfAssessmentRef}
                   reportData={reportData} 
                   formData={formData}
                   isEditing={isEditing}
