@@ -7,6 +7,8 @@ import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { CheckCircle2, XCircle, ArrowLeft, Loader2, AlertCircle } from "lucide-react"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { useAuth } from "@/lib/hooks/useAuth"
@@ -42,6 +44,142 @@ export default function FileTaxReturnPage() {
   const [taxesAlreadyPaid, setTaxesAlreadyPaid] = useState<number>(0)
   const [filing, setFiling] = useState(false)
   const [filed, setFiled] = useState(false)
+  const [showPendingPaymentModal, setShowPendingPaymentModal] = useState(false)
+  const [showNrsModal, setShowNrsModal] = useState(false)
+  const [showFilingActionSelect, setShowFilingActionSelect] = useState(false)
+  const [filingAction, setFilingAction] = useState<string>("")
+  const [showFileOnlyPendingPayModal, setShowFileOnlyPendingPayModal] = useState(false)
+  const [showPaidOnlyContinueModal, setShowPaidOnlyContinueModal] = useState(false)
+  const [showPaidAndFiledConfirmModal, setShowPaidAndFiledConfirmModal] = useState(false)
+
+  const NRS_PORTAL_URL = "https://selfservice.nrs.gov.ng/"
+
+  const openNrsInThisTab = () => {
+    window.location.assign(NRS_PORTAL_URL)
+  }
+
+  const markPaid = async () => {
+    if (!report) return
+    const now = new Date().toISOString()
+    const grossTaxPayable = report.reportData?.tax?.taxPayable || 0
+    try {
+      await reportService.updateReport(report.id, "Self-Assessment", {
+        paymentStatus: "paid",
+        paymentDate: now,
+        // Manual confirmation (since payment happens on NRS)
+        taxesAlreadyPaid: grossTaxPayable,
+        balanceDue: 0
+      })
+      setReport((prev) =>
+        prev
+          ? ({
+              ...prev,
+              paymentStatus: "paid",
+              paymentDate: now,
+              taxesAlreadyPaid: grossTaxPayable,
+              balanceDue: 0
+            } as any)
+          : prev
+      )
+      setTaxesAlreadyPaid(grossTaxPayable)
+      setBalanceDue(0)
+      toast.success("Marked as paid")
+    } catch (e) {
+      console.error(e)
+      toast.error("Failed to mark as paid")
+    }
+  }
+
+  const markFiledOnly = async () => {
+    if (!report) return
+    const now = new Date().toISOString()
+    try {
+      await reportService.updateReport(report.id, "Self-Assessment", {
+        status: "completed",
+        filingStatus: "filed",
+        filingMethod: "direct",
+        filingDate: now
+      } as any)
+      setReport((prev) =>
+        prev ? ({ ...prev, status: "completed", filingStatus: "filed", filingMethod: "direct", filingDate: now } as any) : prev
+      )
+      setFiled(true)
+      toast.success("Filing completed")
+      router.push(`${basePath}/reports/file/${reportId}/confirmation?method=filed&amount=${report.reportData?.tax?.netTaxPayable || 0}`)
+    } catch (e) {
+      console.error(e)
+      toast.error("Failed to mark as filed")
+    }
+  }
+
+  const markPaidAndFiled = async () => {
+    if (!report) return
+    const now = new Date().toISOString()
+    const grossTaxPayable = report.reportData?.tax?.taxPayable || 0
+    try {
+      await reportService.updateReport(report.id, "Self-Assessment", {
+        paymentStatus: "paid",
+        paymentDate: now,
+        taxesAlreadyPaid: grossTaxPayable,
+        balanceDue: 0,
+        status: "completed",
+        filingStatus: "filed",
+        filingMethod: "direct",
+        filingDate: now
+      } as any)
+      setReport((prev) =>
+        prev
+          ? ({
+              ...prev,
+              paymentStatus: "paid",
+              paymentDate: now,
+              taxesAlreadyPaid: grossTaxPayable,
+              balanceDue: 0,
+              filingStatus: "filed",
+              filingMethod: "direct",
+              filingDate: now
+            } as any)
+          : prev
+      )
+      setTaxesAlreadyPaid(grossTaxPayable)
+      setBalanceDue(0)
+      setFiled(true)
+      // Record a manual tax payment so reconciliation can see it
+      await taxPaymentService.createPayment(user!.uid, {
+        transactionId: `manual-${report.id}`,
+        amount: grossTaxPayable,
+        period: "yearly",
+        taxDuration: String(report.reportData?.period?.year || new Date().getFullYear()),
+        paymentMethod: "firs",
+        status: "completed",
+        notes: `Manual confirmation: paid on NRS portal for report ${report.id}`
+      })
+      toast.success("Filing completed")
+      router.push(`${basePath}/reports/file/${reportId}/confirmation?method=filed&amount=${grossTaxPayable}`)
+    } catch (e) {
+      console.error(e)
+      toast.error("Failed to mark as paid & filed")
+    }
+  }
+
+  const markCouldNotFile = async () => {
+    if (!report) return
+    const now = new Date().toISOString()
+    try {
+      await reportService.updateReport(report.id, "Self-Assessment", {
+        filingStatus: "submitted",
+        filingMethod: "direct",
+        updatedAt: now
+      } as any)
+      setReport((prev) =>
+        prev ? ({ ...prev, filingStatus: "submitted", filingMethod: "direct", updatedAt: now } as any) : prev
+      )
+      toast.message("No worries — your filing remains pending. You can try again.")
+    } catch (e) {
+      console.error(e)
+      toast.error("Failed to update filing status")
+    }
+  }
 
   useEffect(() => {
     if (reportId && profile?.userId) {
@@ -276,8 +414,9 @@ export default function FileTaxReturnPage() {
     // If balance > 0, go to generate RRR and payment first
     // If balance <= 0, go directly to state selection and submission method
     if (balanceDue !== null && balanceDue > 0) {
-      // Has balance to pay - go to payment flow first
-      router.push(`${basePath}/reports/file/${reportId}/generate-rrr`)
+      // Has pending balance: user pays + files on NRS portal (we don't generate RRR in-app)
+      setShowFilingActionSelect(true)
+      setShowPendingPaymentModal(true)
     } else {
       // No balance or already balanced - go directly to state selection and submission
       // Use payment-success page with amount=0 (it handles state selection and submission method)
@@ -318,6 +457,186 @@ export default function FileTaxReturnPage() {
     <div className="min-h-screen bg-background">
         <main className="flex-1 px-4 py-6">
           <div className="space-y-6">
+            <Dialog open={showPendingPaymentModal} onOpenChange={setShowPendingPaymentModal}>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Pending payment before filing</DialogTitle>
+                  <DialogDescription>
+                    {balanceDue && balanceDue > 0
+                      ? `You have a pending balance of ₦${balanceDue.toLocaleString()}. You can complete payment and file your return on the NRS portal.`
+                      : "You may need to complete payment before filing. You can complete payment and file your return on the NRS portal."}
+                  </DialogDescription>
+                </DialogHeader>
+
+                <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+                  <p className="font-medium">Manual verification on OTax</p>
+                  <p className="text-muted-foreground mt-1 text-xs">
+                    Payment and filing happen on the NRS portal (external). After you complete any step there, come back to OTax and select the matching status so we can register it.
+                  </p>
+                  <div className="mt-2 text-xs text-muted-foreground">
+                    <p className="font-medium text-foreground">Before you return, keep:</p>
+                    <ul className="list-disc list-inside">
+                      <li>Payment receipt / reference</li>
+                      <li>Acknowledgment number (if filing completed)</li>
+                      <li>Any screenshot or confirmation email</li>
+                    </ul>
+                  </div>
+                </div>
+
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <Button type="button" variant="outline" onClick={() => setShowPendingPaymentModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setShowPendingPaymentModal(false)
+                      setShowNrsModal(true)
+                    }}
+                  >
+                    Continue to file
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* NRS portal in-app modal */}
+            <Dialog open={showNrsModal} onOpenChange={setShowNrsModal}>
+              <DialogContent className="max-w-3xl p-0 overflow-hidden">
+                <div className="p-4 border-b">
+                  <DialogHeader>
+                    <DialogTitle>Continue Filing on NRS Portal</DialogTitle>
+                    <DialogDescription>
+                      Complete your payment (if any) and file your return on the NRS portal.
+                    </DialogDescription>
+                  </DialogHeader>
+                </div>
+
+                <div className="p-4 space-y-3">
+                  <Alert>
+                    <AlertTitle className="text-sm">After you finish on NRS</AlertTitle>
+                    <AlertDescription className="text-xs text-muted-foreground">
+                      Come back to this page and use the dropdown action to mark what happened (paid only / paid &amp; filed / couldn’t file). This is how OTax records your status since the process is manual on an external portal.
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="rounded-lg border overflow-hidden">
+                    <iframe
+                      title="NRS Self Service Portal"
+                      src={NRS_PORTAL_URL}
+                      className="w-full h-[70vh] bg-background"
+                    />
+                  </div>
+
+                  <Alert>
+                    <AlertTitle className="text-sm">If the portal doesn’t show here</AlertTitle>
+                    <AlertDescription className="text-xs text-muted-foreground">
+                      Some sites block embedding in apps. You can open the portal in this tab and continue there.
+                    </AlertDescription>
+                  </Alert>
+                </div>
+
+                <DialogFooter className="p-4 border-t flex-col sm:flex-row gap-2 sm:gap-3">
+                  <Button variant="outline" onClick={() => setShowNrsModal(false)} className="w-full sm:w-auto">
+                    Close
+                  </Button>
+                  <Button onClick={openNrsInThisTab} className="w-full sm:w-auto">
+                    Open NRS in this tab
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* File-only but pending payment reminder */}
+            <Dialog open={showFileOnlyPendingPayModal} onOpenChange={setShowFileOnlyPendingPayModal}>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Pending payment detected</DialogTitle>
+                  <DialogDescription>
+                    You still have a pending balance of ₦{(balanceDue || 0).toLocaleString()}. Do you want to pay now before you mark this as filed?
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={async () => {
+                      setShowFileOnlyPendingPayModal(false)
+                      await markFiledOnly()
+                    }}
+                  >
+                    Later
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setShowFileOnlyPendingPayModal(false)
+                      setShowNrsModal(true)
+                    }}
+                  >
+                    Pay now
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Paid only -> prompt to continue filing */}
+            <Dialog open={showPaidOnlyContinueModal} onOpenChange={setShowPaidOnlyContinueModal}>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Great — payment confirmed</DialogTitle>
+                  <DialogDescription>
+                    Do you want to continue to file your return now on the NRS portal?
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <Button type="button" variant="outline" onClick={() => setShowPaidOnlyContinueModal(false)}>
+                    Later
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      setShowPaidOnlyContinueModal(false)
+                      setShowNrsModal(true)
+                    }}
+                  >
+                    Continue to file
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
+            {/* Paid + filed confirmation */}
+            <Dialog open={showPaidAndFiledConfirmModal} onOpenChange={setShowPaidAndFiledConfirmModal}>
+              <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                  <DialogTitle>Confirm paid + filed</DialogTitle>
+                  <DialogDescription>
+                    Are you sure you have completed BOTH payment and filing on the NRS portal? This will mark your self‑assessment as completed on OTax.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+                  <p className="font-medium">Tip</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Keep your payment reference and acknowledgment number in case we need to verify later.
+                  </p>
+                </div>
+                <DialogFooter className="gap-2 sm:gap-0">
+                  <Button type="button" variant="outline" onClick={() => setShowPaidAndFiledConfirmModal(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={async () => {
+                      setShowPaidAndFiledConfirmModal(false)
+                      await markPaidAndFiled()
+                    }}
+                  >
+                    Yes, I’m sure
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
             {/* System Checks Section */}
             {systemChecks.filter(check => !check.status).length > 0 && (
@@ -403,22 +722,67 @@ export default function FileTaxReturnPage() {
                     You're ready to file your annual tax return. Filing is a reconciliation - you may not need to pay anything if you've already been paying monthly.
                   </AlertDescription>
                 </Alert>
+
+                {showFilingActionSelect && (
+                  <Alert className="mt-4">
+                    <AlertTitle className="text-sm">Manual verification</AlertTitle>
+                    <AlertDescription className="text-xs text-muted-foreground">
+                      Since payment/filing happens on the NRS portal, please use the dropdown below to confirm what you completed so OTax can register it.
+                    </AlertDescription>
+                  </Alert>
+                )}
                 <div className="mt-4">
-                  <Button 
-                    size="lg" 
-                    onClick={handleFileReturn}
-                    disabled={filing}
-                    className="w-full sm:w-auto"
-                  >
-                    {filing ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Filing...
-                      </>
-                    ) : (
-                      'File Tax Return'
-                    )}
-                  </Button>
+                  {showFilingActionSelect ? (
+                    <Select
+                      value={filingAction || undefined}
+                      onValueChange={async (value) => {
+                        setFilingAction(value)
+                        // Execute and reset back to placeholder
+                        if (value === "file_only") {
+                          if ((balanceDue || 0) > 0) {
+                            setShowFileOnlyPendingPayModal(true)
+                          } else {
+                            await markFiledOnly()
+                          }
+                        } else if (value === "paid_only") {
+                          await markPaid()
+                          setShowPaidOnlyContinueModal(true)
+                        } else if (value === "paid_and_filed") {
+                          setShowPaidAndFiledConfirmModal(true)
+                        } else if (value === "try_again") {
+                          await markCouldNotFile()
+                          setShowNrsModal(true)
+                        }
+                        setTimeout(() => setFilingAction(""), 50)
+                      }}
+                    >
+                      <SelectTrigger className="h-11 w-full sm:w-[320px]">
+                        <SelectValue placeholder="How did it go?" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="file_only">Yes, I filed only</SelectItem>
+                        <SelectItem value="paid_only">Yes, I paid only</SelectItem>
+                        <SelectItem value="paid_and_filed">Yes, I paid + file</SelectItem>
+                        <SelectItem value="try_again">No, there was an issue, I’ll try again</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Button
+                      size="lg"
+                      onClick={handleFileReturn}
+                      disabled={filing}
+                      className="w-full sm:w-auto"
+                    >
+                      {filing ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Filing...
+                        </>
+                      ) : (
+                        "File Tax Return"
+                      )}
+                    </Button>
+                  )}
                 </div>
               </Card>
             )}
@@ -446,10 +810,10 @@ export default function FileTaxReturnPage() {
                   <div className="mt-4">
                     <Button 
                       size="lg" 
-                      onClick={() => router.push(`${basePath}/reports/file/${reportId}/generate-rrr`)}
+                      onClick={() => setShowPendingPaymentModal(true)}
                       className="w-full sm:w-auto"
                     >
-                      Pay Balance (₦{balanceDue.toLocaleString()})
+                      Continue on NRS Portal (Pay & File)
                     </Button>
                   </div>
                 )}

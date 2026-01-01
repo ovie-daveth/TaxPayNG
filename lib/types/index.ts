@@ -122,6 +122,8 @@ export interface TaxClassification {
   // Capital asset tracking (for capital allowances)
   isCapitalAsset?: boolean
   capitalAllowanceRate?: number // e.g., 25% for annual allowance
+  initialAllowanceRate?: number // optional initial allowance rate for first year (tax version of depreciation)
+  capitalAssetType?: 'it_equipment' | 'motor_vehicle' | 'plant_machinery' | 'furniture_fittings' | 'building' | 'intangible_software'
   
   // VAT handling (future)
   vatApplicable?: boolean
@@ -669,6 +671,16 @@ export interface SavedReport {
   completedDocumentUrl?: string // URL of the completed/stamped document from agent filing
   completedDocumentName?: string // Name of the completed document
   completedDocumentId?: string // Document ID of the completed document
+
+  /**
+   * Manual filing evidence (for NRS / external portals):
+   * Stored on the report for easy retrieval when viewing filed assessments.
+   */
+  filingEvidence?: {
+    paymentReceipt?: { documentId: string; name: string; url: string; uploadedAt: string }
+    filingProof?: { documentId: string; name: string; url: string; uploadedAt: string }
+    additional?: Array<{ documentId: string; name: string; url: string; uploadedAt: string }>
+  }
 }
 
 // Filing Request Types

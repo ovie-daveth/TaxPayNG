@@ -119,7 +119,10 @@ export default function ReportsPage() {
     if (!profile?.userId) return
 
     try {
-      const reports = await reportService.getUserReports(profile.userId, activeEntityId || undefined, profile.defaultEntityId)
+      // Fallback: some older profiles may not have defaultEntityId set yet.
+      // When an entity is active, treat missing-entity reports as legacy default for that active entity.
+      const defaultEntityIdForLegacy = profile.defaultEntityId || activeEntityId || undefined
+      const reports = await reportService.getUserReports(profile.userId, activeEntityId || undefined, defaultEntityIdForLegacy)
       
       // Calculate stats
       const totalReports = reports.length

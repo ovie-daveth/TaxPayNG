@@ -87,7 +87,8 @@ export function ViewTransactionDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-3xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <DialogHeader>
-            <div className="flex items-center justify-between">
+            {/* On mobile, keep actions away from the Dialog close (X) button */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pr-10 sm:pr-0">
               <div>
                 <DialogTitle className="text-lg sm:text-xl flex items-center gap-2">
                   {transaction.type === 'income' ? (
@@ -102,7 +103,12 @@ export function ViewTransactionDialog({
                 </DialogDescription>
               </div>
               {onEdit && (
-                <Button variant="outline" size="sm" onClick={onEdit}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={onEdit}
+                  className="w-fit self-start sm:self-auto"
+                >
                   Edit
                 </Button>
               )}
@@ -414,7 +420,13 @@ export function ViewTransactionDialog({
                       )}
                       {transaction.taxClassification.isCapitalAsset && (
                         <Badge variant="outline" className="text-xs">
-                          Capital Asset ({transaction.taxClassification.capitalAllowanceRate}% allowance)
+                          {(() => {
+                            const annual = transaction.taxClassification.capitalAllowanceRate || 0
+                            const initial =
+                              transaction.taxClassification.initialAllowanceRate ??
+                              Math.min(50, Math.max(0, annual * 2))
+                            return `Capital Asset (Initial ${initial}%, Annual ${annual}%)`
+                          })()}
                         </Badge>
                       )}
                       {transaction.taxClassification.whtCreditable && (

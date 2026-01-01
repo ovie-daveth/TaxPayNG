@@ -18,11 +18,13 @@ import { SelfAssessmentPreview, type SelfAssessmentPreviewHandle } from "./self-
 import { IncomeStatementPreview } from "./income-statement-preview"
 import { ExpenseReportPreview } from "./expense-report-preview"
 import { TaxSummaryPreview } from "./tax-summary-preview"
+import { useBusiness } from "@/lib/contexts/business-context"
 
 export function RecentReports() {
   const router = useRouter()
   const { user } = useAuth()
   const { profile } = useUserProfile()
+  const { activeEntityId } = useBusiness()
   const [reports, setReports] = useState<SavedReport[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedReport, setSelectedReport] = useState<SavedReport | null>(null)
@@ -40,14 +42,15 @@ export function RecentReports() {
     if (profile?.userId) {
       loadReports()
     }
-  }, [profile?.userId])
+  }, [profile?.userId, activeEntityId])
 
   const loadReports = async () => {
     if (!profile?.userId) return
 
     try {
       setLoading(true)
-      const userReports = await reportService.getUserReports(profile.userId)
+      const defaultEntityIdForLegacy = profile.defaultEntityId || activeEntityId || undefined
+      const userReports = await reportService.getUserReports(profile.userId, activeEntityId || undefined, defaultEntityIdForLegacy)
       setReports(userReports)
     } catch (error) {
       console.error("Error loading reports:", error)

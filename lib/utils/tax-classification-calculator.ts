@@ -16,6 +16,7 @@ export interface TaxClassificationSummary {
     description: string
     originalCost: number
     purchaseYear: number
+    initialAllowanceRate?: number
     allowanceRate: number
     allowanceAmount: number
     bookValueAfter: number
@@ -62,6 +63,7 @@ export async function calculateTaxClassificationBenefits(
         description: asset.description,
         originalCost: asset.originalCost,
         purchaseYear: asset.purchaseYear,
+        initialAllowanceRate: asset.initialAllowanceRate,
         allowanceRate: asset.capitalAllowanceRate,
         allowanceAmount: depreciationAmount,
         bookValueAfter,
@@ -269,6 +271,7 @@ export async function calculateTaxClassificationBenefitsFromTransactions(
           description: asset.description,
           originalCost: asset.originalCost,
           purchaseYear: asset.purchaseYear,
+          initialAllowanceRate: asset.initialAllowanceRate,
           allowanceRate: asset.capitalAllowanceRate,
           allowanceAmount: depreciationAmount,
           bookValueAfter,

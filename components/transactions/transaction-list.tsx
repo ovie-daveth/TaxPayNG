@@ -329,6 +329,55 @@ export function TransactionList({
                     </div>
                   </div>
                   <div className="flex flex-col items-end gap-1">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 -mr-1"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        className="w-40"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <DropdownMenuItem
+                          className="cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleView(transaction)
+                          }}
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          View
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="cursor-pointer"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleEdit(transaction)
+                          }}
+                        >
+                          <Pencil className="w-4 h-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          className="cursor-pointer text-destructive focus:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleDeleteClick(transaction.id)
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                     <p className={`text-sm font-semibold ${isIncome ? 'text-primary' : 'text-foreground'}`}>
                       {isIncome ? '+' : '-'}{formatCurrency(Math.abs(transaction.ngnEquivalent !== undefined && transaction.ngnEquivalent !== null ? transaction.ngnEquivalent : transaction.amount))}
                     </p>
@@ -533,9 +582,12 @@ export function TransactionList({
                                 
                                 // Capital Allowance (for expenses)
                                 if (transaction.type === 'expense' && transaction.taxClassification?.isCapitalAsset && transaction.taxClassification?.capitalAllowanceRate) {
-                                  const allowanceAmount = currentAmount * (transaction.taxClassification.capitalAllowanceRate / 100)
-                                  breakdown.push(`Capital Allowance ${transaction.taxClassification.capitalAllowanceRate}%: ${formatCurrency(allowanceAmount)}`)
-                                  breakdown.push(`(Annual depreciation claim - reduces taxable income)`)
+                                  const annual = transaction.taxClassification.capitalAllowanceRate || 0
+                                  const initial =
+                                    transaction.taxClassification.initialAllowanceRate ??
+                                    Math.min(50, Math.max(0, annual * 2))
+                                  breakdown.push(`Capital Allowance: Initial ${initial}% (first year), Annual ${annual}% (reducing balance)`)
+                                  breakdown.push(`(Claimed during Self-Assessment filing; year-based amount, not a fixed % of this transaction)`)
                                 }
                                 
                                 // Business percentage (for mixed transactions - both income and expense)
@@ -612,13 +664,16 @@ export function TransactionList({
                         {transaction.type === 'expense' && transaction.taxClassification?.isCapitalAsset && transaction.taxClassification?.capitalAllowanceRate && (
                           <div className="text-[9px] text-blue-700 dark:text-blue-300 space-y-0.5">
                             <div className="flex items-center gap-1">
-                              <span>Capital Allowance {transaction.taxClassification.capitalAllowanceRate}%:</span>
-                              <span className="font-medium">
-                                {formatCurrency(transaction.amount * (transaction.taxClassification.capitalAllowanceRate / 100))}
-                              </span>
+                              {(() => {
+                                const annual = transaction.taxClassification!.capitalAllowanceRate || 0
+                                const initial =
+                                  transaction.taxClassification!.initialAllowanceRate ??
+                                  Math.min(50, Math.max(0, annual * 2))
+                                return <span>Capital Allowance: Initial {initial}%, Annual {annual}%</span>
+                              })()}
                             </div>
                             <div className="text-muted-foreground font-bold text-[10px]">
-                              Annual Depreciation Claim
+                              Claimed in Self-Assessment
                             </div>
                           </div>
                         )}

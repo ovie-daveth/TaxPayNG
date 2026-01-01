@@ -1,20 +1,21 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useRef, useState, useEffect } from "react"
 import { usePathname, useRouter, useParams, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
-import { CheckCircle2, Download, FileText, Mail, UserCheck, Loader2, ArrowLeft, FileCheck } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { CheckCircle2, Download, FileText, UserCheck, Loader2, ExternalLink, Check, XCircle, Printer, FileCheck } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { useBusiness } from "@/lib/contexts/business-context"
 import { reportService, documentService } from "@/lib/services"
-import { SavedReport } from "@/lib/types"
+import type { Document, SavedReport } from "@/lib/types"
+import { SelfAssessmentPreview, type SelfAssessmentPreviewHandle } from "@/components/reports/self-assessment-preview"
 import { toast } from "sonner"
-import Link from "next/link"
 import { format } from "date-fns"
 import jsPDF from "jspdf"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
@@ -27,8 +28,7 @@ interface PaymentData {
   timestamp: string
 }
 
-// States with digital filing capabilities
-const STATES_WITH_DIGITAL_FILING = ["Lagos", "FCT", "Rivers", "Kano"]
+const NRS_PORTAL_URL = "https://selfservice.nrs.gov.ng/"
 
 export default function PaymentSuccessPage() {
   const router = useRouter()
@@ -42,13 +42,18 @@ export default function PaymentSuccessPage() {
   const { activeEntityId } = useBusiness()
   const [report, setReport] = useState<SavedReport | null>(null)
   const [loading, setLoading] = useState(true)
+  const selfAssessmentRef = useRef<SelfAssessmentPreviewHandle>(null)
+  const [stateForPrint, setStateForPrint] = useState<string>("")
   const [savingReceipt, setSavingReceipt] = useState(false)
   const [receiptSaved, setReceiptSaved] = useState(false)
-  const [selectedState, setSelectedState] = useState<string>("")
   const [submitting, setSubmitting] = useState(false)
-  const [submissionMethod, setSubmissionMethod] = useState<"direct" | "agent" | "email" | null>(null)
   const [showDocumentModal, setShowDocumentModal] = useState(false)
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([])
+  const [documentSelectMode, setDocumentSelectMode] = useState<"attachments" | "agent">("attachments")
+  const [showNrsModal, setShowNrsModal] = useState(false)
+  const [downloadingPack, setDownloadingPack] = useState(false)
+  const [downloadingDocs, setDownloadingDocs] = useState(false)
+  const [printingReturn, setPrintingReturn] = useState(false)
 
   const paymentData: PaymentData = {
     rrr: searchParams.get("rrr") || "",
@@ -64,10 +69,13 @@ export default function PaymentSuccessPage() {
     if (reportId && profile?.userId) {
       loadReport()
     }
-    if (profile?.address?.state) {
-      setSelectedState(profile.address.state)
+  }, [reportId, profile?.userId])
+
+  useEffect(() => {
+    if (profile?.address?.state && !stateForPrint) {
+      setStateForPrint(profile.address.state)
     }
-  }, [reportId, profile?.userId, profile?.address?.state])
+  }, [profile?.address?.state, stateForPrint])
 
   const loadReport = async () => {
     if (!reportId || !profile?.userId) return
@@ -151,76 +159,200 @@ export default function PaymentSuccessPage() {
     }
   }
 
-  const handleDirectSubmission = async () => {
-    if (!report || !selectedState) return
+  const downloadBlob = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement("a")
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
 
-    setSubmitting(true)
+  const printSelfAssessmentReport = () => {
+    if (!report?.reportData) {
+      toast.error("Report not loaded yet")
+      return
+    }
+    setPrintingReturn(true)
     try {
-      const response = await fetch("/api/irs/submit-return", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          reportId: report.id,
-          state: selectedState,
-          rrr: paymentData.rrr,
-          transactionRef: paymentData.transactionRef
-        }),
-      })
+      selfAssessmentRef.current?.printReport()
+    } finally {
+      // Best-effort: allow button to re-enable even if the print dialog blocks the thread
+      setTimeout(() => setPrintingReturn(false), 1500)
+    }
+  }
 
-      const data = await response.json()
+  const downloadSelectedDocumentsZip = async () => {
+    if (!user?.uid) return
+    if (selectedDocumentIds.length === 0) {
+      toast.error("Select supporting documents first")
+      return
+    }
+    setDownloadingDocs(true)
+    try {
+      const JSZip = (await import("jszip")).default
+      const zip = new JSZip()
+      const folder = zip.folder("supporting-documents")
 
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to submit return")
+      await Promise.all(
+        selectedDocumentIds.map(async (docId) => {
+          const docMeta = (await documentService.getById(docId)) as Document
+          const res = await fetch(docMeta.url)
+          if (!res.ok) throw new Error(`Failed to download ${docMeta.originalName}`)
+          const blob = await res.blob()
+          folder?.file(docMeta.originalName || `${docMeta.name}-${docId}`, blob)
+        })
+      )
+
+      const blob = await zip.generateAsync({ type: "blob" })
+      downloadBlob(blob, `supporting-documents-${Date.now()}.zip`)
+    } catch (e) {
+      console.error(e)
+      toast.error(e instanceof Error ? e.message : "Failed to download documents")
+    } finally {
+      setDownloadingDocs(false)
+    }
+  }
+
+  const downloadFilingPackZip = async () => {
+    if (!report?.reportData) return
+    setDownloadingPack(true)
+    try {
+      const JSZip = (await import("jszip")).default
+      const zip = new JSZip()
+
+      const year = (report as any)?.reportData?.period?.year || new Date().getFullYear()
+      zip.file(
+        "README.txt",
+        `OTax Filing Pack\n\nThis ZIP includes your payment receipt (if any) and supporting documents.\nYour self-assessment return should be printed from the app.\nYear: ${year}\nGenerated: ${new Date().toISOString()}\n`
+      )
+
+      // Add receipt if exists
+      if (!isNoPaymentFiling && paymentData.rrr) {
+        const receipt = await generateReceiptPDF()
+        zip.file(`payment-receipt-${paymentData.rrr}.pdf`, receipt)
       }
 
-      toast.success("Tax return submitted successfully to IRS")
-      router.push(`${basePath}/reports/file/${reportId}/confirmation?acknowledgment=${data.acknowledgmentNumber}&amount=${paymentData.amount}`)
-    } catch (error) {
-      console.error("Error submitting return:", error)
-      toast.error(error instanceof Error ? error.message : "Failed to submit return")
+      // Add selected supporting docs (if any)
+      if (selectedDocumentIds.length > 0) {
+        const folder = zip.folder("supporting-documents")
+        await Promise.all(
+          selectedDocumentIds.map(async (docId) => {
+            const docMeta = (await documentService.getById(docId)) as Document
+            const res = await fetch(docMeta.url)
+            if (!res.ok) throw new Error(`Failed to download ${docMeta.originalName}`)
+            const blob = await res.blob()
+            folder?.file(docMeta.originalName || `${docMeta.name}-${docId}`, blob)
+          })
+        )
+      }
+
+      const blob = await zip.generateAsync({ type: "blob" })
+      downloadBlob(blob, `tax-filing-pack-${year}-${Date.now()}.zip`)
+    } catch (e) {
+      console.error(e)
+      toast.error(e instanceof Error ? e.message : "Failed to download filing pack")
+    } finally {
+      setDownloadingPack(false)
+    }
+  }
+
+  const openNrsPortal = () => {
+    // Fallback if iframe embedding is blocked (opens in the same tab)
+    window.location.assign(NRS_PORTAL_URL)
+  }
+
+  const startSelfFiling = async () => {
+    if (!report) return
+    setSubmitting(true)
+    try {
+      await reportService.updateReport(report.id, "Self-Assessment", {
+        filingStatus: "submitted",
+        filingMethod: "direct"
+      } as any)
+      setReport((prev) => (prev ? ({ ...prev, filingStatus: "submitted", filingMethod: "direct" } as any) : prev))
+      setShowNrsModal(true)
+    } catch (e) {
+      console.error(e)
+      toast.error("Failed to start filing")
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const markSelfFilingResult = async (result: "success" | "failed") => {
+    if (!report) return
+    setSubmitting(true)
+    try {
+      if (result === "success") {
+        await reportService.updateReport(report.id, "Self-Assessment", {
+          filingStatus: "filed",
+          filingMethod: "direct"
+        } as any)
+        setReport((prev) => (prev ? ({ ...prev, filingStatus: "filed", filingMethod: "direct" } as any) : prev))
+        toast.success("Marked as filed")
+        setShowNrsModal(false)
+        router.push(`${basePath}/reports/file/${report.id}/confirmation?method=filed&amount=${paymentData.amount}`)
+      } else {
+        // Keep it pending/submitted (user can try again)
+        await reportService.updateReport(report.id, "Self-Assessment", {
+          filingStatus: "submitted",
+          filingMethod: "direct"
+        } as any)
+        setReport((prev) => (prev ? ({ ...prev, filingStatus: "submitted", filingMethod: "direct" } as any) : prev))
+        toast.message("No worries — your filing remains pending. You can try again.")
+        setShowNrsModal(false)
+      }
+    } catch (e) {
+      console.error(e)
+      toast.error("Failed to update filing status")
     } finally {
       setSubmitting(false)
     }
   }
 
   const handleAgentSubmission = () => {
-    if (!report || !selectedState) return
-    // Show document selection modal first
+    if (!user?.uid) return
+    setDocumentSelectMode("agent")
+    setShowDocumentModal(true)
+  }
+
+  const handleSelectAttachments = () => {
+    if (!user?.uid) return
+    setDocumentSelectMode("attachments")
     setShowDocumentModal(true)
   }
 
   const handleDocumentSelection = async (documentIds: string[]) => {
-    if (!report || !selectedState || !user?.uid) return
-
+    if (!report || !user?.uid) return
     setSelectedDocumentIds(documentIds)
     setShowDocumentModal(false)
-    setSubmitting(true)
 
+    if (documentSelectMode === "attachments") {
+      toast.success(`${documentIds.length} document(s) selected`)
+      return
+    }
+
+    // Agent flow
+    setSubmitting(true)
     try {
       const response = await fetch("/api/filing/agent/assign", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.uid,
-          state: selectedState,
+          state: "NRS",
           reportId: report.id,
-          rrr: paymentData.rrr || undefined,
+          rrr: paymentData.rrr || "",
           supportingDocuments: documentIds,
           entityId: activeEntityId || undefined
         }),
       })
 
       const data = await response.json()
+      if (!response.ok) throw new Error(data.error || "Failed to submit filing request")
 
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to submit filing request")
-      }
-
-      toast.success("Filing request submitted successfully. An agent will be assigned shortly.")
+      toast.success("Filing request submitted. An agent will be assigned shortly.")
       router.push(`${basePath}/reports/file/${reportId}/confirmation?requestId=${data.requestId}&amount=${paymentData.amount}`)
     } catch (error) {
       console.error("Error submitting filing request:", error)
@@ -229,46 +361,6 @@ export default function PaymentSuccessPage() {
       setSubmitting(false)
     }
   }
-
-  const handleEmailSubmission = async () => {
-    if (!report || !selectedState) return
-
-    setSubmitting(true)
-    try {
-      const response = await fetch("/api/irs/email/send", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          state: selectedState,
-          reportId: report.id,
-          rrr: paymentData.rrr || undefined,
-          userInfo: {
-            name: `${profile?.firstName} ${profile?.lastName}`,
-            email: profile?.email || user?.email,
-            tin: profile?.taxId
-          }
-        }),
-      })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to send email")
-      }
-
-      toast.success("Tax return sent to IRS via email")
-      router.push(`${basePath}/reports/file/${reportId}/confirmation?method=email&amount=${paymentData.amount}`)
-    } catch (error) {
-      console.error("Error sending email:", error)
-      toast.error(error instanceof Error ? error.message : "Failed to send email")
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const hasDigitalFiling = selectedState && STATES_WITH_DIGITAL_FILING.includes(selectedState)
 
   if (loading || profileLoading) {
     return (
@@ -299,7 +391,7 @@ export default function PaymentSuccessPage() {
               <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-500 shrink-0" />
               <AlertTitle className="text-xs sm:text-sm md:text-base text-blue-800 dark:text-blue-200 font-medium">Ready to File</AlertTitle>
               <AlertDescription className="text-[11px] sm:text-xs md:text-sm text-blue-700 dark:text-blue-300 mt-1">
-                Your tax return is balanced (no additional payment required). Please select your state and filing method below to complete your tax return submission.
+                Your tax return is balanced (no additional payment required). Download your return and supporting documents, then file via NRS or use an agent.
               </AlertDescription>
             </Alert>
           )}
@@ -376,130 +468,180 @@ export default function PaymentSuccessPage() {
           </Card>
           )}
 
-          {/* IRS Submission Section */}
+          {/* Download pack */}
           <Card>
             <CardHeader className="p-3 sm:p-4 md:p-6">
-              <CardTitle className="text-base sm:text-lg md:text-xl font-semibold">Submit Tax Return to State IRS</CardTitle>
-              <CardDescription className="text-[11px] sm:text-xs md:text-sm mt-0.5 sm:mt-1">
-                Complete your tax filing by submitting your return to the appropriate tax authority
-              </CardDescription>
+              <CardTitle className="text-base sm:text-lg md:text-xl font-semibold">Download Filing Pack</CardTitle>
+              <CardDescription className="text-[11px] sm:text-xs md:text-sm mt-0.5 sm:mt-1">Print your self-assessment return and attach supporting documents before filing.</CardDescription>
             </CardHeader>
-            <CardContent className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-5 md:space-y-6">
-              <div className="space-y-1.5 sm:space-y-2">
-                <Label htmlFor="state" className="text-[11px] sm:text-xs md:text-sm">State of Filing</Label>
-                <Select value={selectedState} onValueChange={setSelectedState}>
-                  <SelectTrigger id="state" className="h-9 sm:h-10 text-xs sm:text-sm">
-                    <SelectValue placeholder="Select your state" />
+            <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-[11px] sm:text-xs md:text-sm">State Government (for the printed header)</Label>
+                <Select value={stateForPrint} onValueChange={setStateForPrint}>
+                  <SelectTrigger className="h-9 sm:h-10 text-xs sm:text-sm">
+                    <SelectValue placeholder={profile?.address?.state ? "Using profile state" : "Select a state"} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Lagos">Lagos</SelectItem>
-                    <SelectItem value="FCT">FCT (Abuja)</SelectItem>
-                    <SelectItem value="Rivers">Rivers</SelectItem>
-                    <SelectItem value="Kano">Kano</SelectItem>
-                    <SelectItem value="Ogun">Ogun</SelectItem>
-                    <SelectItem value="Oyo">Oyo</SelectItem>
-                    <SelectItem value="Delta">Delta</SelectItem>
-                    <SelectItem value="Kaduna">Kaduna</SelectItem>
-                    <SelectItem value="Enugu">Enugu</SelectItem>
+                    <SelectItem value="Abia">Abia</SelectItem>
+                    <SelectItem value="Adamawa">Adamawa</SelectItem>
+                    <SelectItem value="Akwa Ibom">Akwa Ibom</SelectItem>
                     <SelectItem value="Anambra">Anambra</SelectItem>
-                    <SelectItem value="Other">Other</SelectItem>
+                    <SelectItem value="Bauchi">Bauchi</SelectItem>
+                    <SelectItem value="Bayelsa">Bayelsa</SelectItem>
+                    <SelectItem value="Benue">Benue</SelectItem>
+                    <SelectItem value="Borno">Borno</SelectItem>
+                    <SelectItem value="Cross River">Cross River</SelectItem>
+                    <SelectItem value="Delta">Delta</SelectItem>
+                    <SelectItem value="Ebonyi">Ebonyi</SelectItem>
+                    <SelectItem value="Edo">Edo</SelectItem>
+                    <SelectItem value="Ekiti">Ekiti</SelectItem>
+                    <SelectItem value="Enugu">Enugu</SelectItem>
+                    <SelectItem value="FCT">FCT</SelectItem>
+                    <SelectItem value="Gombe">Gombe</SelectItem>
+                    <SelectItem value="Imo">Imo</SelectItem>
+                    <SelectItem value="Jigawa">Jigawa</SelectItem>
+                    <SelectItem value="Kaduna">Kaduna</SelectItem>
+                    <SelectItem value="Kano">Kano</SelectItem>
+                    <SelectItem value="Katsina">Katsina</SelectItem>
+                    <SelectItem value="Kebbi">Kebbi</SelectItem>
+                    <SelectItem value="Kogi">Kogi</SelectItem>
+                    <SelectItem value="Kwara">Kwara</SelectItem>
+                    <SelectItem value="Lagos">Lagos</SelectItem>
+                    <SelectItem value="Nasarawa">Nasarawa</SelectItem>
+                    <SelectItem value="Niger">Niger</SelectItem>
+                    <SelectItem value="Ogun">Ogun</SelectItem>
+                    <SelectItem value="Ondo">Ondo</SelectItem>
+                    <SelectItem value="Osun">Osun</SelectItem>
+                    <SelectItem value="Oyo">Oyo</SelectItem>
+                    <SelectItem value="Plateau">Plateau</SelectItem>
+                    <SelectItem value="Rivers">Rivers</SelectItem>
+                    <SelectItem value="Sokoto">Sokoto</SelectItem>
+                    <SelectItem value="Taraba">Taraba</SelectItem>
+                    <SelectItem value="Yobe">Yobe</SelectItem>
+                    <SelectItem value="Zamfara">Zamfara</SelectItem>
                   </SelectContent>
                 </Select>
+                <p className="text-[11px] text-muted-foreground">
+                  Default is your profile state (if available). You can change it for this printout.
+                </p>
               </div>
 
-              {selectedState && (
-                <>
-                  {hasDigitalFiling ? (
-                    <div className="space-y-3 sm:space-y-4">
-                      <Alert className="p-2.5 sm:p-3 md:p-4">
-                        <AlertDescription className="text-[11px] sm:text-xs md:text-sm">
-                          {selectedState} IRS supports digital filing. You can submit directly.
-                        </AlertDescription>
-                      </Alert>
-                      <Button
-                        onClick={handleDirectSubmission}
-                        disabled={submitting}
-                        className="w-full h-10 sm:h-11 text-xs sm:text-sm md:text-base"
-                        size="lg"
-                      >
-                        {submitting ? (
-                          <>
-                            <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
-                            Submitting...
-                          </>
-                        ) : (
-                          <>
-                            <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-                            Submit Directly to {selectedState} IRS
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-3 sm:space-y-4">
-                      <Alert className="p-2.5 sm:p-3 md:p-4">
-                        <AlertDescription className="text-[11px] sm:text-xs md:text-sm">
-                          {selectedState} IRS does not have a digital filing portal. Choose one of the options below.
-                        </AlertDescription>
-                      </Alert>
-
-                      <div className="grid gap-3 sm:gap-4">
-                        <Card className="border-2">
-                          <CardHeader className="p-3 sm:p-4 md:p-6">
-                            <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
-                              <UserCheck className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-                              Submit via OTax Agent (Recommended)
-                            </CardTitle>
-                            <CardDescription className="text-[11px] sm:text-xs md:text-sm mt-0.5 sm:mt-1">
-                              Our filing agent will handle the submission on your behalf
-                            </CardDescription>
-                          </CardHeader>
-                          <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
-                            <Button
-                              onClick={handleAgentSubmission}
-                              disabled={submitting}
-                              className="w-full h-9 sm:h-10 text-xs sm:text-sm"
-                            >
-                              {submitting ? (
-                                <>
-                                  <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2 animate-spin" />
-                                  Assigning Agent...
-                                </>
-                              ) : (
-                                "Assign Filing Agent"
-                              )}
-                            </Button>
-                          </CardContent>
-                        </Card>
-
-                        <Card className="border-2">
-                          <CardHeader className="p-3 sm:p-4 md:p-6">
-                            <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
-                              <Mail className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-                              Send via Email
-                            </CardTitle>
-                            <CardDescription className="text-[11px] sm:text-xs md:text-sm mt-0.5 sm:mt-1">
-                              We'll email your return and supporting documents to the IRS
-                            </CardDescription>
-                          </CardHeader>
-                          <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
-                            <Button
-                              onClick={handleEmailSubmission}
-                              disabled={true}
-                              variant="outline"
-                              className="w-full h-9 sm:h-10 text-xs sm:text-sm opacity-60 cursor-not-allowed"
-                            >
-                              Send via Email - Coming Soon
-                            </Button>
-                          </CardContent>
-                        </Card>
-                      </div>
-                    </div>
-                  )}
-                </>
-              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                <Button
+                  variant="outline"
+                  onClick={printSelfAssessmentReport}
+                  disabled={printingReturn || !report?.reportData}
+                  className="h-9 sm:h-10 text-xs sm:text-sm justify-start"
+                >
+                  {printingReturn ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Printer className="w-4 h-4 mr-2" />}
+                  Print Self-Assessment
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handleSelectAttachments}
+                  disabled={!user?.uid}
+                  className="h-9 sm:h-10 text-xs sm:text-sm justify-start"
+                >
+                  <UserCheck className="w-4 h-4 mr-2" />
+                  Select Supporting Documents {selectedDocumentIds.length > 0 ? `(${selectedDocumentIds.length})` : ""}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={downloadSelectedDocumentsZip}
+                  disabled={downloadingDocs || selectedDocumentIds.length === 0}
+                  className="h-9 sm:h-10 text-xs sm:text-sm justify-start"
+                >
+                  {downloadingDocs ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+                  Download Supporting Docs (ZIP)
+                </Button>
+                <Button
+                  onClick={downloadFilingPackZip}
+                  disabled={downloadingPack || !report?.reportData}
+                  className="h-9 sm:h-10 text-xs sm:text-sm justify-start"
+                >
+                  {downloadingPack ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
+                  Download Full Filing Pack (ZIP)
+                </Button>
+              </div>
+              <p className="text-[11px] sm:text-xs text-muted-foreground">
+                Tip: The full pack includes your return PDF, receipt (if any), and selected supporting documents.
+              </p>
             </CardContent>
           </Card>
+
+          {/* Filing options */}
+          <div className="grid gap-3 sm:gap-4">
+            <Card className="border-2">
+              <CardHeader className="p-3 sm:p-4 md:p-6">
+                <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
+                  <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                  File Yourself on NRS Portal
+                </CardTitle>
+                <CardDescription className="text-[11px] sm:text-xs md:text-sm mt-0.5 sm:mt-1">
+                  Continue filing on the official NRS self-service portal.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 md:p-6 pt-0 space-y-2">
+                <Button
+                  onClick={startSelfFiling}
+                  disabled={submitting || !report}
+                  className="w-full h-10 sm:h-11 text-xs sm:text-sm"
+                  size="lg"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Opening NRS...
+                    </>
+                  ) : (
+                    <>
+                      Continue to NRS Portal
+                      <ExternalLink className="w-4 h-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+
+                {(report as any)?.filingMethod === "direct" && (report as any)?.filingStatus === "submitted" && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowNrsModal(true)}
+                    className="w-full h-9 sm:h-10 text-xs sm:text-sm"
+                  >
+                    I need to try again
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-2">
+              <CardHeader className="p-3 sm:p-4 md:p-6">
+                <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
+                  <UserCheck className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                  Use an Agent
+                </CardTitle>
+                <CardDescription className="text-[11px] sm:text-xs md:text-sm mt-0.5 sm:mt-1">
+                  An agent will file on your behalf. You’ll select supporting documents first.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+                <Button
+                  onClick={handleAgentSubmission}
+                  disabled={submitting || !report}
+                  className="w-full h-10 sm:h-11 text-xs sm:text-sm"
+                  size="lg"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : (
+                    "Request Agent Filing"
+                  )}
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
         </div>
       </main>
 
@@ -512,6 +654,79 @@ export default function PaymentSuccessPage() {
           userId={user.uid}
         />
       )}
+
+      {/* Hidden full report renderer for printing (prints the entire assessment via SelfAssessmentPreview) */}
+      {report?.reportData && (
+        <div className="hidden">
+          <SelfAssessmentPreview
+            ref={selfAssessmentRef}
+            reportData={report.reportData as any}
+            showFileButton={false}
+            isEditing={false}
+            printState={stateForPrint}
+          />
+        </div>
+      )}
+
+      {/* NRS portal modal */}
+      <Dialog open={showNrsModal} onOpenChange={setShowNrsModal}>
+        <DialogContent className="max-w-3xl p-0 overflow-hidden">
+          <div className="p-4 border-b">
+            <DialogHeader>
+              <DialogTitle>Continue Filing on NRS Portal</DialogTitle>
+              <DialogDescription>
+                Complete your payment (if any) and file your return on the NRS portal.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="p-4 space-y-3">
+            <div className="rounded-lg border overflow-hidden">
+              <iframe
+                title="NRS Self Service Portal"
+                src={NRS_PORTAL_URL}
+                className="w-full h-[70vh] bg-background"
+              />
+            </div>
+
+            <Alert>
+              <AlertTitle className="text-sm">If the portal doesn’t show here</AlertTitle>
+              <AlertDescription className="text-xs text-muted-foreground">
+                Some sites block embedding in apps. You can open the portal in this tab and continue there.
+              </AlertDescription>
+            </Alert>
+          </div>
+
+          <DialogFooter className="p-4 border-t flex-col sm:flex-row gap-2 sm:gap-3">
+            <Button
+              variant="outline"
+              onClick={openNrsPortal}
+              disabled={submitting}
+              className="w-full sm:w-auto"
+            >
+              Open NRS in this tab
+              <ExternalLink className="w-4 h-4 ml-2" />
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => markSelfFilingResult("failed")}
+              disabled={submitting}
+              className="w-full sm:w-auto"
+            >
+              <XCircle className="w-4 h-4 mr-2" />
+              I couldn’t file
+            </Button>
+            <Button
+              onClick={() => markSelfFilingResult("success")}
+              disabled={submitting}
+              className="w-full sm:w-auto"
+            >
+              <Check className="w-4 h-4 mr-2" />
+              I filed successfully
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
