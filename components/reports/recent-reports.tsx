@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useRef, useState, useEffect } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -14,7 +14,7 @@ import { reportService } from "@/lib/services"
 import { SavedReport } from "@/lib/types"
 import { toast } from "sonner"
 import { format } from "date-fns"
-import { SelfAssessmentPreview } from "./self-assessment-preview"
+import { SelfAssessmentPreview, type SelfAssessmentPreviewHandle } from "./self-assessment-preview"
 import { IncomeStatementPreview } from "./income-statement-preview"
 import { ExpenseReportPreview } from "./expense-report-preview"
 import { TaxSummaryPreview } from "./tax-summary-preview"
@@ -34,6 +34,7 @@ export function RecentReports() {
   const [reportToDelete, setReportToDelete] = useState<SavedReport | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [saving, setSaving] = useState(false)
+  const selfAssessmentEditRef = useRef<SelfAssessmentPreviewHandle | null>(null)
 
   useEffect(() => {
     if (profile?.userId) {
@@ -72,15 +73,20 @@ export function RecentReports() {
 
     try {
       setSaving(true)
+      let dataToSave = editingReportData
+      if (editingReport.type === "Self-Assessment" && selfAssessmentEditRef.current) {
+        dataToSave = await selfAssessmentEditRef.current.prepareForSave()
+        setEditingReportData(dataToSave)
+      }
       await reportService.updateReport(editingReport.id, editingReport.type, {
-        reportData: editingReportData
+        reportData: dataToSave
       })
       toast.success("Report updated successfully")
       
       // Update the report in the list
       setReports(reports.map(r => 
         r.id === editingReport.id 
-          ? { ...r, reportData: editingReportData }
+          ? { ...r, reportData: dataToSave }
           : r
       ))
       
@@ -308,6 +314,7 @@ export function RecentReports() {
             <>
               {editingReport.type === 'Self-Assessment' && (
                 <SelfAssessmentPreview
+                  ref={selfAssessmentEditRef}
                   reportData={editingReportData}
                   formData={{
                     includeIncome: true,

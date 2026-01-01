@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Calendar, Filter } from "lucide-react"
 import { useBusiness } from "@/lib/contexts/business-context"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 type DashboardBusinessType = "freelancer" | "creator" | "small-business"
 type TrendDirection = "up" | "down" | "neutral"
@@ -255,6 +256,8 @@ const buildStatsFromSummary = (
   const monthExpenses = monthSummary?.totalExpenses ?? 0
   const monthNet = monthSummary?.netIncome ?? monthIncome - monthExpenses
 
+  const isNetLoss = netIncome < 0
+
   const incomeTransactions = Object.values(periodSummary.categories || {}).reduce(
     (acc, cat) => (cat.income > 0 ? acc + cat.count : acc),
     0
@@ -355,14 +358,14 @@ const buildStatsFromSummary = (
     },
     {
       id: "net-profit",
-      label: "Net Profit",
+      label: isNetLoss ? "Net Loss" : "Net Profit",
       value: formatCurrency(netIncome),
       change: `${periodDisplay} • ${monthDisplay}: ${formatCurrency(monthNet)}`,
       trend: getTrend(netIncome),
-      icon: TrendingUp,
-      color: "text-chart-3",
-      barColor: "bg-green-500",
-      breakdown: [{ label: "After Expenses", value: formatCurrency(netIncome), percentage: 100 }],
+      icon: isNetLoss ? ArrowDownRight : TrendingUp,
+      color: isNetLoss ? "text-destructive" : "text-chart-3",
+      barColor: isNetLoss ? "bg-destructive" : "bg-green-500",
+      breakdown: [{ label: isNetLoss ? "After Expenses (Loss)" : "After Expenses", value: formatCurrency(netIncome), percentage: 100 }],
     },
     {
       id: "tax-payable",
@@ -951,19 +954,33 @@ export function StatsCards({
         const shouldAlignRight = isLastInRow2 || isLastColumn4
 
         return (
-          <div
-            key={stat.id}
-            className="relative"
-            onMouseEnter={() => isHoverEnabled && !isOpen && handleCardHover(stat.id)}
-            onMouseLeave={() => isHoverEnabled && !isOpen && handleCardHover(null)}
-            ref={(el) => {
-              dropdownRefs.current[stat.id] = el
+          <Popover
+            open={showDropdown}
+            onOpenChange={(open) => {
+              // Click-to-pin behavior + close on outside click
+              if (open) {
+                setOpenDropdown(stat.id)
+                setIsHoverEnabled(false)
+                setShowTapHint(false)
+              } else {
+                if (openDropdown === stat.id) setOpenDropdown(null)
+                if (hoveredCard === stat.id) setHoveredCard(null)
+              }
             }}
           >
-            <Card
-              className={`p-4 sm:p-5 md:p-6 cursor-pointer transition-all relative h-full flex flex-col ${isOpen ? "ring-2 ring-primary" : ""} ${cardLoadingClass}`}
-              onClick={() => handleCardClick(stat.id)}
+            <div
+              key={stat.id}
+              className="relative"
+              onMouseEnter={() => isHoverEnabled && !isOpen && handleCardHover(stat.id)}
+              onMouseLeave={() => isHoverEnabled && !isOpen && handleCardHover(null)}
+              ref={(el) => {
+                dropdownRefs.current[stat.id] = el
+              }}
             >
+              <PopoverTrigger asChild>
+                <Card
+                  className={`p-4 sm:p-5 md:p-6 cursor-pointer transition-all relative h-full flex flex-col ${isOpen ? "ring-2 ring-primary" : ""} ${cardLoadingClass}`}
+                >
               {isHovered && !isOpen && isHoverEnabled && (
                 <div className="absolute top-2 right-2 flex items-center gap-1.5 bg-primary/10 dark:bg-primary/20 text-primary text-xs px-2 py-1 rounded-md border border-primary/20">
                   <Info className="w-3 h-3" />
@@ -991,13 +1008,19 @@ export function StatsCards({
                 <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5" />
               </div>
             </div>
-          </Card>
+                </Card>
+              </PopoverTrigger>
 
-            {showDropdown && (
-              <div
-                className={`absolute z-50 mt-2 bg-popover border border-border rounded-lg shadow-lg p-3 sm:p-4 animate-in fade-in-0 zoom-in-95 ${
-                  stat.id === "tax-payable" ? "w-[280px] sm:w-[380px] md:w-[450px]" : "w-[260px] sm:w-[300px] md:w-[320px]"
-                } ${shouldAlignRight ? "right-0" : "left-0"}`}
+              <PopoverContent
+                side="bottom"
+                align="center"
+                sideOffset={8}
+                collisionPadding={12}
+                className={`p-3 sm:p-4 ${
+                  stat.id === "tax-payable"
+                    ? "w-[calc(100vw-24px)] max-w-[450px] sm:w-[380px] md:w-[450px]"
+                    : "w-[calc(100vw-24px)] max-w-[360px] sm:w-[300px] md:w-[320px]"
+                }`}
                 onMouseEnter={() => isHoverEnabled && handleCardHover(stat.id)}
                 onMouseLeave={() => isHoverEnabled && !isOpen && handleCardHover(null)}
               >
@@ -1026,9 +1049,9 @@ export function StatsCards({
                 ) : (
                   <p className="text-[10px] sm:text-xs text-muted-foreground">No breakdown data available yet.</p>
                 )}
-              </div>
-            )}
-          </div>
+              </PopoverContent>
+            </div>
+          </Popover>
         )
       })
       )}

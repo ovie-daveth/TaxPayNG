@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useMemo } from "react"
-import { useRouter, useParams, useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useParams, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -19,6 +19,8 @@ export default function FilingConfirmationPage() {
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
+  const basePath = pathname?.startsWith("/dashboard-creator") ? "/dashboard-creator" : "/dashboard"
   const reportId = params?.reportId as string
   const { user } = useAuth()
   const { profile, loading: profileLoading } = useUserProfile()
@@ -126,7 +128,7 @@ Generated: ${new Date().toISOString()}
               Report not found. Please go back and try again.
             </AlertDescription>
           </Alert>
-          <Button onClick={() => router.push('/dashboard/reports')} className="mt-4">
+          <Button onClick={() => router.push(`${basePath}/reports`)} className="mt-4">
             Back to Reports
           </Button>
         </Card>
@@ -138,7 +140,7 @@ Generated: ${new Date().toISOString()}
     <div className="min-h-screen bg-background">
       <main className="mx-auto px-4 py-6">
         <div className="space-y-6">
-          <Link href="/dashboard/reports">
+          <Link href={`${basePath}/reports`}>
             <Button variant="ghost" className="mb-4">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back to Dashboard
@@ -206,7 +208,7 @@ Generated: ${new Date().toISOString()}
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => router.push(`/dashboard/filing-requests/${requestId || ticketId}`)}
+                      onClick={() => router.push(`${basePath}/filing-requests/${requestId || ticketId}`)}
                     >
                       <UserCheck className="w-4 h-4 mr-2" />
                       Track Status & Message Agent
@@ -272,7 +274,7 @@ Generated: ${new Date().toISOString()}
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => router.push(`/dashboard/filing-requests/${requestId || ticketId}`)}
+                    onClick={() => router.push(`${basePath}/filing-requests/${requestId || ticketId}`)}
                     className="w-full mt-3"
                   >
                     <UserCheck className="w-4 h-4 mr-2" />
@@ -324,7 +326,7 @@ Generated: ${new Date().toISOString()}
 
           {/* Back to Dashboard */}
           <div className="flex justify-center">
-            <Link href="/dashboard">
+            <Link href={basePath}>
               <Button size="lg">
                 Back to Dashboard
               </Button>

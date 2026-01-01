@@ -15,11 +15,13 @@ import { useSubscription } from "@/lib/hooks/useSubscription"
 import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { reportService, ReportData } from "@/lib/services"
 import { toast } from "sonner"
+import { useBusiness } from "@/lib/contexts/business-context"
 
 export default function GenerateIncomeStatementPage() {
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { isSubscribed } = useSubscription()
+  const { activeEntityId } = useBusiness()
   const [showPreview, setShowPreview] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [reportData, setReportData] = useState<ReportData | null>(null)
@@ -99,7 +101,9 @@ export default function GenerateIncomeStatementPage() {
       const data = await reportService.generateReportData(
         profile.userId,
         period,
-        formData.includeInvoices
+        formData.includeInvoices,
+        activeEntityId || undefined,
+        profile.defaultEntityId
       )
 
       // Generate report title
@@ -117,7 +121,8 @@ export default function GenerateIncomeStatementPage() {
         title,
         'Income Statement',
         data,
-        'draft' // All reports are saved as draft initially
+        'draft', // All reports are saved as draft initially
+        activeEntityId || undefined
       )
 
       setReportData(data)

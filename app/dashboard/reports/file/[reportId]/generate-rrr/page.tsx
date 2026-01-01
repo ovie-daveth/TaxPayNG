@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { usePathname, useRouter, useParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -32,6 +32,8 @@ interface RRRResponse {
 export default function GenerateRRRPage() {
   const router = useRouter()
   const params = useParams()
+  const pathname = usePathname()
+  const basePath = pathname?.startsWith("/dashboard-creator") ? "/dashboard-creator" : "/dashboard"
   const reportId = params?.reportId as string
   const { user } = useAuth()
   const { profile, loading: profileLoading } = useUserProfile()
@@ -68,7 +70,7 @@ export default function GenerateRRRPage() {
       
       if (!loadedReport) {
         toast.error("Report not found")
-        router.push('/dashboard/reports')
+        router.push(`${basePath}/reports`)
         return
       }
 
@@ -108,7 +110,7 @@ export default function GenerateRRRPage() {
     } catch (error) {
       console.error("Error loading report:", error)
       toast.error("Failed to load report")
-      router.push('/dashboard/reports')
+      router.push(`${basePath}/reports`)
     } finally {
       setLoading(false)
     }
@@ -194,7 +196,7 @@ export default function GenerateRRRPage() {
   const handlePaymentSuccess = async (receipt: any) => {
     setPaymentReceipt(receipt)
     // Redirect to payment confirmation page
-    router.push(`/dashboard/reports/file/${reportId}/payment-success?rrr=${rrrData?.rrr}&transactionRef=${receipt.transactionRef}&amount=${rrrData?.amount || receipt.amount || 0}`)
+    router.push(`${basePath}/reports/file/${reportId}/payment-success?rrr=${rrrData?.rrr}&transactionRef=${receipt.transactionRef}&amount=${rrrData?.amount || receipt.amount || 0}`)
   }
 
   if (loading || profileLoading) {
@@ -214,7 +216,7 @@ export default function GenerateRRRPage() {
               Report not found. Please go back and try again.
             </AlertDescription>
           </Alert>
-          <Button onClick={() => router.push('/dashboard/reports')} className="mt-4">
+          <Button onClick={() => router.push(`${basePath}/reports`)} className="mt-4">
             Back to Reports
           </Button>
         </Card>

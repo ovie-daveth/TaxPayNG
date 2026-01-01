@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -11,9 +11,10 @@ import { ReportData } from "@/lib/services/reportService"
 import { formatCurrencyAmount, formatCurrencyInput, handleCurrencyInputChange } from "@/lib/utils/currency"
 import { format } from "date-fns"
 import { Printer, ArrowLeft, Plus, Trash2, X, Upload, Loader2, FileCheck, Clock, Mail, CheckCircle2, ExternalLink, Download } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
 import { ocrService } from "@/lib/services/ocrService"
 import { taxPaymentService, invoiceService, transactionService } from "@/lib/services"
@@ -38,10 +39,25 @@ interface SelfAssessmentPreviewProps {
   showFileButton?: boolean
   filingStatus?: 'not_filed' | 'filed' | 'submitted' | 'acknowledged'
   filingMethod?: 'direct' | 'agent' | 'email' | null
+  /**
+   * When true, removes the outer padding/border/rounded corners on mobile so the preview can be full-bleed.
+   * Desktop/tablet styling remains unchanged.
+   */
+  fullBleedMobile?: boolean
 }
 
-export function SelfAssessmentPreview({ reportData, formData, isEditing = false, onDataChange, onBack, reportId, showFileButton = false, filingStatus, filingMethod }: SelfAssessmentPreviewProps) {
+export type SelfAssessmentPreviewHandle = {
+  prepareForSave: () => Promise<ReportData>
+}
+
+export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, SelfAssessmentPreviewProps>(
+  function SelfAssessmentPreview(
+    { reportData, formData, isEditing = false, onDataChange, onBack, reportId, showFileButton = false, filingStatus, filingMethod, fullBleedMobile = false },
+    ref
+  ) {
   const router = useRouter()
+  const pathname = usePathname()
+  const dashboardBasePath = pathname?.startsWith("/dashboard-creator") ? "/dashboard-creator" : "/dashboard"
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { hasAccess } = useSubscription()
@@ -106,6 +122,11 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
   })
   const [uploadingSignature, setUploadingSignature] = useState(false)
   const [scanningSignature, setScanningSignature] = useState(false)
+  const [pendingSignatureFile, setPendingSignatureFile] = useState<File | null>(null)
+  const [signaturePreviewUrl, setSignaturePreviewUrl] = useState<string>("")
+
+  type PartCMobileSection = "reliefs" | "expenses" | "summary"
+  const [partCMobileSection, setPartCMobileSection] = useState<PartCMobileSection>("reliefs")
 
   // Attachment checklist
   const [attachments, setAttachments] = useState({
@@ -294,13 +315,9 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
     }
   }
 
-  const handleSignatureUpload = async (file: File) => {
-    setUploadingSignature(true)
+  const handleSignatureSelected = async (file: File) => {
     setScanningSignature(true)
     try {
-      // Upload signature image to ImageKit
-      const uploadResult = await uploadToImageKit(file, 'signatures')
-      
       // Try OCR extraction to see if there's any text in the signature image
       let extractedText = ''
       try {
@@ -311,23 +328,74 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
         console.log('OCR extraction not applicable for signature')
       }
       
+      // Store locally; upload happens when user saves the report
+      if (signaturePreviewUrl) {
+        URL.revokeObjectURL(signaturePreviewUrl)
+      }
+      const localUrl = URL.createObjectURL(file)
+      setSignaturePreviewUrl(localUrl)
+      setPendingSignatureFile(file)
+
+      // Keep signatureUrl empty so we don't persist a remote URL until Save
       setDeclarationInfo(prev => ({
         ...prev,
-        signatureUrl: uploadResult.url,
+        signatureUrl: '',
         signatureText: extractedText
       }))
-      
-      // The useEffect will automatically sync this change to parent reportData
-      toast.success("Signature uploaded successfully")
+
     } catch (error) {
-      console.error("Error uploading signature:", error)
-      const errorMessage = error instanceof Error ? error.message : "Failed to upload signature"
+      console.error("Error preparing signature:", error)
+      const errorMessage = error instanceof Error ? error.message : "Failed to prepare signature"
       toast.error(errorMessage)
     } finally {
-      setUploadingSignature(false)
       setScanningSignature(false)
     }
   }
+
+  // Cleanup preview URL on unmount
+  useEffect(() => {
+    return () => {
+      if (signaturePreviewUrl) URL.revokeObjectURL(signaturePreviewUrl)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useImperativeHandle(ref, () => ({
+    prepareForSave: async () => {
+      if (!pendingSignatureFile) return reportData
+
+      setUploadingSignature(true)
+      try {
+        const uploadResult = await uploadToImageKit(pendingSignatureFile, "signatures")
+        const newDeclarationInfo = {
+          ...declarationInfo,
+          signatureUrl: uploadResult.url
+        }
+
+        // Clear local pending state
+        setDeclarationInfo(newDeclarationInfo)
+        setPendingSignatureFile(null)
+        if (signaturePreviewUrl) URL.revokeObjectURL(signaturePreviewUrl)
+        setSignaturePreviewUrl("")
+
+        // Persist into report metadata (do not wait for effects)
+        const updated: any = { ...reportData }
+        const metadata = { ...(updated as any).metadata }
+        metadata.declarationInfo = newDeclarationInfo
+        ;(updated as any).metadata = metadata
+        onDataChange?.(updated)
+
+        return updated as ReportData
+      } catch (error) {
+        console.error("Error uploading signature on save:", error)
+        const errorMessage = error instanceof Error ? error.message : "Failed to upload signature"
+        toast.error(errorMessage)
+        return reportData
+      } finally {
+        setUploadingSignature(false)
+      }
+    }
+  }))
 
   // Track if we've initialized to prevent re-initialization loops
   const hasInitializedRef = useRef(false)
@@ -1546,8 +1614,8 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           <div>Name: ${reportData.userInfo.name}</div>
           <div style="margin-top: 30px;">
             Signature / Digital Signature: 
-            ${declarationInfo.signatureUrl 
-              ? `<img src="${declarationInfo.signatureUrl}" alt="Signature" style="max-height: 60px; margin-top: 10px; display: block;" />` 
+            ${(signaturePreviewUrl || declarationInfo.signatureUrl)
+              ? `<img src="${signaturePreviewUrl || declarationInfo.signatureUrl}" alt="Signature" style="max-height: 60px; margin-top: 10px; display: block;" />` 
               : '_________________'}
           </div>
         </div>
@@ -1594,84 +1662,170 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
   }
 
   return (
-    <Card className="p-2 sm:p-3 md:p-4 overflow-x-hidden max-w-full">
-      {/* Action Buttons */}
-      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-3 sm:mb-4 justify-end">
-        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto sm:ml-auto">
-          {showFileButton && reportId && !isEditing && (
-            (() => {
-              // Determine button text and icon based on filing status and method
-              const isFiled = filingStatus === 'filed' || filingStatus === 'submitted' || filingStatus === 'acknowledged'
-              
-              let buttonText = "File Return"
-              let ButtonIcon = FileCheck
-              let buttonVariant: "default" | "outline" | "secondary" = "default"
-              let isDisabled = false
-              
-              if (isFiled) {
-                if (filingMethod === 'agent') {
-                  // Agent filing: check if completed (acknowledged) or still pending
-                  if (filingStatus === 'acknowledged') {
-                    // Agent has completed the filing
+    <Card
+      className={`overflow-x-hidden max-w-full ${
+        fullBleedMobile
+          ? "p-0 border-0 rounded-none sm:p-3 md:p-4 sm:border sm:rounded-lg"
+          : "p-2 sm:p-3 md:p-4"
+      }`}
+    >
+      {/* Mobile: single-page accordion header */}
+      <div
+        className={`sm:hidden sticky top-0 z-20 border-b bg-background/95 backdrop-blur ${
+          fullBleedMobile ? "px-3 pt-3 pb-2" : "-mx-2 px-2 pt-2 pb-2"
+        }`}
+      >
+        <div className="flex items-center justify-between gap-2">
+          {onBack ? (
+            <Button variant="ghost" onClick={onBack} className="h-8 px-2 text-xs">
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              Back
+            </Button>
+          ) : (
+            <div />
+          )}
+
+          <div className="flex items-center gap-2">
+            {showFileButton && reportId && !isEditing && (
+              (() => {
+                const isFiled = filingStatus === 'filed' || filingStatus === 'submitted' || filingStatus === 'acknowledged'
+
+                let buttonText = "File"
+                let ButtonIcon = FileCheck
+                let buttonVariant: "default" | "outline" | "secondary" = "default"
+                let isDisabled = false
+
+                if (isFiled) {
+                  if (filingMethod === 'agent') {
+                    if (filingStatus === 'acknowledged') {
+                      buttonText = "Filed"
+                      ButtonIcon = CheckCircle2
+                      buttonVariant = "outline"
+                      isDisabled = true
+                    } else {
+                      buttonText = "Pending"
+                      ButtonIcon = Clock
+                      buttonVariant = "outline"
+                      isDisabled = true
+                    }
+                  } else if (filingMethod === 'direct') {
+                    buttonText = "Filed"
+                    ButtonIcon = CheckCircle2
+                    buttonVariant = "outline"
+                    isDisabled = true
+                  } else if (filingMethod === 'email') {
+                    buttonText = "Sent"
+                    ButtonIcon = Mail
+                    buttonVariant = "outline"
+                    isDisabled = true
+                  }
+                }
+
+                return (
+                  <Button
+                    onClick={() => {
+                      if (!isDisabled) router.push(`${dashboardBasePath}/reports/file/${reportId}`)
+                    }}
+                    variant={buttonVariant}
+                    disabled={isDisabled}
+                    className="h-8 px-2 text-xs"
+                  >
+                    <ButtonIcon className="w-3.5 h-3.5 mr-1.5" />
+                    {buttonText}
+                  </Button>
+                )
+              })()
+            )}
+
+            <Button variant="outline" onClick={handlePrint} className="h-8 w-8 p-0">
+              <Printer className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+        <p className="mt-2 text-[10px] text-muted-foreground">
+          Tap to expand sections. You can open multiple sections.
+        </p>
+      </div>
+
+      {/* Desktop-only full preview */}
+      <div className="hidden sm:block">
+        {/* Action Buttons */}
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-3 sm:mb-4 justify-end">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto sm:ml-auto">
+            {showFileButton && reportId && !isEditing && (
+              (() => {
+                // Determine button text and icon based on filing status and method
+                const isFiled = filingStatus === 'filed' || filingStatus === 'submitted' || filingStatus === 'acknowledged'
+                
+                let buttonText = "File Return"
+                let ButtonIcon = FileCheck
+                let buttonVariant: "default" | "outline" | "secondary" = "default"
+                let isDisabled = false
+                
+                if (isFiled) {
+                  if (filingMethod === 'agent') {
+                    // Agent filing: check if completed (acknowledged) or still pending
+                    if (filingStatus === 'acknowledged') {
+                      // Agent has completed the filing
+                      buttonText = "Filed and Completed"
+                      ButtonIcon = CheckCircle2
+                      buttonVariant = "outline"
+                      isDisabled = true
+                    } else {
+                      // Still awaiting agent (submitted but not yet acknowledged)
+                      buttonText = "Awaiting Agent"
+                      ButtonIcon = Clock
+                      buttonVariant = "outline"
+                      isDisabled = true
+                    }
+                  } else if (filingMethod === 'direct') {
+                    // Direct filing: show "Filed and Completed" when acknowledged or filed
                     buttonText = "Filed and Completed"
                     ButtonIcon = CheckCircle2
                     buttonVariant = "outline"
                     isDisabled = true
-                  } else {
-                    // Still awaiting agent (submitted but not yet acknowledged)
-                    buttonText = "Awaiting Agent"
-                    ButtonIcon = Clock
+                  } else if (filingMethod === 'email') {
+                    // Email filing: show "Mail Sent, Pending Response"
+                    buttonText = "Mail Sent, Pending Response"
+                    ButtonIcon = Mail
                     buttonVariant = "outline"
                     isDisabled = true
                   }
-                } else if (filingMethod === 'direct') {
-                  // Direct filing: show "Filed and Completed" when acknowledged or filed
-                  buttonText = "Filed and Completed"
-                  ButtonIcon = CheckCircle2
-                  buttonVariant = "outline"
-                  isDisabled = true
-                } else if (filingMethod === 'email') {
-                  // Email filing: show "Mail Sent, Pending Response"
-                  buttonText = "Mail Sent, Pending Response"
-                  ButtonIcon = Mail
-                  buttonVariant = "outline"
-                  isDisabled = true
                 }
-              }
-              
-              return (
-                <Button
-                  onClick={() => {
-                    if (!isDisabled) {
-                      router.push(`/dashboard/reports/file/${reportId}`)
-                    }
-                  }}
-                  variant={buttonVariant}
-                  disabled={isDisabled}
-                  className="h-9 sm:h-10 text-xs sm:text-sm w-full sm:w-auto"
-                >
-                  <ButtonIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-                  <span className="hidden sm:inline">{buttonText}</span>
-                  <span className="sm:hidden">{buttonText.length > 15 ? buttonText.split(' ')[0] : buttonText}</span>
-                </Button>
-              )
-            })()
-          )}
-          <Button
-            variant="outline"
-            onClick={handlePrint}
-            className="h-9 sm:h-10 text-xs sm:text-sm w-full sm:w-auto"
-          >
-            <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-            <span className="hidden sm:inline">Print Return</span>
-            <span className="sm:hidden">Print</span>
-          </Button>
+                
+                return (
+                  <Button
+                    onClick={() => {
+                      if (!isDisabled) {
+                        router.push(`${dashboardBasePath}/reports/file/${reportId}`)
+                      }
+                    }}
+                    variant={buttonVariant}
+                    disabled={isDisabled}
+                    className="h-9 sm:h-10 text-xs sm:text-sm w-full sm:w-auto"
+                  >
+                    <ButtonIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                    <span className="hidden sm:inline">{buttonText}</span>
+                    <span className="sm:hidden">{buttonText.length > 15 ? buttonText.split(' ')[0] : buttonText}</span>
+                  </Button>
+                )
+              })()
+            )}
+            <Button
+              variant="outline"
+              onClick={handlePrint}
+              className="h-9 sm:h-10 text-xs sm:text-sm w-full sm:w-auto"
+            >
+              <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+              <span className="hidden sm:inline">Print Return</span>
+              <span className="sm:hidden">Print</span>
+            </Button>
+          </div>
         </div>
-      </div>
 
-      <div className="space-y-3 sm:space-y-4 md:space-y-6">
-        {/* Cover Page Preview */}
-        <div className="text-center border-2 border-border p-3 sm:p-4 md:p-6 rounded-lg bg-muted/20">
+        <div className="space-y-3 sm:space-y-4 md:space-y-6">
+          {/* Cover Page Preview */}
+          <div className="text-center border-2 border-border p-3 sm:p-4 md:p-6 rounded-lg bg-muted/20">
           <h1 className="text-lg sm:text-xl md:text-2xl font-bold mb-3 sm:mb-4 uppercase">Personal Income Tax Return</h1>
           <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Year of Assessment: {reportData.period.year}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm text-left">
@@ -1688,8 +1842,8 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           </div>
         </div>
 
-        {/* Part A: Personal & Employment Information */}
-        <div>
+          {/* Part A: Personal & Employment Information */}
+          <div>
           <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 border-b-2 border-border pb-1.5 sm:pb-2 uppercase">Part A – Personal & Employment Information</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 text-xs sm:text-sm">
             <div>
@@ -1838,8 +1992,8 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           </div>
         </div>
 
-        {/* Part B: Statement of Income */}
-        <div>
+          {/* Part B: Statement of Income */}
+          <div>
           <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 border-b-2 border-border pb-1.5 sm:pb-2 uppercase">Part B – Statement of Income (All Sources)</h2>
           
           {(!isFreelancer && !isCreator) && (
@@ -2039,14 +2193,321 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           </div>
         </div>
 
-        {/* Part C: Deductible Expenses & Reliefs */}
-        <div>
+          {/* Part C: Deductible Expenses & Reliefs */}
+          <div>
           <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 border-b-2 border-border pb-1.5 sm:pb-2 uppercase">Part C – Deductible Expenses & Reliefs</h2>
+
+          {/* Mobile: redesigned Part C as a compact multi-form */}
+          <div className="sm:hidden space-y-3">
+            <Card className="p-3">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-lg border bg-muted/20 p-2">
+                  <p className="text-[10px] text-muted-foreground">Reliefs Total</p>
+                  <p className="text-xs font-semibold whitespace-nowrap">
+                    {formatCurrency(Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0))}
+                  </p>
+                </div>
+                <div className="rounded-lg border bg-muted/20 p-2">
+                  <p className="text-[10px] text-muted-foreground">Deductible Expenses</p>
+                  <p className="text-xs font-semibold whitespace-nowrap">{formatCurrency(reportData.expenses.taxDeductibleExpenses || 0)}</p>
+                </div>
+                <div className="rounded-lg border bg-muted/20 p-2">
+                  <p className="text-[10px] text-muted-foreground">Capital Allowances</p>
+                  <p className="text-xs font-semibold whitespace-nowrap">{formatCurrency(capitalAllowances || 0)}</p>
+                </div>
+                <div className="rounded-lg border bg-primary/10 p-2">
+                  <p className="text-[10px] text-muted-foreground">Total Deductions</p>
+                  <p className="text-xs font-bold whitespace-nowrap">
+                    {formatCurrency(
+                      (reportData.expenses.taxDeductibleExpenses || 0) +
+                        Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0) +
+                        (capitalAllowances || 0)
+                    )}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-3 flex items-center gap-2">
+                <Label className="text-[10px] text-muted-foreground">Section</Label>
+                <Select
+                  value={partCMobileSection}
+                  onValueChange={(value) => setPartCMobileSection(value as any)}
+                >
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="reliefs">Reliefs</SelectItem>
+                    <SelectItem value="expenses">Expenses</SelectItem>
+                    <SelectItem value="summary">Summary</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </Card>
+
+            {partCMobileSection === "reliefs" && (
+              <Card className="p-0 overflow-hidden">
+                <div className="px-3 py-2 border-b bg-muted/20">
+                  <p className="text-xs font-semibold">Reliefs</p>
+                  <p className="text-[10px] text-muted-foreground">Tap an item to add evidence and notes.</p>
+                </div>
+                <Accordion type="multiple" className="px-0">
+                  {[
+                    {
+                      key: "pensionContribution",
+                      label: "Pension contribution / Retirement savings",
+                      value: reliefAmounts.pensionContribution,
+                      note: reliefNotes.pensionContribution,
+                      evidence: reliefEvidence.pensionContribution
+                    },
+                    {
+                      key: "nhfContribution",
+                      label: "National Housing Fund (NHF) contribution",
+                      value: reliefAmounts.nhfContribution,
+                      note: reliefNotes.nhfContribution,
+                      evidence: reliefEvidence.nhfContribution
+                    },
+                    {
+                      key: "lifeInsurance",
+                      label: "Life Insurance Premiums",
+                      value: reliefAmounts.lifeInsurance,
+                      note: reliefNotes.lifeInsurance,
+                      evidence: reliefEvidence.lifeInsurance
+                    },
+                    {
+                      key: "healthInsurance",
+                      label: "Health Insurance / Medical contributions",
+                      value: reliefAmounts.healthInsurance,
+                      note: reliefNotes.healthInsurance,
+                      evidence: reliefEvidence.healthInsurance
+                    }
+                  ].map((item) => (
+                    <AccordionItem key={item.key} value={item.key}>
+                      <AccordionTrigger className="px-3 py-3 text-xs hover:no-underline">
+                        <div className="flex items-start justify-between gap-3 w-full">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold leading-snug">{item.label}</p>
+                            <p className="text-[10px] text-muted-foreground">Amount (₦)</p>
+                          </div>
+                          <div
+                            className="flex-shrink-0"
+                            onPointerDownCapture={(e) => e.stopPropagation()}
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {isEditing ? (
+                              <Input
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="0.00"
+                                value={formatCurrencyInput(String(item.value || 0))}
+                                onChange={(e) => {
+                                  const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                                  if (!isValid) return
+                                  const parsed = parseFloat(rawValue) || 0
+                                  setReliefAmounts((prev) => ({ ...prev, [item.key]: parsed } as any))
+                                }}
+                                className="h-9 w-[120px] text-xs text-right placeholder:text-xs"
+                              />
+                            ) : (
+                              <span className="text-xs font-semibold whitespace-nowrap">{formatCurrency(item.value || 0)}</span>
+                            )}
+                          </div>
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="px-3">
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] text-muted-foreground">Evidence attached</span>
+                            {isEditing ? (
+                              <Checkbox
+                                checked={item.evidence}
+                                onCheckedChange={(checked) =>
+                                  setReliefEvidence((prev) => ({ ...prev, [item.key]: !!checked } as any))
+                                }
+                              />
+                            ) : (
+                              <span className="text-xs">{item.evidence ? "☑" : "☐"}</span>
+                            )}
+                          </div>
+                          <div>
+                            <Label className="text-[10px] text-muted-foreground">Notes</Label>
+                            {isEditing ? (
+                              <Input
+                                value={String(item.note || "")}
+                                onChange={(e) => setReliefNotes((prev) => ({ ...prev, [item.key]: e.target.value } as any))}
+                                placeholder="Notes (optional)"
+                                className="mt-1 h-9 text-xs placeholder:text-xs"
+                              />
+                            ) : (
+                              <p className="mt-1 text-xs text-muted-foreground">{item.note || "-"}</p>
+                            )}
+                          </div>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  ))}
+                </Accordion>
+              </Card>
+            )}
+
+            {partCMobileSection === "expenses" && (
+              <Card className="p-0 overflow-hidden">
+                <div className="px-3 py-2 border-b bg-muted/20">
+                  <p className="text-xs font-semibold">Business Expenses</p>
+                  <p className="text-[10px] text-muted-foreground">Tap an item for evidence/notes and details.</p>
+                </div>
+
+                {reportData.expenses.transactions && reportData.expenses.transactions.length > 0 ? (
+                  <Accordion type="multiple" className="px-0">
+                    {reportData.expenses.transactions.map((txn, index) => {
+                      // Calculate base amount
+                      let baseAmount = 0
+                      if (txn.currency && txn.currency !== 'NGN' && (txn as any).ngnEquivalent) {
+                        baseAmount = (txn as any).ngnEquivalent
+                      } else {
+                        baseAmount =
+                          (txn as any).netAmount !== undefined
+                            ? (txn as any).netAmount
+                            : (typeof (txn as any).amount === 'number'
+                                ? (txn as any).amount
+                                : Number(String((txn as any).amount).replace(/[₦,]/g, '').trim()) || 0)
+                      }
+
+                      const isCapitalAsset = !!(txn.taxClassification?.isCapitalAsset && txn.taxClassification?.capitalAllowanceRate)
+                      const capitalAssetDetail =
+                        isCapitalAsset && capitalAllowanceDetails.find((d: any) => d.transactionId === (txn as any).id)
+
+                      let deductibleAmount = baseAmount
+                      if (!isCapitalAsset) {
+                        if ((txn as any).transactionNature === 'mixed' && (txn as any).businessPercentage !== undefined) {
+                          deductibleAmount = baseAmount * ((txn as any).businessPercentage / 100)
+                        } else if ((txn as any).transactionNature === 'personal') {
+                          deductibleAmount = 0
+                        }
+                      }
+
+                      const evidenceKey = `expense_${(txn as any).id}`
+
+                      return (
+                        <AccordionItem key={(txn as any).id || index} value={String((txn as any).id || index)}>
+                          <AccordionTrigger className="px-3 py-3 text-xs hover:no-underline">
+                            <div className="flex items-start justify-between gap-3 w-full">
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold truncate">{(txn as any).description || "Untitled transaction"}</p>
+                                <p className="text-[10px] text-muted-foreground truncate">
+                                  {(txn as any).category ? `Category: ${(txn as any).category}` : "Uncategorized"}
+                                </p>
+                                {(txn as any).transactionNature === "mixed" && (txn as any).businessPercentage !== undefined && (
+                                  <p className="text-[10px] text-amber-700 dark:text-amber-300">
+                                    Mixed: {(txn as any).businessPercentage}% business
+                                  </p>
+                                )}
+                              </div>
+                              <div className="text-right flex-shrink-0">
+                                <p className="text-[10px] text-muted-foreground">Deductible</p>
+                                <p className="text-xs font-semibold whitespace-nowrap">
+                                  {isCapitalAsset && capitalAssetDetail
+                                    ? formatCurrency(capitalAssetDetail.allowanceAmount)
+                                    : formatCurrency(deductibleAmount)}
+                                </p>
+                              </div>
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="px-3">
+                            <div className="space-y-2">
+                              {isCapitalAsset && capitalAssetDetail && (
+                                <div className="rounded-lg border bg-muted/20 p-2">
+                                  <p className="text-[10px] text-muted-foreground">Capital Asset</p>
+                                  <p className="text-xs">
+                                    Purchase: <span className="font-medium">{formatCurrency(baseAmount)}</span>
+                                  </p>
+                                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                                    Depreciation: <span className="font-semibold">{formatCurrency(capitalAssetDetail.allowanceAmount)}</span>
+                                  </p>
+                                </div>
+                              )}
+
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] text-muted-foreground">Evidence attached</span>
+                                {isEditing ? (
+                                  <Checkbox
+                                    checked={(reliefEvidence as any)[evidenceKey] || false}
+                                    onCheckedChange={(checked) =>
+                                      setReliefEvidence((prev) => ({ ...prev, [evidenceKey]: !!checked } as any))
+                                    }
+                                  />
+                                ) : (
+                                  <span className="text-xs">{((reliefEvidence as any)[evidenceKey] || false) ? "☑" : "☐"}</span>
+                                )}
+                              </div>
+
+                              <div>
+                                <Label className="text-[10px] text-muted-foreground">Notes</Label>
+                                {isEditing ? (
+                                  <Input
+                                    value={(reliefNotes as any)[evidenceKey] || ""}
+                                    onChange={(e) => setReliefNotes((prev) => ({ ...prev, [evidenceKey]: e.target.value } as any))}
+                                    placeholder="Notes (optional)"
+                                    className="mt-1 h-9 text-xs placeholder:text-xs"
+                                  />
+                                ) : (
+                                  <p className="mt-1 text-xs text-muted-foreground">{(reliefNotes as any)[evidenceKey] || "-"}</p>
+                                )}
+                              </div>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )
+                    })}
+                  </Accordion>
+                ) : (
+                  <div className="p-3">
+                    <p className="text-xs text-muted-foreground text-center">No business expenses recorded for this period</p>
+                  </div>
+                )}
+              </Card>
+            )}
+
+            {partCMobileSection === "summary" && (
+              <div className="space-y-2">
+                <Card className="p-3">
+                  <p className="text-xs font-semibold">Summary</p>
+                  <div className="mt-2 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Reliefs Total</span>
+                      <span className="text-xs font-semibold whitespace-nowrap">
+                        {formatCurrency(Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0))}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Deductible Expenses</span>
+                      <span className="text-xs font-semibold whitespace-nowrap">{formatCurrency(reportData.expenses.taxDeductibleExpenses || 0)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Capital Allowances</span>
+                      <span className="text-xs font-semibold whitespace-nowrap">{formatCurrency(capitalAllowances || 0)}</span>
+                    </div>
+                    <div className="pt-2 border-t flex items-center justify-between">
+                      <span className="text-xs font-semibold">Total Deductions</span>
+                      <span className="text-xs font-bold whitespace-nowrap">
+                        {formatCurrency(
+                          (reportData.expenses.taxDeductibleExpenses || 0) +
+                            Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0) +
+                            (capitalAllowances || 0)
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            )}
+          </div>
           
           {/* Section 1: Reliefs */}
-          <div className="mb-4">
+          <div className="hidden sm:block mb-4">
             <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Reliefs</h3>
-            <div className="overflow-x-auto -mx-3 sm:-mx-4 md:mx-0 px-3 sm:px-4 md:px-0">
+            {/* Desktop: keep table */}
+            <div className="hidden sm:block overflow-x-auto -mx-3 sm:-mx-4 md:mx-0 px-3 sm:px-4 md:px-0">
               <table className="w-full min-w-[600px] border-collapse border border-border text-xs sm:text-sm">
                 <thead>
                   <tr className="bg-muted">
@@ -2239,9 +2700,10 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           </div>
 
           {/* Section 2: Business Expenses */}
-          <div className="mb-4">
+          <div className="hidden sm:block mb-4">
             <h3 className="text-sm font-semibold mb-2 text-muted-foreground">Business Expenses</h3>
-            <div className="overflow-x-auto -mx-3 sm:-mx-4 md:mx-0 px-3 sm:px-4 md:px-0">
+            {/* Desktop: keep table */}
+            <div className="hidden sm:block overflow-x-auto -mx-3 sm:-mx-4 md:mx-0 px-3 sm:px-4 md:px-0">
               <table className="w-full min-w-[600px] border-collapse border border-border text-xs sm:text-sm">
                 <thead>
                   <tr className="bg-muted">
@@ -2410,7 +2872,8 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           </div>
 
           {/* Total Row */}
-          <div className="mt-4 overflow-x-auto -mx-3 sm:-mx-4 md:mx-0 px-3 sm:px-4 md:px-0">
+          {/* Desktop: keep table */}
+          <div className="hidden sm:block mt-4 overflow-x-auto -mx-3 sm:-mx-4 md:mx-0 px-3 sm:px-4 md:px-0">
             <table className="w-full min-w-[600px] border-collapse border border-border text-xs sm:text-sm">
               <tbody>
                 <tr className="bg-muted font-bold">
@@ -2429,8 +2892,8 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           </div>
         </div>
 
-        {/* Part D: Tax Already Paid (Credits) */}
-        <div>
+          {/* Part D: Tax Already Paid (Credits) */}
+          <div>
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3 mb-2 sm:mb-3">
             <h2 className="text-base sm:text-lg font-semibold border-b-2 border-border pb-1.5 sm:pb-2 uppercase">Part D – Tax Already Paid (Credits)</h2>
             {isEditing && (
@@ -2446,7 +2909,143 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
               </Button>
             )}
             </div>
-          <div className="overflow-x-auto -mx-2 sm:-mx-3 md:mx-0 px-2 sm:px-3 md:px-0">
+          {/* Mobile: cards */}
+          <div className="sm:hidden space-y-2">
+            {loadingCredits ? (
+              <Card className="p-3">
+                <p className="text-xs text-muted-foreground text-center">Loading tax credits...</p>
+              </Card>
+            ) : allTaxCredits.length === 0 ? (
+              <Card className="p-3">
+                <p className="text-xs text-muted-foreground text-center italic">No tax credits recorded for this period</p>
+              </Card>
+            ) : (
+              <>
+                {allTaxCredits.map((credit) => (
+                  <Card key={credit.id} className="p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold truncate">Type</p>
+                        {isEditing && credit.source === "manual" ? (
+                          <Input
+                            value={credit.type}
+                            onChange={(e) => {
+                              const updated = allTaxCredits.map((c) => (c.id === credit.id ? { ...c, type: e.target.value } : c))
+                              setAllTaxCredits(updated)
+                              updateTaxCreditsTotals(updated)
+                            }}
+                            className="mt-1 h-9 text-xs placeholder:text-xs"
+                            placeholder="Type of payment"
+                          />
+                        ) : (
+                          <p className="text-xs text-muted-foreground mt-1 break-words">{credit.type}</p>
+                        )}
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-[10px] text-muted-foreground">Amount</p>
+                        {isEditing && credit.source === "manual" ? (
+                          <Input
+                            type="number"
+                            value={credit.amount}
+                            onChange={(e) => {
+                              const amount = parseFloat(e.target.value) || 0
+                              const updated = allTaxCredits.map((c) => (c.id === credit.id ? { ...c, amount } : c))
+                              setAllTaxCredits(updated)
+                              updateTaxCreditsTotals(updated)
+                            }}
+                            className="mt-1 h-9 text-xs text-right placeholder:text-xs w-28"
+                            placeholder="0.00"
+                          />
+                        ) : (
+                          <p className="text-xs font-medium whitespace-nowrap">{formatCurrency(credit.amount)}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-2 grid grid-cols-2 gap-2">
+                      <div>
+                        <p className="text-[10px] text-muted-foreground">Tax Year</p>
+                        {isEditing && credit.source === "manual" ? (
+                          <Input
+                            type="number"
+                            value={credit.taxYear}
+                            onChange={(e) => {
+                              const year = parseInt(e.target.value) || reportData.period.year
+                              const updated = allTaxCredits.map((c) => (c.id === credit.id ? { ...c, taxYear: year } : c))
+                              setAllTaxCredits(updated)
+                            }}
+                            className="mt-1 h-9 text-xs text-center placeholder:text-xs"
+                          />
+                        ) : (
+                          <p className="text-xs text-muted-foreground">{credit.taxYear}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[10px] text-muted-foreground">Evidence</p>
+                        {isEditing ? (
+                          <Checkbox
+                            checked={credit.evidenceAttached}
+                            onCheckedChange={(checked) => {
+                              const updated = allTaxCredits.map((c) =>
+                                c.id === credit.id ? { ...c, evidenceAttached: !!checked } : c
+                              )
+                              setAllTaxCredits(updated)
+                            }}
+                          />
+                        ) : (
+                          <span className="text-xs">{credit.evidenceAttached ? "☑" : "☐"}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-2">
+                      <Label className="text-[10px] text-muted-foreground">Notes</Label>
+                      {isEditing ? (
+                        <Input
+                          value={credit.notes}
+                          onChange={(e) => {
+                            const updated = allTaxCredits.map((c) => (c.id === credit.id ? { ...c, notes: e.target.value } : c))
+                            setAllTaxCredits(updated)
+                          }}
+                          placeholder="Notes"
+                          className="mt-1 h-9 text-xs placeholder:text-xs"
+                        />
+                      ) : (
+                        <p className="mt-1 text-xs text-muted-foreground">{credit.notes || "-"}</p>
+                      )}
+                    </div>
+
+                    {isEditing && credit.source === "manual" && (
+                      <div className="mt-2 flex justify-end">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const updated = allTaxCredits.filter((c) => c.id !== credit.id)
+                            setAllTaxCredits(updated)
+                            updateTaxCreditsTotals(updated)
+                          }}
+                          className="h-8 px-2 text-xs text-destructive"
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    )}
+                  </Card>
+                ))}
+
+                <Card className="p-3 bg-muted/30">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold">Total Tax Credits / Prepaid Tax</p>
+                    <p className="text-xs font-bold whitespace-nowrap">{formatCurrency(taxCredits.total)}</p>
+                  </div>
+                </Card>
+              </>
+            )}
+          </div>
+
+          {/* Desktop: keep table */}
+          <div className="hidden sm:block overflow-x-auto -mx-2 sm:-mx-3 md:mx-0 px-2 sm:px-3 md:px-0">
             <table className="w-full min-w-[600px] border-collapse border border-border text-xs sm:text-sm">
               <thead>
                 <tr className="bg-muted">
@@ -2600,8 +3199,8 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
             </div>
             </div>
 
-        {/* Part E: Tax Computation */}
-        <div>
+          {/* Part E: Tax Computation */}
+          <div>
           <h2 className="text-base sm:text-lg font-semibold mb-2 sm:mb-3 border-b-2 border-border pb-1.5 sm:pb-2 uppercase">Part E – Tax Computation</h2>
           <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
             <div className="flex flex-col sm:flex-row justify-between gap-1 sm:gap-0 py-2 border-b border-border">
@@ -2752,15 +3351,15 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           </DialogContent>
         </Dialog>
 
-        {/* Part F: Declaration & Signature */}
-        <div>
-          <h2 className="text-lg font-semibold mb-4 border-b-2 border-border pb-2 uppercase">Part F – Declaration & Signature</h2>
-          <div className="border-2 border-border p-6 rounded-lg">
-            <p className="text-sm mb-6 leading-relaxed">
+          {/* Part F: Declaration & Signature */}
+          <div>
+          <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 border-b-2 border-border pb-1.5 sm:pb-2 uppercase">Part F – Declaration & Signature</h2>
+          <div className="border-2 border-border p-3 sm:p-6 rounded-lg">
+            <p className="text-xs sm:text-sm mb-4 sm:mb-6 leading-relaxed">
               <strong>I hereby declare that the information given in this return is correct and complete to the best of my knowledge and belief. 
               I understand that false declaration may lead to penalties under the law.</strong>
           </p>
-          <div className="grid grid-cols-2 gap-8 mt-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-8 mt-4 sm:mt-6">
             <div>
                 <div className="border-t-2 border-border pt-2">
                   <p className="text-xs text-muted-foreground mb-2">Name: {reportData.userInfo.name}</p>
@@ -2768,10 +3367,10 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                     <p className="text-xs text-muted-foreground mb-2">Signature / Digital Signature:</p>
                     {isEditing ? (
                       <div className="space-y-2">
-                        {declarationInfo.signatureUrl ? (
+                        {(signaturePreviewUrl || declarationInfo.signatureUrl) ? (
                           <div className="relative border border-border rounded p-2 bg-muted/30">
                             <img 
-                              src={declarationInfo.signatureUrl} 
+                              src={signaturePreviewUrl || declarationInfo.signatureUrl} 
                               alt="Signature" 
                               className="max-h-20 object-contain"
                             />
@@ -2779,7 +3378,12 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                               variant="ghost"
                               size="sm"
                               className="absolute top-1 right-1 h-6 w-6 p-0"
-                              onClick={() => setDeclarationInfo(prev => ({ ...prev, signatureUrl: '' }))}
+                              onClick={() => {
+                                if (signaturePreviewUrl) URL.revokeObjectURL(signaturePreviewUrl)
+                                setSignaturePreviewUrl("")
+                                setPendingSignatureFile(null)
+                                setDeclarationInfo(prev => ({ ...prev, signatureUrl: '' }))
+                              }}
                             >
                               <X className="w-3 h-3" />
                             </Button>
@@ -2793,7 +3397,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                               onChange={(e) => {
                                 const file = e.target.files?.[0]
                                 if (file) {
-                                  handleSignatureUpload(file)
+                                  handleSignatureSelected(file)
                                 }
                               }}
                               disabled={uploadingSignature || scanningSignature}
@@ -2816,9 +3420,9 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                       </div>
                     ) : (
                       <div className="min-h-[60px] border border-border rounded p-2 bg-muted/30 flex items-center justify-center">
-                        {declarationInfo.signatureUrl ? (
+                        {(signaturePreviewUrl || declarationInfo.signatureUrl) ? (
                           <img 
-                            src={declarationInfo.signatureUrl} 
+                            src={signaturePreviewUrl || declarationInfo.signatureUrl} 
                             alt="Signature" 
                             className="max-h-20 object-contain"
                           />
@@ -2853,11 +3457,11 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
           </div>
         </div>
 
-        {/* Attachment Checklist */}
-        <div>
-          <h2 className="text-lg font-semibold mb-4 border-b-2 border-border pb-2 uppercase">Attachment Checklist</h2>
-          <div className="border-2 border-border p-6 rounded-lg">
-            <p className="text-sm mb-4 text-muted-foreground">
+          {/* Attachment Checklist */}
+          <div>
+          <h2 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4 border-b-2 border-border pb-1.5 sm:pb-2 uppercase">Attachment Checklist</h2>
+          <div className="border-2 border-border p-3 sm:p-6 rounded-lg">
+            <p className="text-xs sm:text-sm mb-3 sm:mb-4 text-muted-foreground">
               Please tick (✓) the documents attached with this return:
             </p>
             <div className="space-y-2 text-xs sm:text-sm">
@@ -2956,7 +3560,7 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
                 <Button
                   onClick={() => {
                     if (!isDisabled) {
-                      router.push(`/dashboard/reports/file/${reportId}`)
+                      router.push(`${dashboardBasePath}/reports/file/${reportId}`)
                     }
                   }}
                   variant={buttonVariant}
@@ -2970,7 +3574,680 @@ export function SelfAssessmentPreview({ reportData, formData, isEditing = false,
             })()}
           </div>
         )}
+        </div>
+      </div>
+
+      {/* Mobile-only accordion form */}
+      <div className={`sm:hidden mt-2 ${fullBleedMobile ? "px-2 pb-2" : ""}`}>
+        <Accordion type="multiple" defaultValue={["summary"]} className="space-y-2">
+          <AccordionItem value="summary" className="border rounded-lg">
+            <AccordionTrigger className="px-3 py-2.5 text-xs font-semibold">Summary</AccordionTrigger>
+            <AccordionContent className="px-3">
+              <div className="text-center border border-border p-3 rounded-lg bg-muted/20">
+                <h1 className="text-sm font-bold mb-1.5 uppercase leading-snug">Personal Income Tax Return</h1>
+                <h2 className="text-[11px] font-semibold mb-2">Year of Assessment: {reportData.period.year}</h2>
+                <div className="grid grid-cols-1 gap-1.5 text-[11px] text-left">
+                  <div className="flex justify-between gap-2"><span className="font-semibold">Taxpayer</span><span className="text-right">{reportData.userInfo.name}</span></div>
+                  <div className="flex justify-between gap-2"><span className="font-semibold">TIN / NIN</span><span className="text-right">{reportData.userInfo.tin || 'N/A'}</span></div>
+                  <div className="flex justify-between gap-2"><span className="font-semibold">Business Type</span><span className="text-right">{reportData.userInfo.businessType || 'N/A'}</span></div>
+                  <div className="flex justify-between gap-2"><span className="font-semibold">Generated</span><span className="text-right">{format(new Date(reportData.generatedAt), 'MMM dd, yyyy')}</span></div>
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="partA" className="border rounded-lg">
+            <AccordionTrigger className="px-3 py-2.5 text-xs font-semibold">Part A — Personal Info</AccordionTrigger>
+            <AccordionContent className="px-3">
+              {/* reuse existing Part A layout (already responsive) */}
+              <div className="pt-1">{/* Part A content is in desktop block; keep a simplified mobile view */}
+                <div className="grid grid-cols-1 gap-2 text-xs">
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground font-semibold">Full Name</Label>
+                    {isEditing ? (
+                      <Input
+                        value={reportData.userInfo.name}
+                        onChange={(e) => updateReportData({ userInfo: { ...reportData.userInfo, name: e.target.value } })}
+                        className="mt-1 h-9 text-xs"
+                      />
+                    ) : (
+                      <p className="mt-1 text-xs font-medium">{reportData.userInfo.name}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label className="text-[10px] text-muted-foreground font-semibold">TIN / NIN</Label>
+                    {isEditing ? (
+                      <Input
+                        value={reportData.userInfo.tin || ""}
+                        onChange={(e) => updateReportData({ userInfo: { ...reportData.userInfo, tin: e.target.value } })}
+                        className="mt-1 h-9 text-xs"
+                        placeholder="Enter TIN/NIN"
+                      />
+                    ) : (
+                      <p className="mt-1 text-xs font-medium text-muted-foreground">{reportData.userInfo.tin || "N/A"}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="partB" className="border rounded-lg">
+            <AccordionTrigger className="px-3 py-2.5 text-xs font-semibold">Part B — Income</AccordionTrigger>
+            <AccordionContent className="px-3">
+              <div className="pt-1 space-y-3">
+                <Card className="p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold">Total Gross Income</p>
+                    <p className="text-xs font-bold whitespace-nowrap">{formatCurrency(reportData.income.totalIncome)}</p>
+                  </div>
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    Breakdown is simplified for mobile. Desktop shows full detail.
+                  </p>
+                </Card>
+
+                {(!isFreelancer && !isCreator) && (
+                  <Card className="p-3">
+                    <p className="text-xs font-semibold">Employment Income</p>
+                    <div className="mt-2 flex items-center justify-between">
+                      <span className="text-xs text-muted-foreground">Subtotal</span>
+                      <span className="text-xs font-semibold whitespace-nowrap">{formatCurrency(employmentIncome)}</span>
+                    </div>
+                  </Card>
+                )}
+
+                <Card className="p-3">
+                  <p className="text-xs font-semibold">Business / Self-Employment Income</p>
+                  <div className="mt-2 space-y-2">
+                    {businessIncomeCategories.length > 0 ? (
+                      businessIncomeCategories.slice(0, 8).map((item, idx) => (
+                        <div key={idx} className="flex items-center justify-between gap-3">
+                          <span className="text-xs text-muted-foreground truncate">{item.category}</span>
+                          <span className="text-xs font-medium whitespace-nowrap">{formatCurrency(item.amount)}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-xs text-muted-foreground">Subtotal</span>
+                        <span className="text-xs font-medium whitespace-nowrap">{formatCurrency(businessIncome)}</span>
+                      </div>
+                    )}
+                    <div className="pt-2 border-t flex items-center justify-between gap-3">
+                      <span className="text-xs font-semibold">Subtotal</span>
+                      <span className="text-xs font-bold whitespace-nowrap">{formatCurrency(businessIncome)}</span>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="partC" className="border rounded-lg">
+            <AccordionTrigger className="px-3 py-2.5 text-xs font-semibold">Part C — Deductions</AccordionTrigger>
+            <AccordionContent className="px-3">
+              <div className="pt-1 space-y-3">
+                <Card className="p-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="rounded-lg border bg-muted/20 p-2">
+                      <p className="text-[10px] text-muted-foreground">Reliefs Total</p>
+                      <p className="text-xs font-semibold whitespace-nowrap">
+                        {formatCurrency(Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0))}
+                      </p>
+                    </div>
+                    <div className="rounded-lg border bg-muted/20 p-2">
+                      <p className="text-[10px] text-muted-foreground">Deductible Expenses</p>
+                      <p className="text-xs font-semibold whitespace-nowrap">{formatCurrency(reportData.expenses.taxDeductibleExpenses || 0)}</p>
+                    </div>
+                    <div className="rounded-lg border bg-muted/20 p-2">
+                      <p className="text-[10px] text-muted-foreground">Capital Allowances</p>
+                      <p className="text-xs font-semibold whitespace-nowrap">{formatCurrency(capitalAllowances || 0)}</p>
+                    </div>
+                    <div className="rounded-lg border bg-primary/10 p-2">
+                      <p className="text-[10px] text-muted-foreground">Total Deductions</p>
+                      <p className="text-xs font-bold whitespace-nowrap">
+                        {formatCurrency(
+                          (reportData.expenses.taxDeductibleExpenses || 0) +
+                            Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0) +
+                            (capitalAllowances || 0)
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 flex items-center gap-2">
+                    <Label className="text-[10px] text-muted-foreground">Section</Label>
+                    <Select value={partCMobileSection} onValueChange={(v) => setPartCMobileSection(v as any)}>
+                      <SelectTrigger className="h-9 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="reliefs">Reliefs</SelectItem>
+                        <SelectItem value="expenses">Expenses</SelectItem>
+                        <SelectItem value="summary">Summary</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </Card>
+
+                {partCMobileSection === "reliefs" && (
+                  <Card className="p-0 overflow-hidden">
+                    <div className="px-3 py-2 border-b bg-muted/20">
+                      <p className="text-xs font-semibold">Reliefs</p>
+                      <p className="text-[10px] text-muted-foreground">Tap an item to add evidence and notes.</p>
+                    </div>
+                    <Accordion type="multiple" className="px-0">
+                      {[
+                        { key: "pensionContribution", label: "Pension contribution / Retirement savings" },
+                        { key: "nhfContribution", label: "National Housing Fund (NHF) contribution" },
+                        { key: "lifeInsurance", label: "Life Insurance Premiums" },
+                        { key: "healthInsurance", label: "Health Insurance / Medical contributions" }
+                      ].map((item) => {
+                        const value = (reliefAmounts as any)[item.key] || 0
+                        const note = (reliefNotes as any)[item.key] || ""
+                        const evidence = (reliefEvidence as any)[item.key] || false
+
+                        return (
+                          <AccordionItem key={item.key} value={item.key}>
+                            <AccordionTrigger className="px-3 py-3 text-xs hover:no-underline">
+                              <div className="flex items-start justify-between gap-3 w-full">
+                                <div className="min-w-0">
+                                  <p className="text-xs font-semibold leading-snug">{item.label}</p>
+                                  <p className="text-[10px] text-muted-foreground">Amount (₦)</p>
+                                </div>
+                                <div
+                                  className="flex-shrink-0"
+                                  onPointerDownCapture={(e) => e.stopPropagation()}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {isEditing ? (
+                                    <Input
+                                      type="text"
+                                      inputMode="decimal"
+                                      placeholder="0.00"
+                                      value={formatCurrencyInput(String(value))}
+                                      onChange={(e) => {
+                                        const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                                        if (!isValid) return
+                                        ;(setReliefAmounts as any)((prev: any) => ({ ...prev, [item.key]: parseFloat(rawValue) || 0 }))
+                                      }}
+                                      className="h-9 w-[120px] text-xs text-right placeholder:text-xs"
+                                    />
+                                  ) : (
+                                    <span className="text-xs font-semibold whitespace-nowrap">{formatCurrency(value)}</span>
+                                  )}
+                                </div>
+                              </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="px-3">
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] text-muted-foreground">Evidence attached</span>
+                                  {isEditing ? (
+                                    <Checkbox
+                                      checked={evidence}
+                                      onCheckedChange={(checked) =>
+                                        (setReliefEvidence as any)((prev: any) => ({ ...prev, [item.key]: !!checked }))
+                                      }
+                                    />
+                                  ) : (
+                                    <span className="text-xs">{evidence ? "☑" : "☐"}</span>
+                                  )}
+                                </div>
+                                <div>
+                                  <Label className="text-[10px] text-muted-foreground">Notes</Label>
+                                  {isEditing ? (
+                                    <Input
+                                      value={note}
+                                      onChange={(e) =>
+                                        (setReliefNotes as any)((prev: any) => ({ ...prev, [item.key]: e.target.value }))
+                                      }
+                                      placeholder="Notes (optional)"
+                                      className="mt-1 h-9 text-xs placeholder:text-xs"
+                                    />
+                                  ) : (
+                                    <p className="mt-1 text-xs text-muted-foreground">{note || "-"}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </AccordionContent>
+                          </AccordionItem>
+                        )
+                      })}
+                    </Accordion>
+                  </Card>
+                )}
+
+                {partCMobileSection === "expenses" && (
+                  <Card className="p-0 overflow-hidden">
+                    <div className="px-3 py-2 border-b bg-muted/20">
+                      <p className="text-xs font-semibold">Business Expenses</p>
+                      <p className="text-[10px] text-muted-foreground">Tap an item for evidence/notes.</p>
+                    </div>
+
+                    {reportData.expenses.transactions && reportData.expenses.transactions.length > 0 ? (
+                      <Accordion type="multiple" className="px-0">
+                        {reportData.expenses.transactions.map((txn, index) => {
+                          let baseAmount = 0
+                          if (txn.currency && txn.currency !== "NGN" && (txn as any).ngnEquivalent) {
+                            baseAmount = (txn as any).ngnEquivalent
+                          } else {
+                            baseAmount =
+                              (txn as any).netAmount !== undefined
+                                ? (txn as any).netAmount
+                                : (typeof (txn as any).amount === "number"
+                                    ? (txn as any).amount
+                                    : Number(String((txn as any).amount).replace(/[₦,]/g, "").trim()) || 0)
+                          }
+
+                          const isCapitalAsset = !!(txn.taxClassification?.isCapitalAsset && txn.taxClassification?.capitalAllowanceRate)
+                          const capitalAssetDetail =
+                            isCapitalAsset && capitalAllowanceDetails.find((d: any) => d.transactionId === (txn as any).id)
+
+                          let deductibleAmount = baseAmount
+                          if (!isCapitalAsset) {
+                            if ((txn as any).transactionNature === "mixed" && (txn as any).businessPercentage !== undefined) {
+                              deductibleAmount = baseAmount * ((txn as any).businessPercentage / 100)
+                            } else if ((txn as any).transactionNature === "personal") {
+                              deductibleAmount = 0
+                            }
+                          }
+
+                          const evidenceKey = `expense_${(txn as any).id}`
+                          const evidence = (reliefEvidence as any)[evidenceKey] || false
+                          const note = (reliefNotes as any)[evidenceKey] || ""
+
+                          return (
+                            <AccordionItem key={(txn as any).id || index} value={String((txn as any).id || index)}>
+                              <AccordionTrigger className="px-3 py-3 text-xs hover:no-underline">
+                                <div className="flex items-start justify-between gap-3 w-full">
+                                  <div className="min-w-0">
+                                    
+                                    {(() => {
+                                      const fullDesc = String((txn as any).description || "Untitled transaction")
+                                      const shortDesc = fullDesc.length > 15 ? `${fullDesc.slice(0, 15)}…` : fullDesc
+                                      return (
+                                        <p className="text-xs font-semibold truncate" title={fullDesc}>
+                                          {shortDesc}
+                                        </p>
+                                      )
+                                    })()}
+                                    <p className="text-[10px] text-muted-foreground truncate">
+                                      {(txn as any).category ? `Category: ${(txn as any).category}` : "Uncategorized"}
+                                    </p>
+                                  </div>
+                                  <div className="text-right flex-shrink-0">
+                                    <p className="text-[10px] text-muted-foreground">Deductible</p>
+                                    <p className="text-xs font-semibold whitespace-nowrap">
+                                      {isCapitalAsset && capitalAssetDetail
+                                        ? formatCurrency(capitalAssetDetail.allowanceAmount)
+                                        : formatCurrency(deductibleAmount)}
+                                    </p>
+                                  </div>
+                                </div>
+                              </AccordionTrigger>
+                              <AccordionContent className="px-3">
+                                <div className="space-y-2">
+                                  {isCapitalAsset && capitalAssetDetail && (
+                                    <div className="rounded-lg border bg-muted/20 p-2">
+                                      <p className="text-[10px] text-muted-foreground">Capital Asset</p>
+                                      <p className="text-xs">
+                                        Purchase: <span className="font-medium">{formatCurrency(baseAmount)}</span>
+                                      </p>
+                                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                                        Depreciation: <span className="font-semibold">{formatCurrency(capitalAssetDetail.allowanceAmount)}</span>
+                                      </p>
+                                    </div>
+                                  )}
+
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[10px] text-muted-foreground">Evidence attached</span>
+                                    {isEditing ? (
+                                      <Checkbox
+                                        checked={evidence}
+                                        onCheckedChange={(checked) =>
+                                          setReliefEvidence((prev) => ({ ...prev, [evidenceKey]: !!checked } as any))
+                                        }
+                                      />
+                                    ) : (
+                                      <span className="text-xs">{evidence ? "☑" : "☐"}</span>
+                                    )}
+                                  </div>
+
+                                  <div>
+                                    <Label className="text-[10px] text-muted-foreground">Notes</Label>
+                                    {isEditing ? (
+                                      <Input
+                                        value={note}
+                                        onChange={(e) => setReliefNotes((prev) => ({ ...prev, [evidenceKey]: e.target.value } as any))}
+                                        placeholder="Notes (optional)"
+                                        className="mt-1 h-9 text-xs placeholder:text-xs"
+                                      />
+                                    ) : (
+                                      <p className="mt-1 text-xs text-muted-foreground">{note || "-"}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              </AccordionContent>
+                            </AccordionItem>
+                          )
+                        })}
+                      </Accordion>
+                    ) : (
+                      <div className="p-3">
+                        <p className="text-xs text-muted-foreground text-center">No business expenses recorded for this period</p>
+                      </div>
+                    )}
+                  </Card>
+                )}
+
+                {partCMobileSection === "summary" && (
+                  <Card className="p-3">
+                    <p className="text-xs font-semibold">Summary</p>
+                    <div className="mt-2 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Reliefs Total</span>
+                        <span className="text-xs font-semibold whitespace-nowrap">
+                          {formatCurrency(Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0))}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Deductible Expenses</span>
+                        <span className="text-xs font-semibold whitespace-nowrap">{formatCurrency(reportData.expenses.taxDeductibleExpenses || 0)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs text-muted-foreground">Capital Allowances</span>
+                        <span className="text-xs font-semibold whitespace-nowrap">{formatCurrency(capitalAllowances || 0)}</span>
+                      </div>
+                      <div className="pt-2 border-t flex items-center justify-between">
+                        <span className="text-xs font-semibold">Total Deductions</span>
+                        <span className="text-xs font-bold whitespace-nowrap">
+                          {formatCurrency(
+                            (reportData.expenses.taxDeductibleExpenses || 0) +
+                              Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0) +
+                              (capitalAllowances || 0)
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  </Card>
+                )}
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="partD" className="border rounded-lg">
+            <AccordionTrigger className="px-3 py-2.5 text-xs font-semibold">Part D — Tax Credits</AccordionTrigger>
+            <AccordionContent className="px-3">
+              <div className="pt-1 space-y-2">
+                {loadingCredits ? (
+                  <Card className="p-3">
+                    <p className="text-xs text-muted-foreground text-center">Loading tax credits...</p>
+                  </Card>
+                ) : allTaxCredits.length === 0 ? (
+                  <Card className="p-3">
+                    <p className="text-xs text-muted-foreground text-center italic">No tax credits recorded for this period</p>
+                  </Card>
+                ) : (
+                  <>
+                    {allTaxCredits.map((credit) => (
+                      <Card key={credit.id} className="p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-[10px] text-muted-foreground">Type</p>
+                            <p className="text-xs font-semibold break-words">{credit.type}</p>
+                          </div>
+                          <div className="text-right flex-shrink-0">
+                            <p className="text-[10px] text-muted-foreground">Amount</p>
+                            <p className="text-xs font-bold whitespace-nowrap">{formatCurrency(credit.amount)}</p>
+                          </div>
+                        </div>
+                        <div className="mt-2 flex items-center justify-between">
+                          <span className="text-[10px] text-muted-foreground">Evidence</span>
+                          {isEditing ? (
+                            <Checkbox
+                              checked={credit.evidenceAttached}
+                              onCheckedChange={(checked) => {
+                                const updated = allTaxCredits.map((c) =>
+                                  c.id === credit.id ? { ...c, evidenceAttached: !!checked } : c
+                                )
+                                setAllTaxCredits(updated)
+                              }}
+                            />
+                          ) : (
+                            <span className="text-xs">{credit.evidenceAttached ? "☑" : "☐"}</span>
+                          )}
+                        </div>
+                        <div className="mt-2">
+                          <p className="text-[10px] text-muted-foreground">Notes</p>
+                          {isEditing ? (
+                            <Input
+                              value={credit.notes}
+                              onChange={(e) => {
+                                const updated = allTaxCredits.map((c) => (c.id === credit.id ? { ...c, notes: e.target.value } : c))
+                                setAllTaxCredits(updated)
+                              }}
+                              placeholder="Notes"
+                              className="mt-1 h-9 text-xs placeholder:text-xs"
+                            />
+                          ) : (
+                            <p className="text-xs text-muted-foreground mt-1">{credit.notes || "-"}</p>
+                          )}
+                        </div>
+                      </Card>
+                    ))}
+                  </>
+                )}
+
+                <Card className="p-3 bg-muted/30">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-semibold">Total Tax Credits</p>
+                    <p className="text-xs font-bold whitespace-nowrap">{formatCurrency(taxCredits.total)}</p>
+                  </div>
+                </Card>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="partE" className="border rounded-lg">
+            <AccordionTrigger className="px-3 py-2.5 text-xs font-semibold">Part E — Computation</AccordionTrigger>
+            <AccordionContent className="px-3">
+              <div className="pt-1 space-y-2">
+                <Card className="p-3">
+                  <p className="text-xs font-semibold">Tax Computation (Summary)</p>
+                  <div className="mt-2 space-y-2 text-xs">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">Gross Income</span>
+                      <span className="font-semibold whitespace-nowrap">{formatCurrency(reportData.tax.grossIncome)}</span>
+                    </div>
+
+                    {/* Show how deductions were derived (mobile clarity) */}
+                    <div className="pt-2 border-t">
+                      <p className="text-[10px] text-muted-foreground mb-2">Deductions</p>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-muted-foreground">Deductible Expenses</span>
+                          <span className="font-semibold whitespace-nowrap">{formatCurrency(reportData.expenses.taxDeductibleExpenses || 0)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-muted-foreground">Reliefs</span>
+                          <span className="font-semibold whitespace-nowrap">
+                            {formatCurrency(Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0))}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="text-muted-foreground">Capital Allowances</span>
+                          <span className="font-semibold whitespace-nowrap">{formatCurrency(capitalAllowances || 0)}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="font-semibold">Total Deductions</span>
+                          <span className="font-bold whitespace-nowrap">
+                            {formatCurrency(
+                              (reportData.expenses.taxDeductibleExpenses || 0) +
+                                Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0) +
+                                (capitalAllowances || 0)
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">Taxable Income</span>
+                      <span className="font-semibold whitespace-nowrap">{formatCurrency(reportData.tax.taxableIncome)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">Gross Tax Due</span>
+                      <span className="font-semibold whitespace-nowrap">{formatCurrency(reportData.tax.taxPayable)}</span>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-muted-foreground">Tax Credits</span>
+                      <span className="font-semibold whitespace-nowrap">-{formatCurrency(taxCredits.total)}</span>
+                    </div>
+                    {hasGoldAccess && whtCredits > 0 && (
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-muted-foreground">WHT Credits</span>
+                        <span className="font-semibold text-green-600 dark:text-green-400 whitespace-nowrap">-{formatCurrency(whtCredits)}</span>
+                      </div>
+                    )}
+                    <div className="pt-2 border-t flex items-center justify-between gap-3">
+                      <span className="font-semibold">Net Tax Payable</span>
+                      <span className="font-bold text-primary whitespace-nowrap">
+                        {formatCurrency(Math.max(0, (reportData.tax.taxPayable || 0) - taxCredits.total - whtCredits))}
+                      </span>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="partF" className="border rounded-lg">
+            <AccordionTrigger className="px-3 py-2.5 text-xs font-semibold">Part F — Declaration</AccordionTrigger>
+            <AccordionContent className="px-3">
+              <div className="pt-1 space-y-3">
+                <Card className="p-3">
+                  <p className="text-xs font-semibold">Declaration</p>
+                  <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+                    <strong>
+                      I hereby declare that the information given in this return is correct and complete to the best of my knowledge and belief.
+                      I understand that false declaration may lead to penalties under the law.
+                    </strong>
+                  </p>
+                </Card>
+
+                <Card className="p-3">
+                  <p className="text-xs font-semibold">Signature</p>
+                  <div className="mt-2">
+                    {(signaturePreviewUrl || declarationInfo.signatureUrl) ? (
+                      <div className="relative border border-border rounded p-2 bg-muted/30">
+                        <img
+                          src={signaturePreviewUrl || declarationInfo.signatureUrl}
+                          alt="Signature"
+                          className="max-h-24 object-contain mx-auto"
+                        />
+                        {isEditing && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="absolute top-1 right-1 h-7 w-7 p-0"
+                            onClick={() => {
+                              if (signaturePreviewUrl) URL.revokeObjectURL(signaturePreviewUrl)
+                              setSignaturePreviewUrl("")
+                              setPendingSignatureFile(null)
+                              setDeclarationInfo((prev) => ({ ...prev, signatureUrl: "" }))
+                            }}
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
+                    ) : isEditing ? (
+                      <label className="border-2 border-dashed border-border rounded-lg p-4 text-center cursor-pointer hover:border-primary transition-colors block">
+                        <input
+                          type="file"
+                          className="hidden"
+                          accept="image/*,.pdf"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0]
+                            if (file) handleSignatureSelected(file)
+                          }}
+                          disabled={uploadingSignature || scanningSignature}
+                        />
+                        {uploadingSignature || scanningSignature ? (
+                          <div className="flex flex-col items-center gap-2">
+                            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">
+                              {scanningSignature ? "Processing..." : "Uploading..."}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center gap-2">
+                            <Upload className="w-6 h-6 text-muted-foreground" />
+                            <span className="text-xs text-muted-foreground">Upload Signature</span>
+                          </div>
+                        )}
+                      </label>
+                    ) : (
+                      <div className="min-h-[60px] border border-border rounded p-3 bg-muted/30 flex items-center justify-center">
+                        <span className="text-xs text-muted-foreground">_________________</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-3">
+                    <Label className="text-[10px] text-muted-foreground">Date</Label>
+                    {isEditing ? (
+                      <Input
+                        type="date"
+                        value={declarationInfo.signatureDate}
+                        onChange={(e) => setDeclarationInfo((prev) => ({ ...prev, signatureDate: e.target.value }))}
+                        className="mt-1 h-9 text-xs"
+                      />
+                    ) : (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {declarationInfo.signatureDate
+                          ? format(new Date(declarationInfo.signatureDate), "dd / MM / yyyy")
+                          : `__ / __ / ${reportData.period.year}`}
+                      </p>
+                    )}
+                  </div>
+                </Card>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+
+          <AccordionItem value="attachments" className="border rounded-lg">
+            <AccordionTrigger className="px-3 py-2.5 text-xs font-semibold">Attachments</AccordionTrigger>
+            <AccordionContent className="px-3">
+              <div className="pt-1">
+                <Card className="p-3">
+                  <p className="text-xs font-semibold">Attachment Checklist</p>
+                  <p className="mt-1 text-[10px] text-muted-foreground">Tick the documents you’ll attach with this return.</p>
+                  <div className="mt-3 space-y-2 text-xs">
+                    {[
+                      { key: "receipts", label: "Receipts for pension, NHF, insurance, reliefs" },
+                      { key: "invoices", label: "Invoice records / business income evidence" },
+                      { key: "bankStatements", label: "Bank statements / WHT certificates" },
+                      { key: "capitalAllowance", label: "Capital allowance / depreciation schedules" },
+                      { key: "taxPayments", label: "Proofs of WHT / earlier tax payments / provisional tax" }
+                    ].map((item) => (
+                      <div key={item.key} className="flex items-start gap-2">
+                        <Checkbox
+                          checked={(attachments as any)[item.key]}
+                          onCheckedChange={(checked) => setAttachments((prev) => ({ ...prev, [item.key]: !!checked } as any))}
+                          disabled={!isEditing}
+                          className="mt-0.5"
+                        />
+                        <span className="leading-snug">{item.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              </div>
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
       </div>
     </Card>
   )
-}
+})

@@ -8,6 +8,7 @@ interface ConfirmPaymentRequest {
   transactionRef: string
   amount: number
   reportId?: string
+  entityId?: string
   paymentType?: "filing" | "regular"
   paymentData?: {
     period?: string
@@ -20,7 +21,7 @@ interface ConfirmPaymentRequest {
 export async function POST(request: NextRequest) {
   try {
     const body: ConfirmPaymentRequest = await request.json()
-    const { rrr, status, transactionRef, amount, reportId, paymentType, paymentData: paymentInfo, userId } = body
+    const { rrr, status, transactionRef, amount, reportId, entityId, paymentType, paymentData: paymentInfo, userId } = body
 
     if (!rrr || !status || !transactionRef || !amount) {
       return NextResponse.json(
@@ -31,11 +32,24 @@ export async function POST(request: NextRequest) {
 
     const db = getAdminDb()
 
+    // Prefer explicit entityId from client; otherwise infer from the report record (if available)
+    let resolvedEntityId: string | undefined = entityId || undefined
+    if (!resolvedEntityId && reportId) {
+      try {
+        const reportDoc = await db.collection('selfAssessments').doc(reportId).get()
+        const reportData = reportDoc.exists ? (reportDoc.data() as any) : null
+        if (reportData?.entityId) resolvedEntityId = reportData.entityId
+      } catch (e) {
+        // Best effort only
+      }
+    }
+
     // For regular payments (not filing), save to taxPayments collection
     if (paymentType === 'regular' && userId && paymentInfo) {
       try {
         const taxPaymentData = {
           userId,
+          entityId: resolvedEntityId,
           transactionId: transactionRef,
           amount,
           period: (paymentInfo.period || 'monthly') as 'monthly' | 'quarterly' | 'yearly',
@@ -89,6 +103,7 @@ export async function POST(request: NextRequest) {
       try {
         const taxPaymentData = {
           userId,
+          entityId: resolvedEntityId,
           transactionId: transactionRef,
           amount,
           period: 'yearly' as 'monthly' | 'quarterly' | 'yearly',

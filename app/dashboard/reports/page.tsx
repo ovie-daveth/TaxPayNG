@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { useRouter } from "next/navigation"
 import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
+import { useBusiness } from "@/lib/contexts/business-context"
 
 const reportTemplates = [
   {
@@ -99,6 +100,7 @@ function MobileReportDropdown() {
 export default function ReportsPage() {
   const { user } = useAuth()
   const { profile } = useUserProfile()
+  const { activeEntityId } = useBusiness()
   const [stats, setStats] = useState({
     totalReports: 0,
     reportsThisMonth: 0,
@@ -111,13 +113,13 @@ export default function ReportsPage() {
     if (profile?.userId) {
       loadStats()
     }
-  }, [profile?.userId])
+  }, [profile?.userId, activeEntityId])
 
   const loadStats = async () => {
     if (!profile?.userId) return
 
     try {
-      const reports = await reportService.getUserReports(profile.userId)
+      const reports = await reportService.getUserReports(profile.userId, activeEntityId || undefined, profile.defaultEntityId)
       
       // Calculate stats
       const totalReports = reports.length

@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useParams, useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useParams, useSearchParams } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { CheckCircle2, Download, FileText, Mail, UserCheck, Loader2, ArrowLeft, FileCheck } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useBusiness } from "@/lib/contexts/business-context"
 import { reportService, documentService } from "@/lib/services"
 import { SavedReport } from "@/lib/types"
 import { toast } from "sonner"
@@ -33,9 +34,12 @@ export default function PaymentSuccessPage() {
   const router = useRouter()
   const params = useParams()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
+  const basePath = pathname?.startsWith("/dashboard-creator") ? "/dashboard-creator" : "/dashboard"
   const reportId = params?.reportId as string
   const { user } = useAuth()
   const { profile, loading: profileLoading } = useUserProfile()
+  const { activeEntityId } = useBusiness()
   const [report, setReport] = useState<SavedReport | null>(null)
   const [loading, setLoading] = useState(true)
   const [savingReceipt, setSavingReceipt] = useState(false)
@@ -172,7 +176,7 @@ export default function PaymentSuccessPage() {
       }
 
       toast.success("Tax return submitted successfully to IRS")
-      router.push(`/dashboard/reports/file/${reportId}/confirmation?acknowledgment=${data.acknowledgmentNumber}&amount=${paymentData.amount}`)
+      router.push(`${basePath}/reports/file/${reportId}/confirmation?acknowledgment=${data.acknowledgmentNumber}&amount=${paymentData.amount}`)
     } catch (error) {
       console.error("Error submitting return:", error)
       toast.error(error instanceof Error ? error.message : "Failed to submit return")
@@ -205,7 +209,8 @@ export default function PaymentSuccessPage() {
           state: selectedState,
           reportId: report.id,
           rrr: paymentData.rrr || undefined,
-          supportingDocuments: documentIds
+          supportingDocuments: documentIds,
+          entityId: activeEntityId || undefined
         }),
       })
 
@@ -216,7 +221,7 @@ export default function PaymentSuccessPage() {
       }
 
       toast.success("Filing request submitted successfully. An agent will be assigned shortly.")
-      router.push(`/dashboard/reports/file/${reportId}/confirmation?requestId=${data.requestId}&amount=${paymentData.amount}`)
+      router.push(`${basePath}/reports/file/${reportId}/confirmation?requestId=${data.requestId}&amount=${paymentData.amount}`)
     } catch (error) {
       console.error("Error submitting filing request:", error)
       toast.error(error instanceof Error ? error.message : "Failed to submit filing request")
@@ -254,7 +259,7 @@ export default function PaymentSuccessPage() {
       }
 
       toast.success("Tax return sent to IRS via email")
-      router.push(`/dashboard/reports/file/${reportId}/confirmation?method=email&amount=${paymentData.amount}`)
+      router.push(`${basePath}/reports/file/${reportId}/confirmation?method=email&amount=${paymentData.amount}`)
     } catch (error) {
       console.error("Error sending email:", error)
       toast.error(error instanceof Error ? error.message : "Failed to send email")

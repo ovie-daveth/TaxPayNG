@@ -15,11 +15,13 @@ import { useSubscription } from "@/lib/hooks/useSubscription"
 import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { reportService, ReportData } from "@/lib/services"
 import { toast } from "sonner"
+import { useBusiness } from "@/lib/contexts/business-context"
 
 export default function GenerateTaxSummaryPage() {
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { isSubscribed } = useSubscription()
+  const { activeEntityId } = useBusiness()
   const [showPreview, setShowPreview] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [reportData, setReportData] = useState<ReportData | null>(null)
@@ -98,7 +100,9 @@ export default function GenerateTaxSummaryPage() {
       const data = await reportService.generateReportData(
         profile.userId,
         period,
-        false // includeInvoices = false (use only transactions)
+        false, // includeInvoices = false (use only transactions)
+        activeEntityId || undefined,
+        profile.defaultEntityId
       )
 
       // Generate report title
@@ -116,7 +120,8 @@ export default function GenerateTaxSummaryPage() {
         title,
         'Tax Summary',
         data,
-        'draft' // All reports are saved as draft initially
+        'draft', // All reports are saved as draft initially
+        activeEntityId || undefined
       )
 
       setReportData(data)

@@ -5,7 +5,7 @@ import { FilingRequest } from '@/lib/types'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { userId, state, reportId, rrr, supportingDocuments } = body
+    const { userId, state, reportId, rrr, supportingDocuments, entityId } = body
 
     if (!userId || !state || !reportId || !rrr) {
       return NextResponse.json(
@@ -23,7 +23,20 @@ export async function POST(request: NextRequest) {
 
     const db = getAdminDb()
     
+    // Prefer explicit entityId from client; otherwise infer from the report record (if available)
+    let resolvedEntityId: string | undefined = entityId || undefined
+    if (!resolvedEntityId) {
+      try {
+        const reportDoc = await db.collection('selfAssessments').doc(reportId).get()
+        const reportData = reportDoc.exists ? (reportDoc.data() as any) : null
+        if (reportData?.entityId) resolvedEntityId = reportData.entityId
+      } catch (e) {
+        // Best effort only
+      }
+    }
+
     const requestData: Omit<FilingRequest, 'id'> = {
+      entityId: resolvedEntityId,
       userId,
       state,
       reportId,

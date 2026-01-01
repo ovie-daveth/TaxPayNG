@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter, useParams } from "next/navigation"
+import { usePathname, useRouter, useParams } from "next/navigation"
 import { DashboardNav } from "@/components/dashboard/dashboard-nav"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { Card } from "@/components/ui/card"
@@ -29,6 +29,8 @@ interface SystemCheck {
 export default function FileTaxReturnPage() {
   const router = useRouter()
   const params = useParams()
+  const pathname = usePathname()
+  const basePath = pathname?.startsWith("/dashboard-creator") ? "/dashboard-creator" : "/dashboard"
   const reportId = params?.reportId as string
   const { user } = useAuth()
   const { profile, loading: profileLoading } = useUserProfile()
@@ -77,7 +79,7 @@ export default function FileTaxReturnPage() {
       
       if (!loadedReport) {
         toast.error("Report not found")
-        router.push('/dashboard/reports')
+        router.push(`${basePath}/reports`)
         return
       }
 
@@ -85,7 +87,7 @@ export default function FileTaxReturnPage() {
     } catch (error) {
       console.error("Error loading report:", error)
       toast.error("Failed to load report")
-      router.push('/dashboard/reports')
+      router.push(`${basePath}/reports`)
     } finally {
       setLoading(false)
     }
@@ -113,7 +115,7 @@ export default function FileTaxReturnPage() {
       message: isProfileComplete 
         ? "Your profile information is complete"
         : "Please complete your profile information (name, address, phone)",
-      actionUrl: !isProfileComplete ? "/dashboard/settings" : undefined,
+      actionUrl: !isProfileComplete ? `${basePath}/settings` : undefined,
       actionLabel: !isProfileComplete ? "Complete Profile" : undefined
     })
 
@@ -126,7 +128,7 @@ export default function FileTaxReturnPage() {
       message: isTINVerified
         ? "Your Tax Identification Number is verified"
         : "Please verify your Tax Identification Number (TIN)",
-      actionUrl: !isTINVerified ? "/dashboard/settings" : undefined,
+      actionUrl: !isTINVerified ? `${basePath}/settings` : undefined,
       actionLabel: !isTINVerified ? "Add TIN" : undefined
     })
 
@@ -144,7 +146,7 @@ export default function FileTaxReturnPage() {
         message: hasKYCDocuments
           ? "KYC documents are uploaded"
           : "Please upload your identity documents (ID, Passport, or Driver's License)",
-        actionUrl: !hasKYCDocuments ? "/dashboard/settings?tab=profile&section=kyc" : undefined,
+        actionUrl: !hasKYCDocuments ? `${basePath}/settings?tab=profile&section=kyc` : undefined,
         actionLabel: !hasKYCDocuments ? "Upload Documents" : undefined
       })
     } catch (error) {
@@ -153,7 +155,7 @@ export default function FileTaxReturnPage() {
         name: "KYC Documents",
         status: false,
         message: "Unable to verify KYC documents",
-        actionUrl: "/dashboard/settings?tab=profile&section=kyc",
+        actionUrl: `${basePath}/settings?tab=profile&section=kyc`,
         actionLabel: "Upload Documents"
       })
     }
@@ -179,7 +181,7 @@ export default function FileTaxReturnPage() {
         message: hasData
           ? "Income and expense data is available for this period"
           : "No income or expense data found for this period. Please add transactions.",
-        actionUrl: !hasData ? "/dashboard/transactions" : undefined,
+        actionUrl: !hasData ? `${basePath}/transactions` : undefined,
         actionLabel: !hasData ? "Add Transactions" : undefined
       })
     } catch (error) {
@@ -188,7 +190,7 @@ export default function FileTaxReturnPage() {
         name: "Income & Expense Data",
         status: false,
         message: "Unable to verify transaction data",
-        actionUrl: "/dashboard/transactions",
+        actionUrl: `${basePath}/transactions`,
         actionLabel: "Add Transactions"
       })
     }
@@ -275,11 +277,11 @@ export default function FileTaxReturnPage() {
     // If balance <= 0, go directly to state selection and submission method
     if (balanceDue !== null && balanceDue > 0) {
       // Has balance to pay - go to payment flow first
-      router.push(`/dashboard/reports/file/${reportId}/generate-rrr`)
+      router.push(`${basePath}/reports/file/${reportId}/generate-rrr`)
     } else {
       // No balance or already balanced - go directly to state selection and submission
       // Use payment-success page with amount=0 (it handles state selection and submission method)
-      router.push(`/dashboard/reports/file/${reportId}/payment-success?amount=0`)
+      router.push(`${basePath}/reports/file/${reportId}/payment-success?amount=0`)
     }
   }
 
@@ -304,7 +306,7 @@ export default function FileTaxReturnPage() {
               The requested report could not be found.
             </AlertDescription>
           </Alert>
-          <Button onClick={() => router.push('/dashboard/reports')} className="mt-4">
+          <Button onClick={() => router.push(`${basePath}/reports`)} className="mt-4">
             Back to Reports
           </Button>
         </Card>
@@ -444,7 +446,7 @@ export default function FileTaxReturnPage() {
                   <div className="mt-4">
                     <Button 
                       size="lg" 
-                      onClick={() => router.push(`/dashboard/reports/file/${reportId}/generate-rrr`)}
+                      onClick={() => router.push(`${basePath}/reports/file/${reportId}/generate-rrr`)}
                       className="w-full sm:w-auto"
                     >
                       Pay Balance (₦{balanceDue.toLocaleString()})
@@ -456,7 +458,7 @@ export default function FileTaxReturnPage() {
                     <Button 
                       size="lg" 
                       variant="outline"
-                      onClick={() => router.push(`/dashboard/reports/file/${reportId}/confirmation?method=filed&amount=${report.reportData?.tax?.netTaxPayable || 0}`)}
+                      onClick={() => router.push(`${basePath}/reports/file/${reportId}/confirmation?method=filed&amount=${report.reportData?.tax?.netTaxPayable || 0}`)}
                       className="w-full sm:w-auto"
                     >
                       View Filing Confirmation
@@ -466,23 +468,28 @@ export default function FileTaxReturnPage() {
               </Card>
             )}
 
-            {/* Report Preview */}
-            <Card className="p-6">
-              <h2 className="text-xl font-semibold mb-4">Tax Return Preview</h2>
-              {report.reportData && (
-                <SelfAssessmentPreview
-                  reportData={report.reportData}
-                  formData={{
-                    includeIncome: true,
-                    includeExpenses: true,
-                    includeTax: true,
-                    includeReliefs: true
-                  }}
-                  showFileButton={false}
-                  isEditing={false}
-                />
-              )}
-            </Card>
+            {/* Report Preview (full-bleed on mobile) */}
+            <div className="-mx-2 sm:mx-0">
+              <Card className="p-0 sm:p-6 rounded-none sm:rounded-lg border-x-0 sm:border">
+                <div className="px-4 pt-4 pb-2 sm:px-0 sm:pt-0 sm:pb-0">
+                  <h2 className="text-lg sm:text-xl font-semibold">Tax Return Preview</h2>
+                </div>
+                {report.reportData && (
+                  <SelfAssessmentPreview
+                    reportData={report.reportData}
+                    formData={{
+                      includeIncome: true,
+                      includeExpenses: true,
+                      includeTax: true,
+                      includeReliefs: true
+                    }}
+                    showFileButton={false}
+                    isEditing={false}
+                    fullBleedMobile
+                  />
+                )}
+              </Card>
+            </div>
           </div>
         </main>
 
