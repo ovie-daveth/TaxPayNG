@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useMemo, useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -15,7 +15,8 @@ import { transactionService, taxPaymentService } from "@/lib/services"
 import { calculateNigerianTax } from "@/lib/tax-calculator"
 import { toast } from "sonner"
 import { formatCurrency } from "@/lib/utils"
-import { calculatePeriodTaxes, getCurrentPeriodTax } from "@/lib/utils/tax-period-calculation"
+import { calculatePeriodTaxes } from "@/lib/utils/tax-period-calculation"
+import { TaxDurationSelector } from "@/components/tax-payment/tax-duration-selector"
 
 const formatCurrencyAmount = (amount: number): string => {
   return formatCurrency(amount).replace("NGN", "₦").replace(".00", "")
@@ -55,53 +56,84 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
   const [pendingPeriods, setPendingPeriods] = useState<PendingPeriod[]>([])
   const [selectedPendingPeriods, setSelectedPendingPeriods] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(false)
+  const [selectedTaxDuration, setSelectedTaxDuration] = useState<string>("")
+  const [isSelectedDurationPaid, setIsSelectedDurationPaid] = useState(false)
 
   // Calculate tax amount when period is selected and we move to amount step
   useEffect(() => {
-    if (currentStep === 'amount' && selectedPeriod && user?.uid && !isManual) {
+    if (currentStep === 'amount' && selectedPeriod && user?.uid) {
       calculateTaxAmount()
     }
-  }, [currentStep, selectedPeriod, user?.uid, isManual])
+  }, [currentStep, selectedPeriod, user?.uid, isManual, selectedTaxDuration])
+
+  const yearsToCheck = useMemo(() => {
+    const y = new Date().getFullYear()
+    return [y, y - 1]
+  }, [])
+
+  const handleDurationChange = useCallback((duration: string) => {
+    setSelectedTaxDuration(duration)
+    // reset extra pending selection when changing the target period
+    setSelectedPendingPeriods(new Set())
+  }, [])
 
   const calculateTaxAmount = async () => {
     if (!user?.uid || !selectedPeriod || !profile) return
 
     setLoading(true)
     try {
-      const now = new Date()
-      const currentYear = now.getFullYear()
       const businessType = (profile?.businessType as any) || 'freelancer'
-      
-      // Get current period tax based on actual income
-      const currentPeriodTax = await getCurrentPeriodTax(
-        user.uid,
-        selectedPeriod,
-        businessType
-      )
-      
-      if (!currentPeriodTax) {
-        // No income in current period
-        setCalculatedAmount(0)
-        setPendingPeriods([])
-        return
-      }
-      
-      setCalculatedAmount(currentPeriodTax.amount)
 
       // Get all periods with income and check which are unpaid
       const allPayments = await taxPaymentService.getUserPaymentsSimple(user.uid)
-      const allPeriodsWithIncome = await calculatePeriodTaxes(
-        user.uid,
-        selectedPeriod,
-        currentYear,
-        businessType
+      const completedPayments = allPayments.filter(p => p.status === 'completed')
+
+      const allPeriodsWithIncome = (
+        await Promise.all(
+          yearsToCheck.map((year) =>
+            calculatePeriodTaxes(
+              user.uid,
+              selectedPeriod as 'monthly' | 'quarterly' | 'yearly',
+              year,
+              businessType
+            )
+          )
+        )
+      ).flat()
+
+      // Initialize default selected duration if not set yet
+      if (!selectedTaxDuration) {
+        const now = new Date()
+        let defaultDuration = ""
+        if (selectedPeriod === 'monthly') {
+          defaultDuration = now.toLocaleString('en-US', { month: 'long', year: 'numeric' })
+        } else if (selectedPeriod === 'quarterly') {
+          const currentQuarter = Math.floor(now.getMonth() / 3) + 1
+          const months = ['Jan-Mar', 'Apr-Jun', 'Jul-Sep', 'Oct-Dec']
+          defaultDuration = `${months[currentQuarter - 1]} ${now.getFullYear()}`
+        } else {
+          defaultDuration = now.getFullYear().toString()
+        }
+        setSelectedTaxDuration(defaultDuration)
+      }
+
+      const hasSelectedPayment = completedPayments.some(
+        p =>
+          p.period === selectedPeriod &&
+          p.taxDuration.trim() === (selectedTaxDuration || "").trim()
       )
+
+      const selectedPeriodTax = allPeriodsWithIncome.find(p => p.taxDuration.trim() === (selectedTaxDuration || "").trim())
+      const selectedAmount = selectedPeriodTax?.amount ?? 0
+
+      setIsSelectedDurationPaid(hasSelectedPayment)
+      setCalculatedAmount(hasSelectedPayment ? 0 : selectedAmount)
       
       // Filter to only unpaid periods, excluding the current period
       const pending = allPeriodsWithIncome
         .filter(period => {
-          // Exclude current period to avoid double-counting
-          if (period.taxDuration === currentPeriodTax.taxDuration) {
+          // Exclude the selected target period to avoid double-counting
+          if (period.taxDuration.trim() === (selectedTaxDuration || "").trim()) {
             return false
           }
           
@@ -143,7 +175,7 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
     } else {
       // Amount step - validate and continue
       let finalAmount = 0
-      let taxDuration = ""
+      let taxDuration = selectedTaxDuration || ""
 
       if (isManual) {
         const amount = parseFloat(manualAmount)
@@ -153,7 +185,7 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
         }
         finalAmount = amount
       } else {
-        if (!calculatedAmount) {
+        if (calculatedAmount === null) {
           toast.error('Please wait for calculation to complete')
           return
         }
@@ -166,24 +198,16 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
         const pendingTotal = selectedPending.reduce((sum, p) => sum + p.amount, 0)
         finalAmount += pendingTotal
       }
-
-      // Determine tax duration
-      const now = new Date()
-      if (selectedPeriod === 'monthly') {
-        taxDuration = now.toLocaleString('en-US', { month: 'long', year: 'numeric' })
-      } else if (selectedPeriod === 'quarterly') {
-        const currentQuarter = Math.floor(now.getMonth() / 3) + 1
-        const months = ['Jan-Mar', 'Apr-Jun', 'Jul-Sep', 'Oct-Dec']
-        taxDuration = `Q${currentQuarter} ${now.getFullYear()} (${months[currentQuarter - 1]})`
-      } else {
-        taxDuration = now.getFullYear().toString()
+      if (!taxDuration) {
+        toast.error("Please select the period you want to pay for.")
+        return
       }
 
       onContinue({
         period: selectedPeriod as 'monthly' | 'quarterly' | 'yearly',
         amount: finalAmount,
         taxDuration,
-        calculatedAmount: calculatedAmount || undefined,
+        calculatedAmount: calculatedAmount ?? undefined,
         pendingPeriods: pendingPeriods.length > 0 ? pendingPeriods : undefined,
         isManual
       })
@@ -302,6 +326,24 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
             </div>
           </CardHeader>
           <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 md:space-y-6">
+            {/* Choose which period to pay for */}
+            {selectedPeriod && (
+              <div className="space-y-2">
+                <Label className="text-[11px] sm:text-xs md:text-sm">Pay for</Label>
+                <div className="rounded-lg border p-3 bg-background">
+                  <TaxDurationSelector period={selectedPeriod} onDurationChange={handleDurationChange} />
+                  {selectedTaxDuration && (
+                    <p className="text-[10px] sm:text-[11px] md:text-xs text-muted-foreground mt-2">
+                      Selected: <span className="font-medium text-foreground">{selectedTaxDuration}</span>
+                      {isSelectedDurationPaid ? (
+                        <span className="ml-2 text-green-600 font-medium">• Already paid</span>
+                      ) : null}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Toggle between auto and manual */}
             <div className="flex items-center justify-between p-2.5 sm:p-3 md:p-4 bg-muted rounded-lg">
               <div className="space-y-0.5 flex-1 min-w-0 pr-2 sm:pr-3">
@@ -339,9 +381,7 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
                         {formatCurrencyAmount(calculatedAmount)}
                       </p>
                       <p className="text-[10px] sm:text-[11px] md:text-xs text-muted-foreground mt-0.5 sm:mt-1">
-                        {selectedPeriod === 'monthly' && 'Current month'}
-                        {selectedPeriod === 'quarterly' && 'Current quarter'}
-                        {selectedPeriod === 'yearly' && 'Current year'}
+                        {selectedTaxDuration ? `For ${selectedTaxDuration}` : "Select a period above"}
                       </p>
                     </div>
                     <Calculator className="w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 text-primary shrink-0" />
@@ -453,8 +493,14 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
 
             <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-2.5 md:gap-3 pt-2.5 sm:pt-3 md:pt-4">
               <Button 
-                onClick={handleContinue}
-                disabled={loading || (isManual && !manualAmount) || (!isManual && calculatedAmount === null)}
+                onClick={() => {
+                  if (!isManual && totalWithPending() <= 0) {
+                    toast.message("No tax due for the selected period (already paid).")
+                    return
+                  }
+                  handleContinue()
+                }}
+                disabled={loading || (isManual && !manualAmount) || (!isManual && calculatedAmount === null) || (!isManual && totalWithPending() <= 0)}
                 className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
               >
                 Continue

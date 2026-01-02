@@ -26,6 +26,25 @@ import { useAuth } from "@/lib/hooks/useAuth"
 import { documentService, invoiceService } from "@/lib/services"
 import { Invoice } from "@/lib/types"
 
+function getCapitalAllowanceRatesByAssetType(
+  assetType: TaxClassification['capitalAssetType']
+): { initial: number; annual: number } {
+  switch (assetType) {
+    case 'furniture_fittings':
+      return { initial: 25, annual: 20 }
+    case 'building':
+      return { initial: 15, annual: 10 }
+    case 'intangible_software':
+      // Case-by-case in practice; default to plant & machinery style unless overridden in Advanced
+      return { initial: 50, annual: 25 }
+    case 'it_equipment':
+    case 'motor_vehicle':
+    case 'plant_machinery':
+    default:
+      return { initial: 50, annual: 25 }
+  }
+}
+
 interface AddTransactionDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -209,8 +228,9 @@ export function AddTransactionDialog({
   
   // Tax Classification state (only for Gold+ users)
   const [taxClassification, setTaxClassification] = useState<TaxClassification | undefined>(undefined)
-  const [showTaxClassificationSection, setShowTaxClassificationSection] = useState(false)
   const [skipTaxClassification, setSkipTaxClassification] = useState(false)
+  const [taxClassificationManuallyEdited, setTaxClassificationManuallyEdited] = useState(false)
+  const [showCapitalAllowanceAdvanced, setShowCapitalAllowanceAdvanced] = useState(false)
   
   // Auto-populate tax classification based on transaction data (Gold+ only)
   const autoPopulateTaxClassification = (
@@ -281,7 +301,10 @@ export function AddTransactionDialog({
         
         if (isCapitalAsset && !isNonCapital) {
           classification.isCapitalAsset = true
-          classification.capitalAllowanceRate = 25 // 25% annual allowance (standard in Nigeria)
+          classification.capitalAssetType = 'it_equipment'
+          const { initial, annual } = getCapitalAllowanceRatesByAssetType(classification.capitalAssetType)
+          classification.capitalAllowanceRate = annual
+          classification.initialAllowanceRate = initial
         }
       } else {
         // Personal expenses are not allowable
@@ -636,7 +659,7 @@ export function AddTransactionDialog({
       if (hasTaxClassificationAccess) {
         setTaxClassification(undefined)
         setSkipTaxClassification(false)
-        setShowTaxClassificationSection(false)
+        setTaxClassificationManuallyEdited(false)
       }
     }
   }, [transaction, open, defaultType, defaultCategory, defaultDescription, hasOcrAccess, hasTaxClassificationAccess])
@@ -646,6 +669,7 @@ export function AddTransactionDialog({
     if (!hasTaxClassificationAccess) return
     if (!formData.category || !formData.type) return
     if (skipTaxClassification) return // Don't auto-populate if user skipped
+    if (taxClassificationManuallyEdited) return // Don't overwrite user edits
     
     // Auto-populate tax classification
     const autoClassification = autoPopulateTaxClassification(
@@ -662,11 +686,8 @@ export function AddTransactionDialog({
       autoClassification.vatRate = undefined
     }
     
-    // Only auto-update if user hasn't manually edited (section is collapsed)
-    if (!showTaxClassificationSection) {
-      setTaxClassification(autoClassification)
-    }
-  }, [formData.type, formData.category, formData.description, formData.notes, transactionNature, hasTaxClassificationAccess, showTaxClassificationSection, skipTaxClassification])
+    setTaxClassification(autoClassification)
+  }, [formData.type, formData.category, formData.description, formData.notes, transactionNature, hasTaxClassificationAccess, skipTaxClassification, taxClassificationManuallyEdited])
 
   // Load available invoices when dialog opens (for manual linking)
   useEffect(() => {
@@ -1905,7 +1926,7 @@ export function AddTransactionDialog({
               {/* Tax Classification Section (Gold+ only) */}
               {hasTaxClassificationAccess && taxClassification && !skipTaxClassification && (
                 <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
                         <Label className="text-xs sm:text-sm font-semibold">Tax Classification (Optional</Label>
@@ -1916,6 +1937,7 @@ export function AddTransactionDialog({
                           onClick={() => {
                             setSkipTaxClassification(true)
                             setTaxClassification(undefined)
+                            setTaxClassificationManuallyEdited(false)
                           }}
                           className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground underline"
                         >
@@ -1927,57 +1949,10 @@ export function AddTransactionDialog({
                         Auto-populated based on transaction details. You can edit or skip this section - you can always update it later.
                       </p>
                     </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowTaxClassificationSection(!showTaxClassificationSection)}
-                      className="h-8 text-xs"
-                    >
-                      {showTaxClassificationSection ? 'Hide' : 'Edit'}
-                    </Button>
                   </div>
                   
-                  {/* Read-only summary */}
-                  {!showTaxClassificationSection && (
-                    <div className="space-y-2 text-sm">
-                      {formData.type === 'income' && taxClassification.incomeType && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">Income Type:</span>
-                          <span className="font-medium capitalize">{taxClassification.incomeType}</span>
-                        </div>
-                      )}
-                      {formData.type === 'expense' && taxClassification.expenseType && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">Expense Type:</span>
-                          <span className="font-medium capitalize">{taxClassification.expenseType}</span>
-                        </div>
-                      )}
-                      {taxClassification.isCapitalAsset && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">Capital Asset:</span>
-                          <span className="font-medium">Yes ({taxClassification.capitalAllowanceRate}% allowance)</span>
-                        </div>
-                      )}
-                      {taxClassification.whtCreditable && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">WHT Creditable:</span>
-                          <span className="font-medium">Yes {taxClassification.whtRate && `(${taxClassification.whtRate}%)`}</span>
-                        </div>
-                      )}
-                      {/* VAT Applicable - only show for income transactions, not expenses */}
-                      {formData.type === 'income' && taxClassification.vatApplicable && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">VAT Applicable:</span>
-                          <span className="font-medium">Yes {taxClassification.vatRate && `(${taxClassification.vatRate}%)`}</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {/* Editable form */}
-                  {showTaxClassificationSection && (
-                    <div className="space-y-4 pt-2 border-t">
+                  {/* Editable form (always visible) */}
+                  <div className="space-y-4 pt-2 border-t">
                       {formData.type === 'income' && (
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
@@ -1997,10 +1972,13 @@ export function AddTransactionDialog({
                           </div>
                           <Select
                             value={taxClassification.incomeType || 'taxable'}
-                            onValueChange={(value) => setTaxClassification(prev => ({
-                              ...prev,
-                              incomeType: value as 'taxable' | 'non-taxable' | 'exempt'
-                            }))}
+                            onValueChange={(value) => {
+                              setTaxClassificationManuallyEdited(true)
+                              setTaxClassification(prev => ({
+                                ...prev,
+                                incomeType: value as 'taxable' | 'non-taxable' | 'exempt'
+                              }))
+                            }}
                           >
                             <SelectTrigger className="text-xs sm:text-sm">
                               <SelectValue />
@@ -2036,6 +2014,7 @@ export function AddTransactionDialog({
                               value={taxClassification.expenseType || 'allowable'}
                               onValueChange={(value) => {
                                 const expenseType = value as 'allowable' | 'disallowable' | 'capital'
+                                setTaxClassificationManuallyEdited(true)
                                 setTaxClassification(prev => ({
                                   ...prev,
                                   expenseType
@@ -2074,11 +2053,23 @@ export function AddTransactionDialog({
                             <div className="flex items-center space-x-2">
                               <Switch
                                 checked={taxClassification.isCapitalAsset || false}
-                                onCheckedChange={(checked) => setTaxClassification(prev => ({
-                                  ...prev,
-                                  isCapitalAsset: checked,
-                                  capitalAllowanceRate: checked ? (prev?.capitalAllowanceRate || 25) : undefined
-                                }))}
+                                onCheckedChange={(checked) => {
+                                  setTaxClassificationManuallyEdited(true)
+                                  setTaxClassification(prev => ({
+                                    ...prev,
+                                    isCapitalAsset: checked,
+                                    capitalAssetType: checked ? (prev?.capitalAssetType || 'it_equipment') : undefined,
+                                    ...(() => {
+                                      if (!checked) return { capitalAllowanceRate: undefined, initialAllowanceRate: undefined }
+                                      const nextType = prev?.capitalAssetType || 'it_equipment'
+                                      const { initial, annual } = getCapitalAllowanceRatesByAssetType(nextType)
+                                      return {
+                                        capitalAllowanceRate: prev?.capitalAllowanceRate ?? annual,
+                                        initialAllowanceRate: prev?.initialAllowanceRate ?? initial
+                                      }
+                                    })()
+                                  }))
+                                }}
                               />
                               <div className="flex items-center gap-2 flex-1">
                                 <Label className="text-sm">Is this a long-term asset? (for depreciation)</Label>
@@ -2119,18 +2110,102 @@ export function AddTransactionDialog({
                           
                           {taxClassification.isCapitalAsset && (
                             <div className="space-y-2">
-                              <Label>Capital Allowance Rate (%)</Label>
-                              <Input
-                                type="number"
-                                min="0"
-                                max="100"
-                                step="0.1"
-                                value={taxClassification.capitalAllowanceRate || 25}
-                                onChange={(e) => setTaxClassification(prev => ({
-                                  ...prev,
-                                  capitalAllowanceRate: parseFloat(e.target.value) || 25
-                                }))}
-                              />
+                              <div className="space-y-1.5">
+                                <Label>Asset type</Label>
+                                <Select
+                                  value={taxClassification.capitalAssetType || 'it_equipment'}
+                                  onValueChange={(value) => {
+                                    const assetType = value as TaxClassification['capitalAssetType']
+                                    const { initial, annual } = getCapitalAllowanceRatesByAssetType(assetType)
+                                    setTaxClassificationManuallyEdited(true)
+                                    setTaxClassification(prev => ({
+                                      ...prev,
+                                      capitalAssetType: assetType,
+                                      // Overwrite rates to match the selected asset type unless user already opened Advanced and edited them
+                                      capitalAllowanceRate: annual,
+                                      initialAllowanceRate: initial
+                                    }))
+                                  }}
+                                >
+                                  <SelectTrigger className="h-9 sm:h-10 text-xs sm:text-sm">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="it_equipment">Office & IT Equipment</SelectItem>
+                                    <SelectItem value="motor_vehicle">Motor Vehicles</SelectItem>
+                                    <SelectItem value="plant_machinery">Plant & Machinery</SelectItem>
+                                    <SelectItem value="furniture_fittings">Furniture & Fittings</SelectItem>
+                                    <SelectItem value="building">Buildings (Business-use)</SelectItem>
+                                    <SelectItem value="intangible_software">Intangible / Software</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                <p className="text-[11px] text-muted-foreground">
+                                  We’ll apply Nigeria’s common capital allowance rates automatically.
+                                </p>
+                              </div>
+
+                              <div className="flex items-center justify-between gap-3">
+                                <div className="space-y-0.5">
+                                  <Label>Capital allowance rates</Label>
+                                  <p className="text-xs text-muted-foreground">
+                                    Using:{" "}
+                                    {(() => {
+                                      const annual = taxClassification.capitalAllowanceRate || 25
+                                      const initial = taxClassification.initialAllowanceRate ?? 50
+                                      return `Initial ${initial}%, Annual ${annual}%`
+                                    })()}
+                                  </p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 text-xs"
+                                  onClick={() => setShowCapitalAllowanceAdvanced((v) => !v)}
+                                >
+                                  {showCapitalAllowanceAdvanced ? "Hide Advanced" : "Advanced"}
+                                </Button>
+                              </div>
+
+                              {showCapitalAllowanceAdvanced && (
+                                <div className="space-y-2 pt-2 border-t">
+                                  <Label>Annual Allowance Rate (%)</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.1"
+                                    value={taxClassification.capitalAllowanceRate || 25}
+                                    onChange={(e) => setTaxClassification(prev => {
+                                      setTaxClassificationManuallyEdited(true)
+                                      const rate = parseFloat(e.target.value) || 25
+                                      const next: any = { ...prev, capitalAllowanceRate: rate }
+                                      if (next.initialAllowanceRate === undefined) {
+                                        next.initialAllowanceRate = 50
+                                      }
+                                      return next
+                                    })}
+                                  />
+                                  <Label>Initial Allowance Rate (%)</Label>
+                                  <Input
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    step="0.1"
+                                    value={taxClassification.initialAllowanceRate ?? 50}
+                                    onChange={(e) => {
+                                      setTaxClassificationManuallyEdited(true)
+                                      setTaxClassification(prev => ({
+                                        ...prev,
+                                        initialAllowanceRate: parseFloat(e.target.value) || 0
+                                      }))
+                                    }}
+                                  />
+                                  <p className="text-[11px] text-muted-foreground">
+                                    Most users shouldn’t edit this. We’ll later auto-pick rates based on asset type.
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           )}
                         </>
@@ -2139,11 +2214,14 @@ export function AddTransactionDialog({
                       <div className="flex items-center space-x-2">
                         <Switch
                           checked={taxClassification.whtCreditable || false}
-                          onCheckedChange={(checked) => setTaxClassification(prev => ({
-                            ...prev,
-                            whtCreditable: checked,
-                            whtRate: checked ? (prev?.whtRate || 5) : undefined
-                          }))}
+                          onCheckedChange={(checked) => {
+                            setTaxClassificationManuallyEdited(true)
+                            setTaxClassification(prev => ({
+                              ...prev,
+                              whtCreditable: checked,
+                              whtRate: checked ? (prev?.whtRate || 5) : undefined
+                            }))
+                          }}
                         />
                         <div className="flex items-center gap-2 flex-1">
                           <Label className="text-sm">Was withholding tax deducted from this?</Label>
@@ -2169,10 +2247,13 @@ export function AddTransactionDialog({
                             max="100"
                             step="0.1"
                             value={taxClassification.whtRate || 5}
-                            onChange={(e) => setTaxClassification(prev => ({
-                              ...prev,
-                              whtRate: parseFloat(e.target.value) || 5
-                            }))}
+                            onChange={(e) => {
+                              setTaxClassificationManuallyEdited(true)
+                              setTaxClassification(prev => ({
+                                ...prev,
+                                whtRate: parseFloat(e.target.value) || 5
+                              }))
+                            }}
                           />
                         </div>
                       )}
@@ -2183,11 +2264,14 @@ export function AddTransactionDialog({
                           <div className="flex items-center space-x-2">
                             <Switch
                               checked={taxClassification.vatApplicable || false}
-                              onCheckedChange={(checked) => setTaxClassification(prev => ({
-                                ...prev,
-                                vatApplicable: checked,
-                                vatRate: checked ? (prev?.vatRate || 7.5) : undefined
-                              }))}
+                              onCheckedChange={(checked) => {
+                                setTaxClassificationManuallyEdited(true)
+                                setTaxClassification(prev => ({
+                                  ...prev,
+                                  vatApplicable: checked,
+                                  vatRate: checked ? (prev?.vatRate || 7.5) : undefined
+                                }))
+                              }}
                             />
                             <div className="flex items-center gap-2 flex-1">
                               <Label className="text-sm">Does this include VAT?</Label>
@@ -2213,10 +2297,13 @@ export function AddTransactionDialog({
                                 max="100"
                                 step="0.1"
                                 value={taxClassification.vatRate || 7.5}
-                                onChange={(e) => setTaxClassification(prev => ({
-                                  ...prev,
-                                  vatRate: parseFloat(e.target.value) || 7.5
-                                }))}
+                                onChange={(e) => {
+                                  setTaxClassificationManuallyEdited(true)
+                                  setTaxClassification(prev => ({
+                                    ...prev,
+                                    vatRate: parseFloat(e.target.value) || 7.5
+                                  }))
+                                }}
                               />
                               {formData.type === 'income' && (
                             <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md">
@@ -2232,8 +2319,7 @@ export function AddTransactionDialog({
                       )}
                         </>
                       )}
-                    </div>
-                  )}
+                  </div>
                 </div>
               )}
 

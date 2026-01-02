@@ -44,15 +44,21 @@ interface SelfAssessmentPreviewProps {
    * Desktop/tablet styling remains unchanged.
    */
   fullBleedMobile?: boolean
+  /**
+   * Optional state name to use for the printed form header (e.g., "Lagos").
+   * If not provided, we fall back to the state in the user's profile (if available).
+   */
+  printState?: string
 }
 
 export type SelfAssessmentPreviewHandle = {
   prepareForSave: () => Promise<ReportData>
+  printReport: () => void
 }
 
 export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, SelfAssessmentPreviewProps>(
   function SelfAssessmentPreview(
-    { reportData, formData, isEditing = false, onDataChange, onBack, reportId, showFileButton = false, filingStatus, filingMethod, fullBleedMobile = false },
+    { reportData, formData, isEditing = false, onDataChange, onBack, reportId, showFileButton = false, filingStatus, filingMethod, fullBleedMobile = false, printState },
     ref
   ) {
   const router = useRouter()
@@ -172,6 +178,12 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
     charitableDonations: 0,
     otherRelief: 0
   })
+
+  // "Reliefs" should NOT include capital allowances (we store capital allowances under `depreciation` for evidence/notes)
+  const reliefsTotalExcludingCapitalAllowances = Object.entries(reliefAmounts).reduce((sum, [key, amount]) => {
+    if (key === 'depreciation') return sum
+    return sum + (amount || 0)
+  }, 0)
 
   // Track if personal info has been initialized from address
   const personalInfoInitializedRef = useRef(false)
@@ -394,6 +406,9 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
       } finally {
         setUploadingSignature(false)
       }
+    },
+    printReport: () => {
+      handlePrint()
     }
   }))
 
@@ -994,12 +1009,12 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
     .filter(([cat]) => !['Salary', 'Employment', 'Invoice Income'].includes(cat))
     .reduce((sum, [, amount]) => sum + amount, 0)
 
-  const handlePrint = () => {
-    const printWindow = window.open('', '_blank', 'width=100%,height=100%')
-    if (!printWindow) {
-      toast.error("Please allow popups to print")
-      return
-    }
+  function handlePrint() {
+    const resolvedState =
+      (printState || profile?.address?.state || "").toString().trim()
+    const stateGovernmentLine = resolvedState
+      ? `${resolvedState.toUpperCase()} STATE GOVERNMENT`
+      : "________________ STATE GOVERNMENT"
 
     // Calculate total deductions for print view
     // Include: business expenses + capital allowances + other reliefs (excluding depreciation to avoid double-counting)
@@ -1014,6 +1029,13 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
   <meta charset="UTF-8">
   <title>Personal Income Tax Return - ${reportData.period.year}</title>
   <style>
+    * {
+      box-sizing: border-box;
+    }
+    img {
+      max-width: 100%;
+      height: auto;
+    }
     @media print {
       @page {
         size: A4;
@@ -1028,9 +1050,10 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
     }
     body {
       font-family: 'Times New Roman', serif;
-      padding: 20px;
-      width: 100%;
-      margin: 0 auto;
+      /* Avoid double margins: @page already defines print margins */
+      padding: 0;
+      width: auto;
+      margin: 0;
       background: white;
       color: #000;
       font-size: 11pt;
@@ -1052,26 +1075,57 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
       font-size: 14pt;
       margin-bottom: 20px;
     }
-    .header {
-      text-align: center;
-      border-bottom: 2px solid #000;
-      padding-bottom: 15px;
-      margin-bottom: 25px;
+    .topline {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 10px;
     }
-    .header h1 {
-      margin: 0;
-      font-size: 18pt;
+    .tax-form-code {
+      font-size: 14pt;
       font-weight: bold;
       text-transform: uppercase;
     }
-    .header h2 {
-      margin: 5px 0;
-      font-size: 14pt;
-      font-weight: normal;
+    .gov-header {
+      text-align: center;
+      margin: 10px 0 18px 0;
+    }
+    .gov-header .country {
+      font-size: 13pt;
+      font-weight: bold;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .gov-header .state {
+      font-size: 12pt;
+      font-weight: bold;
+      margin-top: 6px;
+      text-transform: uppercase;
+    }
+    .gov-header .desc {
+      font-size: 9.5pt;
+      margin-top: 10px;
+      font-weight: bold;
+      text-transform: uppercase;
+    }
+    .gov-header .yearline {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 10px;
+      font-size: 10pt;
+      font-weight: bold;
+      text-transform: uppercase;
     }
     .section {
       margin-bottom: 25px;
-      page-break-inside: avoid;
+      /* Allow long sections to break across pages instead of being clipped */
+      page-break-inside: auto;
+      break-inside: auto;
+    }
+    .section-title {
+      break-after: avoid;
+      page-break-after: avoid;
     }
     .section-title {
       font-weight: bold;
@@ -1086,6 +1140,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
       border-collapse: collapse;
       margin-bottom: 15px;
       font-size: 10pt;
+      table-layout: fixed;
     }
     .info-table td {
       padding: 6px 8px;
@@ -1102,12 +1157,14 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
       border-collapse: collapse;
       margin-bottom: 15px;
       font-size: 10pt;
+      table-layout: fixed;
     }
     .amount-table th,
     .amount-table td {
       padding: 8px;
       border: 1px solid #000;
       text-align: left;
+      word-break: break-word;
     }
     .amount-table th {
       background: #f0f0f0;
@@ -1124,6 +1181,13 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
       padding: 6px 0;
       border-bottom: 1px dotted #666;
       font-size: 10pt;
+    }
+    /* Prevent key declaration/signature block from splitting awkwardly */
+    .declaration,
+    .signature-section,
+    .signature-line {
+      break-inside: avoid;
+      page-break-inside: avoid;
     }
     .amount-label {
       font-weight: normal;
@@ -1168,28 +1232,35 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
       text-align: center;
     }
   </style>
+    </style>
 </head>
 <body>
-  <!-- Cover Page -->
-  <div class="cover-page">
-    <div class="cover-title">Personal Income Tax Return</div>
-    <div class="cover-subtitle">Year of Assessment: ${reportData.period.year}</div>
-    <div style="margin-top: 40px; text-align: left; width: 100%; margin-left: auto; margin-right: auto;">
-      <table class="info-table" style="border: none;">
-        <tr><td style="border: none; padding: 4px 0;"><strong>Taxpayer Name:</strong></td><td style="border: none; padding: 4px 0;">${reportData.userInfo.name}</td></tr>
-        <tr><td style="border: none; padding: 4px 0;"><strong>TIN / NIN:</strong></td><td style="border: none; padding: 4px 0;">${reportData.userInfo.tin || 'N/A'}</td></tr>
-        <tr><td style="border: none; padding: 4px 0;"><strong>Address:</strong></td><td style="border: none; padding: 4px 0;">${reportData.userInfo.address || 'N/A'}</td></tr>
-        <tr><td style="border: none; padding: 4px 0;"><strong>Business Type:</strong></td><td style="border: none; padding: 4px 0;">${reportData.userInfo.businessType || 'N/A'}</td></tr>
-        <tr><td style="border: none; padding: 4px 0;"><strong>Date Generated:</strong></td><td style="border: none; padding: 4px 0;">${format(new Date(reportData.generatedAt), 'MMMM dd, yyyy')}</td></tr>
-      </table>
+  <!-- Form header -->
+  <div class="topline">
+    <div></div>
+    <div class="tax-form-code">TAX FORM A</div>
+  </div>
+  <div class="gov-header">
+    <div class="country">FEDERAL REPUBLIC OF NIGERIA</div>
+    <div class="state">${stateGovernmentLine}</div>
+    <div class="desc">PERSONAL INCOME TAX RETURN FORM OF INCOME AND CLAIMS FOR ALLOWANCES AND RELIEFS</div>
+    <div class="yearline">
+      <div>INCOME TAX YEAR ${reportData.period.year}</div>
+      <div>${reportData.period.year}</div>
     </div>
   </div>
 
-  <div class="page-break"></div>
+  <table class="info-table" style="margin-bottom: 20px;">
+    <tr><td>Taxpayer Name</td><td>${reportData.userInfo.name}</td></tr>
+    <tr><td>TIN / NIN</td><td>${reportData.userInfo.tin || 'N/A'}</td></tr>
+    <tr><td>Address</td><td>${reportData.userInfo.address || 'N/A'}</td></tr>
+    <tr><td>Business Type</td><td>${reportData.userInfo.businessType || 'N/A'}</td></tr>
+    <tr><td>Date Generated</td><td>${format(new Date(reportData.generatedAt), 'MMMM dd, yyyy')}</td></tr>
+  </table>
 
   <!-- Part A: Personal & Employment Information -->
   <div class="section">
-    <div class="section-title">Part A – Personal & Employment Information</div>
+    <div class="section-title">Part A – Personal & Employment Information (Year of Assessment: ${reportData.period.year})</div>
     <table class="info-table">
       <tr>
         <td>Full Name</td>
@@ -1228,7 +1299,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
 
   <!-- Part B: Statement of Income -->
   <div class="section">
-    <div class="section-title">Part B – Statement of Income (All Sources)</div>
+    <div class="section-title">Part B – Statement of Income (All Sources) (Year of Assessment: ${reportData.period.year})</div>
     
     ${(!isFreelancer && !isCreator) ? `
     <div style="margin-bottom: 15px;">
@@ -1444,7 +1515,10 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
 
   <!-- Part C: Deductible Expenses & Reliefs -->
   <div class="section">
-    <div class="section-title">Part C – Deductible Expenses & Reliefs</div>
+    <div class="section-title">Part C – Deductible Expenses & Reliefs (Year of Assessment: ${reportData.period.year})</div>
+    <div style="font-size: 10pt; margin: 6px 0 10px 0;">
+      <strong>Reliefs (showing all items)</strong>
+    </div>
     <table class="amount-table">
       <thead>
         <tr>
@@ -1455,38 +1529,52 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
         </tr>
       </thead>
       <tbody>
-        ${reportData.tax.reliefs.pensionContribution > 0 ? `
         <tr>
-          <td>Pension contribution / Retirement savings</td>
-          <td style="text-align: right;">${formatCurrency(reportData.tax.reliefs.pensionContribution)}</td>
+          <td>(a) Annual Premium on Life Assurance</td>
+          <td style="text-align: right;">${formatCurrency(reportData.tax.reliefs.lifeInsurance || 0)}</td>
           <td style="text-align: center;">☐</td>
           <td></td>
         </tr>
-        ` : ''}
-        ${reportData.tax.reliefs.nhfContribution > 0 ? `
         <tr>
-          <td>National Housing Fund (NHF) contribution</td>
-          <td style="text-align: right;">${formatCurrency(reportData.tax.reliefs.nhfContribution)}</td>
+          <td>(b) National Housing Fund Contribution</td>
+          <td style="text-align: right;">${formatCurrency(reportData.tax.reliefs.nhfContribution || 0)}</td>
           <td style="text-align: center;">☐</td>
           <td></td>
         </tr>
-        ` : ''}
-        ${reportData.tax.reliefs.lifeInsurance > 0 ? `
         <tr>
-          <td>Life Insurance Premiums</td>
-          <td style="text-align: right;">${formatCurrency(reportData.tax.reliefs.lifeInsurance)}</td>
+          <td>(c) National Health Insurance Scheme Contribution</td>
+          <td style="text-align: right;">${formatCurrency(reportData.tax.reliefs.healthInsurance || 0)}</td>
           <td style="text-align: center;">☐</td>
           <td></td>
         </tr>
-        ` : ''}
-        ${reportData.tax.reliefs.healthInsurance > 0 ? `
         <tr>
-          <td>Health Insurance / Medical contributions</td>
-          <td style="text-align: right;">${formatCurrency(reportData.tax.reliefs.healthInsurance)}</td>
+          <td>(d) National Pension Scheme / Retirement Savings</td>
+          <td style="text-align: right;">${formatCurrency(reportData.tax.reliefs.pensionContribution || 0)}</td>
           <td style="text-align: center;">☐</td>
           <td></td>
         </tr>
-        ` : ''}
+        <tr>
+          <td>(e) Gratuities</td>
+          <td style="text-align: right;">₦0.00</td>
+          <td style="text-align: center;">☐</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>(f) Charitable Donations</td>
+          <td style="text-align: right;">${formatCurrency(reportData.tax.reliefs.charitableDonations || 0)}</td>
+          <td style="text-align: center;">☐</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td>(g) Any other allowed relief or deduction</td>
+          <td style="text-align: right;">₦0.00</td>
+          <td style="text-align: center;">☐</td>
+          <td></td>
+        </tr>
+
+        <tr style="border-top: 2px solid #000;">
+          <td colspan="4" style="font-weight: bold; background: #f5f5f5;">Deductible Business Expenses</td>
+        </tr>
         ${reportData.expenses.totalExpenses > 0 ? `
         <tr>
           <td>Business expenses (if self-employed) – rent, utilities, materials, fuel, services, etc.</td>
@@ -1497,21 +1585,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
         ` : ''}
         <tr>
           <td>Depreciation / Capital Allowance on assets (if applicable)</td>
-          <td style="text-align: right;">₦0.00</td>
-          <td style="text-align: center;">☐</td>
-          <td></td>
-        </tr>
-        ${reportData.tax.reliefs.charitableDonations > 0 ? `
-        <tr>
-          <td>Charitable Donations</td>
-          <td style="text-align: right;">${formatCurrency(reportData.tax.reliefs.charitableDonations)}</td>
-          <td style="text-align: center;">☐</td>
-          <td></td>
-        </tr>
-        ` : ''}
-        <tr>
-          <td>Any other allowed relief or deduction</td>
-          <td style="text-align: right;">₦0.00</td>
+          <td style="text-align: right;">${formatCurrency(capitalAllowances || 0)}</td>
           <td style="text-align: center;">☐</td>
           <td></td>
         </tr>
@@ -1527,7 +1601,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
 
   <!-- Part D: Tax Already Paid (Credits) -->
   <div class="section">
-    <div class="section-title">Part D – Tax Already Paid (Credits)</div>
+    <div class="section-title">Part D – Tax Already Paid (Credits) (Year of Assessment: ${reportData.period.year})</div>
     <table class="amount-table">
       <thead>
         <tr>
@@ -1565,7 +1639,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
 
   <!-- Part E: Tax Computation -->
   <div class="section">
-    <div class="section-title">Part E – Tax Computation</div>
+    <div class="section-title">Part E – Tax Computation (Year of Assessment: ${reportData.period.year})</div>
     <div class="amount-row">
       <span class="amount-label">1. Total Gross Income (from Part B)</span>
       <span class="amount-value">${formatCurrency(reportData.tax.grossIncome)}</span>
@@ -1603,7 +1677,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
 
   <!-- Part F: Declaration & Signature -->
   <div class="section">
-    <div class="section-title">Part F – Declaration & Signature</div>
+    <div class="section-title">Part F – Declaration & Signature (Year of Assessment: ${reportData.period.year})</div>
     <div class="declaration">
       <p style="margin: 0 0 20px 0;">
         <strong>I hereby declare that the information given in this return is correct and complete to the best of my knowledge and belief. 
@@ -1636,7 +1710,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
 
   <!-- Attachment Checklist -->
   <div class="section page-break">
-    <div class="section-title">Attachment Checklist</div>
+    <div class="section-title">Attachment Checklist (Year of Assessment: ${reportData.period.year})</div>
     <p style="font-size: 10pt; margin-bottom: 10px;">Please tick (✓) the documents attached with this return:</p>
     <ul class="checkbox-list">
       <li>☐ Receipts for pension, NHF, insurance, reliefs</li>
@@ -1651,13 +1725,51 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
 </html>
     `
 
-    printWindow.document.write(printContent)
-    printWindow.document.close()
-    
-    printWindow.onload = () => {
-      setTimeout(() => {
-        printWindow.print()
-      }, 250)
+    // In-app printing via hidden iframe (no redirect/new tab)
+    try {
+      const iframe = document.createElement("iframe")
+      iframe.style.position = "fixed"
+      iframe.style.right = "0"
+      iframe.style.bottom = "0"
+      iframe.style.width = "0"
+      iframe.style.height = "0"
+      iframe.style.border = "0"
+      iframe.style.visibility = "hidden"
+
+      const cleanup = () => {
+        try {
+          if (iframe.parentNode) iframe.parentNode.removeChild(iframe)
+        } catch {
+          // ignore
+        }
+      }
+
+      iframe.onload = () => {
+        try {
+          // Some browsers need a short delay for resources (images) to resolve
+          setTimeout(() => {
+            try {
+              iframe.contentWindow?.focus()
+              iframe.contentWindow?.print()
+            } catch {
+              // ignore - user can still print manually from the iframe if needed
+            } finally {
+              // Best-effort cleanup
+              setTimeout(cleanup, 1500)
+            }
+          }, 250)
+        } catch {
+          setTimeout(cleanup, 1500)
+        }
+      }
+
+      document.body.appendChild(iframe)
+
+      // Use srcdoc (cleanest). This keeps printing in-app without opening a new tab.
+      iframe.srcdoc = printContent
+    } catch (e) {
+      console.error("Print error:", e)
+      toast.error("Failed to open print dialog")
     }
   }
 
@@ -2204,7 +2316,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
                 <div className="rounded-lg border bg-muted/20 p-2">
                   <p className="text-[10px] text-muted-foreground">Reliefs Total</p>
                   <p className="text-xs font-semibold whitespace-nowrap">
-                    {formatCurrency(Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0))}
+                    {formatCurrency(reliefsTotalExcludingCapitalAllowances)}
                   </p>
                 </div>
                 <div className="rounded-lg border bg-muted/20 p-2">
@@ -2220,7 +2332,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
                   <p className="text-xs font-bold whitespace-nowrap">
                     {formatCurrency(
                       (reportData.expenses.taxDeductibleExpenses || 0) +
-                        Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0) +
+                        reliefsTotalExcludingCapitalAllowances +
                         (capitalAllowances || 0)
                     )}
                   </p>
@@ -2476,7 +2588,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
                     <div className="flex items-center justify-between">
                       <span className="text-xs text-muted-foreground">Reliefs Total</span>
                       <span className="text-xs font-semibold whitespace-nowrap">
-                        {formatCurrency(Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0))}
+                        {formatCurrency(reliefsTotalExcludingCapitalAllowances)}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
@@ -2492,7 +2604,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
                       <span className="text-xs font-bold whitespace-nowrap">
                         {formatCurrency(
                           (reportData.expenses.taxDeductibleExpenses || 0) +
-                            Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0) +
+                            reliefsTotalExcludingCapitalAllowances +
                             (capitalAllowances || 0)
                         )}
                       </span>
@@ -2782,34 +2894,67 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
                                   <div className="text-[12px] text-blue-700 dark:text-blue-300 mt-1 space-y-1">
                                     <div className="font-medium text-[10px] text-muted-foreground mb-1">Depreciation / Capital Allowance on assets</div>
                                     {(() => {
-                                      // Calculate the book value at the start of the year for display
-                                      let bookValueAtStartOfYear = capitalAssetDetail.originalCost
-                                      if (capitalAssetDetail.yearsSincePurchase > 0) {
-                                        // Calculate cumulative depreciation up to the start of this year
-                                        for (let year = 0; year < capitalAssetDetail.yearsSincePurchase; year++) {
-                                          const yearDepreciation = bookValueAtStartOfYear * (capitalAssetDetail.allowanceRate / 100)
-                                          bookValueAtStartOfYear -= yearDepreciation
-                                        }
+                                      // Calculate book values using our capital allowance rules:
+                                      // Year 1: Initial (IA) + Annual (AA) both based on original cost, capped by remaining pool
+                                      // Subsequent years: AA based on original cost, capped by remaining pool
+                                      const annualRate = (capitalAssetDetail.allowanceRate || 0) / 100
+                                      const initialRate = (capitalAssetDetail.initialAllowanceRate ?? 0) / 100
+
+                                      let pool = capitalAssetDetail.originalCost
+                                      let year1Allowance = 0
+                                      let bookValueAfterYear1 = pool
+
+                                      if (capitalAssetDetail.yearsSincePurchase >= 0) {
+                                        const ia = pool * initialRate
+                                        const poolAfterIA = Math.max(0, pool - ia)
+                                        const aaBase = capitalAssetDetail.originalCost * annualRate
+                                        const aa = Math.min(poolAfterIA, aaBase)
+                                        year1Allowance = ia + aa
+                                        bookValueAfterYear1 = Math.max(0, poolAfterIA - aa)
                                       }
 
-                                      // Calculate Year 1 depreciation for clarity
-                                      const year1Depreciation = capitalAssetDetail.originalCost * (capitalAssetDetail.allowanceRate / 100)
-                                      const bookValueAfterYear1 = capitalAssetDetail.originalCost - year1Depreciation
+                                      // Roll forward to start of current year
+                                      let bookValueAtStartOfYear = capitalAssetDetail.originalCost
+                                      if (capitalAssetDetail.yearsSincePurchase > 0) {
+                                        // Start after year 1
+                                        bookValueAtStartOfYear = bookValueAfterYear1
+                                        for (let year = 1; year < capitalAssetDetail.yearsSincePurchase; year++) {
+                                          const aaBase = capitalAssetDetail.originalCost * annualRate
+                                          const aa = Math.min(bookValueAtStartOfYear, aaBase)
+                                          bookValueAtStartOfYear = Math.max(0, bookValueAtStartOfYear - aa)
+                                        }
+                                      }
 
                                       return (
                                         <div className="border-l-2 border-blue-300 dark:border-blue-700 pl-2 py-0.5">
                                           <div className="text-[11px] space-y-0.5 mt-0.5">
                                             <div>Purchased {capitalAssetDetail.purchaseYear}: {formatCurrency(capitalAssetDetail.originalCost)}</div>
-                                            {capitalAssetDetail.yearsSincePurchase > 0 && (
+                                            {capitalAssetDetail.yearsSincePurchase === 0 ? (
+                                              <div className="text-blue-600 dark:text-blue-400 font-medium">
+                                                Year 1 Capital Allowance (Initial {capitalAssetDetail.initialAllowanceRate ?? 0}% + Annual {capitalAssetDetail.allowanceRate}% of {formatCurrency(capitalAssetDetail.originalCost)}):
+                                                {" "}
+                                                <strong>{formatCurrency(capitalAssetDetail.allowanceAmount)}</strong>
+                                              </div>
+                                            ) : (
                                               <>
-                                                <div className="text-blue-600 dark:text-blue-400 font-medium">Year 1 Depreciation ({capitalAssetDetail.allowanceRate}% of {formatCurrency(capitalAssetDetail.originalCost)}): <strong>{formatCurrency(year1Depreciation)}</strong></div>
+                                                <div className="text-blue-600 dark:text-blue-400 font-medium">
+                                                  Year 1 Capital Allowance (Initial {capitalAssetDetail.initialAllowanceRate ?? 0}% + Annual {capitalAssetDetail.allowanceRate}% of {formatCurrency(capitalAssetDetail.originalCost)}):
+                                                  {" "}
+                                                  <strong>{formatCurrency(year1Allowance)}</strong>
+                                                </div>
                                                 <div className="text-blue-600 dark:text-blue-400">Book Value after Year 1: <strong>{formatCurrency(bookValueAfterYear1)}</strong></div>
                                               </>
                                             )}
                                             {capitalAssetDetail.yearsSincePurchase > 0 && (
                                               <div>Book Value at start of Year {capitalAssetDetail.yearsSincePurchase + 1}: {formatCurrency(bookValueAtStartOfYear)}</div>
                                             )}
-                                            <div>Year {capitalAssetDetail.yearsSincePurchase + 1} Depreciation ({capitalAssetDetail.allowanceRate}% of {formatCurrency(bookValueAtStartOfYear)}): <strong className="text-blue-700 dark:text-blue-300">{formatCurrency(capitalAssetDetail.allowanceAmount)}</strong></div>
+                                            {capitalAssetDetail.yearsSincePurchase > 0 && (
+                                              <div>
+                                                Year {capitalAssetDetail.yearsSincePurchase + 1} Allowance ({capitalAssetDetail.allowanceRate}% of {formatCurrency(capitalAssetDetail.originalCost)}):
+                                                {" "}
+                                                <strong className="text-blue-700 dark:text-blue-300">{formatCurrency(capitalAssetDetail.allowanceAmount)}</strong>
+                                              </div>
+                                            )}
                                             <div>Remaining Book Value: {formatCurrency(capitalAssetDetail.bookValueAfter)}</div>
                                           </div>
                                         </div>
@@ -3691,7 +3836,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
                     <div className="rounded-lg border bg-muted/20 p-2">
                       <p className="text-[10px] text-muted-foreground">Reliefs Total</p>
                       <p className="text-xs font-semibold whitespace-nowrap">
-                        {formatCurrency(Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0))}
+                        {formatCurrency(reliefsTotalExcludingCapitalAllowances)}
                       </p>
                     </div>
                     <div className="rounded-lg border bg-muted/20 p-2">
@@ -3707,7 +3852,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
                       <p className="text-xs font-bold whitespace-nowrap">
                         {formatCurrency(
                           (reportData.expenses.taxDeductibleExpenses || 0) +
-                            Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0) +
+                            reliefsTotalExcludingCapitalAllowances +
                             (capitalAllowances || 0)
                         )}
                       </p>
@@ -3947,7 +4092,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
                       <div className="flex items-center justify-between">
                         <span className="text-xs text-muted-foreground">Reliefs Total</span>
                         <span className="text-xs font-semibold whitespace-nowrap">
-                          {formatCurrency(Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0))}
+                          {formatCurrency(reliefsTotalExcludingCapitalAllowances)}
                         </span>
                       </div>
                       <div className="flex items-center justify-between">
@@ -3963,7 +4108,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
                         <span className="text-xs font-bold whitespace-nowrap">
                           {formatCurrency(
                             (reportData.expenses.taxDeductibleExpenses || 0) +
-                              Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0) +
+                              reliefsTotalExcludingCapitalAllowances +
                               (capitalAllowances || 0)
                           )}
                         </span>
@@ -4071,7 +4216,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
                         <div className="flex items-center justify-between gap-3">
                           <span className="text-muted-foreground">Reliefs</span>
                           <span className="font-semibold whitespace-nowrap">
-                            {formatCurrency(Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0))}
+                            {formatCurrency(reliefsTotalExcludingCapitalAllowances)}
                           </span>
                         </div>
                         <div className="flex items-center justify-between gap-3">
@@ -4083,7 +4228,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
                           <span className="font-bold whitespace-nowrap">
                             {formatCurrency(
                               (reportData.expenses.taxDeductibleExpenses || 0) +
-                                Object.values(reliefAmounts).reduce((sum, amount) => sum + (amount || 0), 0) +
+                                reliefsTotalExcludingCapitalAllowances +
                                 (capitalAllowances || 0)
                             )}
                           </span>

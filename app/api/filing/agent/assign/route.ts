@@ -7,7 +7,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { userId, state, reportId, rrr, supportingDocuments, entityId } = body
 
-    if (!userId || !state || !reportId || !rrr) {
+    if (!userId || !reportId) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -38,9 +38,9 @@ export async function POST(request: NextRequest) {
     const requestData: Omit<FilingRequest, 'id'> = {
       entityId: resolvedEntityId,
       userId,
-      state,
+      state: state || 'NRS',
       reportId,
-      rrr,
+      rrr: rrr || '',
       supportingDocuments,
       status: 'pending',
       createdAt: new Date().toISOString(),

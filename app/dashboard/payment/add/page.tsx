@@ -5,7 +5,7 @@ import { PaymentReceipt } from "@/components/tax-payment/payment-receipt"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { SimplifiedPaymentForm } from "@/components/tax-payment/simplified-payment-form"
 import { taxPaymentService, documentService, transactionService } from "@/lib/services"
 import { useAuth } from "@/lib/hooks/useAuth"
@@ -17,6 +17,8 @@ import { CheckCircle2, XCircle, AlertCircle, Loader2, TrendingUp } from "lucide-
 import Link from "next/link"
 import { calculatePeriodTaxes } from "@/lib/utils/tax-period-calculation"
 import { formatCurrencyAmount } from "@/lib/utils/currency"
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { uploadToImageKit } from "@/lib/utils/imagekit"
 
 interface PaymentData {
   amount: number
@@ -54,6 +56,8 @@ interface SystemCheck {
 
 export default function PaymentPage() {
   const router = useRouter()
+  const pathname = usePathname()
+  const basePath = pathname?.startsWith("/dashboard-creator") ? "/dashboard-creator" : "/dashboard"
   const { user } = useAuth()
   const { profile, loading: profileLoading } = useUserProfile()
   const [showReceipt, setShowReceipt] = useState(false)
@@ -61,6 +65,11 @@ export default function PaymentPage() {
   const [processing, setProcessing] = useState(false)
   const [paymentFormData, setPaymentFormData] = useState<PaymentFormData | null>(null)
   const [showValidation, setShowValidation] = useState(false)
+  const [showNrsPayModal, setShowNrsPayModal] = useState(false)
+  const [recordingNrsPayment, setRecordingNrsPayment] = useState(false)
+  const [showReceiptUploadModal, setShowReceiptUploadModal] = useState(false)
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [uploadingReceipt, setUploadingReceipt] = useState(false)
   const [systemChecks, setSystemChecks] = useState<SystemCheck[]>([])
   const [allChecksPassed, setAllChecksPassed] = useState(false)
   const [checking, setChecking] = useState(false)
@@ -71,6 +80,8 @@ export default function PaymentPage() {
     periodType: 'monthly' | 'quarterly' | 'yearly'
   }>>([])
   const [loadingOutstanding, setLoadingOutstanding] = useState(false)
+
+  const NRS_PORTAL_URL = "https://selfservice.nrs.gov.ng/"
 
   // Mock payment processing
   const processPayment = async (amount: number, method: string): Promise<PaymentData> => {
@@ -121,7 +132,7 @@ export default function PaymentPage() {
       message: isProfileComplete 
         ? "Your profile information is complete"
         : "Please complete your profile information (name, address, phone)",
-      actionUrl: !isProfileComplete ? "/dashboard/settings" : undefined,
+      actionUrl: !isProfileComplete ? `${basePath}/settings` : undefined,
       actionLabel: !isProfileComplete ? "Complete Profile" : undefined
     })
 
@@ -134,7 +145,7 @@ export default function PaymentPage() {
       message: isTINVerified
         ? "Your Tax Identification Number is verified"
         : "Please verify your Tax Identification Number (TIN)",
-      actionUrl: !isTINVerified ? "/dashboard/settings" : undefined,
+      actionUrl: !isTINVerified ? `${basePath}/settings` : undefined,
       actionLabel: !isTINVerified ? "Add TIN" : undefined
     })
 
@@ -152,7 +163,7 @@ export default function PaymentPage() {
         message: hasKYCDocuments
           ? "KYC documents are uploaded"
           : "Please upload your identity documents (ID, Passport, or Driver's License)",
-        actionUrl: !hasKYCDocuments ? "/dashboard/settings?tab=profile&section=kyc" : undefined,
+        actionUrl: !hasKYCDocuments ? `${basePath}/settings?tab=profile&section=kyc` : undefined,
         actionLabel: !hasKYCDocuments ? "Upload Documents" : undefined
       })
     } catch (error) {
@@ -161,7 +172,7 @@ export default function PaymentPage() {
         name: "KYC Documents",
         status: false,
         message: "Unable to verify KYC documents",
-        actionUrl: "/dashboard/settings?tab=profile&section=kyc",
+        actionUrl: `${basePath}/settings?tab=profile&section=kyc`,
         actionLabel: "Upload Documents"
       })
     }
@@ -191,12 +202,83 @@ export default function PaymentPage() {
     setShowValidation(true)
   }
 
-  const handleProceedToRRR = () => {
+  const handleProceedToPay = () => {
     if (allChecksPassed) {
-      // Navigate to generate RRR page
-      router.push('/dashboard/payment/generate-rrr')
+      // RRR generation is no longer done in-app.
+      // User pays on NRS portal and then confirms payment here so we can record it.
+      setShowNrsPayModal(true)
     } else {
       toast.error("Please complete all required checks before proceeding")
+    }
+  }
+
+  const openReceiptUploadForNrsPayment = () => {
+    if (!user?.uid) return toast.error("Not signed in")
+    if (!paymentFormData) return toast.error("Payment details not found. Please go back and try again.")
+
+    // Require receipt upload before we record the payment in OTax
+    setShowNrsPayModal(false)
+    setShowReceiptUploadModal(true)
+  }
+
+  const uploadReceiptAndRecordNrsPayment = async () => {
+    if (!user?.uid) return toast.error("Not signed in")
+    if (!paymentFormData) return toast.error("Payment details not found. Please go back and try again.")
+    if (!receiptFile) return toast.error("Please upload your payment receipt to continue.")
+
+    setUploadingReceipt(true)
+    setRecordingNrsPayment(true)
+    try {
+      const { isDuplicate } = await checkDuplicatePayment(paymentFormData.period, paymentFormData.taxDuration)
+      if (isDuplicate) {
+        toast.message("This payment already exists in OTax for the selected period.")
+        setShowReceiptUploadModal(false)
+        router.push(`${basePath}/payment`)
+        return
+      }
+
+      const uploadResult = await uploadToImageKit(receiptFile, "payment-receipts", user.uid)
+      const docRes = await documentService.uploadDocument(user.uid, {
+        file: receiptFile,
+        name: `Payment Receipt - ${paymentFormData.taxDuration}`,
+        type: "receipt",
+        imageKitUrl: uploadResult.url,
+        imageKitFileId: uploadResult.fileId,
+        fileSize: uploadResult.size,
+        linkedTransaction: `NRS-${paymentFormData.period}-${paymentFormData.taxDuration}`,
+        notes: `Manual confirmation: Paid on NRS portal (${paymentFormData.period} / ${paymentFormData.taxDuration})`
+      })
+
+      if (!docRes.success || !docRes.data) {
+        throw new Error(docRes.error || "Failed to save receipt document")
+      }
+
+      const transactionId = `NRS-${Date.now()}`
+      const saveResult = await taxPaymentService.createPayment(user.uid, {
+        transactionId,
+        amount: paymentFormData.amount,
+        period: paymentFormData.period,
+        taxDuration: paymentFormData.taxDuration,
+        paymentMethod: "firs",
+        status: "completed",
+        receiptUrl: docRes.data.url,
+        notes: `Manual confirmation: Paid on NRS portal (${paymentFormData.period} / ${paymentFormData.taxDuration})`
+      })
+
+      if (!saveResult.success) {
+        throw new Error(saveResult.error || "Failed to record payment")
+      }
+
+      toast.success("Payment recorded")
+      setShowReceiptUploadModal(false)
+      setReceiptFile(null)
+      router.push(`${basePath}/payment`)
+    } catch (e) {
+      console.error(e)
+      toast.error(e instanceof Error ? e.message : "Failed to upload receipt / record payment")
+    } finally {
+      setUploadingReceipt(false)
+      setRecordingNrsPayment(false)
     }
   }
 
@@ -384,6 +466,7 @@ export default function PaymentPage() {
     setLoadingOutstanding(true)
     try {
       const currentYear = new Date().getFullYear()
+      const yearsToCheck = [currentYear, currentYear - 1]
       
       // Get all completed payments for the current year
       const payments = await taxPaymentService.getUserPaymentsSimple(user.uid)
@@ -395,7 +478,9 @@ export default function PaymentPage() {
         amount: p.amount
       })))
       
-      // Calculate taxes due for monthly, quarterly, and yearly periods
+      // Calculate outstanding taxes for ONE schedule only (avoid double/triple counting the same income)
+      // We use the monthly schedule as the source of truth for "what is due" (e.g., January 2026),
+      // while the user can still choose to pay monthly/quarterly/yearly in the form below.
       const outstanding: Array<{
         period: string
         taxDuration: string
@@ -403,88 +488,29 @@ export default function PaymentPage() {
         periodType: 'monthly' | 'quarterly' | 'yearly'
       }> = []
 
-      // Check monthly outstanding
-      const monthlyTaxes = await calculatePeriodTaxes(
-        user.uid,
-        'monthly',
-        currentYear,
-        profile.businessType as 'freelancer' | 'creator' | 'small-business' | 'sme'
-      )
-      
-      console.log('Calculated monthly taxes:', monthlyTaxes.map(t => ({
-        taxDuration: t.taxDuration,
-        amount: t.amount
-      })))
-      
-      for (const monthTax of monthlyTaxes) {
-        // Check if payment exists for this taxDuration using flexible matching
-        const hasPayment = completedPayments.some(
-          p => paymentMatchesPeriod(p, monthTax.taxDuration, 'monthly')
+      // Check monthly outstanding for current year AND previous year
+      for (const year of yearsToCheck) {
+        const monthlyTaxes = await calculatePeriodTaxes(
+          user.uid,
+          'monthly',
+          year,
+          profile.businessType as 'freelancer' | 'creator' | 'small-business' | 'sme'
         )
-        
-        if (!hasPayment && monthTax.amount > 0) {
-          outstanding.push({
-            period: monthTax.period,
-            taxDuration: monthTax.taxDuration,
-            amount: monthTax.amount,
-            periodType: 'monthly'
-          })
-        }
-      }
 
-      // Check quarterly outstanding
-      const quarterlyTaxes = await calculatePeriodTaxes(
-        user.uid,
-        'quarterly',
-        currentYear,
-        profile.businessType as 'freelancer' | 'creator' | 'small-business' | 'sme'
-      )
-      
-      console.log('Calculated quarterly taxes:', quarterlyTaxes.map(t => ({
-        taxDuration: t.taxDuration,
-        amount: t.amount
-      })))
-      
-      for (const quarterTax of quarterlyTaxes) {
-        const hasPayment = completedPayments.some(
-          p => paymentMatchesPeriod(p, quarterTax.taxDuration, 'quarterly')
-        )
-        
-        if (!hasPayment && quarterTax.amount > 0) {
-          outstanding.push({
-            period: quarterTax.period,
-            taxDuration: quarterTax.taxDuration,
-            amount: quarterTax.amount,
-            periodType: 'quarterly'
-          })
-        }
-      }
+        for (const monthTax of monthlyTaxes) {
+          // Check if payment exists for this taxDuration using flexible matching
+          const hasPayment = completedPayments.some(
+            p => paymentMatchesPeriod(p, monthTax.taxDuration, 'monthly')
+          )
 
-      // Check yearly outstanding (only for current year)
-      const yearlyTaxes = await calculatePeriodTaxes(
-        user.uid,
-        'yearly',
-        currentYear,
-        profile.businessType as 'freelancer' | 'creator' | 'small-business' | 'sme'
-      )
-      
-      console.log('Calculated yearly taxes:', yearlyTaxes.map(t => ({
-        taxDuration: t.taxDuration,
-        amount: t.amount
-      })))
-      
-      for (const yearTax of yearlyTaxes) {
-        const hasPayment = completedPayments.some(
-          p => paymentMatchesPeriod(p, yearTax.taxDuration, 'yearly')
-        )
-        
-        if (!hasPayment && yearTax.amount > 0) {
-          outstanding.push({
-            period: yearTax.period,
-            taxDuration: yearTax.taxDuration,
-            amount: yearTax.amount,
-            periodType: 'yearly'
-          })
+          if (!hasPayment && monthTax.amount > 0) {
+            outstanding.push({
+              period: monthTax.period,
+              taxDuration: monthTax.taxDuration,
+              amount: monthTax.amount,
+              periodType: 'monthly'
+            })
+          }
         }
       }
 
@@ -543,6 +569,155 @@ export default function PaymentPage() {
 
   return (
     <>
+      {/* NRS Pay Modal (replaces in-app RRR generation) */}
+      <Dialog open={showNrsPayModal} onOpenChange={setShowNrsPayModal}>
+        <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-3xl p-0 overflow-hidden sm:rounded-lg h-[92dvh] sm:h-auto">
+          <div className="p-4 border-b">
+            <DialogHeader>
+              <DialogTitle>Proceed to Pay on NRS Portal</DialogTitle>
+              <DialogDescription>
+                Complete your tax payment on the NRS portal. When you’re done, come back and confirm so OTax can record it.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="p-4 space-y-3 overflow-y-auto max-h-[calc(92dvh-140px)] sm:max-h-[70vh]">
+            {paymentFormData && (
+              <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Amount</span>
+                  <span className="font-semibold">{formatCurrencyAmount(paymentFormData.amount, "NGN")}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Period</span>
+                  <span className="font-medium capitalize">{paymentFormData.period}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Tax Duration</span>
+                  <span className="font-medium">{paymentFormData.taxDuration}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-lg border overflow-hidden">
+              <iframe
+                title="NRS Self Service Portal"
+                src={NRS_PORTAL_URL}
+                className="w-full h-[55dvh] sm:h-[70vh] bg-background"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="p-4 border-t flex-col sm:flex-row gap-2 sm:gap-3 sticky bottom-0 bg-background">
+            <Button
+              variant="outline"
+              onClick={() => setShowNrsPayModal(false)}
+              disabled={recordingNrsPayment}
+              className="w-full sm:w-auto"
+            >
+              Close
+            </Button>
+            <Button
+              onClick={openReceiptUploadForNrsPayment}
+              disabled={recordingNrsPayment}
+              className="w-full sm:w-auto"
+            >
+              {recordingNrsPayment ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Recording...
+                </>
+              ) : (
+                "Payment made"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Required Receipt Upload (before recording manual payment) */}
+      <Dialog open={showReceiptUploadModal} onOpenChange={(open) => {
+        // Don't allow closing if we're uploading/recording
+        if (!open && (uploadingReceipt || recordingNrsPayment)) return
+        setShowReceiptUploadModal(open)
+      }}>
+        <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-lg p-0 overflow-hidden sm:rounded-lg">
+          <div className="p-4 border-b">
+            <DialogHeader>
+              <DialogTitle>Upload payment receipt</DialogTitle>
+              <DialogDescription>
+                Receipt upload is required before OTax can mark this as a completed payment.
+              </DialogDescription>
+            </DialogHeader>
+          </div>
+
+          <div className="p-4 space-y-3">
+            {paymentFormData && (
+              <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Amount</span>
+                  <span className="font-semibold">{formatCurrencyAmount(paymentFormData.amount, "NGN")}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Period</span>
+                  <span className="font-medium capitalize">{paymentFormData.period}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">Tax Duration</span>
+                  <span className="font-medium">{paymentFormData.taxDuration}</span>
+                </div>
+              </div>
+            )}
+
+            <div className="rounded-lg border p-3 bg-background">
+              <p className="text-sm font-medium">Receipt file</p>
+              <p className="text-xs text-muted-foreground mt-1">Accepted: PDF or image</p>
+              <div className="mt-2">
+                <input
+                  type="file"
+                  accept=".pdf,image/*"
+                  onChange={(e) => setReceiptFile(e.target.files?.[0] || null)}
+                  disabled={uploadingReceipt || recordingNrsPayment}
+                />
+              </div>
+              {receiptFile && (
+                <p className="text-xs text-muted-foreground mt-2 truncate">
+                  Selected: <span className="font-medium text-foreground">{receiptFile.name}</span>
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="p-4 border-t flex-col sm:flex-row gap-2 sm:gap-3 bg-background">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowReceiptUploadModal(false)
+                setShowNrsPayModal(true)
+              }}
+              disabled={uploadingReceipt || recordingNrsPayment}
+              className="w-full sm:w-auto"
+            >
+              Back
+            </Button>
+            <Button
+              onClick={uploadReceiptAndRecordNrsPayment}
+              disabled={uploadingReceipt || recordingNrsPayment || !receiptFile}
+              className="w-full sm:w-auto"
+            >
+              {(uploadingReceipt || recordingNrsPayment) ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Uploading...
+                </>
+              ) : (
+                "Upload & Confirm"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Receipt Modal */}
       {showReceipt && paymentData && (
         <PaymentReceipt 
@@ -619,7 +794,7 @@ export default function PaymentPage() {
                           All Checks Passed
                         </AlertTitle>
                         <AlertDescription className="text-[11px] sm:text-xs md:text-sm text-green-700 dark:text-green-300 mt-1">
-                          You're ready to generate RRR and proceed with payment
+                          You're ready to proceed to payment
                         </AlertDescription>
                       </Alert>
                     )}
@@ -633,11 +808,11 @@ export default function PaymentPage() {
                         Back
                       </Button>
                       <Button
-                        onClick={handleProceedToRRR}
+                        onClick={handleProceedToPay}
                         disabled={!allChecksPassed}
                         className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
                       >
-                        Proceed to Generate RRR
+                        Proceed to Pay
                       </Button>
                     </div>
                   </div>
@@ -647,13 +822,13 @@ export default function PaymentPage() {
           </div>
         ) : (
           <div className="space-y-3 sm:space-y-4 md:space-y-6">
-            {/* Back Button - Desktop Only */}
-            <div className="hidden md:block mb-2">
+            {/* Back Button */}
+            <div className="mb-1 sm:mb-2">
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => router.back()}
-                className="h-8 text-xs sm:text-sm"
+                onClick={() => router.push(`${basePath}/payment`)}
+                className="h-8 text-xs sm:text-sm -ml-2"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back

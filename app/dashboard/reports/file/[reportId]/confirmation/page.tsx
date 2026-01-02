@@ -6,15 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Label } from "@/components/ui/label"
-import { CheckCircle2, Download, FileText, ArrowLeft, Loader2, Clock, Mail, UserCheck } from "lucide-react"
+import { CheckCircle2, FileText, ArrowLeft, Loader2, Clock, Mail, UserCheck } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
-import { reportService } from "@/lib/services"
-import { SavedReport } from "@/lib/types"
+import { documentService, reportService } from "@/lib/services"
+import { Document, SavedReport } from "@/lib/types"
+import { uploadToImageKit } from "@/lib/utils/imagekit"
 import { toast } from "sonner"
 import Link from "next/link"
-// JSZip will be imported dynamically
-
 export default function FilingConfirmationPage() {
   const router = useRouter()
   const params = useParams()
@@ -26,7 +25,13 @@ export default function FilingConfirmationPage() {
   const { profile, loading: profileLoading } = useUserProfile()
   const [report, setReport] = useState<SavedReport | null>(null)
   const [loading, setLoading] = useState(true)
-  const [downloading, setDownloading] = useState(false)
+  const [uploadingPaymentReceipt, setUploadingPaymentReceipt] = useState(false)
+  const [uploadingFilingProof, setUploadingFilingProof] = useState(false)
+  const [uploadingAdditional, setUploadingAdditional] = useState(false)
+
+  const [paymentReceiptFile, setPaymentReceiptFile] = useState<File | null>(null)
+  const [filingProofFile, setFilingProofFile] = useState<File | null>(null)
+  const [additionalFiles, setAdditionalFiles] = useState<File[]>([])
 
   const acknowledgmentNumber = searchParams.get("acknowledgment")
   const ticketId = searchParams.get("ticketId")
@@ -68,48 +73,90 @@ export default function FilingConfirmationPage() {
     }
   }
 
-  const downloadFilingPack = async () => {
+  const attachEvidenceToReport = async (
+    kind: "paymentReceipt" | "filingProof" | "additional",
+    doc: Document
+  ) => {
     if (!report) return
 
-    setDownloading(true)
-    try {
-      const JSZip = (await import("jszip")).default
-      const zip = new JSZip()
+    const entry = { documentId: doc.id, name: doc.name, url: doc.url, uploadedAt: doc.uploadedAt }
 
-      // Add report PDF (would need to generate this)
-      // zip.file("annual-tax-return.pdf", reportPdfBlob)
+    // IMPORTANT: Avoid race conditions when uploading receipt + proof concurrently.
+    // We update only the nested field we need so one upload doesn't overwrite the other.
+    if (kind === "paymentReceipt" || kind === "filingProof") {
+      const fieldPath = kind === "paymentReceipt" ? "filingEvidence.paymentReceipt" : "filingEvidence.filingProof"
+      await reportService.updateReport(report.id, "Self-Assessment", {
+        [fieldPath]: entry
+      } as any)
 
-      // Add receipt PDF (would need to fetch this)
-      // zip.file("payment-receipt.pdf", receiptPdfBlob)
-
-      // Add supporting documents (would need to fetch from documents)
-      // zip.file("supporting-docs.pdf", supportingDocsBlob)
-
-      // For now, create a placeholder
-      zip.file("README.txt", `Tax Filing Package
-Tax Year: ${report.reportData?.period?.year || 'N/A'}
-Report ID: ${report.id}
-${acknowledgmentNumber ? `Acknowledgment: ${acknowledgmentNumber}` : ''}
-${ticketId ? `Ticket ID: ${ticketId}` : ''}
-Generated: ${new Date().toISOString()}
-`)
-
-      const blob = await zip.generateAsync({ type: "blob" })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement("a")
-      a.href = url
-      a.download = `tax-filing-${report.reportData?.period?.year || 'unknown'}-${Date.now()}.zip`
-      a.click()
-      URL.revokeObjectURL(url)
-
-      toast.success("Filing pack downloaded")
-    } catch (error) {
-      console.error("Error downloading pack:", error)
-      toast.error("Failed to download filing pack")
-    } finally {
-      setDownloading(false)
+      setReport((prevReport) => {
+        if (!prevReport) return prevReport
+        return {
+          ...prevReport,
+          filingEvidence: {
+            ...(prevReport.filingEvidence || {}),
+            [kind]: entry
+          }
+        } as any
+      })
+      return
     }
+
+    // Additional evidence: append (we keep this sequential in UI, so a simple merge is OK)
+    const latest = await reportService.getReportById(report.id, "Self-Assessment")
+    const prevAdditional = (latest as any)?.filingEvidence?.additional || report.filingEvidence?.additional || []
+    const nextAdditional = [...prevAdditional, entry]
+
+    await reportService.updateReport(report.id, "Self-Assessment", {
+      "filingEvidence.additional": nextAdditional
+    } as any)
+
+    setReport((prevReport) => {
+      if (!prevReport) return prevReport
+      return {
+        ...prevReport,
+        filingEvidence: {
+          ...(prevReport.filingEvidence || {}),
+          additional: nextAdditional
+        }
+      } as any
+    })
   }
+
+  const uploadEvidence = async (file: File, kind: "paymentReceipt" | "filingProof" | "additional") => {
+    if (!user?.uid || !report) {
+      throw new Error("User/report not ready. Please refresh and try again.")
+    }
+
+    const year = report.reportData?.period?.year || new Date().getFullYear()
+    const defaultName =
+      kind === "paymentReceipt"
+        ? `Tax Payment Receipt - ${year}`
+        : kind === "filingProof"
+          ? `Filing Proof - ${year}`
+          : `Filing Evidence - ${year}`
+
+    // Upload file to ImageKit via our API (reliable + enforces storage usage)
+    const uploadResult = await uploadToImageKit(file, "filing-evidence", user.uid)
+
+    const res = await documentService.uploadDocument(user.uid, {
+      file,
+      name: defaultName,
+      type: kind === "paymentReceipt" ? "receipt" : "proof",
+      imageKitUrl: uploadResult.url,
+      imageKitFileId: uploadResult.fileId,
+      fileSize: uploadResult.size,
+      notes: `Self-Assessment Report: ${report.id}${acknowledgmentNumber ? ` | Ack: ${acknowledgmentNumber}` : ""}`
+    })
+
+    if (!res.success || !res.data) {
+      throw new Error(res.error || "Upload failed")
+    }
+
+    await attachEvidenceToReport(kind, res.data as any)
+    return res.data as any as Document
+  }
+
 
   if (loading || profileLoading) {
     return (
@@ -228,16 +275,70 @@ Generated: ${new Date().toISOString()}
             </CardContent>
           </Card>
 
-          {/* Receipt Section */}
+          {/* Payment Receipt (manual upload) */}
           <Card>
             <CardHeader>
               <CardTitle>Payment Receipt</CardTitle>
-              <CardDescription>Your RRR payment confirmation</CardDescription>
+              <CardDescription>Upload your tax payment receipt (if you paid)</CardDescription>
             </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">
-                Your payment receipt has been saved to your documents. You can access it from the Documents section.
-              </p>
+            <CardContent className="space-y-3">
+              <Alert>
+                <AlertTitle className="text-sm">Manual upload</AlertTitle>
+                <AlertDescription className="text-xs text-muted-foreground">
+                  Since payment can happen on an external portal, upload the receipt/reference you received so OTax can store it.
+                </AlertDescription>
+              </Alert>
+
+              {report.filingEvidence?.paymentReceipt ? (
+                <div className="rounded-lg border p-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{report.filingEvidence.paymentReceipt.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{report.filingEvidence.paymentReceipt.url}</p>
+                  </div>
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={report.filingEvidence!.paymentReceipt!.url} target="_blank" rel="noreferrer">
+                      View
+                    </a>
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">Upload receipt</Label>
+                    <input
+                      type="file"
+                      accept=".pdf,image/*"
+                      onChange={(e) => setPaymentReceiptFile(e.target.files?.[0] || null)}
+                    />
+                  </div>
+                  <Button
+                    onClick={async () => {
+                      if (!paymentReceiptFile) return toast.error("Please choose a file")
+                      setUploadingPaymentReceipt(true)
+                      try {
+                        await uploadEvidence(paymentReceiptFile, "paymentReceipt")
+                        setPaymentReceiptFile(null)
+                        toast.success("Payment receipt uploaded")
+                      } catch (e) {
+                        console.error(e)
+                        toast.error(e instanceof Error ? e.message : "Failed to upload")
+                      } finally {
+                        setUploadingPaymentReceipt(false)
+                      }
+                    }}
+                    disabled={uploadingPaymentReceipt}
+                  >
+                    {uploadingPaymentReceipt ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      "Upload Payment Receipt"
+                    )}
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -245,7 +346,7 @@ Generated: ${new Date().toISOString()}
           <Card>
             <CardHeader>
               <CardTitle>Filing Proof</CardTitle>
-              <CardDescription>Proof of your tax return submission</CardDescription>
+              <CardDescription>Upload proof of submission (confirmation email/screenshot/acknowledgment)</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {acknowledgmentNumber && (
@@ -290,37 +391,119 @@ Generated: ${new Date().toISOString()}
                   </p>
                 </div>
               )}
-            </CardContent>
-          </Card>
 
-          {/* Download Pack */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Download Filing Pack</CardTitle>
-              <CardDescription>Download all documents related to this filing</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button
-                onClick={downloadFilingPack}
-                disabled={downloading}
-                variant="outline"
-                className="w-full"
-              >
-                {downloading ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Preparing Download...
-                  </>
+              {report.filingEvidence?.filingProof ? (
+                <div className="rounded-lg border p-3 flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">{report.filingEvidence.filingProof.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{report.filingEvidence.filingProof.url}</p>
+                  </div>
+                  <Button variant="outline" size="sm" asChild>
+                    <a href={report.filingEvidence!.filingProof!.url} target="_blank" rel="noreferrer">
+                      View
+                    </a>
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">Upload proof</Label>
+                    <input
+                      type="file"
+                      accept=".pdf,image/*"
+                      onChange={(e) => setFilingProofFile(e.target.files?.[0] || null)}
+                    />
+                  </div>
+                  <Button
+                    onClick={async () => {
+                      if (!filingProofFile) return toast.error("Please choose a file")
+                      setUploadingFilingProof(true)
+                      try {
+                        await uploadEvidence(filingProofFile, "filingProof")
+                        setFilingProofFile(null)
+                        toast.success("Filing proof uploaded")
+                      } catch (e) {
+                        console.error(e)
+                        toast.error(e instanceof Error ? e.message : "Failed to upload")
+                      } finally {
+                        setUploadingFilingProof(false)
+                      }
+                    }}
+                    disabled={uploadingFilingProof}
+                  >
+                    {uploadingFilingProof ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Uploading...
+                      </>
+                    ) : (
+                      "Upload Filing Proof"
+                    )}
+                  </Button>
+                </>
+              )}
+
+              <div className="pt-2 border-t space-y-2">
+                <p className="text-sm font-medium">Other evidence (optional)</p>
+                {report.filingEvidence?.additional?.length ? (
+                  <div className="space-y-2">
+                    {report.filingEvidence.additional.map((d) => (
+                      <div key={d.documentId} className="rounded-lg border p-3 flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{d.name}</p>
+                          <p className="text-xs text-muted-foreground truncate">{d.url}</p>
+                        </div>
+                        <Button variant="outline" size="sm" asChild>
+                          <a href={d.url} target="_blank" rel="noreferrer">
+                            View
+                          </a>
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
                 ) : (
-                  <>
-                    <Download className="w-4 h-4 mr-2" />
-                    Download Filing Pack (ZIP)
-                  </>
+                  <p className="text-xs text-muted-foreground">No additional evidence uploaded.</p>
                 )}
-              </Button>
-              <p className="text-xs text-muted-foreground mt-2">
-                Includes: Annual Return PDF, Payment Receipt, Supporting Documents
-              </p>
+
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">Upload additional files</Label>
+                  <input
+                    type="file"
+                    multiple
+                    accept=".pdf,image/*"
+                    onChange={(e) => setAdditionalFiles(Array.from(e.target.files || []))}
+                  />
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    if (!additionalFiles.length) return toast.error("Please choose at least one file")
+                    setUploadingAdditional(true)
+                    try {
+                      for (const f of additionalFiles) {
+                        await uploadEvidence(f, "additional")
+                      }
+                      setAdditionalFiles([])
+                      toast.success("Evidence uploaded")
+                    } catch (e) {
+                      console.error(e)
+                      toast.error(e instanceof Error ? e.message : "Failed to upload")
+                    } finally {
+                      setUploadingAdditional(false)
+                    }
+                  }}
+                  disabled={uploadingAdditional}
+                >
+                  {uploadingAdditional ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Uploading...
+                    </>
+                  ) : (
+                    "Upload Additional Evidence"
+                  )}
+                </Button>
+              </div>
             </CardContent>
           </Card>
 

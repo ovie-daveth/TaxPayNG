@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Calculator, LayoutDashboard, Settings, LogOut, ChevronLeft, ChevronRight, Receipt, FileText, Bell, IdCardIcon, FileCheck, BarChart3, MessageSquare, Plus, Menu, Handshake, Building2 } from "lucide-react"
+import { Calculator, LayoutDashboard, Settings, LogOut, ChevronLeft, ChevronRight, Receipt, FileText, Bell, IdCardIcon, FileCheck, BarChart3, MessageSquare, Plus, Menu, Handshake } from "lucide-react"
 import OtaxLogo from "../OtaxLogo"
 import { useState, useEffect } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
@@ -19,15 +19,12 @@ import { useTransactions } from "@/lib/hooks/useTransactions"
 import { useSubscription } from "@/lib/hooks/useSubscription"
 import { SubscriptionRequiredModal } from "../subscription/subscription-required-modal"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
-import { BusinessSwitcher } from "@/components/business/business-switcher"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 const navItems = [
   { href: "/dashboard-creator", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard-creator/transactions", label: "Transactions", icon: Receipt },
   { href: "/dashboard-creator/invoices", label: "Invoices", icon: FileCheck },
   { href: "/dashboard-creator/brand-deals", label: "Brand Deals", icon: Handshake },
-  { href: "/dashboard-creator/businesses", label: "Businesses", icon: Building2 },
   { href: "/dashboard-creator/reports", label: "Reports", icon: BarChart3 },
   { href: "/dashboard-creator/filing-requests", label: "Filing Requests", icon: MessageSquare },
   { href: "/dashboard-creator/tax-calculator", label: "Tax Calculator", icon: Calculator },
@@ -47,7 +44,6 @@ export function DashboardNavCreator() {
   const [isAddTransactionDialogOpen, setIsAddTransactionDialogOpen] = useState(false)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
-  const [isBusinessSwitcherOpen, setIsBusinessSwitcherOpen] = useState(false)
   
   const { isSubscribed, isExpired, loading: subscriptionLoading } = useSubscription()
   const { createTransaction } = useTransactions(user?.uid || null)
@@ -280,17 +276,7 @@ export function DashboardNavCreator() {
             <Menu className="w-5 h-5 text-foreground" />
           </button>
           <div className="flex items-center gap-1.5 flex-shrink-0">
-            {profile?.subscriptionType === "PLATINUM" && (
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsBusinessSwitcherOpen(true)}
-                className="h-8 w-8"
-                aria-label="Switch business"
-              >
-                <Building2 className="w-4 h-4" />
-              </Button>
-            )}
+            {/* Business switcher lives in the header; removed from sidebar/menu for creators */}
             <NotificationBell />
             {mobileAddButton.show && (
               <Button 
@@ -454,30 +440,7 @@ export function DashboardNavCreator() {
               </div>
             </div>
 
-            {/* PLATINUM: Business Switcher */}
-            {profile?.subscriptionType === "PLATINUM" && (
-              <div className="mt-4">
-                <p className="text-xs font-medium text-muted-foreground mb-2">Business</p>
-                <div className="flex flex-col gap-2">
-                  <BusinessSwitcher
-                    className="w-full"
-                    triggerClassName="w-full"
-                    showManageLink={false}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="w-full justify-center"
-                    onClick={() => {
-                      setIsMobileMenuOpen(false)
-                      router.push("/dashboard-creator/businesses")
-                    }}
-                  >
-                    Manage Businesses
-                  </Button>
-                </div>
-              </div>
-            )}
+            {/* Business switcher lives in the header; removed from sidebar/menu for creators */}
           </div>
 
           {/* Menu Items */}
@@ -534,32 +497,7 @@ export function DashboardNavCreator() {
         transaction={null}
       />
 
-      {/* Mobile Business Switcher Modal (PLATINUM) */}
-      <Dialog open={isBusinessSwitcherOpen} onOpenChange={setIsBusinessSwitcherOpen}>
-        <DialogContent className="max-w-[95vw] sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-base">Switch Business</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <BusinessSwitcher
-              className="w-full"
-              triggerClassName="w-full"
-              showManageLink={false}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={() => {
-                setIsBusinessSwitcherOpen(false)
-                router.push("/dashboard-creator/businesses")
-              }}
-            >
-              Manage Businesses
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Business switcher lives in the header; removed from sidebar/menu for creators */}
       
       {/* Subscription Required Modal */}
       {(profile?.businessType !== 'agent' || !profile) && (
