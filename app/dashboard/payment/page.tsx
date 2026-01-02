@@ -58,7 +58,11 @@ type FilterCategory = "period" | "method" | "status"
 export default function PaymentHistoryPage() {
   const router = useRouter()
   const pathname = usePathname()
-  const basePath = pathname?.startsWith("/dashboard-creator") ? "/dashboard-creator" : "/dashboard"
+  const basePath = pathname?.startsWith("/dashboard-creator")
+    ? "/dashboard-creator"
+    : pathname?.startsWith("/dashboard-sme")
+      ? "/dashboard-sme"
+      : "/dashboard"
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { isSubscribed, loading: subscriptionLoading } = useSubscription()

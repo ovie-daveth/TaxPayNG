@@ -57,7 +57,11 @@ interface SystemCheck {
 export default function PaymentPage() {
   const router = useRouter()
   const pathname = usePathname()
-  const basePath = pathname?.startsWith("/dashboard-creator") ? "/dashboard-creator" : "/dashboard"
+  const basePath = pathname?.startsWith("/dashboard-creator")
+    ? "/dashboard-creator"
+    : pathname?.startsWith("/dashboard-sme")
+      ? "/dashboard-sme"
+      : "/dashboard"
   const { user } = useAuth()
   const { profile, loading: profileLoading } = useUserProfile()
   const [showReceipt, setShowReceipt] = useState(false)

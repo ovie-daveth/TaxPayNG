@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Calculator, LayoutDashboard, Users, DollarSign, FileText, Settings, LogOut, ChevronLeft, ChevronRight, TrendingUp, Menu, Bell, User } from "lucide-react"
+import { Calculator, LayoutDashboard, Users, DollarSign, FileText, Settings, LogOut, ChevronLeft, ChevronRight, TrendingUp, Menu, Bell, User, Receipt, FileCheck, IdCardIcon, MessageSquare } from "lucide-react"
 import OtaxLogo from "../OtaxLogo"
 import { useState } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
@@ -16,10 +16,15 @@ import { useUserProfile } from "@/lib/contexts/user-profile-context"
 
 const navItems = [
   { href: "/dashboard-sme", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard-sme/transactions", label: "Transactions", icon: Receipt },
+  { href: "/dashboard-sme/invoices", label: "Invoices", icon: FileCheck },
+  { href: "/dashboard-sme/reports", label: "Reports", icon: TrendingUp },
+  { href: "/dashboard-sme/filing-requests", label: "Filing Requests", icon: MessageSquare },
+  { href: "/dashboard-sme/payment", label: "Payment", icon: IdCardIcon },
+  { href: "/dashboard-sme/documents", label: "Documents", icon: FileText },
   { href: "/dashboard-sme/employees", label: "Employees", icon: Users },
   { href: "/dashboard-sme/payroll", label: "Payroll", icon: DollarSign },
   { href: "/dashboard-sme/paye", label: "PAYE Tax", icon: FileText },
-  { href: "/dashboard-sme/reports", label: "Reports", icon: TrendingUp },
   { href: "/dashboard-sme/reminders", label: "Reminders", icon: Bell },
   { href: "/dashboard-sme/settings", label: "Settings", icon: Settings },
 ]
@@ -42,12 +47,11 @@ export function DashboardNavSME() {
     }
   }
 
-  // Items shown in bottom nav - only 4 items: Invoice, Transaction, Tax Calculator, Report
-  // For SME, we'll use: Employees (as Invoice equivalent), PAYE (as Transaction equivalent), Tax Calculator, Reports
+  // Items shown in bottom nav - we keep high-frequency modules for SMEs
   const bottomNavItems = [
-    "/dashboard-sme/employees",
-    "/dashboard-sme/paye",
+    "/dashboard-sme/invoices",
     "/dashboard-sme/tax-calculator",
+    "/dashboard-sme/transactions",
     "/dashboard-sme/reports"
   ]
 
@@ -156,37 +160,37 @@ export function DashboardNavSME() {
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border safe-area-inset-bottom">
         <div className="flex items-center justify-around px-2 py-2">
-          <Link href="/dashboard-sme/employees" className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] rounded-lg transition-colors">
-            <Users className={cn(
+          <Link href="/dashboard-sme/invoices" className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] rounded-lg transition-colors">
+            <FileCheck className={cn(
               "w-5 h-5",
-              (pathname === "/dashboard-sme/employees" || pathname?.startsWith("/dashboard-sme/employees/")) 
+              (pathname === "/dashboard-sme/invoices" || pathname?.startsWith("/dashboard-sme/invoices/")) 
                 ? "text-primary" 
                 : "text-muted-foreground"
             )} />
             <span className={cn(
               "text-[10px] font-medium",
-              (pathname === "/dashboard-sme/employees" || pathname?.startsWith("/dashboard-sme/employees/")) 
+              (pathname === "/dashboard-sme/invoices" || pathname?.startsWith("/dashboard-sme/invoices/")) 
                 ? "text-primary" 
                 : "text-muted-foreground"
             )}>
-              Employees
+              Invoices
             </span>
           </Link>
 
-          <Link href="/dashboard-sme/paye" className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] rounded-lg transition-colors">
-            <FileText className={cn(
+          <Link href="/dashboard-sme/transactions" className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] rounded-lg transition-colors">
+            <Receipt className={cn(
               "w-5 h-5",
-              (pathname === "/dashboard-sme/paye" || pathname?.startsWith("/dashboard-sme/paye/")) 
+              (pathname === "/dashboard-sme/transactions" || pathname?.startsWith("/dashboard-sme/transactions/")) 
                 ? "text-primary" 
                 : "text-muted-foreground"
             )} />
             <span className={cn(
               "text-[10px] font-medium",
-              (pathname === "/dashboard-sme/paye" || pathname?.startsWith("/dashboard-sme/paye/")) 
+              (pathname === "/dashboard-sme/transactions" || pathname?.startsWith("/dashboard-sme/transactions/")) 
                 ? "text-primary" 
                 : "text-muted-foreground"
             )}>
-              PAYE
+              Transactions
             </span>
           </Link>
 
@@ -227,20 +231,20 @@ export function DashboardNavSME() {
             </span>
           </Link>
 
-          <Link href="/dashboard-sme/payroll" className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] rounded-lg transition-colors">
-            <DollarSign className={cn(
+          <Link href="/dashboard-sme/payment" className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] rounded-lg transition-colors">
+            <IdCardIcon className={cn(
               "w-5 h-5",
-              (pathname === "/dashboard-sme/payroll" || pathname?.startsWith("/dashboard-sme/payroll/")) 
+              (pathname === "/dashboard-sme/payment" || pathname?.startsWith("/dashboard-sme/payment/")) 
                 ? "text-primary" 
                 : "text-muted-foreground"
             )} />
             <span className={cn(
               "text-[10px] font-medium",
-              (pathname === "/dashboard-sme/payroll" || pathname?.startsWith("/dashboard-sme/payroll/")) 
+              (pathname === "/dashboard-sme/payment" || pathname?.startsWith("/dashboard-sme/payment/")) 
                 ? "text-primary" 
                 : "text-muted-foreground"
             )}>
-              Payroll
+              Payment
             </span>
           </Link>
         </div>

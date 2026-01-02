@@ -41,28 +41,34 @@ export default function SMEDashboardPage() {
         <Card className="p-4 sm:p-5 md:p-6 lg:col-span-1">
           <h3 className="text-base sm:text-lg font-semibold mb-3 sm:mb-4">Quick Actions</h3>
           <div className="space-y-2">
-            <Link href="/dashboard-sme/employees">
-              <Button variant="outline" className="w-full justify-start h-9 sm:h-10 text-xs sm:text-sm">
-                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-                Manage Employees
-              </Button>
-            </Link>
-            <Link href="/dashboard-sme/payroll">
-              <Button variant="outline" className="w-full justify-start h-9 sm:h-10 text-xs sm:text-sm">
-                <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-                Process Payroll
-              </Button>
-            </Link>
-            <Link href="/dashboard-sme/paye">
+            <Link href="/dashboard-sme/transactions">
               <Button variant="outline" className="w-full justify-start h-9 sm:h-10 text-xs sm:text-sm">
                 <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-                Remit PAYE Tax
+                Add / Review Transactions
+              </Button>
+            </Link>
+            <Link href="/dashboard-sme/invoices">
+              <Button variant="outline" className="w-full justify-start h-9 sm:h-10 text-xs sm:text-sm">
+                <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                Manage Invoices
+              </Button>
+            </Link>
+            <Link href="/dashboard-sme/payment">
+              <Button variant="outline" className="w-full justify-start h-9 sm:h-10 text-xs sm:text-sm">
+                <DollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                Record Tax Payment
               </Button>
             </Link>
             <Link href="/dashboard-sme/reports">
               <Button variant="outline" className="w-full justify-start h-9 sm:h-10 text-xs sm:text-sm">
                 <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
                 View Reports
+              </Button>
+            </Link>
+            <Link href="/dashboard-sme/filing-requests">
+              <Button variant="outline" className="w-full justify-start h-9 sm:h-10 text-xs sm:text-sm">
+                <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                Agent Filing Tracking
               </Button>
             </Link>
           </div>

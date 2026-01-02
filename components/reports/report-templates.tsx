@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { FileText, Calculator, BarChart3, FileCheck, Plus } from "lucide-react"
@@ -46,9 +46,21 @@ const templates = [
 
 export function ReportTemplates() {
   const router = useRouter()
+  const pathname = usePathname()
   const { profile } = useUserProfile()
   const { isSubscribed, loading: subscriptionLoading } = useSubscription()
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+
+  const basePath = pathname?.startsWith("/dashboard-creator")
+    ? "/dashboard-creator"
+    : pathname?.startsWith("/dashboard-sme")
+      ? "/dashboard-sme"
+      : "/dashboard"
+
+  const resolvedTemplates = templates.map(t => ({
+    ...t,
+    href: t.href.replace(/^\/dashboard/, basePath),
+  }))
 
   const handleGenerateClick = (href: string) => {
     // Wait for subscription status to load
@@ -73,7 +85,7 @@ export function ReportTemplates() {
         </div>
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {templates.map((template) => {
+          {resolvedTemplates.map((template) => {
             const Icon = template.icon
             return (
               <div
