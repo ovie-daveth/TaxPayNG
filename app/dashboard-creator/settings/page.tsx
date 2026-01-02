@@ -2196,46 +2196,16 @@ export default function SettingsPage() {
                       />
                     </div>
                     <Separator />
-                    <div className="flex items-center justify-between p-3 sm:p-4 border rounded-lg gap-3 sm:gap-4">
+                    <div className="flex items-center justify-between p-3 sm:p-4 border rounded-lg gap-3 sm:gap-4 bg-muted/20">
                       <div className="space-y-0.5 min-w-0 flex-1">
                         <Label className="text-sm sm:text-base">SMS Notifications</Label>
-                        <p className="text-xs sm:text-sm text-muted-foreground">Receive SMS alerts for reminders and deadlines</p>
+                        <p className="text-xs sm:text-sm text-muted-foreground">
+                          Coming soon — SMS alerts for reminders and deadlines.
+                        </p>
                       </div>
                       <Switch 
-                        checked={notificationPreferences.smsNotifications}
-                        onCheckedChange={async (checked) => {
-                          setNotificationPreferences(prev => ({ ...prev, smsNotifications: checked }))
-                          
-                          // Auto-save on toggle
-                          if (!user?.uid) {
-                            toast.error("User not authenticated")
-                            return
-                          }
-                          
-                          try {
-                            const result = await userService.updatePreferences(user.uid, {
-                              currency: profile?.preferences?.currency || 'NGN',
-                              theme: profile?.preferences?.theme || 'system',
-                              notifications: notificationPreferences.emailNotifications || checked, // Legacy field
-                              emailNotifications: notificationPreferences.emailNotifications,
-                              smsNotifications: checked
-                            })
-                            
-                            if (result.success) {
-                              toast.success(`SMS notifications ${checked ? 'enabled' : 'disabled'}`)
-                              refetchProfile()
-                            } else {
-                              toast.error(result.error || "Failed to save preferences")
-                              // Revert on error
-                              setNotificationPreferences(prev => ({ ...prev, smsNotifications: !checked }))
-                            }
-                          } catch (error) {
-                            console.error("Error saving preferences:", error)
-                            toast.error("Failed to save notification preferences")
-                            // Revert on error
-                            setNotificationPreferences(prev => ({ ...prev, smsNotifications: !checked }))
-                          }
-                        }}
+                        checked={false}
+                        disabled
                         className="flex-shrink-0" 
                       />
                     </div>
