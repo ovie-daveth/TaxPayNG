@@ -6,9 +6,14 @@ import { Download, CheckCircle2, Copy, X, Receipt, Calendar, CreditCard, Hash } 
 import { toast } from "sonner"
 import { formatCurrency } from "@/lib/utils"
 import { useState } from "react"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { uploadToImageKit } from "@/lib/utils/imagekit"
+import { documentService, taxPaymentService } from "@/lib/services"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface PaymentReceiptProps {
   paymentData: {
+    id?: string
     amount: number
     tips: string[]
     status: string
@@ -19,6 +24,7 @@ interface PaymentReceiptProps {
     rrr?: string
     tin?: string
     state?: string
+    receiptUrl?: string
   }
   onDownload: () => void
   onClose: () => void
@@ -26,6 +32,11 @@ interface PaymentReceiptProps {
 
 export function PaymentReceipt({ paymentData, onDownload, onClose }: PaymentReceiptProps) {
   const [loading, setLoading] = useState(false)
+  const { user } = useAuth()
+  const [externalReceiptFile, setExternalReceiptFile] = useState<File | null>(null)
+  const [uploadingExternalReceipt, setUploadingExternalReceipt] = useState(false)
+  const [externalReceiptUrl, setExternalReceiptUrl] = useState<string | undefined>(paymentData.receiptUrl)
+  const [receiptView, setReceiptView] = useState<"otax" | "uploaded">(paymentData.receiptUrl ? "uploaded" : "otax")
 
   const generateReceiptPDF = async () => {
     setLoading(true)
@@ -192,7 +203,7 @@ export function PaymentReceipt({ paymentData, onDownload, onClose }: PaymentRece
         <body>
           <div class="receipt-container">
             <div class="header">
-              <div class="logo">TaxPayNG</div>
+              <div class="logo">OTax NG</div>
               <div class="subtitle">Official Tax Payment Receipt</div>
               <div class="status-badge">✓ Successful</div>
             </div>
@@ -243,10 +254,10 @@ export function PaymentReceipt({ paymentData, onDownload, onClose }: PaymentRece
             ` : ''}
             
             <div class="footer">
-              <div style="font-weight: 600; margin-bottom: 5px;">Thank you for using TaxPayNG</div>
+              <div style="font-weight: 600; margin-bottom: 5px;">Thank you for using OTax NG</div>
               <div>This is an official receipt for your tax payment</div>
               <div>Keep this receipt for your tax records</div>
-              <div style="margin-top: 15px;">For support, contact: support@taxpayng.com</div>
+              <div style="margin-top: 15px;">For support, contact: otax.ng@gmail.com</div>
             </div>
           </div>
         </body>
@@ -277,6 +288,58 @@ export function PaymentReceipt({ paymentData, onDownload, onClose }: PaymentRece
     toast.success('Transaction ID copied!')
   }
 
+  const uploadExternalReceipt = async () => {
+    if (!paymentData.id) {
+      toast.error("This payment can’t be updated yet. Please refresh and try again.")
+      return
+    }
+    if (!user?.uid) {
+      toast.error("Please sign in again and try.")
+      return
+    }
+    if (!externalReceiptFile) {
+      toast.error("Please choose a receipt file first.")
+      return
+    }
+
+    setUploadingExternalReceipt(true)
+    try {
+      // Upload to ImageKit (counts toward storage via API route)
+      const uploadResult = await uploadToImageKit(externalReceiptFile, "payment-receipts", user.uid)
+
+      // Save as a Document (so it appears in Documents + counts usage)
+      const docRes = await documentService.uploadDocument(user.uid, {
+        file: externalReceiptFile,
+        name: `Payment Receipt - ${paymentData.taxDuration}`,
+        type: "receipt",
+        imageKitUrl: uploadResult.url,
+        imageKitFileId: uploadResult.fileId,
+        fileSize: uploadResult.size,
+        linkedTransaction: paymentData.transactionId,
+        notes: `External receipt uploaded for payment ${paymentData.transactionId} (${paymentData.method}).`
+      })
+
+      if (!docRes.success || !docRes.data) {
+        throw new Error(docRes.error || "Failed to save receipt document")
+      }
+
+      // Link to the payment record
+      await taxPaymentService.update(paymentData.id, {
+        receiptUrl: docRes.data.url,
+        updatedAt: new Date().toISOString()
+      })
+
+      setExternalReceiptUrl(docRes.data.url)
+      setExternalReceiptFile(null)
+      toast.success("Receipt uploaded and linked to this payment")
+    } catch (e) {
+      console.error(e)
+      toast.error(e instanceof Error ? e.message : "Failed to upload receipt")
+    } finally {
+      setUploadingExternalReceipt(false)
+    }
+  }
+
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="max-w-md p-0 gap-0 overflow-hidden animate-in fade-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col">
@@ -294,15 +357,23 @@ export function PaymentReceipt({ paymentData, onDownload, onClose }: PaymentRece
 
         {/* Receipt Body */}
         <div className="p-6 space-y-4 bg-gray-50 overflow-y-auto flex-1">
-          {/* QR Code Placeholder */}
-          <div className="flex justify-center py-4">
-            <div className="w-32 h-32 bg-white border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center">
-              <div className="text-center">
-                <Receipt className="w-12 h-12 mx-auto text-gray-400 mb-2" />
-                <p className="text-xs text-gray-500">Receipt QR</p>
+          {/* Receipt selector */}
+          <Tabs value={receiptView} onValueChange={(v) => setReceiptView(v as "otax" | "uploaded")} className="w-full">
+            <TabsList className="grid grid-cols-2 w-full">
+              <TabsTrigger value="otax">OTax receipt</TabsTrigger>
+              <TabsTrigger value="uploaded">Uploaded receipt</TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="otax" className="mt-4 space-y-4">
+              {/* QR Code Placeholder */}
+              <div className="flex justify-center py-4">
+                <div className="w-32 h-32 bg-white border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center">
+                  <div className="text-center">
+                    <Receipt className="w-12 h-12 mx-auto text-gray-400 mb-2" />
+                    <p className="text-xs text-gray-500">Receipt QR</p>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
           {/* Transaction Details */}
           <div className="bg-white rounded-xl p-4 space-y-3 border border-gray-200">
@@ -382,12 +453,95 @@ export function PaymentReceipt({ paymentData, onDownload, onClose }: PaymentRece
             </div>
           )}
 
-          {/* Footer Note */}
-          <div className="text-center text-xs text-gray-500 space-y-1 bg-white rounded-lg p-4 border border-gray-200">
-            <p className="font-semibold text-gray-700">Thank you for using TaxPayNG</p>
-            <p>Keep this receipt for your tax records</p>
-            <p>For support: support@taxpayng.com</p>
-          </div>
+              {/* Footer Note */}
+              <div className="text-center text-xs text-gray-500 space-y-1 bg-white rounded-lg p-4 border border-gray-200">
+                <p className="font-semibold text-gray-700">Thank you for using OTax NG</p>
+                <p>Keep this receipt for your tax records</p>
+                <p>For support: otax.ng@gmail.com</p>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="uploaded" className="mt-4 space-y-4">
+              {!paymentData.id ? (
+                <div className="bg-white rounded-xl p-4 border border-gray-200">
+                  <p className="text-sm font-semibold text-gray-900">Uploaded receipt</p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    This payment isn’t linked to a saved payment record yet, so you can’t attach an uploaded receipt here.
+                  </p>
+                </div>
+              ) : (
+                <div className="bg-white rounded-xl p-4 border border-gray-200">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900">Uploaded receipt</p>
+                      <p className="text-xs text-gray-500 mt-1">
+                        Add the receipt you received outside OTax (e.g., NRS) so we can store it against this payment.
+                      </p>
+                    </div>
+                    {externalReceiptUrl && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8"
+                        onClick={() => {
+                          setExternalReceiptUrl(undefined)
+                          setExternalReceiptFile(null)
+                        }}
+                      >
+                        Replace
+                      </Button>
+                    )}
+                  </div>
+
+                  {externalReceiptUrl ? (
+                    <div className="mt-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <a
+                          href={externalReceiptUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-xs font-medium text-primary underline truncate"
+                        >
+                          Open uploaded receipt
+                        </a>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8"
+                          onClick={() => setReceiptView("otax")}
+                        >
+                          View OTax receipt
+                        </Button>
+                      </div>
+
+                      <div className="rounded-lg border overflow-hidden bg-gray-50">
+                        <iframe
+                          title="Uploaded receipt preview"
+                          src={externalReceiptUrl}
+                          className="w-full h-[55vh] bg-white"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-3 space-y-2">
+                      <input
+                        type="file"
+                        accept=".pdf,image/*"
+                        onChange={(e) => setExternalReceiptFile(e.target.files?.[0] || null)}
+                      />
+                      <Button
+                        onClick={uploadExternalReceipt}
+                        disabled={uploadingExternalReceipt}
+                        className="w-full h-9"
+                      >
+                        {uploadingExternalReceipt ? "Uploading..." : "Add receipt"}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </TabsContent>
+          </Tabs>
         </div>
 
         {/* Action Buttons */}

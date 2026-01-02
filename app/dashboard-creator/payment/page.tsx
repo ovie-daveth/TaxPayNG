@@ -14,6 +14,7 @@ import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { taxPaymentService } from "@/lib/services"
 import { TaxPayment } from "@/lib/types"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { 
   ArrowLeft, 
   Download, 
@@ -29,12 +30,15 @@ import {
   Loader2,
   Copy,
   Sparkles,
-  Plus
+  Plus,
+  MoreVertical,
+  Eye
 } from "lucide-react"
 import { toast } from "sonner"
 import { formatCurrency, cn } from "@/lib/utils"
 
 interface PaymentData {
+  id?: string
   amount: number
   tips: string[]
   status: string
@@ -45,6 +49,7 @@ interface PaymentData {
   rrr?: string
   tin?: string
   state?: string
+  receiptUrl?: string
 }
 
 type ViewMode = "grid" | "table"
@@ -139,6 +144,7 @@ export default function PaymentHistoryPage() {
 
   const handleViewReceipt = (payment: TaxPayment) => {
     const paymentData: PaymentData = {
+      id: payment.id,
       amount: payment.amount,
       tips: [
         "Keep this receipt for your records",
@@ -151,7 +157,8 @@ export default function PaymentHistoryPage() {
       transactionId: payment.transactionId,
       method: payment.paymentMethod.charAt(0).toUpperCase() + payment.paymentMethod.slice(1),
       taxDuration: payment.taxDuration,
-      timestamp: payment.createdAt
+      timestamp: payment.createdAt,
+      receiptUrl: payment.receiptUrl
     }
     
     setSelectedPayment(paymentData)
@@ -238,8 +245,8 @@ export default function PaymentHistoryPage() {
       {/* Main Content */}
     <div className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6 animate-in fade-in duration-300">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 mb-4 sm:mb-6 md:mb-8">
-        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-end gap-3 sm:gap-4 mb-4 sm:mb-6 md:mb-8">
+        <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto sm:ml-auto justify-end">
           <Button
             variant={showFilters ? "default" : "outline"}
             onClick={() => setShowFilters(!showFilters)}
@@ -269,14 +276,7 @@ export default function PaymentHistoryPage() {
           </div>
         </div>
 
-        <Button
-          onClick={() => router.push("/dashboard-creator/payment/add")}
-          className="w-full sm:w-auto gap-1.5 sm:gap-2 h-8 sm:h-9 text-xs sm:text-sm"
-        >
-          <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-          <span className="hidden sm:inline">Add Payment</span>
-          <span className="sm:hidden">Add</span>
-        </Button>
+        {/* Action button removed (header button is enough) */}
       </div>
 
       {/* Stats Cards */}
@@ -430,13 +430,96 @@ export default function PaymentHistoryPage() {
                 : "Try adjusting your filters to see more results."}
             </p>
             {payments.length === 0 && (
-              <Button onClick={() => router.push("/dashboard/payment/add")} size="lg" className="h-9 sm:h-10 text-sm sm:text-base">
+              <Button onClick={() => router.push("/dashboard-creator/payment/add")} size="lg" className="h-9 sm:h-10 text-sm sm:text-base">
                 Make Payment
               </Button>
             )}
           </div>
         </Card>
-      ) : viewMode === "grid" ? (
+      ) : (
+        <>
+          {/* Mobile Card View (like invoices/transactions) */}
+          <div className="md:hidden space-y-2">
+            {filteredPayments.map((payment) => {
+              const statusColor =
+                payment.status === "completed"
+                  ? "bg-green-100 dark:bg-green-900/20 text-green-700 dark:text-green-300"
+                  : payment.status === "pending"
+                    ? "bg-amber-100 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300"
+                    : "bg-red-100 dark:bg-red-900/20 text-red-700 dark:text-red-300"
+
+              return (
+                <div
+                  key={payment.id}
+                  onClick={() => handleViewReceipt(payment)}
+                  className="flex items-center gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all duration-200 hover:bg-muted/50 bg-card"
+                >
+                  {/* Icon */}
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${statusColor}`}>
+                    <Wallet className="w-4 h-4" />
+                  </div>
+
+                  {/* Main */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate">{payment.taxDuration}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">
+                      {payment.period} • {payment.paymentMethod}
+                    </p>
+                  </div>
+
+                  {/* Right */}
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-sm font-bold whitespace-nowrap">{formatCurrency(payment.amount)}</p>
+                    <div className="mt-0.5 flex justify-end">
+                      <span className="text-[10px] px-2 py-0.5 rounded-full border bg-muted/30">
+                        {payment.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem
+                        className="cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          handleViewReceipt(payment)
+                        }}
+                      >
+                        <Eye className="w-4 h-4 mr-2" />
+                        View receipt
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="cursor-pointer"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          copyTransactionId(payment.transactionId)
+                        }}
+                      >
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy transaction ID
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Desktop Views */}
+          <div className="hidden md:block">
+            {viewMode === "grid" ? (
         /* Grid View */
         <div className="grid gap-3 sm:gap-4 md:gap-6 grid-cols-1 md:grid-cols-1 lg:grid-cols-3">
           {filteredPayments.map((payment, index) => (
@@ -504,7 +587,7 @@ export default function PaymentHistoryPage() {
             </Card>
           ))}
         </div>
-      ) : (
+            ) : (
         /* Table View */
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
@@ -568,6 +651,9 @@ export default function PaymentHistoryPage() {
             </table>
           </div>
         </Card>
+            )}
+          </div>
+        </>
       )}
     </div>
     {profile && profile.businessType !== 'agent' && (

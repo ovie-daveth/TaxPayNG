@@ -670,7 +670,7 @@ export default function PaymentSuccessPage() {
 
       {/* NRS portal modal */}
       <Dialog open={showNrsModal} onOpenChange={setShowNrsModal}>
-        <DialogContent className="max-w-3xl p-0 overflow-hidden">
+        <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-3xl p-0 overflow-hidden sm:rounded-lg h-[92dvh] sm:h-auto">
           <div className="p-4 border-b">
             <DialogHeader>
               <DialogTitle>Continue Filing on NRS Portal</DialogTitle>
@@ -680,12 +680,12 @@ export default function PaymentSuccessPage() {
             </DialogHeader>
           </div>
 
-          <div className="p-4 space-y-3">
+          <div className="p-4 space-y-3 overflow-y-auto max-h-[calc(92dvh-140px)] sm:max-h-[70vh]">
             <div className="rounded-lg border overflow-hidden">
               <iframe
                 title="NRS Self Service Portal"
                 src={NRS_PORTAL_URL}
-                className="w-full h-[70vh] bg-background"
+                className="w-full h-[55dvh] sm:h-[70vh] bg-background"
               />
             </div>
 
@@ -697,7 +697,7 @@ export default function PaymentSuccessPage() {
             </Alert>
           </div>
 
-          <DialogFooter className="p-4 border-t flex-col sm:flex-row gap-2 sm:gap-3">
+          <DialogFooter className="p-4 border-t flex-col sm:flex-row gap-2 sm:gap-3 sticky bottom-0 bg-background">
             <Button
               variant="outline"
               onClick={openNrsPortal}
