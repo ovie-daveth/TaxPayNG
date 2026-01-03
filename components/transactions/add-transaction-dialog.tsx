@@ -1044,6 +1044,31 @@ export function AddTransactionDialog({
             setShowCloseConfirmation(true)
           }
         }}
+        onInteractOutside={(e) => {
+          // Prevent closing the dialog when clicking outside if a Select dropdown is open
+          // This fixes the mobile issue where tapping outside a Select closes the entire modal
+          const target = e.target as HTMLElement
+          
+          // Check if the click target is within a Select portal (Radix Select uses a portal)
+          const isSelectContent = target.closest('[data-radix-select-content]') !== null
+          
+          // Check if any Select dropdown is currently open
+          // We check synchronously to catch it before it closes
+          const openSelectContent = document.querySelector('[data-radix-select-content][data-state="open"]')
+          
+          // Also check for Select trigger that might be in an open state
+          // This provides an additional check in case the content check misses it
+          const openSelectTrigger = document.querySelector('[data-radix-select-trigger][data-state="open"]')
+          
+          // Prevent closing if:
+          // 1. Clicking directly on Select content, OR
+          // 2. An open Select content exists, OR
+          // 3. An open Select trigger exists
+          // This prevents the modal from closing when user taps outside Select on mobile
+          if (isSelectContent || openSelectContent || openSelectTrigger) {
+            e.preventDefault()
+          }
+        }}
       >
         <DialogHeader className="pb-2 sm:pb-4">
           <DialogTitle className="text-sm sm:text-lg md:text-xl">{transaction ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
