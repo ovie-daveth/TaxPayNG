@@ -15,7 +15,9 @@ import { User } from "lucide-react"
 import { ThemeToggle } from "../theme-toggle"
 import { NotificationBell } from "../notifications/notification-bell"
 import { AddTransactionDialog } from "../transactions/add-transaction-dialog"
+import { AddReminderDialog } from "../reminders/add-reminder-dialog"
 import { useTransactions } from "@/lib/hooks/useTransactions"
+import { useReminders } from "@/lib/hooks/useReminders"
 import { useSubscription } from "@/lib/hooks/useSubscription"
 import { SubscriptionRequiredModal } from "../subscription/subscription-required-modal"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -41,11 +43,13 @@ export function DashboardNav() {
   const { profile } = useUserProfile()
   const [hasFilingRequests, setHasFilingRequests] = useState(false)
   const [isAddTransactionDialogOpen, setIsAddTransactionDialogOpen] = useState(false)
+  const [isAddReminderDialogOpen, setIsAddReminderDialogOpen] = useState(false)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   
   const { isSubscribed, isExpired, loading: subscriptionLoading } = useSubscription()
   const { createTransaction } = useTransactions(user?.uid || null)
+  const { createReminder } = useReminders(user?.uid || null)
   
   // Get page info for mobile add button
   const getMobileAddButton = () => {
@@ -62,7 +66,7 @@ export function DashboardNav() {
       case "/dashboard/documents":
         return { icon: Plus, action: () => {}, show: true }
       case "/dashboard/reminders":
-        return { icon: Plus, action: () => {}, show: true }
+        return { icon: Plus, action: () => checkSubscription(() => setIsAddReminderDialogOpen(true)), show: true }
       case "/dashboard/reports":
         return { icon: Plus, action: () => router.push("/dashboard/reports/generate/self-assessment"), show: true }
       case "/dashboard/payment":
@@ -488,6 +492,13 @@ export function DashboardNav() {
         onOpenChange={setIsAddTransactionDialogOpen}
         onSubmit={createTransaction}
         transaction={null}
+      />
+      
+      {/* Add Reminder Dialog */}
+      <AddReminderDialog 
+        open={isAddReminderDialogOpen} 
+        onOpenChange={setIsAddReminderDialogOpen}
+        onSubmit={createReminder}
       />
       
       {/* Subscription Required Modal */}
