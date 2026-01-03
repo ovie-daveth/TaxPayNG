@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -233,6 +233,10 @@ export function AddTransactionDialog({
   const [skipTaxClassification, setSkipTaxClassification] = useState(false)
   const [taxClassificationManuallyEdited, setTaxClassificationManuallyEdited] = useState(false)
   const [showCapitalAllowanceAdvanced, setShowCapitalAllowanceAdvanced] = useState(false)
+  
+  // Track if any Select dropdown is open to prevent dialog from closing on mobile
+  const [isAnySelectOpen, setIsAnySelectOpen] = useState(false)
+  const selectOpenTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // Auto-populate tax classification based on transaction data (Gold+ only)
   const autoPopulateTaxClassification = (
@@ -691,6 +695,62 @@ export function AddTransactionDialog({
     setTaxClassification(autoClassification)
   }, [formData.type, formData.category, formData.description, formData.notes, transactionNature, hasTaxClassificationAccess, skipTaxClassification, taxClassificationManuallyEdited])
 
+  // Monitor for Select dropdowns opening/closing to prevent dialog from closing on mobile
+  useEffect(() => {
+    if (!open) {
+      setIsAnySelectOpen(false)
+      if (selectOpenTimeoutRef.current) {
+        clearTimeout(selectOpenTimeoutRef.current)
+      }
+      return
+    }
+
+    const checkSelectState = () => {
+      // Check if any Select dropdown is open
+      const openSelect = document.querySelector('[data-radix-select-content][data-state="open"]')
+      const isOpen = !!openSelect
+      
+      setIsAnySelectOpen(isOpen)
+    }
+
+    // Check immediately
+    checkSelectState()
+
+    // Listen for mutations to catch Select state changes immediately
+    // This is more efficient than polling
+    const observer = new MutationObserver((mutations) => {
+      // Only check if mutations are related to Select components
+      const hasSelectMutation = mutations.some(mutation => {
+        const target = mutation.target as HTMLElement
+        return target.hasAttribute?.('data-radix-select-content') ||
+               target.closest?.('[data-radix-select-content]') !== null ||
+               mutation.attributeName === 'data-state'
+      })
+      
+      if (hasSelectMutation) {
+        checkSelectState()
+      }
+    })
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-state']
+    })
+
+    // Also set up a fallback interval (less frequent) in case mutations are missed
+    const interval = setInterval(checkSelectState, 200)
+
+    return () => {
+      clearInterval(interval)
+      observer.disconnect()
+      if (selectOpenTimeoutRef.current) {
+        clearTimeout(selectOpenTimeoutRef.current)
+      }
+    }
+  }, [open])
+
   // Load available invoices when dialog opens (for manual linking)
   useEffect(() => {
     const loadInvoices = async () => {
@@ -1052,20 +1112,27 @@ export function AddTransactionDialog({
           // Check if the click target is within a Select portal (Radix Select uses a portal)
           const isSelectContent = target.closest('[data-radix-select-content]') !== null
           
-          // Check if any Select dropdown is currently open
-          // We check synchronously to catch it before it closes
+          // Check if any Select dropdown is currently open (from our tracked state)
+          // Also do a synchronous check as a fallback
           const openSelectContent = document.querySelector('[data-radix-select-content][data-state="open"]')
           
-          // Also check for Select trigger that might be in an open state
-          // This provides an additional check in case the content check misses it
-          const openSelectTrigger = document.querySelector('[data-radix-select-trigger][data-state="open"]')
+          // Check for Select viewport - if it exists, a Select was recently open
+          // This helps catch the timing issue on mobile where Select closes but portal still exists briefly
+          const selectViewport = document.querySelector('[data-radix-select-viewport]')
+          const selectContent = document.querySelector('[data-radix-select-content]')
           
           // Prevent closing if:
           // 1. Clicking directly on Select content, OR
-          // 2. An open Select content exists, OR
-          // 3. An open Select trigger exists
+          // 2. Our tracked state says a Select is open, OR
+          // 3. An open Select content exists (synchronous check), OR
+          // 4. A Select portal with viewport exists (Select might be closing but still in DOM)
           // This prevents the modal from closing when user taps outside Select on mobile
-          if (isSelectContent || openSelectContent || openSelectTrigger) {
+          const shouldPrevent = isSelectContent || 
+                                isAnySelectOpen || 
+                                openSelectContent || 
+                                (selectContent && selectViewport)
+          
+          if (shouldPrevent) {
             e.preventDefault()
           }
         }}
