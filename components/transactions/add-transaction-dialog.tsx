@@ -1,7 +1,9 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { createPortal } from "react-dom"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { X } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -1093,53 +1095,86 @@ export function AddTransactionDialog({
     onOpenChange(false)
   }
 
-  return (
-    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
-      <DialogContent 
-        className="w-[calc(100vw-2rem)] sm:w-full max-w-2xl max-h-[90vh] sm:max-h-[95vh] overflow-y-auto p-3 sm:p-4 md:p-6"
-        onEscapeKeyDown={(e) => {
-          // Prevent close on escape if there are unsaved changes
-          if (hasUnsavedChanges) {
-            e.preventDefault()
-            setShowCloseConfirmation(true)
-          }
-        }}
-        onInteractOutside={(e) => {
-          // Prevent closing the dialog when clicking outside if a Select dropdown is open
-          // This fixes the mobile issue where tapping outside a Select closes the entire modal
-          const target = e.target as HTMLElement
+  // Handle escape key
+  useEffect(() => {
+    if (!open) return
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (hasUnsavedChanges) {
+          setShowCloseConfirmation(true)
+        } else {
+          handleDialogOpenChange(false)
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [open, hasUnsavedChanges])
+
+  // Handle backdrop click
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only close if clicking directly on the overlay (not on content)
+    if (e.target === e.currentTarget) {
+      // Check if a Select dropdown is open
+      const target = e.target as HTMLElement
+      const isSelectContent = target.closest('[data-radix-select-content]') !== null
+      const openSelectContent = document.querySelector('[data-radix-select-content][data-state="open"]')
+      const selectViewport = document.querySelector('[data-radix-select-viewport]')
+      const selectContent = document.querySelector('[data-radix-select-content]')
+      
+      // Prevent closing if Select is open
+      const shouldPrevent = isSelectContent || 
+                            isAnySelectOpen || 
+                            openSelectContent || 
+                            (selectContent && selectViewport)
+      
+      if (!shouldPrevent) {
+        if (hasUnsavedChanges) {
+          setShowCloseConfirmation(true)
+        } else {
+          handleDialogOpenChange(false)
+        }
+      }
+    }
+  }
+
+  // Render modal content using portal to ensure proper z-index layering
+  const modalContent = open ? (
+    <>
+      {/* Custom Modal Overlay */}
+      <div
+        className="fixed inset-0 z-50 bg-black/50 dark:bg-black/50 animate-in fade-in-0"
+        onClick={handleBackdropClick}
+        aria-hidden="true"
+      />
+      
+      {/* Custom Modal Content */}
+      <div className="fixed left-[50%] top-[50%] z-50 w-[calc(100vw-2rem)] sm:w-full max-w-2xl max-h-[90vh] sm:max-h-[95vh] translate-x-[-50%] translate-y-[-50%] border bg-background rounded-lg shadow-lg animate-in fade-in-0 zoom-in-95 slide-in-from-left-1/2 slide-in-from-top-[48%] duration-200">
+        <div className="flex flex-col h-full max-h-[90vh] sm:max-h-[95vh]">
+          {/* Header */}
+          <div className="flex items-center justify-between p-3 sm:p-4 md:p-6 pb-2 sm:pb-4 border-b">
+            <h2 className="text-sm sm:text-lg md:text-xl font-semibold leading-none tracking-tight">
+              {transaction ? 'Edit Transaction' : 'Add Transaction'}
+            </h2>
+            <button
+              onClick={() => {
+                if (hasUnsavedChanges) {
+                  setShowCloseConfirmation(true)
+                } else {
+                  handleDialogOpenChange(false)
+                }
+              }}
+              className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </button>
+          </div>
           
-          // Check if the click target is within a Select portal (Radix Select uses a portal)
-          const isSelectContent = target.closest('[data-radix-select-content]') !== null
-          
-          // Check if any Select dropdown is currently open (from our tracked state)
-          // Also do a synchronous check as a fallback
-          const openSelectContent = document.querySelector('[data-radix-select-content][data-state="open"]')
-          
-          // Check for Select viewport - if it exists, a Select was recently open
-          // This helps catch the timing issue on mobile where Select closes but portal still exists briefly
-          const selectViewport = document.querySelector('[data-radix-select-viewport]')
-          const selectContent = document.querySelector('[data-radix-select-content]')
-          
-          // Prevent closing if:
-          // 1. Clicking directly on Select content, OR
-          // 2. Our tracked state says a Select is open, OR
-          // 3. An open Select content exists (synchronous check), OR
-          // 4. A Select portal with viewport exists (Select might be closing but still in DOM)
-          // This prevents the modal from closing when user taps outside Select on mobile
-          const shouldPrevent = isSelectContent || 
-                                isAnySelectOpen || 
-                                openSelectContent || 
-                                (selectContent && selectViewport)
-          
-          if (shouldPrevent) {
-            e.preventDefault()
-          }
-        }}
-      >
-        <DialogHeader className="pb-2 sm:pb-4">
-          <DialogTitle className="text-sm sm:text-lg md:text-xl">{transaction ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
-        </DialogHeader>
+          {/* Content */}
+          <div className="overflow-y-auto p-3 sm:p-4 md:p-6">
         <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 mt-2 sm:mt-4">
           {!isSubscribed && !transaction && (
             <SubscriptionAlert 
@@ -1493,7 +1528,7 @@ export function AddTransactionDialog({
                   readOnly={!!(profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown)}
                   disabled={!!(profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown)}
                   required
-                  className="text-base sm:text-lg font-medium"
+                  className="text-xs sm:text-base md:text-lg font-medium"
                 />
                 {formData.currency !== 'NGN' && convertedAmountNGN !== null && (
                   <div className="text-xs text-muted-foreground space-y-1 mt-2 p-2 bg-muted/50 rounded-md">
@@ -2323,6 +2358,7 @@ export function AddTransactionDialog({
                                       }
                                       return next
                                     })}
+                                    className="text-xs sm:text-sm"
                                   />
                                   <Label>Initial Allowance Rate (%)</Label>
                                   <Input
@@ -2338,6 +2374,7 @@ export function AddTransactionDialog({
                                         initialAllowanceRate: parseFloat(e.target.value) || 0
                                       }))
                                     }}
+                                    className="text-xs sm:text-sm"
                                   />
                                   <p className="text-[11px] text-muted-foreground">
                                     Most users shouldn’t edit this. We’ll later auto-pick rates based on asset type.
@@ -2392,6 +2429,7 @@ export function AddTransactionDialog({
                                 whtRate: parseFloat(e.target.value) || 5
                               }))
                             }}
+                            className="text-xs sm:text-sm"
                           />
                         </div>
                       )}
@@ -2442,6 +2480,7 @@ export function AddTransactionDialog({
                                     vatRate: parseFloat(e.target.value) || 7.5
                                   }))
                                 }}
+                                className="text-xs sm:text-sm"
                               />
                               {formData.type === 'income' && (
                             <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md">
@@ -2558,7 +2597,16 @@ export function AddTransactionDialog({
             </>
           )}
         </form>
-      </DialogContent>
+          </div>
+        </div>
+      </div>
+    </>
+  ) : null
+
+  return (
+    <>
+      {typeof window !== 'undefined' && createPortal(modalContent, document.body)}
+      
       {profile && profile.businessType !== 'agent' && (
         <SubscriptionRequiredModal
           open={showSubscriptionModal}
@@ -2591,6 +2639,7 @@ export function AddTransactionDialog({
                     setCustomCategory('')
                   }
                 }}
+                className="text-xs sm:text-sm"
                 autoFocus
               />
             </div>
@@ -2654,6 +2703,6 @@ export function AddTransactionDialog({
           </div>
         </DialogContent>
       </Dialog>
-    </Dialog>
+    </>
   )
 }

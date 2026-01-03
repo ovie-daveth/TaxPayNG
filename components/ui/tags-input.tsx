@@ -74,7 +74,7 @@ export function TagsInput({
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
             placeholder={tags.length === 0 ? placeholder : ""}
-            className="border-0 shadow-none focus-visible:ring-0 flex-1 min-w-[120px]"
+            className="border-0 shadow-none focus-visible:ring-0 flex-1 min-w-[120px] text-xs sm:text-sm"
           />
         )}
       </div>
