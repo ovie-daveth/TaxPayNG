@@ -57,6 +57,14 @@ export default function InvoicesPage() {
     hasPrev: false
   })
 
+  const handleCreateInvoiceClick = () => {
+    if (!isSubscribed && profile && profile.businessType !== 'agent') {
+      setShowSubscriptionModal(true)
+      return
+    }
+    setIsAddDialogOpen(true)
+  }
+
   const loadInvoices = async () => {
     if (!profile?.userId) return
     
@@ -177,15 +185,6 @@ export default function InvoicesPage() {
     }
   }
 
-  const handleMarkAsPaid = async (invoiceId: string) => {
-    // This is now handled in the ViewInvoiceDialog with receipt upload
-    // Keeping this for backward compatibility but it will open the view dialog
-    const invoice = invoices.find(inv => inv.id === invoiceId)
-    if (invoice) {
-      setSelectedInvoice(invoice)
-      setIsViewDialogOpen(true)
-    }
-  }
 
   const handleSaveCreditNoteAsPDF = async () => {
     if (!selectedInvoice?.whtCreditNote || !profile?.userId) {
@@ -212,20 +211,6 @@ export default function InvoicesPage() {
       // Set margins
       const margin = 20
       let yPos = margin
-
-      // Helper function to add text with word wrapping
-      const addText = (text: string, x: number, y: number, options: { fontSize?: number; fontStyle?: string; align?: 'left' | 'center' | 'right'; color?: [number, number, number] } = {}) => {
-        pdf.setFontSize(options.fontSize || 12)
-        pdf.setFont('helvetica', options.fontStyle || 'normal')
-        if (options.color) {
-          pdf.setTextColor(options.color[0], options.color[1], options.color[2])
-        } else {
-          pdf.setTextColor(0, 0, 0)
-        }
-        const lines = pdf.splitTextToSize(text, 170) // 210mm - 40mm margins = 170mm
-        pdf.text(lines, x, y, { align: options.align || 'left' })
-        return y + (lines.length * (options.fontSize || 12) * 0.4)
-      }
 
       // Header
       pdf.setFontSize(24)
@@ -490,7 +475,7 @@ console.log("invoices", invoices)
               : "Get started by creating your first invoice"}
           </p>
           {!searchTerm && statusFilter === "all" && (
-            <Button onClick={() => setIsAddDialogOpen(true)} className="h-9 lg:w-[20%] md:w-[25%]  w-full sm:h-10 text-xs sm:text-sm ">
+            <Button onClick={handleCreateInvoiceClick} className="h-9 lg:w-[20%] md:w-[25%]  w-full sm:h-10 text-xs sm:text-sm ">
               <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
               Create Invoice
             </Button>
