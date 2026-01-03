@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Calculator, LayoutDashboard, Users, DollarSign, FileText, Settings, LogOut, ChevronLeft, ChevronRight, TrendingUp, Menu, Bell, User, Receipt, FileCheck, IdCardIcon, MessageSquare } from "lucide-react"
 import OtaxLogo from "../OtaxLogo"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { toast } from "sonner"
@@ -33,9 +33,34 @@ export function DashboardNavSME() {
   const pathname = usePathname()
   const router = useRouter()
   const { sidebarCollapsed, toggleSidebar } = useSidebar()
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
   const { profile } = useUserProfile()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [hasFilingRequests, setHasFilingRequests] = useState(false)
+
+  useEffect(() => {
+    const checkFilingRequests = async () => {
+      if (!user?.uid) {
+        setHasFilingRequests(false)
+        return
+      }
+
+      try {
+        const response = await fetch(`/api/filing-requests?userId=${user.uid}`)
+        const result = await response.json()
+        if (result.success && result.data && result.data.length > 0) {
+          setHasFilingRequests(true)
+        } else {
+          setHasFilingRequests(false)
+        }
+      } catch (error) {
+        console.error("Error checking filing requests:", error)
+        setHasFilingRequests(false)
+      }
+    }
+
+    checkFilingRequests()
+  }, [user?.uid])
 
   const handleLogout = async () => {
     const result = await logout()
@@ -47,6 +72,14 @@ export function DashboardNavSME() {
     }
   }
 
+  // Filter nav items based on whether user has filing requests
+  const filteredNavItems = navItems.filter(item => {
+    if (item.href === "/dashboard-sme/filing-requests") {
+      return hasFilingRequests
+    }
+    return true
+  })
+
   // Items shown in bottom nav - we keep high-frequency modules for SMEs
   const bottomNavItems = [
     "/dashboard-sme/invoices",
@@ -56,7 +89,7 @@ export function DashboardNavSME() {
   ]
 
   // Items to show in the sidebar menu (all items except those in bottom nav)
-  const menuNavItems = navItems.filter(item => {
+  const menuNavItems = filteredNavItems.filter(item => {
     return !bottomNavItems.includes(item.href)
   })
 
@@ -93,8 +126,8 @@ export function DashboardNavSME() {
           </Button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-8">
-          {navItems.map((item) => {
+        <nav className="flex-1 px-4 space-y-8 overflow-y-auto overflow-x-hidden">
+          {filteredNavItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href
             return (
@@ -121,14 +154,48 @@ export function DashboardNavSME() {
           })}
         </nav>
 
-        <div className="p-4 border-t border-border">
+        <div className="p-4 border-t border-border space-y-3">
+          {/* User Info */}
+          {profile && (
+            <div className={cn(
+              "flex items-center gap-2 px-2 py-2 rounded-lg transition-all duration-200",
+              sidebarCollapsed ? "justify-center" : "justify-start"
+            )}>
+              <div className={cn(
+                "flex-shrink-0 rounded-full bg-primary/10 p-1.5 flex items-center justify-center",
+                sidebarCollapsed ? "w-8 h-8" : "w-9 h-9"
+              )}>
+                <User className={cn(
+                  "text-primary",
+                  sidebarCollapsed ? "w-4 h-4" : "w-5 h-5"
+                )} />
+              </div>
+              {!sidebarCollapsed && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {profile.firstName && profile.lastName 
+                      ? `${profile.firstName} ${profile.lastName}`
+                      : profile.firstName || profile.lastName || profile.email?.split('@')[0] || 'User'
+                    }
+                  </p>
+                  {profile.email && (
+                    <p className="text-xs text-muted-foreground truncate">
+                      {profile.email}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Logout Button */}
           <Button 
             variant="ghost" 
             className={cn(
-              "w-full text-muted-foreground transition-all duration-200",
+              "w-full text-muted-foreground hover:text-foreground transition-all duration-200",
               sidebarCollapsed ? "justify-center px-2" : "justify-start"
             )} 
-            size="sm"
+            size="lg"
             title={sidebarCollapsed ? "Log out" : undefined}
             onClick={handleLogout}
           >

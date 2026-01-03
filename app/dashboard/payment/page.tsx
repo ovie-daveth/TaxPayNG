@@ -176,6 +176,15 @@ export default function PaymentHistoryPage() {
     setSelectedPayment(null)
   }
 
+  const handleMakePayment = () => {
+    if (!isSubscribed && profile && profile.businessType !== 'agent') {
+      setShowSubscriptionModal(true)
+      return
+    }
+
+    router.push(`${basePath}/payment/add`)
+  }
+
   const getStatusBadge = (status: string) => {
     const config = {
       completed: { 
@@ -436,7 +445,7 @@ export default function PaymentHistoryPage() {
                 : "Try adjusting your filters to see more results."}
             </p>
             {payments.length === 0 && (
-              <Button onClick={() => router.push(`${basePath}/payment/add`)} size="lg" className="h-9 sm:h-10 text-sm sm:text-base">
+              <Button onClick={handleMakePayment} size="lg" className="h-9 sm:h-10 text-sm sm:text-base">
                 Make Payment
               </Button>
             )}

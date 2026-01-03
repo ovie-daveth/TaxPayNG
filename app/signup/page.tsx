@@ -320,7 +320,6 @@ export default function SignupPage() {
                   <SelectItem value="creator">Creator / Influencer</SelectItem>
                   <SelectItem value="sme">Small Business</SelectItem>
                   <SelectItem value="agent">Tax Filing Agent</SelectItem>
-                  <SelectItem value="large_corporation">Large Corporation</SelectItem>
                 </SelectContent>
               </Select>
             </div>
