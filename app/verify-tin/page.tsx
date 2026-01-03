@@ -120,18 +120,10 @@ export default function VerifyTaxIdPage() {
     }
   }
 
-  const handleGetTaxId = () => {
-    // Official Tax ID portal
-    const registrationUrl = "https://taxid.firs.gov.ng/"
-    
-    // Check if user is on mobile (viewport width < 768px)
-    const isMobile = window.innerWidth < 768
-    openPortal(registrationUrl, isMobile)
-  }
 
   const handleVerifyTaxIdPortal = () => {
     // Official Tax ID portal (verification happens there)
-    const verificationUrl = "https://taxid.firs.gov.ng/"
+    const verificationUrl = "https://taxid.nrs.gov.ng/"
     
     // Check if user is on mobile (viewport width < 768px)
     const isMobile = window.innerWidth < 768
@@ -458,7 +450,7 @@ export default function VerifyTaxIdPage() {
                   <ExternalLink className="w-5 h-5 text-accent" />
                 </div>
                 <div className="flex-1 w-full">
-                  <h3 className="font-semibold mb-2 text-sm sm:text-base">Don't have know your Tax ID?</h3>
+                  <h3 className="font-semibold mb-2 text-sm sm:text-base">Don't know your Tax ID?</h3>
                   <p className="text-xs sm:text-sm text-muted-foreground mb-4">
                     You can retrieve your Tax ID using the official FIRS Tax ID portal.
                   </p>

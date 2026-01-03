@@ -168,6 +168,8 @@ export function AddTransactionDialog({
     attachments: [] as string[],
     documentId: undefined as string | undefined
   })
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [showCloseConfirmation, setShowCloseConfirmation] = useState(false)
   const [convertedAmountNGN, setConvertedAmountNGN] = useState<number | null>(null)
   const [isConverting, setIsConverting] = useState(false)
   const [exchangeRate, setExchangeRate] = useState<number | null>(null)
@@ -996,9 +998,53 @@ export function AddTransactionDialog({
       setIsSubmitting(false)
     }
   }
+
+  const handleDialogOpenChange = (newOpen: boolean) => {
+    // If trying to close and there are unsaved changes, show confirmation
+    if (!newOpen && hasUnsavedChanges) {
+      setShowCloseConfirmation(true)
+      return
+    }
+    // Otherwise, close normally
+    onOpenChange(newOpen)
+    // Reset unsaved changes when closing
+    if (!newOpen) {
+      setHasUnsavedChanges(false)
+    }
+  }
+
+  // Track changes in form fields
+  useEffect(() => {
+    // Only mark as having changes if form has been modified and isn't in edit mode for an existing transaction
+    if (!transaction) {
+      const hasFormData = formData.description.trim() || 
+                          formData.amount || 
+                          formData.category || 
+                          formData.notes.trim() ||
+                          formData.attachments.length > 0 ||
+                          formData.tags.length > 0
+      setHasUnsavedChanges(hasFormData as boolean)
+    }
+  }, [formData, transaction])
+
+  const handleConfirmClose = () => {
+    setShowCloseConfirmation(false)
+    setHasUnsavedChanges(false)
+    onOpenChange(false)
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-2xl max-h-[90vh] sm:max-h-[95vh] overflow-y-auto p-3 sm:p-4 md:p-6">
+    <Dialog open={open} onOpenChange={handleDialogOpenChange}>
+      <DialogContent 
+        className="w-[calc(100vw-2rem)] sm:w-full max-w-2xl max-h-[90vh] sm:max-h-[95vh] overflow-y-auto p-3 sm:p-4 md:p-6"
+        onEscapeKeyDown={(e) => {
+          // Prevent close on escape if there are unsaved changes
+          if (hasUnsavedChanges) {
+            e.preventDefault()
+            setShowCloseConfirmation(true)
+          }
+        }}
+      >
         <DialogHeader className="pb-2 sm:pb-4">
           <DialogTitle className="text-sm sm:text-lg md:text-xl">{transaction ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
         </DialogHeader>
@@ -2479,6 +2525,38 @@ export function AddTransactionDialog({
                 disabled={!customCategory.trim()}
               >
                 Confirm
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Close Confirmation Dialog */}
+      <Dialog open={showCloseConfirmation} onOpenChange={setShowCloseConfirmation}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-600" />
+              Unsaved Changes
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              You have unsaved changes in your transaction. If you close now, all the data you entered will be lost.
+            </p>
+            <p className="text-sm font-medium">Are you sure you want to close without saving?</p>
+            <div className="flex gap-3 justify-end">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowCloseConfirmation(false)}
+              >
+                Continue Editing
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleConfirmClose}
+              >
+                Discard Changes
               </Button>
             </div>
           </div>
