@@ -1,7 +1,7 @@
 import { BaseService } from './base'
 import { Invoice, InvoiceFilters, InvoiceItem, ApiResponse, PaginatedResponse, SavedClient, WHTCreditNote } from '@/lib/types'
 import { calculateTaxPeriod } from '@/lib/utils/date'
-import { fetchExchangeRate } from '@/lib/utils/currency'
+import { fetchExchangeRate, CurrencyCode } from '@/lib/utils/currency'
 
 export class InvoiceService extends BaseService {
   private sendingInvoices: Set<string> = new Set() // Track invoices being sent to prevent duplicates
@@ -139,14 +139,33 @@ export class InvoiceService extends BaseService {
       let filtered = allInvoices
 
       if (filters?.entityId) {
-        filtered = filtered.filter(inv => inv.entityId === filters.entityId)
+        // Filter by entityId:
+        // - For sent invoices: use entityId (sender's entity)
+        // - For received invoices: use recipientEntityId (recipient's assigned entity)
+        filtered = filtered.filter(inv => {
+          const isReceivedInvoice = inv.recipientUserId === userId
+          if (isReceivedInvoice) {
+            // For received invoices, filter by recipientEntityId if set, otherwise include all
+            return !inv.recipientEntityId || inv.recipientEntityId === filters.entityId
+          }
+          // For sent invoices, filter by entityId
+          return inv.entityId === filters.entityId
+        })
       }
 
       if (filters?.status) {
         filtered = filtered.filter(inv => inv.status === filters.status)
       }
       if (filters?.invoiceType) {
-        filtered = filtered.filter(inv => (inv.invoiceType || 'outgoing') === filters.invoiceType)
+        // Determine invoiceType from user's perspective:
+        // - If user is the sender (userId === invoice.userId), it's 'outgoing'
+        // - If user is the recipient (recipientUserId === userId), it's 'incoming'
+        filtered = filtered.filter(inv => {
+          const userInvoiceType = inv.userId === userId ? 'outgoing' : 
+                                  inv.recipientUserId === userId ? 'incoming' : 
+                                  (inv.invoiceType || 'outgoing')
+          return userInvoiceType === filters.invoiceType
+        })
       }
       if (filters?.clientId) {
         filtered = filtered.filter(inv => inv.client.id === filters.clientId)
@@ -154,6 +173,8 @@ export class InvoiceService extends BaseService {
       if (filters?.startDate || filters?.endDate) {
         const start = filters.startDate ? new Date(filters.startDate) : null
         const end = filters.endDate ? new Date(filters.endDate) : null
+        if (start) start.setHours(0, 0, 0, 0)
+        if (end) end.setHours(23, 59, 59, 999)
         filtered = filtered.filter(inv => {
           const invDate = inv.issueDate ? new Date(inv.issueDate) : new Date(inv.createdAt)
           if (start && invDate < start) return false
@@ -164,6 +185,8 @@ export class InvoiceService extends BaseService {
       if (filters?.dateRange) {
         const start = filters.dateRange.start ? new Date(filters.dateRange.start) : null
         const end = filters.dateRange.end ? new Date(filters.dateRange.end) : null
+        if (start) start.setHours(0, 0, 0, 0)
+        if (end) end.setHours(23, 59, 59, 999)
         filtered = filtered.filter(inv => {
           const invDate = inv.issueDate ? new Date(inv.issueDate) : new Date(inv.createdAt)
           if (start && invDate < start) return false
@@ -238,13 +261,13 @@ export class InvoiceService extends BaseService {
       let exchangeRateDate: string | undefined
       let ngnEquivalent: number | undefined
       
-      if (invoiceData.currency && invoiceData.currency !== 'NGN' && invoiceData.total) {
+      if (invoiceData.currency && invoiceData.currency !== 'NGN' && invoiceData.invoiceTotal) {
         try {
-          const rate = await fetchExchangeRate(invoiceData.currency, 'NGN', invoiceData.issueDate)
+          const rate = await fetchExchangeRate(invoiceData.currency as CurrencyCode, 'NGN')
           if (rate) {
-            exchangeRate = rate.rate
-            exchangeRateDate = rate.date
-            ngnEquivalent = invoiceData.total * rate.rate
+            exchangeRate = rate
+            exchangeRateDate = invoiceData.issueDate || new Date().toISOString()
+            ngnEquivalent = invoiceData.invoiceTotal * rate
           }
         } catch (error) {
           console.error('Error fetching exchange rate for invoice:', error)
@@ -301,8 +324,29 @@ export class InvoiceService extends BaseService {
       // Verify ownership
       const existingInvoice = await this.getById(invoiceId)
       
-      // No authorization check needed - if user can view the invoice, they can update it
-      // The view dialog already ensures invoice.userId === profile.userId
+      // Authorization: user must be sender OR recipient
+      const isSender = existingInvoice.userId === userId
+      const isRecipient = existingInvoice.recipientUserId === userId
+      
+      if (!isSender && !isRecipient) {
+        return {
+          success: false,
+          error: 'Unauthorized: You can only update invoices you sent or received'
+        }
+      }
+      
+      // Recipients can only update recipientEntityId
+      if (isRecipient && !isSender) {
+        const allowedFields = ['recipientEntityId']
+        const updateKeys = Object.keys(updateData)
+        const disallowedFields = updateKeys.filter(key => !allowedFields.includes(key))
+        if (disallowedFields.length > 0) {
+          return {
+            success: false,
+            error: `Recipients can only update: ${allowedFields.join(', ')}`
+          }
+        }
+      }
 
       // Check if invoice should be marked as overdue
       if (updateData.status === 'sent' || (existingInvoice.status === 'sent' && !updateData.status)) {
@@ -630,8 +674,8 @@ export class InvoiceService extends BaseService {
           transactionData.category = invoice.items[0]?.description || 'sales'
           
           // Sum up item-level platform fees
-          const totalGross = invoice.items.reduce((sum, item) => sum + (item.grossAmount || item.amount || 0), 0)
-          const totalFees = invoice.items.reduce((sum, item) => sum + (item.platformFees || 0), 0)
+          const totalGross = invoice.items.reduce((sum: number, item: InvoiceItem) => sum + (item.grossAmount || item.amount || 0), 0)
+          const totalFees = invoice.items.reduce((sum: number, item: InvoiceItem) => sum + (item.platformFees || 0), 0)
           const totalNet = totalGross - totalFees
           
           transactionData.grossAmount = totalGross || invoice.total
@@ -772,9 +816,9 @@ export class InvoiceService extends BaseService {
           attachments: invoice.attachments,
           attachmentFileIds: invoice.attachmentFileIds,
           // Platform fees breakdown for creator income (from item-level fees)
-          grossAmount: invoice.items.reduce((sum, item) => sum + (item.grossAmount || item.amount || 0), 0) || invoice.total,
-          platformFees: invoice.items.reduce((sum, item) => sum + (item.platformFees || 0), 0),
-          netAmount: invoice.items.reduce((sum, item) => sum + (item.netAmount || item.amount || 0), 0) || invoice.total
+          grossAmount: invoice.items.reduce((sum: number, item: InvoiceItem) => sum + (item.grossAmount || item.amount || 0), 0) || invoice.total,
+          platformFees: invoice.items.reduce((sum: number, item: InvoiceItem) => sum + (item.platformFees || 0), 0),
+          netAmount: invoice.items.reduce((sum: number, item: InvoiceItem) => sum + (item.netAmount || item.amount || 0), 0) || invoice.total
         }
         
         // Only include receiptUrl and attachments if they have values
@@ -825,6 +869,8 @@ export class InvoiceService extends BaseService {
       if (startDate || endDate) {
         const start = startDate ? new Date(startDate) : null
         const end = endDate ? new Date(endDate) : null
+        if (start) start.setHours(0, 0, 0, 0)
+        if (end) end.setHours(23, 59, 59, 999)
         filtered = invoices.filter(inv => {
           const invDate = inv.issueDate ? new Date(inv.issueDate) : new Date(inv.createdAt)
           if (start && invDate < start) return false

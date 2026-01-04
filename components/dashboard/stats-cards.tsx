@@ -955,6 +955,7 @@ export function StatsCards({
 
         return (
           <Popover
+            key={stat.id}
             open={showDropdown}
             onOpenChange={(open) => {
               // Click-to-pin behavior + close on outside click
@@ -969,7 +970,6 @@ export function StatsCards({
             }}
           >
             <div
-              key={stat.id}
               className="relative"
               onMouseEnter={() => isHoverEnabled && !isOpen && handleCardHover(stat.id)}
               onMouseLeave={() => isHoverEnabled && !isOpen && handleCardHover(null)}

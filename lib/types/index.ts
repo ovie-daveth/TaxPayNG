@@ -457,6 +457,7 @@ export interface Invoice {
   
   // For invoices sent to/received from other OTax users
   recipientUserId?: string // OTax user ID who received this invoice (if sent to another OTax user)
+  recipientEntityId?: string // Business entity ID assigned by recipient (for organizing received invoices)
   senderUserId?: string // OTax user ID who sent this invoice (if received from another OTax user)
   senderInvoiceNumber?: string // Original invoice number from sender (for duplicate detection)
   recipientEmail?: string // Email of recipient (if not an OTax user)

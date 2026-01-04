@@ -246,6 +246,11 @@ export function AddInvoiceDialog({
       setItemDisplayValues(displayValues)
       setItemCurrencies(currencies)
       setItemConvertedAmounts(convertedAmounts)
+      // For creators and freelancers, ensure vatable is false for all items
+      const itemsWithoutVAT = (profile?.businessType === 'creator' || profile?.businessType === 'freelancer')
+        ? items.map(item => ({ ...item, vatable: false }))
+        : items
+      
       setFormData({
         invoiceType: invoice.invoiceType || 'outgoing',
         template: invoice.template,
@@ -254,7 +259,7 @@ export function AddInvoiceDialog({
         issueDate: invoice.issueDate.split('T')[0],
         dueDate: invoice.dueDate.split('T')[0],
         currency: invoice.currency as CurrencyCode,
-        items: items,
+        items: itemsWithoutVAT,
         discount: invoice.discount || 0,
         vatRate: invoice.vatRate || 7.5,
         // Note: WHT fields are not editable by issuer - they are set by client when deducting
@@ -437,6 +442,11 @@ export function AddInvoiceDialog({
         if (item.id === itemId) {
           const updated = { ...item, ...updates }
           
+          // For creators and freelancers, always set vatable to false
+          if (profile?.businessType === 'creator' || profile?.businessType === 'freelancer') {
+            updated.vatable = false
+          }
+          
           // Always calculate gross amount (Quantity × Unit Price)
           const grossAmount = calculateGrossAmount(updated)
           
@@ -568,6 +578,37 @@ export function AddInvoiceDialog({
       ...prev,
       items: prev.items.filter(item => item.id !== itemId)
     }))
+    // Clean up item-related state
+    setItemDisplayValues(prev => {
+      const updated = { ...prev }
+      delete updated[itemId]
+      return updated
+    })
+    setItemCurrencies(prev => {
+      const updated = { ...prev }
+      delete updated[itemId]
+      return updated
+    })
+    setItemConvertedAmounts(prev => {
+      const updated = { ...prev }
+      delete updated[itemId]
+      return updated
+    })
+    setItemGrossAmounts(prev => {
+      const updated = { ...prev }
+      delete updated[itemId]
+      return updated
+    })
+    setItemPlatformFees(prev => {
+      const updated = { ...prev }
+      delete updated[itemId]
+      return updated
+    })
+    setItemPlatformFeesDisplay(prev => {
+      const updated = { ...prev }
+      delete updated[itemId]
+      return updated
+    })
   }
 
   const calculateTotals = () => {
@@ -577,8 +618,8 @@ export function AddInvoiceDialog({
     let vatableSubtotal = 0
     
     formData.items.forEach(item => {
-      // If unit price is 0, skip this item
-      if (item.unitPrice === 0) return
+      // If unit price is 0 or description is empty, skip this item
+      if (item.unitPrice === 0 || !item.description.trim()) return
       
       // Use calculateItemAmount which returns net amount (gross - platform fees) for creators
       // or gross amount (quantity × unit price) for non-creators
@@ -651,8 +692,11 @@ export function AddInvoiceDialog({
       return
     }
   
-    if (formData.items.length === 0 || formData.items.some(item => !item.description.trim() || item.unitPrice <= 0)) {
-      toast.error("Please add at least one valid item")
+    // Filter out invalid items (empty description or zero unit price)
+    const validItems = formData.items.filter(item => item.description.trim() && item.unitPrice > 0)
+    
+    if (validItems.length === 0) {
+      toast.error("Please add at least one valid item with description and unit price")
       return
     }
   
@@ -684,10 +728,13 @@ export function AddInvoiceDialog({
         formData.invoiceType === 'outgoing' ? (formData.supplier || getInitialSupplier()) : getInitialSupplier()
       )
   
-      // Use items as-is (amounts are already calculated during input via updateItem)
+      // Filter out invalid items (empty description or zero unit price) before submitting
+      const validItemsForSubmission = formData.items.filter(item => item.description.trim() && item.unitPrice > 0)
+      
+      // Use valid items only (amounts are already calculated during input via updateItem)
       // Just ensure currency is saved if different from invoice currency
       // Include item-level platform fees for creators
-      const itemsWithCalculatedAmounts = formData.items.map(item => {
+      const itemsWithCalculatedAmounts = validItemsForSubmission.map(item => {
         const itemCurrency = itemCurrencies[item.id] || formData.currency
         return {
           ...item,
@@ -1296,10 +1343,12 @@ export function AddInvoiceDialog({
                 <span>-{getCurrencySymbol(formData.currency)} {(totals.subtotal * formData.discount / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             )}
-            <div className="flex justify-between items-center text-xs sm:text-sm">
-              <span>VAT ({formData.vatRate || 7.5}%):</span>
-              <span className="font-medium">{getCurrencySymbol(formData.currency)} {totals.vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
+            {profile?.businessType !== 'creator' && profile?.businessType !== 'freelancer' && (
+              <div className="flex justify-between items-center text-xs sm:text-sm">
+                <span>VAT ({formData.vatRate || 7.5}%):</span>
+                <span className="font-medium">{getCurrencySymbol(formData.currency)} {totals.vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center text-xs sm:text-sm font-semibold border-t pt-2 mt-2">
               <span>Invoice Total:</span>
               <span>{getCurrencySymbol(formData.currency)} {totals.invoiceTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -1312,14 +1361,7 @@ export function AddInvoiceDialog({
 
           {/* Invoice Items */}
           <div className="space-y-3 sm:space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
-              <h3 className="text-base sm:text-lg font-semibold">Items</h3>
-              <Button type="button" variant="outline" size="sm" onClick={addItem} className="h-8 sm:h-9 text-xs sm:text-sm w-full sm:w-auto">
-                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-                <span className="hidden sm:inline">Add Item</span>
-                <span className="sm:hidden">Add</span>
-              </Button>
-            </div>
+            <h3 className="text-base sm:text-lg font-semibold">Items</h3>
             
             {/* Note about Item Tax (for non-VAT items) */}
             <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
@@ -1335,7 +1377,20 @@ export function AddInvoiceDialog({
                   {/* Row 1: Description and Quantity */}
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 flex-1">
                     <div className="flex-1 space-y-2">
-                      <Label className="text-xs sm:text-sm">Description</Label>
+                      <div className="flex items-center justify-between gap-2">
+                        <Label className="text-xs sm:text-sm">Description</Label>
+                        {formData.items.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => removeItem(item.id)}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
                       <Input
                         value={item.description}
                         onChange={(e) => updateItem(item.id, { description: e.target.value })}
@@ -1444,27 +1499,29 @@ export function AddInvoiceDialog({
                       </Tooltip>
                       {/* <p className="text-xs text-muted-foreground">Qty × Unit Price</p> */}
                     </div>
-                    <div className="space-y-2 flex flex-col justify-end flex-shrink-0">
-                      <div className="flex items-center space-x-2 sm:pt-0 pt-2">
-                        <Checkbox
-                          id={`vatable-${item.id}`}
-                          checked={item.vatable || false}
-                          onCheckedChange={(checked) => updateItem(item.id, { vatable: !!checked })}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <div className="flex flex-col min-w-0">
-                          <Label htmlFor={`vatable-${item.id}`} className="text-xs sm:text-sm cursor-pointer">
-                            Vatable
-                          </Label>
-                          {item.vatable && (
-                            <p className="text-xs text-muted-foreground mt-1 break-words">
-                              VAT: {getCurrencySymbol(formData.currency)}{(calculateItemAmount(item) * (formData.vatRate || 7.5) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </p>
-                          )}
+                    {/* VAT checkbox - only for registered businesses (not creators/freelancers) */}
+                    {profile?.businessType !== 'creator' && profile?.businessType !== 'freelancer' && (
+                      <div className="space-y-2 flex flex-col justify-end flex-shrink-0">
+                        <div className="flex items-center space-x-2 sm:pt-0 pt-2">
+                          <Checkbox
+                            id={`vatable-${item.id}`}
+                            checked={item.vatable || false}
+                            onCheckedChange={(checked) => updateItem(item.id, { vatable: !!checked })}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <div className="flex flex-col min-w-0">
+                            <Label htmlFor={`vatable-${item.id}`} className="text-xs sm:text-sm cursor-pointer">
+                              Vatable
+                            </Label>
+                            {item.vatable && (
+                              <p className="text-xs text-muted-foreground mt-1 break-words">
+                                VAT: {getCurrencySymbol(formData.currency)}{(calculateItemAmount(item) * (formData.vatRate || 7.5) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    
+                    )}
                   </div>
                   
                   {/* Platform Fees Breakdown (for creators) - Compact inline layout */}
@@ -1558,28 +1615,49 @@ export function AddInvoiceDialog({
                     </div> */}
                 </div>
               ))}
+              <Button type="button" variant="outline" size="sm" onClick={addItem} className="h-8 sm:h-9 text-xs sm:text-sm w-full sm:w-auto">
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                <span className="hidden sm:inline">Add Item</span>
+                <span className="sm:hidden">Add</span>
+              </Button>
             </div>
           </div>
 
-          {/* VAT Section */}
-          <div className="space-y-3 sm:space-y-4 border-t pt-3 sm:pt-4">
-            <div className="space-y-2">
-              <Label htmlFor="vat-rate" className="text-xs sm:text-sm">VAT Rate (%)</Label>
-              <Input
-                id="vat-rate"
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={formData.vatRate}
-                onChange={(e) => setFormData(prev => ({ ...prev, vatRate: parseFloat(e.target.value) || 7.5 }))}
-                onKeyDown={handleInputKeyDown}
-                onClick={(e) => e.stopPropagation()}
-                className="h-9 sm:h-10 text-xs sm:text-sm"
-              />
-              <p className="text-xs text-muted-foreground">Default: 7.5% (Nigeria VAT rate)</p>
+          {/* VAT Section - only for registered businesses (not creators/freelancers) */}
+          {profile?.businessType !== 'creator' && profile?.businessType !== 'freelancer' && (
+            <div className="space-y-3 sm:space-y-4 border-t pt-3 sm:pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="vat-rate" className="text-xs sm:text-sm">VAT Rate (%)</Label>
+                <Input
+                  id="vat-rate"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={formData.vatRate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, vatRate: parseFloat(e.target.value) || 7.5 }))}
+                  onKeyDown={handleInputKeyDown}
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
+                />
+                <p className="text-xs text-muted-foreground">Default: 7.5% (Nigeria VAT rate)</p>
+              </div>
+              
+              {/* VAT Eligibility Information */}
+              <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+                <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
+                <AlertDescription className="text-xs sm:text-sm text-blue-900 dark:text-blue-100">
+                  <strong>VAT Eligibility Rules:</strong>
+                  <ul className="mt-1.5 space-y-1 list-disc list-inside">
+                    <li><strong>Salary earners</strong> → Cannot charge VAT</li>
+                    <li><strong>Small freelancers/creators under ₦100m turnover</strong> → Cannot charge VAT</li>
+                    <li><strong>Registered businesses or individuals over ₦100m turnover</strong> → Must charge VAT (7.5%)</li>
+                  </ul>
+                  <p className="mt-1.5"><strong>Important:</strong> Only VAT-registered businesses with annual turnover above ₦100 million can legally charge VAT. VAT is collected on behalf of the government, not earned as revenue. Make sure you are VAT-registered before charging VAT on your invoices.</p>
+                </AlertDescription>
+              </Alert>
             </div>
-          </div>
+          )}
 
           {/* Discount Section */}
           <div className="space-y-3 sm:space-y-4 border-t pt-3 sm:pt-4">
@@ -1613,10 +1691,12 @@ export function AddInvoiceDialog({
                 <span className="whitespace-nowrap">-{getCurrencySymbol(formData.currency)} {(totals.subtotal * formData.discount / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             )}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-0 text-xs sm:text-sm">
-              <span>VAT ({formData.vatRate || 7.5}%):</span>
-              <span className="font-medium whitespace-nowrap">{getCurrencySymbol(formData.currency)} {totals.vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
+            {profile?.businessType !== 'creator' && profile?.businessType !== 'freelancer' && (
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-0 text-xs sm:text-sm">
+                <span>VAT ({formData.vatRate || 7.5}%):</span>
+                <span className="font-medium whitespace-nowrap">{getCurrencySymbol(formData.currency)} {totals.vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            )}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-0 text-xs sm:text-sm font-semibold border-t pt-2 mt-2">
               <span>Invoice Total:</span>
               <span className="whitespace-nowrap">{getCurrencySymbol(formData.currency)} {totals.invoiceTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>

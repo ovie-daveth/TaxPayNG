@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label"
 import { formatCurrencyAmount } from "@/lib/utils/currency"
 import { documentService } from "@/lib/services"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
+import { DeleteConfirmationModal } from "@/components/ui/delete-confirmation-modal"
 
 export default function InvoicesPage() {
   const router = useRouter()
@@ -46,6 +47,9 @@ export default function InvoicesPage() {
   const [isSavingCreditNote, setIsSavingCreditNote] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [viewMode, setViewMode] = useState<"card" | "table">("table")
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -140,20 +144,29 @@ export default function InvoicesPage() {
     )
   }
 
-  const handleDelete = async (invoiceId: string) => {
-    if (!profile?.userId) return
-    if (!confirm("Are you sure you want to delete this invoice?")) return
+  const handleDeleteClick = (invoiceId: string) => {
+    setInvoiceToDelete(invoiceId)
+    setDeleteDialogOpen(true)
+  }
 
+  const handleDeleteConfirm = async () => {
+    if (!profile?.userId || !invoiceToDelete) return
+
+    setIsDeleting(true)
     try {
-      const result = await invoiceService.deleteInvoice(invoiceId, profile.userId)
+      const result = await invoiceService.deleteInvoice(invoiceToDelete, profile.userId)
       if (result.success) {
         toast.success("Invoice deleted successfully")
+        setDeleteDialogOpen(false)
+        setInvoiceToDelete(null)
         loadInvoices()
       } else {
         toast.error(result.error || "Failed to delete invoice")
       }
     } catch (error) {
       toast.error("Failed to delete invoice")
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -634,7 +647,7 @@ console.log("invoices", invoices)
                           variant="outline" 
                           size="icon"
                           className="h-9 w-9"
-                          onClick={() => handleDelete(invoice.id)}
+                          onClick={() => handleDeleteClick(invoice.id)}
                         >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -839,7 +852,7 @@ console.log("invoices", invoices)
                                 variant="ghost" 
                                 size="icon"
                                 className="h-7 w-7 sm:h-8 sm:w-8 text-destructive hover:text-destructive"
-                                onClick={() => handleDelete(invoice.id)}
+                                onClick={() => handleDeleteClick(invoice.id)}
                               >
                                 <Trash2 className="w-3.5 h-3.5 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" />
                               </Button>
@@ -1022,6 +1035,20 @@ console.log("invoices", invoices)
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={deleteDialogOpen}
+        onClose={() => {
+          setDeleteDialogOpen(false)
+          setInvoiceToDelete(null)
+        }}
+        onConfirm={handleDeleteConfirm}
+        isDeleting={isDeleting}
+        title="Delete Invoice"
+        description="Are you sure you want to delete this invoice? This action cannot be undone."
+      />
+
       {profile && profile.businessType !== 'agent' && (
         <SubscriptionRequiredModal
           open={showSubscriptionModal}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Fragment } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -20,6 +20,7 @@ import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { invoiceService, documentService } from "@/lib/services"
 import { uploadToImageKit, ImageUploadResult } from "@/lib/utils/imagekit"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useBusiness } from "@/lib/contexts/business-context"
 
 interface ViewInvoiceDialogProps {
   open: boolean
@@ -38,6 +39,7 @@ export function ViewInvoiceDialog({
 }: ViewInvoiceDialogProps) {
   const { user } = useAuth()
   const { profile } = useUserProfile()
+  const { entities } = useBusiness()
   const [isMarkingPaid, setIsMarkingPaid] = useState(false)
   const [showPaymentForm, setShowPaymentForm] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
@@ -66,6 +68,12 @@ export function ViewInvoiceDialog({
   const [itemConvertedAmounts, setItemConvertedAmounts] = useState<Record<string, number>>({})
   const [shouldSaveReceipt, setShouldSaveReceipt] = useState(false)
   const [isSavingReceipt, setIsSavingReceipt] = useState(false)
+  const [selectedEntityId, setSelectedEntityId] = useState<string | undefined>(invoice?.recipientEntityId)
+
+  // Sync selectedEntityId with invoice prop
+  useEffect(() => {
+    setSelectedEntityId(invoice?.recipientEntityId)
+  }, [invoice?.recipientEntityId])
 
   // Check if user can view this invoice (must be sender OR recipient)
   const isSender = invoice && profile?.userId && invoice.userId === profile.userId
@@ -847,6 +855,35 @@ export function ViewInvoiceDialog({
     }
   }
 
+  const handleEntityChange = async (entityId: string) => {
+    if (!profile?.userId || !invoice || !isRecipient) return
+
+    const newEntityId = entityId === "none" ? undefined : entityId
+    
+    // Optimistically update the UI
+    setSelectedEntityId(newEntityId)
+
+    try {
+      const result = await invoiceService.updateInvoice(invoice.id, profile.userId, {
+        recipientEntityId: newEntityId
+      })
+
+      if (result.success) {
+        toast.success("Business entity assigned successfully")
+        onInvoiceUpdated?.()
+      } else {
+        // Revert on error
+        setSelectedEntityId(invoice.recipientEntityId)
+        toast.error(result.error || "Failed to assign business entity")
+      }
+    } catch (error) {
+      // Revert on error
+      setSelectedEntityId(invoice.recipientEntityId)
+      console.error("Error updating entity:", error)
+      toast.error("Failed to assign business entity")
+    }
+  }
+
   const handlePrint = () => {
     // Create a print window with the invoice content
     const printWindow = window.open('', '_blank')
@@ -1437,6 +1474,36 @@ export function ViewInvoiceDialog({
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
           <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-5 md:space-y-6">
+            {/* Business Entity Selector for Received Invoices */}
+            {isRecipient && !isSender && entities.length > 0 && (
+              <Card className="p-3 sm:p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <Label className="text-sm font-medium">Assign to Business Entity</Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Select which business entity this invoice belongs to for organization
+                    </p>
+                  </div>
+                  <Select
+                    value={selectedEntityId || "none"}
+                    onValueChange={handleEntityChange}
+                  >
+                    <SelectTrigger className="w-full sm:w-[200px]">
+                      <SelectValue placeholder="Select entity" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None (Unassigned)</SelectItem>
+                      {entities.map(entity => (
+                        <SelectItem key={entity.id} value={entity.id}>
+                          {entity.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </Card>
+            )}
+            
             {/* Top Section: Invoice Header and Client Info */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
               {/* Left: Invoice Header */}
@@ -2361,8 +2428,8 @@ export function ViewInvoiceDialog({
                               const displayAmount = isCreatorInvoice && platformFees > 0 ? netAmount : grossAmount
                               
                               return (
-                                <>
-                                  <tr key={item.id || index} className="border-t hover:bg-muted/30 transition-colors">
+                                <Fragment key={item.id || index}>
+                                  <tr className="border-t hover:bg-muted/30 transition-colors">
                                     <td className="p-2 sm:p-3 text-xs sm:text-sm break-words">{item.description}</td>
                                     <td className="p-2 sm:p-3 text-center text-xs sm:text-sm">{item.quantity}</td>
                                     <td className="p-2 sm:p-3 text-right text-xs sm:text-sm">
@@ -2416,7 +2483,7 @@ export function ViewInvoiceDialog({
                                       </td>
                                     </tr>
                                   )}
-                                </>
+                                </Fragment>
                               )
                             })}
                           </tbody>
