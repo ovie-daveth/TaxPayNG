@@ -62,7 +62,7 @@ export default function InvoicesPage() {
   })
 
   const handleCreateInvoiceClick = () => {
-    if (!isSubscribed && profile && profile.businessType !== 'agent') {
+    if (!isSubscribed && profile && (profile.businessType === 'freelancer' || profile.businessType === 'creator')) {
       setShowSubscriptionModal(true)
       return
     }
@@ -106,7 +106,7 @@ export default function InvoicesPage() {
   // Listen for create invoice event from header
   useEffect(() => {
     const handleCreateInvoice = () => {
-      if (!isSubscribed) {
+      if (!isSubscribed && profile && (profile.businessType === 'freelancer' || profile.businessType === 'creator')) {
         setShowSubscriptionModal(true)
         return
       }
@@ -114,7 +114,7 @@ export default function InvoicesPage() {
     }
     window.addEventListener('createInvoice', handleCreateInvoice)
     return () => window.removeEventListener('createInvoice', handleCreateInvoice)
-  }, [isSubscribed])
+  }, [isSubscribed, profile])
 
   // Handle invoiceId query parameter to open specific invoice
   useEffect(() => {
@@ -1039,7 +1039,7 @@ console.log("invoices", invoices)
         description="Are you sure you want to delete this invoice? This action cannot be undone."
       />
 
-      {profile && profile.businessType !== 'agent' && (
+      {profile && (profile.businessType === 'freelancer' || profile.businessType === 'creator') && (
         <SubscriptionRequiredModal
           open={showSubscriptionModal}
           onOpenChange={setShowSubscriptionModal}

@@ -59,6 +59,14 @@ export default function InvoicesPage() {
     hasPrev: false
   })
 
+  const handleCreateInvoiceClick = () => {
+    if (!isSubscribed && profile && (profile.businessType === 'freelancer' || profile.businessType === 'creator')) {
+      setShowSubscriptionModal(true)
+      return
+    }
+    setIsAddDialogOpen(true)
+  }
+
   const loadInvoices = async () => {
     if (!profile?.userId) return
     
@@ -93,7 +101,7 @@ export default function InvoicesPage() {
   // Listen for create invoice event from header
   useEffect(() => {
     const handleCreateInvoice = () => {
-      if (!isSubscribed) {
+      if (!isSubscribed && profile && (profile.businessType === 'freelancer' || profile.businessType === 'creator')) {
         setShowSubscriptionModal(true)
         return
       }
@@ -101,7 +109,7 @@ export default function InvoicesPage() {
     }
     window.addEventListener('createInvoice', handleCreateInvoice)
     return () => window.removeEventListener('createInvoice', handleCreateInvoice)
-  }, [isSubscribed])
+  }, [isSubscribed, profile])
 
   // Handle invoiceId query parameter to open specific invoice
   useEffect(() => {
@@ -498,7 +506,7 @@ console.log("invoices", invoices)
               : "Get started by creating your first invoice"}
           </p>
           {!searchTerm && statusFilter === "all" && (
-            <Button onClick={() => setIsAddDialogOpen(true)} className="h-9 lg:w-[20%] md:w-[25%]  w-full sm:h-10 text-xs sm:text-sm ">
+            <Button onClick={handleCreateInvoiceClick} className="h-9 lg:w-[20%] md:w-[25%]  w-full sm:h-10 text-xs sm:text-sm ">
               <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
               Create Invoice
             </Button>
@@ -1049,7 +1057,7 @@ console.log("invoices", invoices)
         description="Are you sure you want to delete this invoice? This action cannot be undone."
       />
 
-      {profile && profile.businessType !== 'agent' && (
+      {profile && (profile.businessType === 'freelancer' || profile.businessType === 'creator') && (
         <SubscriptionRequiredModal
           open={showSubscriptionModal}
           onOpenChange={setShowSubscriptionModal}

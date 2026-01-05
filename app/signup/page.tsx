@@ -3,7 +3,7 @@
 import type React from "react"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -76,10 +76,12 @@ type SignupPayload = {
 
 export default function SignupPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { signUp, user, loading } = useAuth()
   const [isLoading, setIsLoading] = useState(false)
   const [showComingSoonModal, setShowComingSoonModal] = useState(false)
   const [signupSuccess, setSignupSuccess] = useState(false)
+  const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null)
   const [formData, setFormData] = useState<{
     fullName: string
     email: string
@@ -103,6 +105,19 @@ export default function SignupPage() {
   const pendingSignupDataRef = useRef<SignupPayload | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  
+  // Check for invoiceId in URL params
+  useEffect(() => {
+    const invoiceId = searchParams?.get('invoiceId')
+    const email = searchParams?.get('email')
+    if (invoiceId) {
+      setPendingInvoiceId(invoiceId)
+    }
+    if (email && !formData.email) {
+      setFormData(prev => ({ ...prev, email: decodeURIComponent(email) }))
+    }
+  }, [searchParams])
+
   // Redirect to login after successful signup (no auto-login)
   // For agents, redirect to agent KYC page after login
   useEffect(() => {
@@ -144,6 +159,31 @@ export default function SignupPage() {
       console.log("result now", result)
 
       if (result?.success) {
+        // Link invoice if invoiceId was in URL
+        if (pendingInvoiceId && result.userId) {
+          try {
+            const linkResponse = await fetch('/api/invoices/link-to-user', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                invoiceId: pendingInvoiceId,
+                userId: result.userId,
+                email: payload.email.toLowerCase()
+              })
+            })
+            
+            if (linkResponse.ok) {
+              // Store invoiceId for redirect after login
+              sessionStorage.setItem('pendingInvoiceId', pendingInvoiceId)
+            }
+          } catch (error) {
+            console.error('Error linking invoice:', error)
+            // Don't fail signup if invoice linking fails
+          }
+        }
+        
         toast.success('Account created successfully! Please log in to continue.')
         setVerifiedEmail(payload.email.toLowerCase())
         setSignupSuccess(true)

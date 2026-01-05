@@ -184,6 +184,7 @@ export function AddInvoiceDialog({
     supplier: getInitialSupplier(),
     sendToOtaxUser: false,
     recipientEmail: "",
+    sendViaEmail: false,
     client: {
       name: "",
       email: "",
@@ -826,6 +827,36 @@ export function AddInvoiceDialog({
           }
         }
         
+        // If sending via email, send the invoice email
+        if (formData.sendViaEmail && formData.client.email && result.data) {
+          try {
+            const authToken = await user.getIdToken()
+            const emailResponse = await fetch('/api/invoices/send-email', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+              },
+              body: JSON.stringify({
+                invoiceId: result.data.id,
+                recipientEmail: formData.client.email.trim(),
+                senderUserId: user.uid
+              })
+            })
+
+            const emailData = await emailResponse.json()
+
+            if (emailResponse.ok && emailData.success) {
+              toast.success(`Invoice email sent successfully to ${formData.client.email.trim()}`)
+            } else {
+              toast.error(emailData.error || "Failed to send invoice email")
+            }
+          } catch (error) {
+            console.error('Error sending invoice email:', error)
+            toast.error("Failed to send invoice email")
+          }
+        }
+        
         onOpenChange(false)
         onSuccess?.()
       } else {
@@ -1069,6 +1100,23 @@ export function AddInvoiceDialog({
                   )}
                 </div>
               )}
+
+              {/* Send via Email Option */}
+              <div className="space-y-2 border-t pt-4">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="send-via-email"
+                    checked={formData.sendViaEmail || false}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, sendViaEmail: !!checked }))}
+                  />
+                  <Label htmlFor="send-via-email" className="font-medium cursor-pointer text-xs sm:text-sm">
+                    Send via Email
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground ml-6 sm:ml-7">
+                  Send invoice to client via email using the client email address. They will receive a PDF attachment and can create an OTax account to view it online.
+                </p>
+              </div>
             </div>
           )}
 

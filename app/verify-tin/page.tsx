@@ -48,16 +48,47 @@ export default function VerifyTaxIdPage() {
     }
   }, [user, authLoading, router])
 
-  // Check if user already has Tax ID saved but needs to upload business documents
+  // Check if user already has Tax ID and redirect if complete
   useEffect(() => {
-    if (profile) {
-      if (profile.taxId && !profile.businessDocuments && profile.businessType === 'sme') {
+    if (!profile || loading) return
+
+    // Check if businessDocuments exists and has at least one document
+    const hasBusinessDocuments = profile.businessDocuments && (
+      profile.businessDocuments.cac || 
+      profile.businessDocuments.taxCertificate || 
+      profile.businessDocuments.businessLicense
+    )
+
+    // If user has TIN and is SME with documents, redirect to dashboard
+    if (profile.taxId && profile.businessType === 'sme') {
+      if (hasBusinessDocuments) {
+        console.log("TIN and business documents exist, redirecting to SME dashboard")
+        router.push("/dashboard-sme")
+        return
+      } else {
+        // TIN exists but no documents - show document upload
         console.log("Tax ID saved but no business documents, showing document upload")
         setTinVerified(true)
         setShowDocumentUpload(true)
+        return
       }
     }
-  }, [profile])
+
+    // If user has TIN and is not SME, redirect to appropriate dashboard
+    if (profile.taxId && profile.businessType !== 'sme') {
+      console.log("TIN exists for non-SME, redirecting to dashboard")
+      if (profile.businessType === 'creator') {
+        router.push("/dashboard-creator")
+      } else {
+        router.push("/dashboard")
+      }
+      return
+    }
+
+    // If no TIN, show the TIN input form
+    setShowDocumentUpload(false)
+    setTinVerified(false)
+  }, [profile, loading, router])
 
   if (!user && authLoading) {
     return (
@@ -237,6 +268,9 @@ export default function VerifyTaxIdPage() {
       await userService.upsertProfile(user.uid, {
         businessDocuments: uploadedDocUrls as { cac?: string; taxCertificate?: string; businessLicense?: string }
       })
+
+      // Refetch profile to update the local state
+      await refetchProfile()
 
       toast.success('Business documents uploaded successfully!')
       router.push("/dashboard-sme")
@@ -484,23 +518,27 @@ export default function VerifyTaxIdPage() {
               </div>
             </div>
 
-            {/* Skip Option - Only show for freelancers */}
-            {profile?.businessType !== 'sme' && (
-              <div className="text-center">
-                <Button 
-                  variant="ghost" 
-                  type="button"
-                  onClick={() => router.push("/dashboard")}
-                  disabled={isVerifying || isLoading}
-                  className="text-sm sm:text-base"
-                >
-                  Skip for now
-                </Button>
-                <p className="text-xs text-muted-foreground mt-2">
-                  You can add your Tax ID later in settings
-                </p>
-              </div>
-            )}
+            {/* Skip Option - Show for all business types */}
+            <div className="text-center">
+              <Button 
+                variant="ghost" 
+                type="button"
+                onClick={() => {
+                  if (profile?.businessType === 'sme') {
+                    router.push("/dashboard-sme")
+                  } else {
+                    router.push("/dashboard")
+                  }
+                }}
+                disabled={isVerifying || isLoading}
+                className="text-sm sm:text-base"
+              >
+                Skip for now
+              </Button>
+              <p className="text-xs text-muted-foreground mt-2">
+                You can add your Tax ID and business documents later in settings
+              </p>
+            </div>
             </>
           )}
         </Card>
@@ -654,4 +692,5 @@ export default function VerifyTaxIdPage() {
     </div>
   )
 }
+
 

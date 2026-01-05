@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { DashboardNav } from "@/components/dashboard/dashboard-nav"
+import { DashboardNavSME } from "@/components/dashboard/dashboard-nav-sme"
 import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { Card } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -107,6 +107,31 @@ export default function SettingsPage() {
     category: 'general'
   })
   const [isSendingSupport, setIsSendingSupport] = useState(false)
+  const [businessDocuments, setBusinessDocuments] = useState({
+    cac: '',
+    taxCertificate: '',
+    businessLicense: ''
+  })
+  const [businessDocumentFileIds, setBusinessDocumentFileIds] = useState({
+    cac: '',
+    taxCertificate: '',
+    businessLicense: ''
+  })
+  const [businessDocumentSizes, setBusinessDocumentSizes] = useState({
+    cac: 0,
+    taxCertificate: 0,
+    businessLicense: 0
+  })
+  const [uploadingBusinessDoc, setUploadingBusinessDoc] = useState({
+    cac: false,
+    taxCertificate: false,
+    businessLicense: false
+  })
+  const [deletingBusinessDoc, setDeletingBusinessDoc] = useState({
+    cac: false,
+    taxCertificate: false,
+    businessLicense: false
+  })
 
   // Loading state: show skeleton while auth or profile is loading
   const isLoading = authLoading || profileLoading
@@ -164,13 +189,13 @@ export default function SettingsPage() {
       toast.success(`Successfully subscribed to ${plan} plan!`)
       refetchProfile()
       // Clean URL
-      router.replace('/dashboard/settings?tab=subscription', { scroll: false })
+      router.replace('/dashboard-sme/settings?tab=subscription', { scroll: false })
     }
 
     if (error) {
       toast.error(message || 'Subscription payment failed. Please try again.')
       // Clean URL
-      router.replace('/dashboard/settings?tab=subscription', { scroll: false })
+      router.replace('/dashboard-sme/settings?tab=subscription', { scroll: false })
     }
   }, [searchParams, router, refetchProfile])
 
@@ -360,7 +385,7 @@ export default function SettingsPage() {
   if (isLoading) {
     return (
       <div className="h-screen flex flex-col overflow-hidden">
-        <DashboardNav />
+        <DashboardNavSME />
         <main className="flex-1 overflow-hidden">
           <div className="px-6 py-8 h-full overflow-y-auto hide-scrollbar">
             <SettingsSkeleton />
