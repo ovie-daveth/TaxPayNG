@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Fragment } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Textarea } from "@/components/ui/textarea"
-import { Download, Printer, ExternalLink, Upload, X, FileText, Loader2, Edit, Save, XCircle, Calculator, Plus, Info, Receipt } from "lucide-react"
+import { Download, Printer, ExternalLink, Upload, X, FileText, Loader2, Edit, Save, XCircle, Calculator, Plus, Info, Receipt, Mail } from "lucide-react"
 import { Card } from "@/components/ui/card"
 import { Invoice, InvoiceType, InvoiceClient, InvoiceItem } from "@/lib/types"
 import { getCurrencySymbol, formatCurrencyAmount, formatCurrencyInput, parseCurrencyInput, SUPPORTED_CURRENCIES, CurrencyCode, fetchExchangeRate, convertCurrency } from "@/lib/utils/currency"
@@ -20,6 +20,7 @@ import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { invoiceService, documentService } from "@/lib/services"
 import { uploadToImageKit, ImageUploadResult } from "@/lib/utils/imagekit"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { useBusiness } from "@/lib/contexts/business-context"
 
 interface ViewInvoiceDialogProps {
   open: boolean
@@ -38,6 +39,7 @@ export function ViewInvoiceDialog({
 }: ViewInvoiceDialogProps) {
   const { user } = useAuth()
   const { profile } = useUserProfile()
+  const { entities } = useBusiness()
   const [isMarkingPaid, setIsMarkingPaid] = useState(false)
   const [showPaymentForm, setShowPaymentForm] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
@@ -66,6 +68,15 @@ export function ViewInvoiceDialog({
   const [itemConvertedAmounts, setItemConvertedAmounts] = useState<Record<string, number>>({})
   const [shouldSaveReceipt, setShouldSaveReceipt] = useState(false)
   const [isSavingReceipt, setIsSavingReceipt] = useState(false)
+  const [selectedEntityId, setSelectedEntityId] = useState<string | undefined>(invoice?.recipientEntityId)
+  const [isSendingEmail, setIsSendingEmail] = useState(false)
+  const [showEmailDialog, setShowEmailDialog] = useState(false)
+  const [recipientEmail, setRecipientEmail] = useState("")
+
+  // Sync selectedEntityId with invoice prop
+  useEffect(() => {
+    setSelectedEntityId(invoice?.recipientEntityId)
+  }, [invoice?.recipientEntityId])
 
   // Check if user can view this invoice (must be sender OR recipient)
   const isSender = invoice && profile?.userId && invoice.userId === profile.userId
@@ -847,6 +858,35 @@ export function ViewInvoiceDialog({
     }
   }
 
+  const handleEntityChange = async (entityId: string) => {
+    if (!profile?.userId || !invoice || !isRecipient) return
+
+    const newEntityId = entityId === "none" ? undefined : entityId
+    
+    // Optimistically update the UI
+    setSelectedEntityId(newEntityId)
+
+    try {
+      const result = await invoiceService.updateInvoice(invoice.id, profile.userId, {
+        recipientEntityId: newEntityId
+      })
+
+      if (result.success) {
+        toast.success("Business entity assigned successfully")
+        onInvoiceUpdated?.()
+      } else {
+        // Revert on error
+        setSelectedEntityId(invoice.recipientEntityId)
+        toast.error(result.error || "Failed to assign business entity")
+      }
+    } catch (error) {
+      // Revert on error
+      setSelectedEntityId(invoice.recipientEntityId)
+      console.error("Error updating entity:", error)
+      toast.error("Failed to assign business entity")
+    }
+  }
+
   const handlePrint = () => {
     // Create a print window with the invoice content
     const printWindow = window.open('', '_blank')
@@ -1295,6 +1335,55 @@ export function ViewInvoiceDialog({
     toast.info("PDF download coming soon")
   }
 
+  const handleSendViaEmail = async () => {
+    if (!invoice || !profile?.userId || !user?.uid) return
+
+    if (!recipientEmail.trim()) {
+      toast.error("Please enter recipient email address")
+      return
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(recipientEmail.trim())) {
+      toast.error("Please enter a valid email address")
+      return
+    }
+
+    setIsSendingEmail(true)
+    try {
+      const authToken = await user.getIdToken()
+      const response = await fetch('/api/invoices/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          invoiceId: invoice.id,
+          recipientEmail: recipientEmail.trim(),
+          senderUserId: profile.userId
+        })
+      })
+
+      const data = await response.json()
+
+      if (response.ok && data.success) {
+        toast.success(`Invoice email sent successfully to ${recipientEmail.trim()}`)
+        setShowEmailDialog(false)
+        setRecipientEmail("")
+        onInvoiceUpdated?.()
+      } else {
+        toast.error(data.error || "Failed to send invoice email")
+      }
+    } catch (error) {
+      console.error('Error sending invoice email:', error)
+      toast.error("Failed to send invoice email")
+    } finally {
+      setIsSendingEmail(false)
+    }
+  }
+
   const handleSaveEdit = async () => {
     if (!editedInvoice || !profile?.userId) return
 
@@ -1365,6 +1454,22 @@ export function ViewInvoiceDialog({
               {displayAsIncoming ? 'Bill' : 'Invoice'} {invoice.invoiceNumber}
             </DialogTitle>
             <div className="flex flex-wrap gap-2 w-full sm:w-auto sm:mr-8">
+              {/* Send via Email button - only for sender */}
+              {isSender && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setRecipientEmail(invoice.client?.email || "")
+                    setShowEmailDialog(true)
+                  }}
+                  className="h-8 sm:h-9 text-xs sm:text-sm"
+                >
+                  <Mail className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                  <span className="hidden sm:inline">Send via Email</span>
+                  <span className="sm:hidden">Email</span>
+                </Button>
+              )}
               {/* Edit/Save/Cancel buttons - only for issuer when client hasn't paid */}
               {isSender && invoice.clientPaymentStatus !== 'paid' && (
                 <>
@@ -1437,6 +1542,36 @@ export function ViewInvoiceDialog({
 
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
           <div className="p-3 sm:p-4 md:p-6 space-y-4 sm:space-y-5 md:space-y-6">
+            {/* Business Entity Selector for Received Invoices */}
+            {isRecipient && !isSender && entities.length > 0 && (
+              <Card className="p-3 sm:p-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <Label className="text-sm font-medium">Assign to Business Entity</Label>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Select which business entity this invoice belongs to for organization
+                    </p>
+                  </div>
+                  <Select
+                    value={selectedEntityId || "none"}
+                    onValueChange={handleEntityChange}
+                  >
+                    <SelectTrigger className="w-full sm:w-[200px]">
+                      <SelectValue placeholder="Select entity" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">None (Unassigned)</SelectItem>
+                      {entities.map(entity => (
+                        <SelectItem key={entity.id} value={entity.id}>
+                          {entity.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </Card>
+            )}
+            
             {/* Top Section: Invoice Header and Client Info */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
               {/* Left: Invoice Header */}
@@ -2361,8 +2496,8 @@ export function ViewInvoiceDialog({
                               const displayAmount = isCreatorInvoice && platformFees > 0 ? netAmount : grossAmount
                               
                               return (
-                                <>
-                                  <tr key={item.id || index} className="border-t hover:bg-muted/30 transition-colors">
+                                <Fragment key={item.id || index}>
+                                  <tr className="border-t hover:bg-muted/30 transition-colors">
                                     <td className="p-2 sm:p-3 text-xs sm:text-sm break-words">{item.description}</td>
                                     <td className="p-2 sm:p-3 text-center text-xs sm:text-sm">{item.quantity}</td>
                                     <td className="p-2 sm:p-3 text-right text-xs sm:text-sm">
@@ -2416,7 +2551,7 @@ export function ViewInvoiceDialog({
                                       </td>
                                     </tr>
                                   )}
-                                </>
+                                </Fragment>
                               )
                             })}
                           </tbody>
@@ -2620,6 +2755,59 @@ export function ViewInvoiceDialog({
             </div>
           )}
       </DialogContent>
+      </Dialog>
+
+      {/* Send via Email Dialog */}
+      <Dialog open={showEmailDialog} onOpenChange={setShowEmailDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send Invoice via Email</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="recipient-email">Recipient Email</Label>
+              <Input
+                id="recipient-email"
+                type="email"
+                value={recipientEmail}
+                onChange={(e) => setRecipientEmail(e.target.value)}
+                placeholder="client@example.com"
+                className="mt-1"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                The recipient will receive an email with a link to create an OTax account and view the invoice.
+              </p>
+            </div>
+            <div className="flex gap-3 justify-end pt-4">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowEmailDialog(false)
+                  setRecipientEmail("")
+                }}
+                disabled={isSendingEmail}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSendViaEmail}
+                disabled={isSendingEmail || !recipientEmail.trim()}
+              >
+                {isSendingEmail ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="w-4 h-4 mr-2" />
+                    Send Email
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
       </Dialog>
     </Dialog>
     </>

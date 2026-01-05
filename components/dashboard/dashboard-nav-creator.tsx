@@ -15,7 +15,9 @@ import { User } from "lucide-react"
 import { ThemeToggle } from "../theme-toggle"
 import { NotificationBell } from "../notifications/notification-bell"
 import { AddTransactionDialog } from "../transactions/add-transaction-dialog"
+import { AddReminderDialog } from "../reminders/add-reminder-dialog"
 import { useTransactions } from "@/lib/hooks/useTransactions"
+import { useReminders } from "@/lib/hooks/useReminders"
 import { useSubscription } from "@/lib/hooks/useSubscription"
 import { SubscriptionRequiredModal } from "../subscription/subscription-required-modal"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -42,11 +44,13 @@ export function DashboardNavCreator() {
   const { profile } = useUserProfile()
   const [hasFilingRequests, setHasFilingRequests] = useState(false)
   const [isAddTransactionDialogOpen, setIsAddTransactionDialogOpen] = useState(false)
+  const [isAddReminderDialogOpen, setIsAddReminderDialogOpen] = useState(false)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   
   const { isSubscribed, isExpired, loading: subscriptionLoading } = useSubscription()
   const { createTransaction } = useTransactions(user?.uid || null)
+  const { createReminder } = useReminders(user?.uid || null)
   
   const checkSubscription = (action: () => void) => {
     // Wait for subscription status to load
@@ -77,7 +81,7 @@ export function DashboardNavCreator() {
       case "/dashboard-creator/documents":
         return { icon: Plus, action: () => {}, show: true }
       case "/dashboard-creator/reminders":
-        return { icon: Plus, action: () => {}, show: true }
+        return { icon: Plus, action: () => checkSubscription(() => setIsAddReminderDialogOpen(true)), show: true }
       case "/dashboard-creator/reports":
         return { icon: Plus, action: () => router.push("/dashboard-creator/reports/generate/self-assessment"), show: true }
       case "/dashboard-creator/payment":
@@ -495,6 +499,13 @@ export function DashboardNavCreator() {
         onOpenChange={setIsAddTransactionDialogOpen}
         onSubmit={createTransaction}
         transaction={null}
+      />
+      
+      {/* Add Reminder Dialog */}
+      <AddReminderDialog 
+        open={isAddReminderDialogOpen} 
+        onOpenChange={setIsAddReminderDialogOpen}
+        onSubmit={createReminder}
       />
 
       {/* Business switcher lives in the header; removed from sidebar/menu for creators */}

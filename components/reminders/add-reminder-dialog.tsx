@@ -1,13 +1,14 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { createPortal } from "react-dom"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { X, Loader2 } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
-import { Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import { Reminder } from "@/lib/types"
 
@@ -30,6 +31,10 @@ export function AddReminderDialog({ open, onOpenChange, onSubmit, editingReminde
     isCompleted: false
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
+  
+  // Track if any Select dropdown is open to prevent dialog from closing on mobile
+  const [isAnySelectOpen, setIsAnySelectOpen] = useState(false)
+  const selectOpenTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   const isEditMode = !!editingReminder
 
@@ -137,12 +142,120 @@ export function AddReminderDialog({ open, onOpenChange, onSubmit, editingReminde
     }
   }
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl w-[calc(100vw-2rem)] sm:w-full p-3 sm:p-4 md:p-6">
-        <DialogHeader className="pb-2 sm:pb-3">
-          <DialogTitle className="text-base sm:text-lg md:text-xl">{isEditMode ? 'Edit Reminder' : 'Add Reminder'}</DialogTitle>
-        </DialogHeader>
+  // Monitor for Select dropdowns opening/closing to prevent dialog from closing on mobile
+  useEffect(() => {
+    if (!open) {
+      setIsAnySelectOpen(false)
+      if (selectOpenTimeoutRef.current) {
+        clearTimeout(selectOpenTimeoutRef.current)
+      }
+      return
+    }
+
+    const checkSelectState = () => {
+      const openSelect = document.querySelector('[data-radix-select-content][data-state="open"]')
+      const isOpen = !!openSelect
+      setIsAnySelectOpen(isOpen)
+    }
+
+    checkSelectState()
+
+    const observer = new MutationObserver((mutations) => {
+      const hasSelectMutation = mutations.some(mutation => {
+        const target = mutation.target as HTMLElement
+        return target.hasAttribute?.('data-radix-select-content') ||
+               target.closest?.('[data-radix-select-content]') !== null ||
+               mutation.attributeName === 'data-state'
+      })
+      
+      if (hasSelectMutation) {
+        checkSelectState()
+      }
+    })
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-state']
+    })
+
+    const interval = setInterval(checkSelectState, 200)
+
+    return () => {
+      clearInterval(interval)
+      observer.disconnect()
+      if (selectOpenTimeoutRef.current) {
+        clearTimeout(selectOpenTimeoutRef.current)
+      }
+    }
+  }, [open])
+
+  // Handle escape key
+  useEffect(() => {
+    if (!open) return
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onOpenChange(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [open, onOpenChange])
+
+  // Handle backdrop click
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      const target = e.target as HTMLElement
+      const isSelectContent = target.closest('[data-radix-select-content]') !== null
+      const openSelectContent = document.querySelector('[data-radix-select-content][data-state="open"]')
+      const selectViewport = document.querySelector('[data-radix-select-viewport]')
+      const selectContent = document.querySelector('[data-radix-select-content]')
+      
+      const shouldPrevent = isSelectContent || 
+                            isAnySelectOpen || 
+                            openSelectContent || 
+                            (selectContent && selectViewport)
+      
+      if (!shouldPrevent) {
+        onOpenChange(false)
+      }
+    }
+  }
+
+  if (!open) return null
+
+  // Render modal content using portal
+  const modalContent = (
+    <>
+      {/* Custom Modal Overlay */}
+      <div
+        className="fixed inset-0 z-50 bg-black/50 dark:bg-black/50 animate-in fade-in-0"
+        onClick={handleBackdropClick}
+        aria-hidden="true"
+      />
+      
+      {/* Custom Modal Content */}
+      <div className="fixed left-[50%] top-[50%] z-50 w-[calc(100vw-2rem)] sm:w-full max-w-2xl max-h-[90vh] sm:max-h-[95vh] translate-x-[-50%] translate-y-[-50%] border bg-background rounded-lg shadow-lg animate-in fade-in-0 zoom-in-95 slide-in-from-left-1/2 slide-in-from-top-[48%] duration-200">
+        <div className="flex flex-col h-full max-h-[90vh] sm:max-h-[95vh]">
+          {/* Header */}
+          <div className="flex items-center justify-between p-3 sm:p-4 md:p-6 pb-2 sm:pb-3 border-b">
+            <h2 className="text-base sm:text-lg md:text-xl font-semibold leading-none tracking-tight">
+              {isEditMode ? 'Edit Reminder' : 'Add Reminder'}
+            </h2>
+            <button
+              onClick={() => onOpenChange(false)}
+              className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </button>
+          </div>
+          
+          {/* Content */}
+          <div className="overflow-y-auto p-3 sm:p-4 md:p-6">
         <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 mt-2 sm:mt-4 overflow-x-hidden">
           <div className="space-y-1.5 sm:space-y-2">
             <Label htmlFor="reminder-title" className="text-xs sm:text-sm">Title *</Label>
@@ -255,7 +368,15 @@ export function AddReminderDialog({ open, onOpenChange, onSubmit, editingReminde
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+
+  return (
+    <>
+      {typeof window !== 'undefined' && createPortal(modalContent, document.body)}
+    </>
   )
 }

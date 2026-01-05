@@ -164,6 +164,9 @@ export function formatCurrencyInput(value: string): string {
   // Remove all non-digit characters except decimal point
   const numericValue = value.replace(/[^\d.]/g, "")
   
+  // Check if value ends with a decimal point (user is typing decimal)
+  const endsWithDecimal = numericValue.endsWith(".")
+  
   // Split by decimal point
   const parts = numericValue.split(".")
   const integerPart = parts[0] || ""
@@ -172,8 +175,18 @@ export function formatCurrencyInput(value: string): string {
   // Add commas to integer part
   const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
   
-  // Combine with decimal part if exists
-  return decimalPart ? `${formattedInteger}.${decimalPart}` : formattedInteger
+  // If there's a decimal part, include it
+  if (decimalPart) {
+    return `${formattedInteger}.${decimalPart}`
+  }
+  
+  // If value ends with decimal point, preserve it (user is typing "16.")
+  if (endsWithDecimal && integerPart) {
+    return `${formattedInteger}.`
+  }
+  
+  // Otherwise, just return the formatted integer
+  return formattedInteger
 }
 
 /**
@@ -201,23 +214,41 @@ export function handleCurrencyInputChange(value: string): {
   // Remove all non-digit characters except decimal point
   const cleaned = value.replace(/[^\d.]/g, "")
   
+  // Check if value ends with a decimal point (user is typing decimal)
+  const endsWithDecimal = cleaned.endsWith(".")
+  
   // Prevent multiple decimal points
   const parts = cleaned.split(".")
   if (parts.length > 2) {
     return { isValid: false, rawValue: "", displayValue: "" }
   }
 
-  // Limit decimal places to 2
+  // Allow up to 2 decimal places for all currencies (e.g., 16.5, 100.50)
   if (parts[1] && parts[1].length > 2) {
-    return { isValid: false, rawValue: "", displayValue: "" }
+    // Truncate to 2 decimal places if more are entered
+    const truncatedDecimal = parts[1].substring(0, 2)
+    const truncatedValue = parts[0] + "." + truncatedDecimal
+    const displayValue = formatCurrencyInput(truncatedValue)
+    return {
+      isValid: true,
+      rawValue: truncatedValue,
+      displayValue,
+    }
   }
 
-  // Format for display (with commas)
-  const displayValue = formatCurrencyInput(cleaned)
+  // Preserve trailing decimal point if user is typing it (e.g., "16." -> keep the ".")
+  let rawValue = cleaned
+  if (endsWithDecimal && parts[0] && !parts[1]) {
+    // User typed something like "16." - preserve the decimal point
+    rawValue = cleaned
+  }
+
+  // Format for display (with commas, preserving decimals and trailing decimal point)
+  const displayValue = formatCurrencyInput(rawValue)
   
   return {
     isValid: true,
-    rawValue: cleaned,
+    rawValue: rawValue,
     displayValue,
   }
 }

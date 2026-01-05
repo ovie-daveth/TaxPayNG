@@ -16,7 +16,7 @@ import { SettingsSkeleton } from "@/components/ui/skeletons"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
-import { userService } from "@/lib/services"
+import { userService, documentService } from "@/lib/services"
 import { toast } from "sonner"
 import { Progress } from "@/components/ui/progress"
 import { Badge } from "@/components/ui/badge"
@@ -133,6 +133,24 @@ export default function SettingsPage() {
       emailNotifications,
       smsNotifications
     })
+
+    // Load KYC documents
+    if (profile.kycDocuments) {
+      setKycDocuments({
+        id: profile.kycDocuments.id || '',
+        passport: profile.kycDocuments.passport || '',
+        driverLicense: profile.kycDocuments.driverLicense || ''
+      })
+    }
+
+    // Load business documents
+    if (profile.businessDocuments) {
+      setBusinessDocuments({
+        cac: profile.businessDocuments.cac || '',
+        taxCertificate: profile.businessDocuments.taxCertificate || '',
+        businessLicense: profile.businessDocuments.businessLicense || ''
+      })
+    }
   }, [profile, profileLoading])
 
   // Handle subscription payment success/error from URL params
@@ -564,6 +582,280 @@ export default function SettingsPage() {
                         </div>
                       </div>
                     </div>
+                    <Separator />
+                    {/* Business Documents Section - Only for SMEs */}
+                    {profile?.businessType === 'sme' && (
+                      <div className="space-y-3 sm:space-y-4">
+                        <div>
+                          <h3 className="text-base sm:text-lg font-semibold">Business Documents</h3>
+                          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+                            Upload your business documents for verification (CAC Certificate, Tax Clearance Certificate, or Business License)
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+                          {/* CAC Certificate */}
+                          <div className="space-y-1.5 sm:space-y-2">
+                            <Label className="text-xs sm:text-sm">CAC Certificate</Label>
+                            <div className="border-2 border-dashed rounded-lg p-3 sm:p-4 flex flex-col items-center justify-center min-h-[100px] sm:min-h-[120px]">
+                              {businessDocuments.cac ? (
+                                <div className="flex flex-col items-center gap-1.5 sm:gap-2 w-full">
+                                  <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
+                                  <p className="text-xs sm:text-sm text-muted-foreground text-center">Document uploaded</p>
+                                  <div className="flex gap-1.5 sm:gap-2 mt-1.5 sm:mt-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => window.open(businessDocuments.cac, '_blank')}
+                                      className="h-7 sm:h-8 text-xs sm:text-sm"
+                                    >
+                                      View
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={async () => {
+                                        if (!user?.uid) return
+                                        setDeletingBusinessDoc(prev => ({ ...prev, cac: true }))
+                                        try {
+                                          await userService.upsertProfile(user.uid, {
+                                            businessDocuments: { ...businessDocuments, cac: undefined }
+                                          })
+                                          setBusinessDocuments(prev => ({ ...prev, cac: '' }))
+                                          toast.success("CAC Certificate deleted")
+                                          await refetchProfile()
+                                        } catch (error) {
+                                          toast.error("Failed to delete document")
+                                        } finally {
+                                          setDeletingBusinessDoc(prev => ({ ...prev, cac: false }))
+                                        }
+                                      }}
+                                      disabled={deletingBusinessDoc.cac}
+                                      className="h-7 sm:h-8 text-xs sm:text-sm"
+                                    >
+                                      {deletingBusinessDoc.cac ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <label className="cursor-pointer flex flex-col items-center gap-1.5 sm:gap-2 w-full">
+                                  <Upload className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground" />
+                                  <span className="text-xs sm:text-sm text-muted-foreground text-center">Click to upload</span>
+                                  <Input
+                                    type="file"
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    className="hidden"
+                                    onChange={async (e) => {
+                                      const file = e.target.files?.[0]
+                                      if (!file || !user?.uid) return
+                                      setUploadingBusinessDoc(prev => ({ ...prev, cac: true }))
+                                      try {
+                                        const result = await uploadToImageKit(file, 'business-documents', user.uid)
+                                        await userService.upsertProfile(user.uid, {
+                                          businessDocuments: { ...businessDocuments, cac: result.url }
+                                        })
+                                        setBusinessDocuments(prev => ({ ...prev, cac: result.url }))
+                                        toast.success("CAC Certificate uploaded successfully")
+                                        await refetchProfile()
+                                        await documentService.uploadDocument(user.uid, {
+                                          file,
+                                          name: 'CAC Certificate',
+                                          type: 'proof',
+                                          imageKitUrl: result.url,
+                                          imageKitFileId: result.fileId,
+                                          fileSize: result.size
+                                        })
+                                      } catch (error) {
+                                        console.error("Upload error:", error)
+                                        toast.error(error instanceof Error ? error.message : "Failed to upload document")
+                                      } finally {
+                                        setUploadingBusinessDoc(prev => ({ ...prev, cac: false }))
+                                        e.target.value = ''
+                                      }
+                                    }}
+                                    disabled={uploadingBusinessDoc.cac}
+                                  />
+                                  {uploadingBusinessDoc.cac && <span className="text-xs text-muted-foreground">Uploading...</span>}
+                                </label>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Tax Clearance Certificate */}
+                          <div className="space-y-1.5 sm:space-y-2">
+                            <Label className="text-xs sm:text-sm">Tax Clearance Certificate</Label>
+                            <div className="border-2 border-dashed rounded-lg p-3 sm:p-4 flex flex-col items-center justify-center min-h-[100px] sm:min-h-[120px]">
+                              {businessDocuments.taxCertificate ? (
+                                <div className="flex flex-col items-center gap-1.5 sm:gap-2 w-full">
+                                  <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
+                                  <p className="text-xs sm:text-sm text-muted-foreground text-center">Document uploaded</p>
+                                  <div className="flex gap-1.5 sm:gap-2 mt-1.5 sm:mt-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => window.open(businessDocuments.taxCertificate, '_blank')}
+                                      className="h-7 sm:h-8 text-xs sm:text-sm"
+                                    >
+                                      View
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={async () => {
+                                        if (!user?.uid) return
+                                        setDeletingBusinessDoc(prev => ({ ...prev, taxCertificate: true }))
+                                        try {
+                                          await userService.upsertProfile(user.uid, {
+                                            businessDocuments: { ...businessDocuments, taxCertificate: undefined }
+                                          })
+                                          setBusinessDocuments(prev => ({ ...prev, taxCertificate: '' }))
+                                          toast.success("Tax Clearance Certificate deleted")
+                                          await refetchProfile()
+                                        } catch (error) {
+                                          toast.error("Failed to delete document")
+                                        } finally {
+                                          setDeletingBusinessDoc(prev => ({ ...prev, taxCertificate: false }))
+                                        }
+                                      }}
+                                      disabled={deletingBusinessDoc.taxCertificate}
+                                      className="h-7 sm:h-8 text-xs sm:text-sm"
+                                    >
+                                      {deletingBusinessDoc.taxCertificate ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <label className="cursor-pointer flex flex-col items-center gap-1.5 sm:gap-2 w-full">
+                                  <Upload className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground" />
+                                  <span className="text-xs sm:text-sm text-muted-foreground text-center">Click to upload</span>
+                                  <Input
+                                    type="file"
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    className="hidden"
+                                    onChange={async (e) => {
+                                      const file = e.target.files?.[0]
+                                      if (!file || !user?.uid) return
+                                      setUploadingBusinessDoc(prev => ({ ...prev, taxCertificate: true }))
+                                      try {
+                                        const result = await uploadToImageKit(file, 'business-documents', user.uid)
+                                        await userService.upsertProfile(user.uid, {
+                                          businessDocuments: { ...businessDocuments, taxCertificate: result.url }
+                                        })
+                                        setBusinessDocuments(prev => ({ ...prev, taxCertificate: result.url }))
+                                        toast.success("Tax Clearance Certificate uploaded successfully")
+                                        await refetchProfile()
+                                        await documentService.uploadDocument(user.uid, {
+                                          file,
+                                          name: 'Tax Clearance Certificate',
+                                          type: 'proof',
+                                          imageKitUrl: result.url,
+                                          imageKitFileId: result.fileId,
+                                          fileSize: result.size
+                                        })
+                                      } catch (error) {
+                                        console.error("Upload error:", error)
+                                        toast.error(error instanceof Error ? error.message : "Failed to upload document")
+                                      } finally {
+                                        setUploadingBusinessDoc(prev => ({ ...prev, taxCertificate: false }))
+                                        e.target.value = ''
+                                      }
+                                    }}
+                                    disabled={uploadingBusinessDoc.taxCertificate}
+                                  />
+                                  {uploadingBusinessDoc.taxCertificate && <span className="text-xs text-muted-foreground">Uploading...</span>}
+                                </label>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Business License */}
+                          <div className="space-y-1.5 sm:space-y-2">
+                            <Label className="text-xs sm:text-sm">Business License</Label>
+                            <div className="border-2 border-dashed rounded-lg p-3 sm:p-4 flex flex-col items-center justify-center min-h-[100px] sm:min-h-[120px]">
+                              {businessDocuments.businessLicense ? (
+                                <div className="flex flex-col items-center gap-1.5 sm:gap-2 w-full">
+                                  <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
+                                  <p className="text-xs sm:text-sm text-muted-foreground text-center">Document uploaded</p>
+                                  <div className="flex gap-1.5 sm:gap-2 mt-1.5 sm:mt-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => window.open(businessDocuments.businessLicense, '_blank')}
+                                      className="h-7 sm:h-8 text-xs sm:text-sm"
+                                    >
+                                      View
+                                    </Button>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={async () => {
+                                        if (!user?.uid) return
+                                        setDeletingBusinessDoc(prev => ({ ...prev, businessLicense: true }))
+                                        try {
+                                          await userService.upsertProfile(user.uid, {
+                                            businessDocuments: { ...businessDocuments, businessLicense: undefined }
+                                          })
+                                          setBusinessDocuments(prev => ({ ...prev, businessLicense: '' }))
+                                          toast.success("Business License deleted")
+                                          await refetchProfile()
+                                        } catch (error) {
+                                          toast.error("Failed to delete document")
+                                        } finally {
+                                          setDeletingBusinessDoc(prev => ({ ...prev, businessLicense: false }))
+                                        }
+                                      }}
+                                      disabled={deletingBusinessDoc.businessLicense}
+                                      className="h-7 sm:h-8 text-xs sm:text-sm"
+                                    >
+                                      {deletingBusinessDoc.businessLicense ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <label className="cursor-pointer flex flex-col items-center gap-1.5 sm:gap-2 w-full">
+                                  <Upload className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground" />
+                                  <span className="text-xs sm:text-sm text-muted-foreground text-center">Click to upload</span>
+                                  <Input
+                                    type="file"
+                                    accept=".pdf,.jpg,.jpeg,.png"
+                                    className="hidden"
+                                    onChange={async (e) => {
+                                      const file = e.target.files?.[0]
+                                      if (!file || !user?.uid) return
+                                      setUploadingBusinessDoc(prev => ({ ...prev, businessLicense: true }))
+                                      try {
+                                        const result = await uploadToImageKit(file, 'business-documents', user.uid)
+                                        await userService.upsertProfile(user.uid, {
+                                          businessDocuments: { ...businessDocuments, businessLicense: result.url }
+                                        })
+                                        setBusinessDocuments(prev => ({ ...prev, businessLicense: result.url }))
+                                        toast.success("Business License uploaded successfully")
+                                        await refetchProfile()
+                                        await documentService.uploadDocument(user.uid, {
+                                          file,
+                                          name: 'Business License',
+                                          type: 'proof',
+                                          imageKitUrl: result.url,
+                                          imageKitFileId: result.fileId,
+                                          fileSize: result.size
+                                        })
+                                      } catch (error) {
+                                        console.error("Upload error:", error)
+                                        toast.error(error instanceof Error ? error.message : "Failed to upload document")
+                                      } finally {
+                                        setUploadingBusinessDoc(prev => ({ ...prev, businessLicense: false }))
+                                        e.target.value = ''
+                                      }
+                                    }}
+                                    disabled={uploadingBusinessDoc.businessLicense}
+                                  />
+                                  {uploadingBusinessDoc.businessLicense && <span className="text-xs text-muted-foreground">Uploading...</span>}
+                                </label>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                     <Separator />
                     <div ref={kycSectionRef} className="space-y-3 sm:space-y-4" id="kyc-section">
                       <div>

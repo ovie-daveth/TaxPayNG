@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, useRef } from "react"
+import { createPortal } from "react-dom"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
@@ -53,6 +54,10 @@ export function AddInvoiceDialog({
   const [itemConvertedAmounts, setItemConvertedAmounts] = useState<Record<string, number>>({})
 
   const [isSendingToUser, setIsSendingToUser] = useState(false)
+  
+  // Track if any Select dropdown is open to prevent dialog from closing on mobile
+  const [isAnySelectOpen, setIsAnySelectOpen] = useState(false)
+  const selectOpenTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
   // New invoice fields for creators (optional)
   const [showCreatorFields, setShowCreatorFields] = useState(false)
@@ -179,6 +184,7 @@ export function AddInvoiceDialog({
     supplier: getInitialSupplier(),
     sendToOtaxUser: false,
     recipientEmail: "",
+    sendViaEmail: false,
     client: {
       name: "",
       email: "",
@@ -241,6 +247,11 @@ export function AddInvoiceDialog({
       setItemDisplayValues(displayValues)
       setItemCurrencies(currencies)
       setItemConvertedAmounts(convertedAmounts)
+      // For creators and freelancers, ensure vatable is false for all items
+      const itemsWithoutVAT = (profile?.businessType === 'creator' || profile?.businessType === 'freelancer')
+        ? items.map(item => ({ ...item, vatable: false }))
+        : items
+      
       setFormData({
         invoiceType: invoice.invoiceType || 'outgoing',
         template: invoice.template,
@@ -249,7 +260,7 @@ export function AddInvoiceDialog({
         issueDate: invoice.issueDate.split('T')[0],
         dueDate: invoice.dueDate.split('T')[0],
         currency: invoice.currency as CurrencyCode,
-        items: items,
+        items: itemsWithoutVAT,
         discount: invoice.discount || 0,
         vatRate: invoice.vatRate || 7.5,
         // Note: WHT fields are not editable by issuer - they are set by client when deducting
@@ -432,6 +443,11 @@ export function AddInvoiceDialog({
         if (item.id === itemId) {
           const updated = { ...item, ...updates }
           
+          // For creators and freelancers, always set vatable to false
+          if (profile?.businessType === 'creator' || profile?.businessType === 'freelancer') {
+            updated.vatable = false
+          }
+          
           // Always calculate gross amount (Quantity × Unit Price)
           const grossAmount = calculateGrossAmount(updated)
           
@@ -563,6 +579,37 @@ export function AddInvoiceDialog({
       ...prev,
       items: prev.items.filter(item => item.id !== itemId)
     }))
+    // Clean up item-related state
+    setItemDisplayValues(prev => {
+      const updated = { ...prev }
+      delete updated[itemId]
+      return updated
+    })
+    setItemCurrencies(prev => {
+      const updated = { ...prev }
+      delete updated[itemId]
+      return updated
+    })
+    setItemConvertedAmounts(prev => {
+      const updated = { ...prev }
+      delete updated[itemId]
+      return updated
+    })
+    setItemGrossAmounts(prev => {
+      const updated = { ...prev }
+      delete updated[itemId]
+      return updated
+    })
+    setItemPlatformFees(prev => {
+      const updated = { ...prev }
+      delete updated[itemId]
+      return updated
+    })
+    setItemPlatformFeesDisplay(prev => {
+      const updated = { ...prev }
+      delete updated[itemId]
+      return updated
+    })
   }
 
   const calculateTotals = () => {
@@ -572,8 +619,8 @@ export function AddInvoiceDialog({
     let vatableSubtotal = 0
     
     formData.items.forEach(item => {
-      // If unit price is 0, skip this item
-      if (item.unitPrice === 0) return
+      // If unit price is 0 or description is empty, skip this item
+      if (item.unitPrice === 0 || !item.description.trim()) return
       
       // Use calculateItemAmount which returns net amount (gross - platform fees) for creators
       // or gross amount (quantity × unit price) for non-creators
@@ -646,8 +693,11 @@ export function AddInvoiceDialog({
       return
     }
   
-    if (formData.items.length === 0 || formData.items.some(item => !item.description.trim() || item.unitPrice <= 0)) {
-      toast.error("Please add at least one valid item")
+    // Filter out invalid items (empty description or zero unit price)
+    const validItems = formData.items.filter(item => item.description.trim() && item.unitPrice > 0)
+    
+    if (validItems.length === 0) {
+      toast.error("Please add at least one valid item with description and unit price")
       return
     }
   
@@ -679,10 +729,13 @@ export function AddInvoiceDialog({
         formData.invoiceType === 'outgoing' ? (formData.supplier || getInitialSupplier()) : getInitialSupplier()
       )
   
-      // Use items as-is (amounts are already calculated during input via updateItem)
+      // Filter out invalid items (empty description or zero unit price) before submitting
+      const validItemsForSubmission = formData.items.filter(item => item.description.trim() && item.unitPrice > 0)
+      
+      // Use valid items only (amounts are already calculated during input via updateItem)
       // Just ensure currency is saved if different from invoice currency
       // Include item-level platform fees for creators
-      const itemsWithCalculatedAmounts = formData.items.map(item => {
+      const itemsWithCalculatedAmounts = validItemsForSubmission.map(item => {
         const itemCurrency = itemCurrencies[item.id] || formData.currency
         return {
           ...item,
@@ -774,6 +827,36 @@ export function AddInvoiceDialog({
           }
         }
         
+        // If sending via email, send the invoice email
+        if (formData.sendViaEmail && formData.client.email && result.data) {
+          try {
+            const authToken = await user.getIdToken()
+            const emailResponse = await fetch('/api/invoices/send-email', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+              },
+              body: JSON.stringify({
+                invoiceId: result.data.id,
+                recipientEmail: formData.client.email.trim(),
+                senderUserId: user.uid
+              })
+            })
+
+            const emailData = await emailResponse.json()
+
+            if (emailResponse.ok && emailData.success) {
+              toast.success(`Invoice email sent successfully to ${formData.client.email.trim()}`)
+            } else {
+              toast.error(emailData.error || "Failed to send invoice email")
+            }
+          } catch (error) {
+            console.error('Error sending invoice email:', error)
+            toast.error("Failed to send invoice email")
+          }
+        }
+        
         onOpenChange(false)
         onSuccess?.()
       } else {
@@ -808,12 +891,120 @@ export function AddInvoiceDialog({
     e.stopPropagation()
   }
 
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-5xl max-h-[90vh] sm:max-h-[95vh] overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 hide-scrollbar">
-        <DialogHeader className="pb-2 sm:pb-4">
-          <DialogTitle className="text-base sm:text-lg md:text-xl">{invoice ? "Edit Invoice" : "Create New Invoice"}</DialogTitle>
-        </DialogHeader>
+  // Monitor for Select dropdowns opening/closing to prevent dialog from closing on mobile
+  useEffect(() => {
+    if (!open) {
+      setIsAnySelectOpen(false)
+      if (selectOpenTimeoutRef.current) {
+        clearTimeout(selectOpenTimeoutRef.current)
+      }
+      return
+    }
+
+    const checkSelectState = () => {
+      const openSelect = document.querySelector('[data-radix-select-content][data-state="open"]')
+      const isOpen = !!openSelect
+      setIsAnySelectOpen(isOpen)
+    }
+
+    checkSelectState()
+
+    const observer = new MutationObserver((mutations) => {
+      const hasSelectMutation = mutations.some(mutation => {
+        const target = mutation.target as HTMLElement
+        return target.hasAttribute?.('data-radix-select-content') ||
+               target.closest?.('[data-radix-select-content]') !== null ||
+               mutation.attributeName === 'data-state'
+      })
+      
+      if (hasSelectMutation) {
+        checkSelectState()
+      }
+    })
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-state']
+    })
+
+    const interval = setInterval(checkSelectState, 200)
+
+    return () => {
+      clearInterval(interval)
+      observer.disconnect()
+      if (selectOpenTimeoutRef.current) {
+        clearTimeout(selectOpenTimeoutRef.current)
+      }
+    }
+  }, [open])
+
+  // Handle escape key
+  useEffect(() => {
+    if (!open) return
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onOpenChange(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [open, onOpenChange])
+
+  // Handle backdrop click
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.target === e.currentTarget) {
+      const target = e.target as HTMLElement
+      const isSelectContent = target.closest('[data-radix-select-content]') !== null
+      const openSelectContent = document.querySelector('[data-radix-select-content][data-state="open"]')
+      const selectViewport = document.querySelector('[data-radix-select-viewport]')
+      const selectContent = document.querySelector('[data-radix-select-content]')
+      
+      const shouldPrevent = isSelectContent || 
+                            isAnySelectOpen || 
+                            openSelectContent || 
+                            (selectContent && selectViewport)
+      
+      if (!shouldPrevent) {
+        onOpenChange(false)
+      }
+    }
+  }
+
+  if (!open) return null
+
+  // Render modal content using portal
+  const modalContent = (
+    <>
+      {/* Custom Modal Overlay */}
+      <div
+        className="fixed inset-0 z-50 bg-black/50 dark:bg-black/50 animate-in fade-in-0"
+        onClick={handleBackdropClick}
+        aria-hidden="true"
+      />
+      
+      {/* Custom Modal Content */}
+      <div className="fixed left-[50%] top-[50%] z-50 w-[calc(100vw-2rem)] sm:w-full max-w-5xl max-h-[90vh] sm:max-h-[95vh] translate-x-[-50%] translate-y-[-50%] border bg-background rounded-lg shadow-lg animate-in fade-in-0 zoom-in-95 slide-in-from-left-1/2 slide-in-from-top-[48%] duration-200">
+        <div className="flex flex-col h-full max-h-[90vh] sm:max-h-[95vh]">
+          {/* Header */}
+          <div className="flex items-center justify-between p-3 sm:p-4 md:p-6 pb-2 sm:pb-4 border-b">
+            <h2 className="text-base sm:text-lg md:text-xl font-semibold leading-none tracking-tight">
+              {invoice ? "Edit Invoice" : "Create New Invoice"}
+            </h2>
+            <button
+              onClick={() => onOpenChange(false)}
+              className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </button>
+          </div>
+          
+          {/* Content */}
+          <div className="overflow-y-auto overflow-x-hidden p-3 sm:p-4 md:p-6 hide-scrollbar">
 
         <form onSubmit={handleFormSubmit} className="space-y-4 sm:space-y-5 md:space-y-6 max-w-full overflow-x-hidden">
           {/* Send to OTax User Option */}
@@ -861,7 +1052,7 @@ export function AddInvoiceDialog({
                       placeholder="user@example.com"
                       disabled={isSearchingUser}
                       autoComplete="email"
-                      className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm pr-10"
+                      className="h-9 sm:h-10 text-xs sm:text-sm pr-10"
                     />
                     {isSearchingUser ? (
                       <Loader2 className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-muted-foreground" />
@@ -909,6 +1100,23 @@ export function AddInvoiceDialog({
                   )}
                 </div>
               )}
+
+              {/* Send via Email Option */}
+              <div className="space-y-2 border-t pt-4">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="send-via-email"
+                    checked={formData.sendViaEmail || false}
+                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, sendViaEmail: !!checked }))}
+                  />
+                  <Label htmlFor="send-via-email" className="font-medium cursor-pointer text-xs sm:text-sm">
+                    Send via Email
+                  </Label>
+                </div>
+                <p className="text-xs text-muted-foreground ml-6 sm:ml-7">
+                  Send invoice to client via email using the client email address. They will receive a PDF attachment and can create an OTax account to view it online.
+                </p>
+              </div>
             </div>
           )}
 
@@ -946,7 +1154,7 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="Your business or name"
-                  className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
@@ -958,7 +1166,7 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="Registered business name"
-                  className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
             </div>
@@ -973,7 +1181,7 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="your@email.com"
-                  className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
@@ -985,7 +1193,7 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="+234 800 000 0000"
-                  className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
             </div>
@@ -998,7 +1206,7 @@ export function AddInvoiceDialog({
                 onKeyDown={handleInputKeyDown}
                 onClick={(e) => e.stopPropagation()}
                 placeholder="Street address"
-                className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                className="h-9 sm:h-10 text-xs sm:text-sm"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
@@ -1011,7 +1219,7 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="City"
-                  className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
@@ -1023,7 +1231,7 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="State"
-                  className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
@@ -1035,7 +1243,7 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="Postal code"
-                  className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
             </div>
@@ -1049,7 +1257,7 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="Your TIN"
-                  className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
@@ -1061,7 +1269,7 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="VAT Reg Number (if VAT-registered)"
-                  className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
                 <p className="text-xs text-muted-foreground">Required if your business is VAT-registered</p>
               </div>
@@ -1085,7 +1293,7 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="Enter client name"
-                  className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
@@ -1097,7 +1305,7 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="Client's business name"
-                  className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
             </div>
@@ -1112,7 +1320,7 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="client@example.com"
-                  className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
@@ -1124,7 +1332,7 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="+234 800 000 0000"
-                  className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
               <div className="space-y-2">
@@ -1136,7 +1344,7 @@ export function AddInvoiceDialog({
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="Optional"
-                  className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
                 />
               </div>
             </div>
@@ -1183,10 +1391,12 @@ export function AddInvoiceDialog({
                 <span>-{getCurrencySymbol(formData.currency)} {(totals.subtotal * formData.discount / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             )}
-            <div className="flex justify-between items-center text-xs sm:text-sm">
-              <span>VAT ({formData.vatRate || 7.5}%):</span>
-              <span className="font-medium">{getCurrencySymbol(formData.currency)} {totals.vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
+            {profile?.businessType !== 'creator' && profile?.businessType !== 'freelancer' && (
+              <div className="flex justify-between items-center text-xs sm:text-sm">
+                <span>VAT ({formData.vatRate || 7.5}%):</span>
+                <span className="font-medium">{getCurrencySymbol(formData.currency)} {totals.vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center text-xs sm:text-sm font-semibold border-t pt-2 mt-2">
               <span>Invoice Total:</span>
               <span>{getCurrencySymbol(formData.currency)} {totals.invoiceTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -1199,14 +1409,7 @@ export function AddInvoiceDialog({
 
           {/* Invoice Items */}
           <div className="space-y-3 sm:space-y-4">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
-              <h3 className="text-base sm:text-lg font-semibold">Items</h3>
-              <Button type="button" variant="outline" size="sm" onClick={addItem} className="h-8 sm:h-9 text-xs sm:text-sm w-full sm:w-auto">
-                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
-                <span className="hidden sm:inline">Add Item</span>
-                <span className="sm:hidden">Add</span>
-              </Button>
-            </div>
+            <h3 className="text-base sm:text-lg font-semibold">Items</h3>
             
             {/* Note about Item Tax (for non-VAT items) */}
             <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
@@ -1222,14 +1425,27 @@ export function AddInvoiceDialog({
                   {/* Row 1: Description and Quantity */}
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 flex-1">
                     <div className="flex-1 space-y-2">
-                      <Label className="text-xs sm:text-sm">Description</Label>
+                      <div className="flex items-center justify-between gap-2">
+                        <Label className="text-xs sm:text-sm">Description</Label>
+                        {formData.items.length > 1 && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => removeItem(item.id)}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                      </div>
                       <Input
                         value={item.description}
                         onChange={(e) => updateItem(item.id, { description: e.target.value })}
                         onKeyDown={handleInputKeyDown}
                         onClick={(e) => e.stopPropagation()}
                         placeholder="Item description"
-                        className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                        className="h-9 sm:h-10 text-xs sm:text-sm"
                       />
                     </div>
                     <div className="space-y-2 w-full sm:w-20 flex-shrink-0">
@@ -1299,7 +1515,7 @@ export function AddInvoiceDialog({
                           onChange={(e) => handleUnitPriceChange(item.id, e.target.value)}
                           onKeyDown={handleInputKeyDown}
                           onClick={(e) => e.stopPropagation()}
-                          className="text-xs sm:text-sm font-medium flex-1 min-w-0 h-9 sm:h-10 placeholder:text-xs sm:placeholder:text-sm"
+                          className="text-xs sm:text-sm font-medium flex-1 min-w-0 h-9 sm:h-10"
                         />
                       </div>
                     </div>
@@ -1331,27 +1547,29 @@ export function AddInvoiceDialog({
                       </Tooltip>
                       {/* <p className="text-xs text-muted-foreground">Qty × Unit Price</p> */}
                     </div>
-                    <div className="space-y-2 flex flex-col justify-end flex-shrink-0">
-                      <div className="flex items-center space-x-2 sm:pt-0 pt-2">
-                        <Checkbox
-                          id={`vatable-${item.id}`}
-                          checked={item.vatable || false}
-                          onCheckedChange={(checked) => updateItem(item.id, { vatable: !!checked })}
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                        <div className="flex flex-col min-w-0">
-                          <Label htmlFor={`vatable-${item.id}`} className="text-xs sm:text-sm cursor-pointer">
-                            Vatable
-                          </Label>
-                          {item.vatable && (
-                            <p className="text-xs text-muted-foreground mt-1 break-words">
-                              VAT: {getCurrencySymbol(formData.currency)}{(calculateItemAmount(item) * (formData.vatRate || 7.5) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </p>
-                          )}
+                    {/* VAT checkbox - only for registered businesses (not creators/freelancers) */}
+                    {profile?.businessType !== 'creator' && profile?.businessType !== 'freelancer' && (
+                      <div className="space-y-2 flex flex-col justify-end flex-shrink-0">
+                        <div className="flex items-center space-x-2 sm:pt-0 pt-2">
+                          <Checkbox
+                            id={`vatable-${item.id}`}
+                            checked={item.vatable || false}
+                            onCheckedChange={(checked) => updateItem(item.id, { vatable: !!checked })}
+                            onClick={(e) => e.stopPropagation()}
+                          />
+                          <div className="flex flex-col min-w-0">
+                            <Label htmlFor={`vatable-${item.id}`} className="text-xs sm:text-sm cursor-pointer">
+                              Vatable
+                            </Label>
+                            {item.vatable && (
+                              <p className="text-xs text-muted-foreground mt-1 break-words">
+                                VAT: {getCurrencySymbol(formData.currency)}{(calculateItemAmount(item) * (formData.vatRate || 7.5) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </p>
+                            )}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    
+                    )}
                   </div>
                   
                   {/* Platform Fees Breakdown (for creators) - Compact inline layout */}
@@ -1409,7 +1627,7 @@ export function AddInvoiceDialog({
                             onKeyDown={handleInputKeyDown}
                             onClick={(e) => e.stopPropagation()}
                             placeholder="0.00"
-                            className="h-8 sm:h-9 text-[11px] sm:text-xs placeholder:text-[11px] sm:placeholder:text-xs"
+                            className="h-8 sm:h-9 text-[11px] sm:text-xs"
                           />
                         </div>
                         <div className="space-y-1 min-w-0">
@@ -1445,28 +1663,49 @@ export function AddInvoiceDialog({
                     </div> */}
                 </div>
               ))}
+              <Button type="button" variant="outline" size="sm" onClick={addItem} className="h-8 sm:h-9 text-xs sm:text-sm w-full sm:w-auto">
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                <span className="hidden sm:inline">Add Item</span>
+                <span className="sm:hidden">Add</span>
+              </Button>
             </div>
           </div>
 
-          {/* VAT Section */}
-          <div className="space-y-3 sm:space-y-4 border-t pt-3 sm:pt-4">
-            <div className="space-y-2">
-              <Label htmlFor="vat-rate" className="text-xs sm:text-sm">VAT Rate (%)</Label>
-              <Input
-                id="vat-rate"
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={formData.vatRate}
-                onChange={(e) => setFormData(prev => ({ ...prev, vatRate: parseFloat(e.target.value) || 7.5 }))}
-                onKeyDown={handleInputKeyDown}
-                onClick={(e) => e.stopPropagation()}
-                className="h-9 sm:h-10 text-xs sm:text-sm"
-              />
-              <p className="text-xs text-muted-foreground">Default: 7.5% (Nigeria VAT rate)</p>
+          {/* VAT Section - only for registered businesses (not creators/freelancers) */}
+          {profile?.businessType !== 'creator' && profile?.businessType !== 'freelancer' && (
+            <div className="space-y-3 sm:space-y-4 border-t pt-3 sm:pt-4">
+              <div className="space-y-2">
+                <Label htmlFor="vat-rate" className="text-xs sm:text-sm">VAT Rate (%)</Label>
+                <Input
+                  id="vat-rate"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  value={formData.vatRate}
+                  onChange={(e) => setFormData(prev => ({ ...prev, vatRate: parseFloat(e.target.value) || 7.5 }))}
+                  onKeyDown={handleInputKeyDown}
+                  onClick={(e) => e.stopPropagation()}
+                  className="h-9 sm:h-10 text-xs sm:text-sm"
+                />
+                <p className="text-xs text-muted-foreground">Default: 7.5% (Nigeria VAT rate)</p>
+              </div>
+              
+              {/* VAT Eligibility Information */}
+              <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+                <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
+                <AlertDescription className="text-xs sm:text-sm text-blue-900 dark:text-blue-100">
+                  <strong>VAT Eligibility Rules:</strong>
+                  <ul className="mt-1.5 space-y-1 list-disc list-inside">
+                    <li><strong>Salary earners</strong> → Cannot charge VAT</li>
+                    <li><strong>Small freelancers/creators under ₦100m turnover</strong> → Cannot charge VAT</li>
+                    <li><strong>Registered businesses or individuals over ₦100m turnover</strong> → Must charge VAT (7.5%)</li>
+                  </ul>
+                  <p className="mt-1.5"><strong>Important:</strong> Only VAT-registered businesses with annual turnover above ₦100 million can legally charge VAT. VAT is collected on behalf of the government, not earned as revenue. Make sure you are VAT-registered before charging VAT on your invoices.</p>
+                </AlertDescription>
+              </Alert>
             </div>
-          </div>
+          )}
 
           {/* Discount Section */}
           <div className="space-y-3 sm:space-y-4 border-t pt-3 sm:pt-4">
@@ -1500,10 +1739,12 @@ export function AddInvoiceDialog({
                 <span className="whitespace-nowrap">-{getCurrencySymbol(formData.currency)} {(totals.subtotal * formData.discount / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             )}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-0 text-xs sm:text-sm">
-              <span>VAT ({formData.vatRate || 7.5}%):</span>
-              <span className="font-medium whitespace-nowrap">{getCurrencySymbol(formData.currency)} {totals.vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
+            {profile?.businessType !== 'creator' && profile?.businessType !== 'freelancer' && (
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-0 text-xs sm:text-sm">
+                <span>VAT ({formData.vatRate || 7.5}%):</span>
+                <span className="font-medium whitespace-nowrap">{getCurrencySymbol(formData.currency)} {totals.vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+            )}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-0 text-xs sm:text-sm font-semibold border-t pt-2 mt-2">
               <span>Invoice Total:</span>
               <span className="whitespace-nowrap">{getCurrencySymbol(formData.currency)} {totals.invoiceTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -1582,7 +1823,7 @@ export function AddInvoiceDialog({
                           value={platformAccountId}
                           onChange={(e) => setPlatformAccountId(e.target.value)}
                           placeholder="Your account ID or username"
-                          className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                          className="h-9 sm:h-10 text-xs sm:text-sm"
                         />
                       </div>
                       <div className="space-y-2">
@@ -1593,7 +1834,7 @@ export function AddInvoiceDialog({
                           value={platformAccountUrl}
                           onChange={(e) => setPlatformAccountUrl(e.target.value)}
                           placeholder="https://..."
-                          className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                          className="h-9 sm:h-10 text-xs sm:text-sm"
                         />
                       </div>
                     </div>
@@ -1631,7 +1872,7 @@ export function AddInvoiceDialog({
                             value={businessPercentage || ""}
                             onChange={(e) => setBusinessPercentage(e.target.value ? parseFloat(e.target.value) : undefined)}
                             placeholder="e.g., 55"
-                            className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                            className="h-9 sm:h-10 text-xs sm:text-sm"
                           />
                           <p className="text-xs text-muted-foreground">Enter the percentage that applies to business use (0-100)</p>
                         </div>
@@ -1675,7 +1916,7 @@ export function AddInvoiceDialog({
                   }
                 }}
                 placeholder="Type and press Enter to add tag"
-                className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                className="h-9 sm:h-10 text-xs sm:text-sm"
               />
             </div>
             <p className="text-xs text-muted-foreground">Add tags to organize and search your invoices</p>
@@ -1715,7 +1956,7 @@ export function AddInvoiceDialog({
                 onKeyDown={handleInputKeyDown}
                 onClick={(e) => e.stopPropagation()}
                 placeholder="e.g., Net 30"
-                className="h-9 sm:h-10 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm"
+                className="h-9 sm:h-10 text-xs sm:text-sm"
               />
             </div>
           </div>
@@ -1776,7 +2017,16 @@ export function AddInvoiceDialog({
             </Button>
           </div>
         </form>
-      </DialogContent>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+
+  return (
+    <>
+      {typeof window !== 'undefined' && createPortal(modalContent, document.body)}
+      
       {profile && profile.businessType !== 'agent' && (
         <SubscriptionRequiredModal
           open={showSubscriptionModal}
@@ -1784,7 +2034,7 @@ export function AddInvoiceDialog({
           businessType={profile.businessType || 'freelancer'}
         />
       )}
-    </Dialog>
+    </>
   )
 }
 

@@ -213,6 +213,16 @@ export function TransactionList({
     }
   }
 
+  const handleAddTransaction = () => {
+    if (!isSubscribed && profile && profile.businessType !== 'agent') {
+      setShowSubscriptionModal(true)
+      return
+    }
+
+    setEditingTransaction(null)
+    setIsAddDialogOpen(true)
+  }
+
   const handleSubmit = async (data: Omit<Transaction, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
    console.log("Data from handleSubmit:", data)
     try {
@@ -268,10 +278,7 @@ export function TransactionList({
           <div className="text-muted-foreground">
             <p className="text-lg font-medium mb-2">No transactions found</p>
             <p className="text-sm mb-4">Start by adding your first transaction</p>
-            <Button onClick={() => {
-              setEditingTransaction(null)
-              setIsAddDialogOpen(true)
-            }}>
+            <Button onClick={handleAddTransaction}>
               Add Transaction
             </Button>
           </div>

@@ -1,7 +1,9 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
+import { createPortal } from "react-dom"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
+import { X } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -17,6 +19,7 @@ import { uploadToImageKit, ImageUploadResult } from "@/lib/utils/imagekit"
 import { TagsInput } from "@/components/ui/tags-input"
 import { ocrService, ReceiptData } from "@/lib/services"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
 import { SUPPORTED_CURRENCIES, CurrencyCode, fetchExchangeRate, convertCurrency, getCurrencySymbol, formatCurrencyInput, parseCurrencyInput, handleCurrencyInputChange } from "@/lib/utils/currency"
 import { useSubscription } from "@/lib/hooks/useSubscription"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
@@ -121,15 +124,29 @@ export function AddTransactionDialog({
         ]
       } else {
         return [
-          { value: "Rent", label: "Rent" },
-          { value: "Software", label: "Software" },
-          { value: "Utilities", label: "Utilities" },
-          { value: "Marketing", label: "Marketing" },
-          { value: "Food", label: "Food" },
-          { value: "Transport", label: "Transport" },
-          { value: "Entertainment", label: "Entertainment" },
-          { value: "Healthcare", label: "Healthcare" },
-          { value: "Education", label: "Education" },
+          // Tax Deductible Categories (based on FAQ)
+          { value: "Office Rent", label: "Office Rent / Workspace" },
+          { value: "Software & Subscriptions", label: "Software & Subscriptions" },
+          { value: "Utilities", label: "Utilities (Internet, Electricity)" },
+          { value: "Marketing & Advertising", label: "Marketing & Advertising" },
+          { value: "Professional Fees", label: "Professional Fees (Accountants, Lawyers)" },
+          { value: "Business Travel", label: "Business Travel & Transport" },
+          { value: "Business Meals", label: "Business Meals (Client Meetings)" },
+          { value: "Training & Education", label: "Training & Education (Business-related)" },
+          { value: "Office Supplies", label: "Office Supplies" },
+          { value: "Office Equipment", label: "Office Equipment" },
+          { value: "Internet & Phone", label: "Internet & Phone (Business)" },
+          { value: "Business Insurance", label: "Business Insurance" },
+          { value: "Contractor Fees", label: "Contractor / Freelancer Fees" },
+          { value: "Bank Charges", label: "Bank Charges (Business Account)" },
+          { value: "Accounting Software", label: "Accounting Software" },
+          // Personal / Non-deductible Categories
+          { value: "Personal Expenses", label: "Personal Expenses" },
+          { value: "Personal Meals", label: "Personal Meals" },
+          { value: "Personal Transport", label: "Personal Transport" },
+          { value: "Entertainment", label: "Entertainment (Personal)" },
+          { value: "Healthcare", label: "Healthcare (Personal)" },
+          { value: "Education (Personal)", label: "Education (Personal)" },
           { value: "Other", label: "Other" },
         ]
       }
@@ -168,6 +185,8 @@ export function AddTransactionDialog({
     attachments: [] as string[],
     documentId: undefined as string | undefined
   })
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [showCloseConfirmation, setShowCloseConfirmation] = useState(false)
   const [convertedAmountNGN, setConvertedAmountNGN] = useState<number | null>(null)
   const [isConverting, setIsConverting] = useState(false)
   const [exchangeRate, setExchangeRate] = useState<number | null>(null)
@@ -232,6 +251,82 @@ export function AddTransactionDialog({
   const [taxClassificationManuallyEdited, setTaxClassificationManuallyEdited] = useState(false)
   const [showCapitalAllowanceAdvanced, setShowCapitalAllowanceAdvanced] = useState(false)
   
+  // Track if any Select dropdown is open to prevent dialog from closing on mobile
+  const [isAnySelectOpen, setIsAnySelectOpen] = useState(false)
+  const selectOpenTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  
+  // Auto-determine tax deductible for freelancers based on category only
+  const autoDetermineTaxDeductible = (
+    type: Transaction['type'],
+    category: string
+  ): boolean => {
+    // Only for expense transactions
+    if (type !== 'expense') {
+      return false // Income transactions don't use taxDeductible field
+    }
+
+    if (!category) {
+      return false // No category selected
+    }
+
+    const categoryLower = category.toLowerCase()
+
+    // Tax Deductible Categories (based on FAQ - business expenses)
+    const taxDeductibleCategories = [
+      'office rent',
+      'software & subscriptions',
+      'utilities',
+      'marketing & advertising',
+      'professional fees',
+      'business travel',
+      'business meals',
+      'training & education',
+      'office supplies',
+      'office equipment',
+      'internet & phone',
+      'business insurance',
+      'contractor fees',
+      'contractor / freelancer fees',
+      'bank charges',
+      'accounting software'
+    ]
+
+    // Check if category is tax deductible (exact match)
+    if (taxDeductibleCategories.some(tdc => {
+      const tdcLower = tdc.toLowerCase().trim()
+      return categoryLower === tdcLower
+    })) {
+      return true
+    }
+
+    // Non-deductible Categories (personal expenses)
+    const nonDeductibleCategories = [
+      'personal expenses',
+      'personal meals',
+      'personal transport',
+      'entertainment',
+      'healthcare',
+      'education (personal)'
+    ]
+
+    // Check if category is non-deductible (exact match)
+    if (nonDeductibleCategories.some(ndc => {
+      const ndcLower = ndc.toLowerCase().trim()
+      return categoryLower === ndcLower
+    })) {
+      return false
+    }
+
+    // Default for "Other" category - assume not deductible (user can specify if needed)
+    if (categoryLower === 'other') {
+      return false
+    }
+
+    // Default: if category is not in the lists above, default to false (conservative approach)
+    // User can manually override if needed (but switch is removed, so this won't be visible)
+    return false
+  }
+
   // Auto-populate tax classification based on transaction data (Gold+ only)
   const autoPopulateTaxClassification = (
     type: Transaction['type'],
@@ -689,6 +784,87 @@ export function AddTransactionDialog({
     setTaxClassification(autoClassification)
   }, [formData.type, formData.category, formData.description, formData.notes, transactionNature, hasTaxClassificationAccess, skipTaxClassification, taxClassificationManuallyEdited])
 
+  // Auto-determine tax deductible for freelancers (non-creators, non-Gold users) - based on category only
+  useEffect(() => {
+    // Only apply to freelancers (non-creators) and non-Gold users (no tax classification access)
+    // Only for expense transactions
+    if (profile?.businessType === 'creator') return // Creators use tax classification
+    if (hasTaxClassificationAccess) return // Gold users use tax classification instead
+    if (formData.type !== 'expense') return
+    if (!formData.category) return // Skip if no category selected
+
+    // Auto-determine tax deductible based on category only
+    const shouldBeTaxDeductible = autoDetermineTaxDeductible(
+      formData.type,
+      formData.category
+    )
+
+    // Update tax deductible (this will only trigger re-render if value actually changes)
+    setFormData(prev => {
+      // Only update if different to avoid unnecessary state updates
+      if (prev.taxDeductible !== shouldBeTaxDeductible) {
+        return { ...prev, taxDeductible: shouldBeTaxDeductible }
+      }
+      return prev
+    })
+  }, [formData.type, formData.category, profile?.businessType, hasTaxClassificationAccess])
+
+  // Monitor for Select dropdowns opening/closing to prevent dialog from closing on mobile
+  useEffect(() => {
+    if (!open) {
+      setIsAnySelectOpen(false)
+      if (selectOpenTimeoutRef.current) {
+        clearTimeout(selectOpenTimeoutRef.current)
+      }
+      return
+    }
+
+    const checkSelectState = () => {
+      // Check if any Select dropdown is open
+      const openSelect = document.querySelector('[data-radix-select-content][data-state="open"]')
+      const isOpen = !!openSelect
+      
+      setIsAnySelectOpen(isOpen)
+    }
+
+    // Check immediately
+    checkSelectState()
+
+    // Listen for mutations to catch Select state changes immediately
+    // This is more efficient than polling
+    const observer = new MutationObserver((mutations) => {
+      // Only check if mutations are related to Select components
+      const hasSelectMutation = mutations.some(mutation => {
+        const target = mutation.target as HTMLElement
+        return target.hasAttribute?.('data-radix-select-content') ||
+               target.closest?.('[data-radix-select-content]') !== null ||
+               mutation.attributeName === 'data-state'
+      })
+      
+      if (hasSelectMutation) {
+        checkSelectState()
+      }
+    })
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['data-state']
+    })
+
+    // Also set up a fallback interval (less frequent) in case mutations are missed
+    const interval = setInterval(checkSelectState, 200)
+
+    return () => {
+      clearInterval(interval)
+      observer.disconnect()
+      if (selectOpenTimeoutRef.current) {
+        clearTimeout(selectOpenTimeoutRef.current)
+      }
+    }
+  }, [open])
+
   // Load available invoices when dialog opens (for manual linking)
   useEffect(() => {
     const loadInvoices = async () => {
@@ -713,7 +889,18 @@ export function AddTransactionDialog({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.description || !formData.amount || !formData.category) return
+    if (!formData.description) {
+      toast.error("Please enter a description")
+      return
+    }
+    if (!formData.amount) {
+      toast.error("Please enter an amount")
+      return
+    }
+    if (!formData.category) {
+      toast.error("Please select a category")
+      return
+    }
 
     // Check subscription before submitting
     if (!isSubscribed && !transaction) {
@@ -996,12 +1183,121 @@ export function AddTransactionDialog({
       setIsSubmitting(false)
     }
   }
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-2xl max-h-[90vh] sm:max-h-[95vh] overflow-y-auto p-3 sm:p-4 md:p-6">
-        <DialogHeader className="pb-2 sm:pb-4">
-          <DialogTitle className="text-sm sm:text-lg md:text-xl">{transaction ? 'Edit Transaction' : 'Add Transaction'}</DialogTitle>
-        </DialogHeader>
+
+  const handleDialogOpenChange = (newOpen: boolean) => {
+    // If trying to close and there are unsaved changes, show confirmation
+    if (!newOpen && hasUnsavedChanges) {
+      setShowCloseConfirmation(true)
+      return
+    }
+    // Otherwise, close normally
+    onOpenChange(newOpen)
+    // Reset unsaved changes when closing
+    if (!newOpen) {
+      setHasUnsavedChanges(false)
+    }
+  }
+
+  // Track changes in form fields
+  useEffect(() => {
+    // Only mark as having changes if form has been modified and isn't in edit mode for an existing transaction
+    if (!transaction) {
+      const hasFormData = formData.description.trim() || 
+                          formData.amount || 
+                          formData.category || 
+                          formData.notes.trim() ||
+                          formData.attachments.length > 0 ||
+                          formData.tags.length > 0
+      setHasUnsavedChanges(hasFormData as boolean)
+    }
+  }, [formData, transaction])
+
+  const handleConfirmClose = () => {
+    setShowCloseConfirmation(false)
+    setHasUnsavedChanges(false)
+    onOpenChange(false)
+  }
+
+  // Handle escape key
+  useEffect(() => {
+    if (!open) return
+
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (hasUnsavedChanges) {
+          setShowCloseConfirmation(true)
+        } else {
+          handleDialogOpenChange(false)
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [open, hasUnsavedChanges])
+
+  // Handle backdrop click
+  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Only close if clicking directly on the overlay (not on content)
+    if (e.target === e.currentTarget) {
+      // Check if a Select dropdown is open
+      const target = e.target as HTMLElement
+      const isSelectContent = target.closest('[data-radix-select-content]') !== null
+      const openSelectContent = document.querySelector('[data-radix-select-content][data-state="open"]')
+      const selectViewport = document.querySelector('[data-radix-select-viewport]')
+      const selectContent = document.querySelector('[data-radix-select-content]')
+      
+      // Prevent closing if Select is open
+      const shouldPrevent = isSelectContent || 
+                            isAnySelectOpen || 
+                            openSelectContent || 
+                            (selectContent && selectViewport)
+      
+      if (!shouldPrevent) {
+        if (hasUnsavedChanges) {
+          setShowCloseConfirmation(true)
+        } else {
+          handleDialogOpenChange(false)
+        }
+      }
+    }
+  }
+
+  // Render modal content using portal to ensure proper z-index layering
+  const modalContent = open ? (
+    <>
+      {/* Custom Modal Overlay */}
+      <div
+        className="fixed inset-0 z-50 bg-black/50 dark:bg-black/50 animate-in fade-in-0"
+        onClick={handleBackdropClick}
+        aria-hidden="true"
+      />
+      
+      {/* Custom Modal Content */}
+      <div className="fixed left-[50%] top-[50%] z-50 w-[calc(100vw-2rem)] sm:w-full max-w-2xl max-h-[90vh] sm:max-h-[95vh] translate-x-[-50%] translate-y-[-50%] border bg-background rounded-lg shadow-lg animate-in fade-in-0 zoom-in-95 slide-in-from-left-1/2 slide-in-from-top-[48%] duration-200">
+        <div className="flex flex-col h-full max-h-[90vh] sm:max-h-[95vh]">
+          {/* Header */}
+          <div className="flex items-center justify-between p-3 sm:p-4 md:p-6 pb-2 sm:pb-4 border-b">
+            <h2 className="text-sm sm:text-lg md:text-xl font-semibold leading-none tracking-tight">
+              {transaction ? 'Edit Transaction' : 'Add Transaction'}
+            </h2>
+            <button
+              onClick={() => {
+                if (hasUnsavedChanges) {
+                  setShowCloseConfirmation(true)
+                } else {
+                  handleDialogOpenChange(false)
+                }
+              }}
+              className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none"
+            >
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </button>
+          </div>
+          
+          {/* Content */}
+          <div className="overflow-y-auto p-3 sm:p-4 md:p-6">
         <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 mt-2 sm:mt-4">
           {!isSubscribed && !transaction && (
             <SubscriptionAlert 
@@ -1355,7 +1651,7 @@ export function AddTransactionDialog({
                   readOnly={!!(profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown)}
                   disabled={!!(profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown)}
                   required
-                  className="text-base sm:text-lg font-medium"
+                  className="text-xs sm:text-base md:text-lg font-medium"
                 />
                 {formData.currency !== 'NGN' && convertedAmountNGN !== null && (
                   <div className="text-xs text-muted-foreground space-y-1 mt-2 p-2 bg-muted/50 rounded-md">
@@ -1631,27 +1927,6 @@ export function AddTransactionDialog({
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="description" className="text-xs sm:text-sm">Description</Label>
-                <Input
-                  id="description"
-                  placeholder={
-                    profile?.businessType === 'creator'
-                      ? formData.type === 'income'
-                        ? "e.g., Brand sponsorship payment from XYZ Company"
-                        : "e.g., Camera equipment purchase"
-                      : formData.type === 'income'
-                        ? "e.g., Client payment for website design"
-                        : "e.g., Software subscription"
-                  }
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  required
-                  className="text-xs sm:text-sm"
-                />
-                <p className="text-xs text-muted-foreground">You can add more details later</p>
-              </div>
-
-              <div className="space-y-2">
                 <div className="flex items-center gap-2">
                   <Label htmlFor="category" className="text-xs sm:text-sm">What is this for?</Label>
                   <TooltipProvider>
@@ -1698,6 +1973,39 @@ export function AddTransactionDialog({
                     Custom: {formData.category}
                   </p>
                 )}
+                {/* Tax Deductible Status Indicator (for freelancers, expense transactions only) */}
+                {formData.type === 'expense' && profile?.businessType !== 'creator' && !hasTaxClassificationAccess && formData.category && (
+                  <div className="flex items-center gap-2 mt-2">
+                    <p className="text-xs text-muted-foreground">Tax Status:</p>
+                    <Badge 
+                      variant={formData.taxDeductible ? 'default' : 'secondary'} 
+                      className="text-xs"
+                    >
+                      {formData.taxDeductible ? 'Tax Deductible' : 'Not Tax Deductible'}
+                    </Badge>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description" className="text-xs sm:text-sm">Description</Label>
+                <Input
+                  id="description"
+                  placeholder={
+                    profile?.businessType === 'creator'
+                      ? formData.type === 'income'
+                        ? "e.g., Brand sponsorship payment from XYZ Company"
+                        : "e.g., Camera equipment purchase"
+                      : formData.type === 'income'
+                        ? "e.g., Client payment for website design"
+                        : "e.g., Software subscription"
+                  }
+                  value={formData.description}
+                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                  required
+                  className="text-xs sm:text-sm"
+                />
+                <p className="text-xs text-muted-foreground">You can add more details later</p>
               </div>
 
               {/* Phase 1: Date separation for tax compliance */}
@@ -2185,6 +2493,7 @@ export function AddTransactionDialog({
                                       }
                                       return next
                                     })}
+                                    className="text-xs sm:text-sm"
                                   />
                                   <Label>Initial Allowance Rate (%)</Label>
                                   <Input
@@ -2200,6 +2509,7 @@ export function AddTransactionDialog({
                                         initialAllowanceRate: parseFloat(e.target.value) || 0
                                       }))
                                     }}
+                                    className="text-xs sm:text-sm"
                                   />
                                   <p className="text-[11px] text-muted-foreground">
                                     Most users shouldn’t edit this. We’ll later auto-pick rates based on asset type.
@@ -2254,6 +2564,7 @@ export function AddTransactionDialog({
                                 whtRate: parseFloat(e.target.value) || 5
                               }))
                             }}
+                            className="text-xs sm:text-sm"
                           />
                         </div>
                       )}
@@ -2304,6 +2615,7 @@ export function AddTransactionDialog({
                                     vatRate: parseFloat(e.target.value) || 7.5
                                   }))
                                 }}
+                                className="text-xs sm:text-sm"
                               />
                               {formData.type === 'income' && (
                             <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-md">
@@ -2333,34 +2645,6 @@ export function AddTransactionDialog({
                 />
               </div>
 
-              {/* Tax Deductible switch - only show if Expense Type is not set (for non-Gold users or legacy compatibility) */}
-              {formData.type !== 'income' && !hasTaxClassificationAccess && (
-                <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-                  <div className="space-y-0.5 flex-1">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="tax-deductible" className="cursor-pointer">
-                        Can I claim this for tax?
-                      </Label>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <p className="text-sm">If this expense is used for your business, you can claim it to reduce your tax bill. Personal expenses cannot be claimed.</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </div>
-                    <p className="text-xs text-muted-foreground">You can update this later if you're not sure</p>
-                  </div>
-                  <Switch
-                    id="tax-deductible"
-                    checked={formData.taxDeductible}
-                    onCheckedChange={(checked) => setFormData(prev => ({ ...prev, taxDeductible: checked }))}
-                  />
-                </div>
-              )}
 
               <div className="flex gap-3 pt-4">
                 <Button
@@ -2420,7 +2704,16 @@ export function AddTransactionDialog({
             </>
           )}
         </form>
-      </DialogContent>
+          </div>
+        </div>
+      </div>
+    </>
+  ) : null
+
+  return (
+    <>
+      {typeof window !== 'undefined' && createPortal(modalContent, document.body)}
+      
       {profile && profile.businessType !== 'agent' && (
         <SubscriptionRequiredModal
           open={showSubscriptionModal}
@@ -2453,6 +2746,7 @@ export function AddTransactionDialog({
                     setCustomCategory('')
                   }
                 }}
+                className="text-xs sm:text-sm"
                 autoFocus
               />
             </div>
@@ -2484,6 +2778,38 @@ export function AddTransactionDialog({
           </div>
         </DialogContent>
       </Dialog>
-    </Dialog>
+
+      {/* Close Confirmation Dialog */}
+      <Dialog open={showCloseConfirmation} onOpenChange={setShowCloseConfirmation}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-amber-600" />
+              Unsaved Changes
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              You have unsaved changes in your transaction. If you close now, all the data you entered will be lost.
+            </p>
+            <p className="text-sm font-medium">Are you sure you want to close without saving?</p>
+            <div className="flex gap-3 justify-end">
+              <Button 
+                variant="outline" 
+                onClick={() => setShowCloseConfirmation(false)}
+              >
+                Continue Editing
+              </Button>
+              <Button 
+                variant="destructive" 
+                onClick={handleConfirmClose}
+              >
+                Discard Changes
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   )
 }

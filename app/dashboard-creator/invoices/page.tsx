@@ -26,6 +26,7 @@ import { formatCurrencyAmount } from "@/lib/utils/currency"
 import { documentService } from "@/lib/services"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
 import { useBusiness } from "@/lib/contexts/business-context"
+import { DeleteConfirmationModal } from "@/components/ui/delete-confirmation-modal"
 
 export default function InvoicesPage() {
   const router = useRouter()
@@ -48,6 +49,9 @@ export default function InvoicesPage() {
   const [isSavingCreditNote, setIsSavingCreditNote] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [viewMode, setViewMode] = useState<"card" | "table">("table")
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [invoiceToDelete, setInvoiceToDelete] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 20,
@@ -56,6 +60,14 @@ export default function InvoicesPage() {
     hasNext: false,
     hasPrev: false
   })
+
+  const handleCreateInvoiceClick = () => {
+    if (!isSubscribed && profile && (profile.businessType === 'freelancer' || profile.businessType === 'creator')) {
+      setShowSubscriptionModal(true)
+      return
+    }
+    setIsAddDialogOpen(true)
+  }
 
   const loadInvoices = async () => {
     if (!profile?.userId) return
@@ -94,7 +106,7 @@ export default function InvoicesPage() {
   // Listen for create invoice event from header
   useEffect(() => {
     const handleCreateInvoice = () => {
-      if (!isSubscribed) {
+      if (!isSubscribed && profile && (profile.businessType === 'freelancer' || profile.businessType === 'creator')) {
         setShowSubscriptionModal(true)
         return
       }
@@ -102,7 +114,7 @@ export default function InvoicesPage() {
     }
     window.addEventListener('createInvoice', handleCreateInvoice)
     return () => window.removeEventListener('createInvoice', handleCreateInvoice)
-  }, [isSubscribed])
+  }, [isSubscribed, profile])
 
   // Handle invoiceId query parameter to open specific invoice
   useEffect(() => {
@@ -145,20 +157,29 @@ export default function InvoicesPage() {
     )
   }
 
-  const handleDelete = async (invoiceId: string) => {
-    if (!profile?.userId) return
-    if (!confirm("Are you sure you want to delete this invoice?")) return
+  const handleDeleteClick = (invoiceId: string) => {
+    setInvoiceToDelete(invoiceId)
+    setDeleteDialogOpen(true)
+  }
 
+  const handleDeleteConfirm = async () => {
+    if (!profile?.userId || !invoiceToDelete) return
+
+    setIsDeleting(true)
     try {
-      const result = await invoiceService.deleteInvoice(invoiceId, profile.userId)
+      const result = await invoiceService.deleteInvoice(invoiceToDelete, profile.userId)
       if (result.success) {
         toast.success("Invoice deleted successfully")
+        setDeleteDialogOpen(false)
+        setInvoiceToDelete(null)
         loadInvoices()
       } else {
         toast.error(result.error || "Failed to delete invoice")
       }
     } catch (error) {
       toast.error("Failed to delete invoice")
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -177,15 +198,6 @@ export default function InvoicesPage() {
     }
   }
 
-  const handleMarkAsPaid = async (invoiceId: string) => {
-    // This is now handled in the ViewInvoiceDialog with receipt upload
-    // Keeping this for backward compatibility but it will open the view dialog
-    const invoice = invoices.find(inv => inv.id === invoiceId)
-    if (invoice) {
-      setSelectedInvoice(invoice)
-      setIsViewDialogOpen(true)
-    }
-  }
 
   const handleSaveCreditNoteAsPDF = async () => {
     if (!selectedInvoice?.whtCreditNote || !profile?.userId) {
@@ -212,20 +224,6 @@ export default function InvoicesPage() {
       // Set margins
       const margin = 20
       let yPos = margin
-
-      // Helper function to add text with word wrapping
-      const addText = (text: string, x: number, y: number, options: { fontSize?: number; fontStyle?: string; align?: 'left' | 'center' | 'right'; color?: [number, number, number] } = {}) => {
-        pdf.setFontSize(options.fontSize || 12)
-        pdf.setFont('helvetica', options.fontStyle || 'normal')
-        if (options.color) {
-          pdf.setTextColor(options.color[0], options.color[1], options.color[2])
-        } else {
-          pdf.setTextColor(0, 0, 0)
-        }
-        const lines = pdf.splitTextToSize(text, 170) // 210mm - 40mm margins = 170mm
-        pdf.text(lines, x, y, { align: options.align || 'left' })
-        return y + (lines.length * (options.fontSize || 12) * 0.4)
-      }
 
       // Header
       pdf.setFontSize(24)
@@ -490,7 +488,7 @@ console.log("invoices", invoices)
               : "Get started by creating your first invoice"}
           </p>
           {!searchTerm && statusFilter === "all" && (
-            <Button onClick={() => setIsAddDialogOpen(true)} className="h-9 lg:w-[20%] md:w-[25%]  w-full sm:h-10 text-xs sm:text-sm ">
+            <Button onClick={handleCreateInvoiceClick} className="h-9 lg:w-[20%] md:w-[25%]  w-full sm:h-10 text-xs sm:text-sm ">
               <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
               Create Invoice
             </Button>
@@ -639,7 +637,7 @@ console.log("invoices", invoices)
                           variant="outline" 
                           size="icon"
                           className="h-9 w-9"
-                          onClick={() => handleDelete(invoice.id)}
+                          onClick={() => handleDeleteClick(invoice.id)}
                         >
                         <Trash2 className="w-4 h-4" />
                       </Button>
@@ -844,7 +842,7 @@ console.log("invoices", invoices)
                                 variant="ghost" 
                                 size="icon"
                                 className="h-7 w-7 sm:h-8 sm:w-8 text-destructive hover:text-destructive"
-                                onClick={() => handleDelete(invoice.id)}
+                                onClick={() => handleDeleteClick(invoice.id)}
                               >
                                 <Trash2 className="w-3.5 h-3.5 sm:w-3.5 sm:h-3.5 md:w-4 md:h-4" />
                               </Button>
@@ -1027,7 +1025,21 @@ console.log("invoices", invoices)
           )}
         </DialogContent>
       </Dialog>
-      {profile && profile.businessType !== 'agent' && (
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={deleteDialogOpen}
+        onClose={() => {
+          setDeleteDialogOpen(false)
+          setInvoiceToDelete(null)
+        }}
+        onConfirm={handleDeleteConfirm}
+        isDeleting={isDeleting}
+        title="Delete Invoice"
+        description="Are you sure you want to delete this invoice? This action cannot be undone."
+      />
+
+      {profile && (profile.businessType === 'freelancer' || profile.businessType === 'creator') && (
         <SubscriptionRequiredModal
           open={showSubscriptionModal}
           onOpenChange={setShowSubscriptionModal}

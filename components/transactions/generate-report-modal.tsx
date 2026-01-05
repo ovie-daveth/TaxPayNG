@@ -143,6 +143,7 @@ export function GenerateReportModal({
         )
         toast.success("Expense report generated and saved")
       } else {
+        // For self-assessment, don't auto-save, let user review and save manually
         toast.success("Self-assessment report generated. Please review and save when ready.")
       }
       
@@ -151,6 +152,7 @@ export function GenerateReportModal({
       setShowPreview(true)
       if (reportType === 'self-assessment') {
         setIsEditing(true)
+        // Don't close modal - keep it open for review and filing
       }
     } catch (error) {
       console.error("Error generating report:", error)
@@ -207,6 +209,8 @@ export function GenerateReportModal({
       
       const title = `Self-Assessment Filing - ${periodLabel}`
 
+      let finalReportId = savedReportId
+      
       if (savedReportId) {
         await reportService.updateReport(
           savedReportId,
@@ -216,7 +220,7 @@ export function GenerateReportModal({
             updatedAt: new Date().toISOString()
           }
         )
-        toast.success("Report updated successfully")
+        toast.success("Report updated successfully. You can now file from here.")
       } else {
         const reportId = await reportService.saveReport(
           profile.userId,
@@ -226,10 +230,17 @@ export function GenerateReportModal({
           'draft'
         )
         setSavedReportId(reportId)
-        toast.success("Report saved successfully")
+        finalReportId = reportId
+        toast.success("Report saved successfully. You can now file from here.")
       }
 
+      // Exit editing mode to show file button, but keep modal open
       setIsEditing(false)
+      
+      // Ensure reportId is set for file button to show
+      if (finalReportId && !savedReportId) {
+        setSavedReportId(finalReportId)
+      }
     } catch (error) {
       console.error("Error saving report:", error)
       toast.error(error instanceof Error ? error.message : "Failed to save report")
@@ -244,6 +255,8 @@ export function GenerateReportModal({
 
   const handleClose = (open: boolean) => {
     if (!open) {
+      // Only reset state if user explicitly closes (not when navigating to file)
+      // This allows the modal to stay open after generating/saving
       setShowPreview(false)
       setReportData(null)
       setSavedReportId(null)
