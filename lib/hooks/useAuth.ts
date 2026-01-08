@@ -141,13 +141,14 @@ export function useAuth() {
         }
         
         // Sign out the user immediately after signup (no auto-login)
+        const userId = user.uid
         await signOut(auth)
         setAuthState({
           user: null,
           loading: false,
           error: null
         })
-        return { success: true }
+        return { success: true, userId }
       } else {
         const errorMessage = profileResult?.error || 'An error occurred during sign up'
         console.log("Profile update failed:", errorMessage)

@@ -1,6 +1,7 @@
 "use client"
 
 import type React from "react"
+import { Suspense } from "react"
 
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
@@ -78,7 +79,7 @@ type SignupPayload = {
   phone?: string
 }
 
-export default function SignupPage() {
+function SignupPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { signUp, signInWithGoogle, user, loading } = useAuth()
@@ -221,7 +222,7 @@ export default function SignupPage() {
 
       if (result?.success) {
         // Link invoice if invoiceId was in URL
-        if (pendingInvoiceId && result.userId) {
+        if (pendingInvoiceId && 'userId' in result && result.userId) {
           try {
             const linkResponse = await fetch('/api/invoices/link-to-user', {
               method: 'POST',
@@ -716,5 +717,20 @@ export default function SignupPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-sm text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    }>
+      <SignupPageContent />
+    </Suspense>
   )
 }
