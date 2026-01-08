@@ -47,7 +47,8 @@ export default function AdminWaitlistPage() {
   const [bulkUserTypeFilter, setBulkUserTypeFilter] = useState<"all" | "sme" | "freelancer" | "creator">("all")
   const [markingId, setMarkingId] = useState<string | null>(null)
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false)
-  const [pendingAction, setPendingAction] = useState<null | { type: "sendEmail" | "markNotified"; payload: any }>(null)
+  const [pendingAction, setPendingAction] = useState<null | { type: "sendEmail" | "markNotified" | "signUp"; payload: any }>(null)
+  const [signingUpId, setSigningUpId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!authLoading && !adminLoading) {
@@ -295,6 +296,60 @@ export default function AdminWaitlistPage() {
     setPendingAction({ type: "markNotified", payload: { entry } })
   }
 
+  const handleSignUp = async (entry: any) => {
+    if (!entry?.id || signingUpId === entry.id) return
+
+    try {
+      setSigningUpId(entry.id)
+
+      const currentUser = auth.currentUser
+      const token = currentUser ? await currentUser.getIdToken() : undefined
+
+      const response = await fetch("/api/admin/signup-waitlist-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          waitlistId: entry.id
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to sign up user")
+      }
+
+      toast.success(data.message || "User signed up successfully")
+      
+      // Update waitlist entry
+      setWaitlist((prev) =>
+        prev.map((item) =>
+          item.id === entry.id
+            ? {
+                ...item,
+                signedUp: true,
+                signedUpAt: new Date().toISOString(),
+                userId: data.userId
+              }
+            : item
+        )
+      )
+    } catch (error: any) {
+      console.error("Sign up error:", error)
+      toast.error(error.message || "Failed to sign up user")
+    } finally {
+      setSigningUpId(null)
+    }
+  }
+
+  const handleSignUpClick = (entry: any) => {
+    setConfirmDialogOpen(true)
+    setPendingAction({ type: "signUp", payload: { entry } })
+  }
+
   const handleBulkSend = async () => {
     if (bulkSending || waitlist.length === 0) return
 
@@ -480,6 +535,7 @@ export default function AdminWaitlistPage() {
                     <th className="text-left p-4 font-semibold">User Type</th>
                     <th className="text-left p-4 font-semibold">Platform Expectations</th>
                     <th className="text-left p-4 font-semibold">Status</th>
+                    <th className="text-left p-4 font-semibold">Created</th>
                     <th className="text-left p-4 font-semibold">Signed Up</th>
                     <th className="text-left p-4 font-semibold">Actions</th>
                   </tr>
@@ -505,7 +561,36 @@ export default function AdminWaitlistPage() {
                         {formatDate(w.createdAt)}
                       </td>
                       <td className="p-4">
+                        {w.signedUp ? (
+                          <Badge variant="default" className="bg-green-600">
+                            <Check className="w-3 h-3 mr-1" />
+                            Signed Up
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">Not Signed Up</Badge>
+                        )}
+                      </td>
+                      <td className="p-4">
                         <div className="flex items-center gap-2">
+                          {!w.signedUp && (
+                            <Button
+                              variant="default"
+                              size="sm"
+                              className="h-8 text-xs"
+                              onClick={() => handleSignUpClick(w)}
+                              disabled={signingUpId === w.id}
+                              title="Sign Up User"
+                            >
+                              {signingUpId === w.id ? (
+                                <>
+                                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                  Signing Up...
+                                </>
+                              ) : (
+                                "Sign Up"
+                              )}
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -664,7 +749,9 @@ export default function AdminWaitlistPage() {
                 ? `Send an email to ${pendingAction.payload.recipient.name || pendingAction.payload.recipient.email}?`
                 : pendingAction?.type === "markNotified" && pendingAction.payload?.entry
                   ? `Mark ${pendingAction.payload.entry.email} as notified?`
-                  : "Are you sure you want to proceed with this action?"}
+                  : pendingAction?.type === "signUp" && pendingAction.payload?.entry
+                    ? `Sign up ${pendingAction.payload.entry.name || pendingAction.payload.entry.email}? A random password will be generated and sent to their email.`
+                    : "Are you sure you want to proceed with this action?"}
             </DialogDescription>
           </DialogHeader>
 
@@ -684,6 +771,8 @@ export default function AdminWaitlistPage() {
                   openEmailDialogWithRecipient(pendingAction.payload.recipient)
                 } else if (pendingAction?.type === "markNotified" && pendingAction.payload?.entry) {
                   markNotified(pendingAction.payload.entry)
+                } else if (pendingAction?.type === "signUp" && pendingAction.payload?.entry) {
+                  handleSignUp(pendingAction.payload.entry)
                 }
                 setConfirmDialogOpen(false)
                 setPendingAction(null)

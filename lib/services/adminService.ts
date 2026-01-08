@@ -56,30 +56,40 @@ export const adminService = {
   },
 
   /**
-   * Set user as admin by updating their userProfile and creating admin doc
+   * Set user as admin by updating their userProfile
+   * Uses API route with Admin SDK to bypass Firestore rules
    */
   async setAdmin(email: string, uid: string): Promise<void> {
     try {
-      // Find userProfile by userId
-      const userProfileQuery = query(
-        collection(db, "userProfiles"),
-        where("userId", "==", uid)
-      )
-      const userProfileSnapshot = await getDocs(userProfileQuery)
-      
-      if (!userProfileSnapshot.empty) {
-        const profileDoc = userProfileSnapshot.docs[0]
-        await updateDoc(profileDoc.ref, {
-          role: "admin",
-          updatedAt: new Date().toISOString()
-        })
-      } else {
-        // If profile doesn't exist, we might need to create it
-        // This shouldn't happen in normal flow, but handle it gracefully
-        console.warn("User profile not found for UID:", uid)
+      // Get current user's auth token
+      const { auth } = await import("@/firebase/firebase")
+      const currentUser = auth.currentUser
+      if (!currentUser) {
+        throw new Error("User not authenticated")
       }
-      
-      // No need to create separate admins collection - we use userProfiles with role field
+
+      const token = await currentUser.getIdToken()
+
+      // Call API route that uses Admin SDK
+      const response = await fetch("/api/admin/set-admin-role", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          email,
+          uid
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to set admin role")
+      }
+
+      console.log("✅ Admin role set successfully:", data.message)
     } catch (error) {
       console.error("Error setting admin role:", error)
       throw error

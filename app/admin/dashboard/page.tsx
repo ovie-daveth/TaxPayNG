@@ -90,121 +90,41 @@ export default function AdminDashboard() {
       try {
         setLoading(true)
         
-        console.log("🔍 Debug: Starting to fetch stats...")
-        console.log("🔍 Debug: Current user UID:", user.uid)
-
-        // Ensure userProfile has admin role set
-        console.log("🔍 Debug: Ensuring userProfile has admin role...")
-        await adminService.setAdmin(user.email || "", user.uid)
-
-        // Fetch user counts
-        console.log("🔍 Debug: Attempting to fetch userProfiles...")
-        const usersSnapshot = await getDocs(collection(db, "userProfiles"))
-        console.log("🔍 Debug: Successfully fetched userProfiles, count:", usersSnapshot.size)
-        const totalUsers = usersSnapshot.size
-
-        // Fetch transaction counts
-        console.log("🔍 Debug: Attempting to fetch transactions...")
-        const transactionsSnapshot = await getDocs(collection(db, "transactions"))
-        console.log("🔍 Debug: Successfully fetched transactions, count:", transactionsSnapshot.size)
-        const totalTransactions = transactionsSnapshot.size
-
-        // Fetch blog posts
-        const blogPostsSnapshot = await getDocs(query(
-          collection(db, "blogPosts"),
-          orderBy("publishedAt", "desc")
-        ))
-        const totalBlogPosts = blogPostsSnapshot.size
-
-        // Fetch waitlist
-        const waitlistSnapshot = await getDocs(collection(db, "waitlist"))
-        const totalWaitlist = waitlistSnapshot.size
-
-        // Fetch recent users
-        const recentUsersQuery = query(
-          collection(db, "userProfiles"),
-          orderBy("createdAt", "desc"),
-          limit(5)
-        )
-        const recentUsersSnapshot = await getDocs(recentUsersQuery)
-        const recentUsers = recentUsersSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }))
-
-        // Fetch recent transactions
-        const recentTransactionsQuery = query(
-          collection(db, "transactions"),
-          orderBy("createdAt", "desc"),
-          limit(5)
-        )
-        const recentTransactionsSnapshot = await getDocs(recentTransactionsQuery)
-        const recentTransactions = recentTransactionsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }))
-
-        // Fetch all users and transactions for charts
-        const allUsersSnapshot = await getDocs(query(
-          collection(db, "userProfiles"),
-          orderBy("createdAt", "desc"),
-          limit(20)
-        ))
-        const allUsersData = allUsersSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }))
-
-        // Fetch ALL transactions (no limit) for accurate income/expense calculations
-        const allTransactionsSnapshot = await getDocs(query(
-          collection(db, "transactions"),
-          orderBy("createdAt", "desc")
-        ))
-        const allTransactionsData = allTransactionsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }))
-
-        // Fetch tax calculations for tax categorization chart
-        const taxCalculationsSnapshot = await getDocs(collection(db, "taxCalculations"))
-        const allTaxCalculationsData = taxCalculationsSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        }))
-
-        console.log("🔍 Debug: All stats fetched successfully!")
-        
-        setStats({
-          totalUsers,
-          totalTransactions,
-          totalBlogPosts,
-          totalWaitlist,
-          recentUsers,
-          recentTransactions
-        })
-        setAllUsers(allUsersData)
-        setAllTransactions(allTransactionsData)
-        setAllTaxCalculations(allTaxCalculationsData)
-      } catch (error: any) {
-        console.error("❌ Debug: Error fetching stats:", error)
-        console.error("❌ Debug: Error code:", error?.code)
-        console.error("❌ Debug: Error message:", error?.message)
-        console.error("❌ Debug: Full error:", JSON.stringify(error, null, 2))
-        
-        // Check admin status when error occurs
-        if (user) {
-          const userProfileQuery = query(
-            collection(db, "userProfiles"),
-            where("userId", "==", user.uid)
-          )
-          const userProfileSnapshot = await getDocs(userProfileQuery)
-          if (!userProfileSnapshot.empty) {
-            const profileData = userProfileSnapshot.docs[0].data()
-            console.error("❌ Debug: UserProfile role when error occurred:", profileData.role)
-          }
+        // Ensure userProfile has admin role set (uses API route with Admin SDK)
+        try {
+          await adminService.setAdmin(user.email || "", user.uid)
+        } catch (error: any) {
+          // If already admin or other error, continue
+          console.log("Admin role check:", error.message)
         }
-        
-        toast.error("Failed to load dashboard stats")
+
+        // Fetch stats using API route (uses Admin SDK to bypass Firestore rules)
+        const token = await user.getIdToken()
+        const response = await fetch("/api/admin/dashboard-stats", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          }
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to fetch dashboard stats")
+        }
+
+        if (data.success) {
+          setStats(data.stats)
+          setAllUsers(data.allUsers)
+          setAllTransactions(data.allTransactions)
+          setAllTaxCalculations(data.allTaxCalculations)
+        } else {
+          throw new Error(data.error || "Failed to fetch dashboard stats")
+        }
+      } catch (error: any) {
+        console.error("❌ Error fetching stats:", error)
+        toast.error(error.message || "Failed to load dashboard stats")
       } finally {
         setLoading(false)
       }
