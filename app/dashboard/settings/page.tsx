@@ -38,7 +38,7 @@ export default function SettingsPage() {
   const searchParams = useSearchParams()
   const { user, loading: authLoading, setPasswordForGoogleUser } = useAuth()
   const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
-  const { isSubscribed, subscriptionType, isExpired, isExpiringSoon, subscriptionExpiryDate } = useSubscription()
+  const { isSubscribed, subscriptionType, isExpired, isExpiringSoon, subscriptionExpiryDate, freeTrialStatus } = useSubscription()
   const { sidebarCollapsed } = useSidebar()
   const [isSaving, setIsSaving] = useState(false)
   const [processingSubscription, setProcessingSubscription] = useState<string | null>(null)
@@ -70,6 +70,21 @@ export default function SettingsPage() {
     id: false,
     passport: false,
     driverLicense: false
+  })
+  const [businessDocuments, setBusinessDocuments] = useState({
+    cac: '',
+    taxCertificate: '',
+    businessLicense: ''
+  })
+  const [uploadingBusinessDoc, setUploadingBusinessDoc] = useState({
+    cac: false,
+    taxCertificate: false,
+    businessLicense: false
+  })
+  const [deletingBusinessDoc, setDeletingBusinessDoc] = useState({
+    cac: false,
+    taxCertificate: false,
+    businessLicense: false
   })
   const [subscriptionData, setSubscriptionData] = useState({
     isSubscribe: false,
@@ -147,8 +162,8 @@ export default function SettingsPage() {
     if (profile.businessDocuments) {
       setBusinessDocuments({
         cac: profile.businessDocuments.cac || '',
-        taxCertificate: profile.businessDocuments.taxCertificate || '',
-        businessLicense: profile.businessDocuments.businessLicense || ''
+        taxCertificate: (profile.businessDocuments as any).taxCertificate || '',
+        businessLicense: (profile.businessDocuments as any).businessLicense || ''
       })
     }
   }, [profile, profileLoading])
@@ -705,7 +720,7 @@ export default function SettingsPage() {
                                         setDeletingBusinessDoc(prev => ({ ...prev, taxCertificate: true }))
                                         try {
                                           await userService.upsertProfile(user.uid, {
-                                            businessDocuments: { ...businessDocuments, taxCertificate: undefined }
+                                            businessDocuments: { ...businessDocuments, taxCertificate: undefined } as any
                                           })
                                           setBusinessDocuments(prev => ({ ...prev, taxCertificate: '' }))
                                           toast.success("Tax Clearance Certificate deleted")
@@ -738,7 +753,7 @@ export default function SettingsPage() {
                                       try {
                                         const result = await uploadToImageKit(file, 'business-documents', user.uid)
                                         await userService.upsertProfile(user.uid, {
-                                          businessDocuments: { ...businessDocuments, taxCertificate: result.url }
+                                          businessDocuments: { ...businessDocuments, taxCertificate: result.url } as any
                                         })
                                         setBusinessDocuments(prev => ({ ...prev, taxCertificate: result.url }))
                                         toast.success("Tax Clearance Certificate uploaded successfully")
@@ -792,7 +807,7 @@ export default function SettingsPage() {
                                         setDeletingBusinessDoc(prev => ({ ...prev, businessLicense: true }))
                                         try {
                                           await userService.upsertProfile(user.uid, {
-                                            businessDocuments: { ...businessDocuments, businessLicense: undefined }
+                                            businessDocuments: { ...businessDocuments, businessLicense: undefined } as any
                                           })
                                           setBusinessDocuments(prev => ({ ...prev, businessLicense: '' }))
                                           toast.success("Business License deleted")
@@ -825,7 +840,7 @@ export default function SettingsPage() {
                                       try {
                                         const result = await uploadToImageKit(file, 'business-documents', user.uid)
                                         await userService.upsertProfile(user.uid, {
-                                          businessDocuments: { ...businessDocuments, businessLicense: result.url }
+                                          businessDocuments: { ...businessDocuments, businessLicense: result.url } as any
                                         })
                                         setBusinessDocuments(prev => ({ ...prev, businessLicense: result.url }))
                                         toast.success("Business License uploaded successfully")
@@ -1534,12 +1549,96 @@ export default function SettingsPage() {
                           Manage your subscription plan and view usage limits
                         </p>
                       </div>
-                      <Badge variant={isSubscribed && !isExpired ? "default" : isExpired ? "destructive" : "secondary"} className="text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 w-fit">
-                        {isExpired ? "Expired" : isSubscribed ? `Subscribed - ${subscriptionType}` : "Not Subscribed"}
+                      <Badge variant={
+                        isSubscribed && !isExpired ? "default" 
+                        : isExpired ? "destructive" 
+                        : freeTrialStatus.isInFreeTrial ? "secondary"
+                        : "secondary"
+                      } className="text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 w-fit">
+                        {isExpired ? "Expired" 
+                          : isSubscribed ? `Subscribed - ${subscriptionType}` 
+                          : freeTrialStatus.isInFreeTrial ? `Free Trial - ${freeTrialStatus.daysRemaining} days left`
+                          : "Not Subscribed"}
                       </Badge>
                     </div>
                   </div>
                   <div className="space-y-6">
+                    {/* Free Trial Information */}
+                    {freeTrialStatus.isInFreeTrial && !isSubscribed && (
+                      <div className={`p-4 sm:p-5 md:p-6 border rounded-lg ${
+                        freeTrialStatus.isExpiringSoon
+                          ? 'border-amber-500/20 bg-amber-500/10'
+                          : 'border-blue-500/20 bg-blue-500/10'
+                      }`}>
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <h3 className={`text-base sm:text-lg font-semibold ${
+                                freeTrialStatus.isExpiringSoon
+                                  ? 'text-amber-600 dark:text-amber-400'
+                                  : 'text-blue-600 dark:text-blue-400'
+                              }`}>
+                                Free Trial Active
+                              </h3>
+                              <Badge variant={freeTrialStatus.isExpiringSoon ? "destructive" : "secondary"} className="text-xs">
+                                {freeTrialStatus.daysRemaining} {freeTrialStatus.daysRemaining === 1 ? 'day' : 'days'} remaining
+                              </Badge>
+                            </div>
+                            <div className="space-y-2 text-xs sm:text-sm text-muted-foreground">
+                              {profile?.freeTrialStartDate && (
+                                <p>
+                                  <span className="font-medium">Started:</span>{' '}
+                                  {new Date(profile.freeTrialStartDate).toLocaleDateString('en-US', { 
+                                    year: 'numeric', 
+                                    month: 'long', 
+                                    day: 'numeric' 
+                                  })}
+                                </p>
+                              )}
+                              {profile?.freeTrialEndDate && (
+                                <p>
+                                  <span className="font-medium">Ends:</span>{' '}
+                                  {new Date(profile.freeTrialEndDate).toLocaleDateString('en-US', { 
+                                    year: 'numeric', 
+                                    month: 'long', 
+                                    day: 'numeric' 
+                                  })}
+                                </p>
+                              )}
+                              {freeTrialStatus.isExpiringSoon && (
+                                <p className="text-amber-600 dark:text-amber-400 font-medium mt-2">
+                                  Your free trial is ending soon. Subscribe now to continue using all features.
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          {freeTrialStatus.isExpiringSoon && (
+                            <Button
+                              onClick={() => {
+                                const availablePlans = profile?.businessType === 'sme' 
+                                  ? (['Small Business', 'Big Business'] as const)
+                                  : (['PRO', 'GOLD', 'PLATINUM'] as const)
+                                if (availablePlans.length > 0) {
+                                  handleSubscribe(availablePlans[0])
+                                }
+                              }}
+                              disabled={processingSubscription !== null}
+                              className="w-full sm:w-auto text-xs sm:text-sm h-9 sm:h-10"
+                            >
+                              {processingSubscription ? (
+                                <>
+                                  <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-2 animate-spin" />
+                                  Processing...
+                                </>
+                              ) : (
+                                "Subscribe Now"
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
                     {/* Show warning banner if subscription is expiring soon or expired (2 days before through 2 days after) */}
                     {isExpiringSoon && subscriptionType && subscriptionExpiryDate && (
                       <div className={`p-4 sm:p-5 md:p-6 border rounded-lg ${
