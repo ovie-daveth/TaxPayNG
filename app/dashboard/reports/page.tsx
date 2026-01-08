@@ -49,7 +49,7 @@ function MobileReportDropdown() {
   const router = useRouter()
   const pathname = usePathname()
   const { profile } = useUserProfile()
-  const { isSubscribed, loading: subscriptionLoading } = useSubscription()
+  const { isSubscribedOnly, loading: subscriptionLoading } = useSubscription()
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
 
   const basePath = pathname?.startsWith("/dashboard-creator")
@@ -67,7 +67,7 @@ function MobileReportDropdown() {
     if (subscriptionLoading) {
       return
     }
-    if (!isSubscribed) {
+    if (!isSubscribedOnly()) {
       setShowSubscriptionModal(true)
       return
     }

@@ -359,5 +359,16 @@ service cloud.firestore {
       allow update: if isValidConversation() && isValidUpdate();
       allow delete: if isAuthenticated();
     }
+    
+    // Security Logs Collection (Admin only - read access)
+    // Note: Write access is handled server-side via Admin SDK
+    match /securityLogs/{logId} {
+      // Only authenticated users can read (app-level checks ensure only admins access)
+      allow read: if isAuthenticated();
+      // Write operations are handled server-side only
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
   }
 }

@@ -141,6 +141,23 @@ export function useSubscription() {
     return userPlanLevel >= requiredPlanLevel
   }
 
+  // Check if user is subscribed (excludes free trial users)
+  // Use this for features that require actual subscription, not free trial
+  const isSubscribedOnly = (): boolean => {
+    // Must be subscribed (not just free trial)
+    if (!isSubscribed || !subscriptionType) {
+      return false
+    }
+
+    // Subscription must not be expired
+    if (isExpired) {
+      return false
+    }
+
+    // User is subscribed and subscription is active
+    return true
+  }
+
   return {
     isSubscribed,
     subscriptionType,
@@ -150,6 +167,7 @@ export function useSubscription() {
     freeTrialStatus,
     isBlocked,
     hasAccess,
+    isSubscribedOnly,
     loading: loading || authLoading || profileLoading
   }
 }

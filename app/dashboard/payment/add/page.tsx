@@ -10,7 +10,9 @@ import { SimplifiedPaymentForm } from "@/components/tax-payment/simplified-payme
 import { taxPaymentService, documentService, transactionService } from "@/lib/services"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useSubscription } from "@/lib/hooks/useSubscription"
 import { toast } from "sonner"
+import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
 import { CheckCircle2, XCircle, AlertCircle, Loader2, TrendingUp } from "lucide-react"
@@ -65,6 +67,8 @@ export default function PaymentPage() {
       : "/dashboard"
   const { user } = useAuth()
   const { profile, loading: profileLoading } = useUserProfile()
+  const { isSubscribedOnly, loading: subscriptionLoading } = useSubscription()
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [showReceipt, setShowReceipt] = useState(false)
   const [paymentData, setPaymentData] = useState<PaymentData | null>(null)
   const [processing, setProcessing] = useState(false)
@@ -88,6 +92,15 @@ export default function PaymentPage() {
   const [loadingOutstanding, setLoadingOutstanding] = useState(false)
 
   const NRS_PORTAL_URL = "https://selfservice.nrs.gov.ng/"
+
+  // Check subscription on mount
+  useEffect(() => {
+    if (subscriptionLoading || profileLoading) return
+    
+    if (!isSubscribedOnly()) {
+      setShowSubscriptionModal(true)
+    }
+  }, [isSubscribedOnly, subscriptionLoading, profileLoading])
 
   // Mock payment processing
   const processPayment = async (amount: number, method: string): Promise<PaymentData> => {
@@ -587,6 +600,26 @@ export default function PaymentPage() {
     }
   }
 
+  // Don't render content if user is not subscribed (show modal instead)
+  if (!subscriptionLoading && !profileLoading && !isSubscribedOnly()) {
+    return (
+      <>
+        {profile && profile.businessType !== 'agent' && (
+          <SubscriptionRequiredModal
+            open={showSubscriptionModal}
+            onOpenChange={(open) => {
+              setShowSubscriptionModal(open)
+              if (!open) {
+                router.push(`${basePath}/payment`)
+              }
+            }}
+            businessType={profile.businessType || 'freelancer'}
+          />
+        )}
+      </>
+    )
+  }
+
   return (
     <>
       {/* Payment Portal Selector Modal */}
@@ -959,6 +992,21 @@ export default function PaymentPage() {
           </div>
         )}
       </div>
+
+      {/* Subscription Required Modal */}
+      {profile && profile.businessType !== 'agent' && (
+        <SubscriptionRequiredModal
+          open={showSubscriptionModal}
+          onOpenChange={(open) => {
+            setShowSubscriptionModal(open)
+            if (!open && !isSubscribedOnly()) {
+              // Redirect back if modal is closed and user is not subscribed
+              router.push(`${basePath}/payment`)
+            }
+          }}
+          businessType={profile.businessType || 'freelancer'}
+        />
+      )}
     </>
   )
 }

@@ -1,5 +1,7 @@
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { auth } from '@/firebase/firebase';
+import { validateClientTime, getServerTime } from './security/timeValidation';
+import { logSecurityEvent } from './security/monitoring';
 
 interface SubscriptionValidationResult {
   hasAccess: boolean;
@@ -8,10 +10,12 @@ interface SubscriptionValidationResult {
   subscriptionType?: string | null;
   expiredDate?: string;
   isExpiringSoon?: boolean;
+  timeWarning?: string; // Warning about time mismatch
 }
 
 export async function validateSubscriptionServerSide(
-  userId?: string
+  userId?: string,
+  clientTime?: string
 ): Promise<SubscriptionValidationResult> {
   try {
     const functions = getFunctions();
@@ -22,11 +26,40 @@ export async function validateSubscriptionServerSide(
       throw new Error('User must be authenticated');
     }
 
+    // Validate client time if provided
+    let timeWarning: string | undefined;
+    if (clientTime) {
+      const timeValidation = validateClientTime(clientTime, getServerTime());
+      if (timeValidation.isSuspicious) {
+        timeWarning = timeValidation.warning;
+        // Log suspicious time mismatch
+        logSecurityEvent({
+          type: 'time_mismatch',
+          userId: userId || currentUser.uid,
+          severity: timeValidation.timeDifferenceSeconds > 300 ? 'high' : 'medium',
+          description: `Client/server time mismatch detected: ${timeValidation.timeDifferenceSeconds}s difference`,
+          metadata: {
+            clientTime,
+            serverTime: getServerTime().toISOString(),
+            differenceSeconds: timeValidation.timeDifferenceSeconds
+          }
+        }).catch(err => console.error('Error logging security event:', err));
+      }
+    }
+
     const result = await validateSubscription({
-      userId: userId || currentUser.uid
+      userId: userId || currentUser.uid,
+      clientTime: clientTime || getServerTime().toISOString()
     });
 
-    return result.data as SubscriptionValidationResult;
+    const validationResult = result.data as SubscriptionValidationResult;
+    
+    // Add time warning if present
+    if (timeWarning) {
+      validationResult.timeWarning = timeWarning;
+    }
+
+    return validationResult;
   } catch (error: any) {
     console.error('Error validating subscription:', error);
     

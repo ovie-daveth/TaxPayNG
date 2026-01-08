@@ -28,7 +28,7 @@ export function DashboardHeader() {
   
   const { user } = useAuth()
   const { profile } = useUserProfile()
-  const { hasAccess, loading: subscriptionLoading } = useSubscription()
+  const { hasAccess, isSubscribedOnly, loading: subscriptionLoading } = useSubscription()
   const { uploadDocument } = useDocumentsFirebase()
   const { createTransaction } = useTransactions(user?.uid || null)
   // Load reminders hook for header actions
@@ -208,7 +208,15 @@ export function DashboardHeader() {
           subtitle: "Manage your tax payments and receipts",
           buttonText: "New Payment",
           buttonIcon: Plus,
-          buttonAction: () => router.push(`${basePath}/payment/add`)
+          buttonAction: () => {
+            // Check subscription before navigating
+            if (subscriptionLoading) return
+            if (!isSubscribedOnly()) {
+              setShowSubscriptionModal(true)
+              return
+            }
+            router.push(`${basePath}/payment/add`)
+          }
         }
       case "/dashboard/settings":
         return {

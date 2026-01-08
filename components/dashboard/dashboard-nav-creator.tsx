@@ -48,7 +48,7 @@ export function DashboardNavCreator() {
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   
-  const { hasAccess, loading: subscriptionLoading } = useSubscription()
+  const { hasAccess, isSubscribedOnly, loading: subscriptionLoading } = useSubscription()
   const { createTransaction } = useTransactions(user?.uid || null)
   const { createReminder } = useReminders(user?.uid || null)
   
@@ -85,7 +85,18 @@ export function DashboardNavCreator() {
       case "/dashboard-creator/reports":
         return { icon: Plus, action: () => router.push("/dashboard-creator/reports/generate/self-assessment"), show: true }
       case "/dashboard-creator/payment":
-        return { icon: Plus, action: () => router.push("/dashboard-creator/payment/add"), show: true }
+        return { 
+          icon: Plus, 
+          action: () => {
+            if (subscriptionLoading) return
+            if (!isSubscribedOnly()) {
+              setShowSubscriptionModal(true)
+              return
+            }
+            router.push("/dashboard-creator/payment/add")
+          }, 
+          show: true 
+        }
       default:
         return { icon: Plus, action: () => {}, show: false }
     }

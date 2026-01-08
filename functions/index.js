@@ -20,6 +20,39 @@ exports.validateSubscription = functions.https.onCall(async (data, context) => {
     );
   }
 
+  // SECURITY: Validate client time if provided
+  let timeWarning = null;
+  if (data.clientTime) {
+    const serverTime = admin.firestore.Timestamp.now().toDate();
+    const clientTime = new Date(data.clientTime);
+    const timeDifference = Math.abs(serverTime.getTime() - clientTime.getTime());
+    const timeDifferenceSeconds = Math.floor(timeDifference / 1000);
+    
+    // Log suspicious time mismatches (> 5 minutes)
+    if (timeDifference > 5 * 60 * 1000) {
+      timeWarning = `Time mismatch detected: ${timeDifferenceSeconds}s difference`;
+      console.warn(`[SECURITY] Time mismatch for user ${userId}: ${timeDifferenceSeconds}s`);
+      
+      // Log to security logs
+      try {
+        await admin.firestore().collection('securityLogs').add({
+          type: 'time_mismatch',
+          userId: userId,
+          severity: timeDifferenceSeconds > 300 ? 'high' : 'medium',
+          description: `Client/server time mismatch: ${timeDifferenceSeconds}s difference`,
+          metadata: {
+            clientTime: data.clientTime,
+            serverTime: serverTime.toISOString(),
+            differenceSeconds: timeDifferenceSeconds
+          },
+          timestamp: serverTime.toISOString()
+        });
+      } catch (logError) {
+        console.error('Error logging time mismatch:', logError);
+      }
+    }
+  }
+
   try {
     const userProfileDoc = await admin.firestore()
       .collection('userProfiles')
@@ -35,6 +68,7 @@ exports.validateSubscription = functions.https.onCall(async (data, context) => {
     }
 
     const profile = userProfileDoc.docs[0].data();
+    // SECURITY: Always use server time, never trust client time
     const now = admin.firestore.Timestamp.now();
     const nowDate = now.toDate();
 
@@ -68,20 +102,23 @@ exports.validateSubscription = functions.https.onCall(async (data, context) => {
           hasAccess: true,
           reason: 'free_trial_active',
           daysRemaining: daysRemaining,
-          isExpiringSoon: daysRemaining <= 2
+          isExpiringSoon: daysRemaining <= 2,
+          timeWarning: timeWarning || undefined
         };
       } else {
         return {
           hasAccess: false,
           reason: 'free_trial_expired',
-          expiredDate: trialEndDate.toISOString()
+          expiredDate: trialEndDate.toISOString(),
+          timeWarning: timeWarning || undefined
         };
       }
     }
 
     return {
       hasAccess: false,
-      reason: 'no_subscription_or_trial'
+      reason: 'no_subscription_or_trial',
+      timeWarning: timeWarning || undefined
     };
 
   } catch (error) {
