@@ -6,17 +6,28 @@ import { getAdminDb } from '@/lib/firebase-admin'
  * 1. Checking and sending reminder emails
  * 2. Checking subscription expiry and deactivating expired subscriptions
  * 
- * This runs daily at 4 AM to handle both tasks efficiently
+ * This runs daily to handle both tasks efficiently
  * 
- * GET /api/cron/daily-tasks
+ * GET /api/cron/daily-tasks?secret=YOUR_SECRET
  * 
- * For Vercel Cron, add to vercel.json:
- * {
- *   "crons": [{
- *     "path": "/api/cron/daily-tasks",
- *     "schedule": "0 4 * * *"  // Daily at 4 AM
- *   }]
- * }
+ * Setup with External Cron Service (cron-job.org):
+ * 
+ * 1. Go to https://cron-job.org and create a free account
+ * 2. Create a new cron job with these settings:
+ *    - URL: https://yourdomain.com/api/cron/daily-tasks?secret=YOUR_SECRET
+ *    - Schedule: Daily at 4:00 AM (or your preferred time)
+ *    - Method: GET
+ *    - Timezone: Your preferred timezone (e.g., UTC, Africa/Lagos)
+ * 
+ * 3. Recommended schedule: "0 4 * * *" (Daily at 4 AM)
+ * 
+ * Security:
+ * - Set CRON_SECRET in your .env.local file
+ * - Use the same secret in the cron job URL
+ * - This prevents unauthorized access to your cron endpoint
+ * 
+ * Example URL:
+ * https://yourdomain.com/api/cron/daily-tasks?secret=your_random_secret_key_here
  */
 export async function GET(request: NextRequest) {
   const results = {
