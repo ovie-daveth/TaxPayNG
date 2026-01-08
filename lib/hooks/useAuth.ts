@@ -94,11 +94,19 @@ export function useAuth() {
       })
 
       // Create user profile in Firestore
+      // Set up free trial (7 days from signup)
+      const now = new Date()
+      const freeTrialEndDate = new Date(now)
+      freeTrialEndDate.setDate(freeTrialEndDate.getDate() + 7)
+      
       const profileData: any = {
         email: data.email,
         firstName: data.firstName,
         lastName: data.lastName,
         businessType: data.businessType,
+        freeTrialStartDate: now.toISOString(),
+        freeTrialEndDate: freeTrialEndDate.toISOString(),
+        freeTrialUsed: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
@@ -117,6 +125,15 @@ export function useAuth() {
 
       if (profileResult && profileResult.success) {
         console.log("Profile updated successfully")
+        
+        // Create default reminders for the user
+        try {
+          const { createDefaultReminders } = await import('@/lib/utils/defaultReminders')
+          await createDefaultReminders(user.uid, data.businessType)
+        } catch (reminderError) {
+          console.error('Error creating default reminders:', reminderError)
+          // Don't fail signup if reminders fail
+        }
         
         // Sign out the user immediately after signup (no auto-login)
         await signOut(auth)

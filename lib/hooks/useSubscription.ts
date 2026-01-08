@@ -2,6 +2,7 @@ import { useState, useEffect } from "react"
 import { useAuth } from "./useAuth"
 import { useUserProfile } from "./useUserProfile"
 import { SubscriptionType } from "@/lib/types"
+import { getFreeTrialStatus, shouldBlockAccess, FreeTrialStatus } from "@/lib/utils/freeTrial"
 
 export function useSubscription() {
   const { user, loading: authLoading } = useAuth()
@@ -11,6 +12,14 @@ export function useSubscription() {
   const [subscriptionExpiryDate, setSubscriptionExpiryDate] = useState<string | null>(null)
   const [isExpiringSoon, setIsExpiringSoon] = useState(false)
   const [isExpired, setIsExpired] = useState(false)
+  const [freeTrialStatus, setFreeTrialStatus] = useState<FreeTrialStatus>({
+    isInFreeTrial: false,
+    daysRemaining: 0,
+    isExpiringSoon: false,
+    isExpired: false,
+    freeTrialEndDate: null
+  })
+  const [isBlocked, setIsBlocked] = useState(false)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -25,9 +34,25 @@ export function useSubscription() {
       setSubscriptionExpiryDate(null)
       setIsExpiringSoon(false)
       setIsExpired(false)
+      setFreeTrialStatus({
+        isInFreeTrial: false,
+        daysRemaining: 0,
+        isExpiringSoon: false,
+        isExpired: false,
+        freeTrialEndDate: null
+      })
+      setIsBlocked(false)
       setLoading(false)
       return
     }
+
+    // Check free trial status
+    const trialStatus = getFreeTrialStatus(profile)
+    setFreeTrialStatus(trialStatus)
+    
+    // Check if user should be blocked
+    const blocked = shouldBlockAccess(profile)
+    setIsBlocked(blocked)
 
     const subscribed = profile.isSubscribe ?? false
     const expiryDate = profile.subscriptionExpiryDate || null
@@ -72,8 +97,23 @@ export function useSubscription() {
   }, [profile, authLoading, profileLoading])
 
   const hasAccess = (requiredPlan?: SubscriptionType): boolean => {
+    // If blocked (free trial expired and no subscription), no access
+    if (isBlocked) {
+      return false
+    }
+
     // If subscription expired, no access
     if (isExpired) {
+      return false
+    }
+
+    // If in free trial, allow access (unless blocked)
+    if (freeTrialStatus.isInFreeTrial && !isBlocked) {
+      // For free trial users, only allow basic features (no plan requirement)
+      if (!requiredPlan) {
+        return true
+      }
+      // Free trial users don't have access to premium features
       return false
     }
 
@@ -107,6 +147,8 @@ export function useSubscription() {
     subscriptionExpiryDate,
     isExpiringSoon,
     isExpired,
+    freeTrialStatus,
+    isBlocked,
     hasAccess,
     loading: loading || authLoading || profileLoading
   }

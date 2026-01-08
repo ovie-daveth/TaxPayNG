@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { ArrowRight, BarChart3, Calculator, FileText, Bell, CheckCircle2, Loader2, Sparkles, Shield, TrendingUp, Clock, Users, Zap, Award, DollarSign, ScanLine, FolderArchive, CreditCard, Layers, Receipt, FileCheck, Smartphone, Building2 } from "lucide-react"
+import { ArrowRight, BarChart3, Calculator, FileText, Bell, CheckCircle2, Loader2, Sparkles, Shield, TrendingUp, Clock, Users, Zap, Award, DollarSign, ScanLine, FolderArchive, CreditCard, Layers, Receipt, FileCheck, Smartphone, Building2, LogIn } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { toast } from "sonner"
 import { db } from "@/firebase/firebase"
@@ -196,6 +196,12 @@ export default function HomePage() {
               <Button size="lg" className="w-full sm:w-auto text-base sm:text-lg h-12 sm:h-14 px-6 sm:px-8 group animate-button-shimmer relative">
                 <span className="relative z-10">Start Free Trial</span>
                 <ArrowRight className="ml-2 w-4 h-4 sm:w-5 sm:h-5 group-hover:translate-x-1 transition-transform relative z-10" />
+              </Button>
+            </Link>
+            <Link href="/login" className="w-full sm:w-auto">
+              <Button size="lg" variant="outline" className="w-full sm:w-auto text-base sm:text-lg h-12 sm:h-14 px-6 sm:px-8 border-2 border-gray-200 bg-transparent hover:bg-primary-foreground/10">
+                <span className="relative z-10">Login</span>
+                <LogIn className="ml-2 w-4 h-4 sm:w-5 sm:h-5 transition-transform relative z-10" />
               </Button>
             </Link>
           </div>
