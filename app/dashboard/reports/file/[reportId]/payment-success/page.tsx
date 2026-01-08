@@ -35,7 +35,11 @@ export default function PaymentSuccessPage() {
   const params = useParams()
   const searchParams = useSearchParams()
   const pathname = usePathname()
-  const basePath = pathname?.startsWith("/dashboard-creator") ? "/dashboard-creator" : "/dashboard"
+  const basePath = pathname?.startsWith("/dashboard-creator")
+    ? "/dashboard-creator"
+    : pathname?.startsWith("/dashboard-sme")
+      ? "/dashboard-sme"
+      : "/dashboard"
   const reportId = params?.reportId as string
   const { user } = useAuth()
   const { profile, loading: profileLoading } = useUserProfile()

@@ -18,7 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { useBusiness } from "@/lib/contexts/business-context"
 
@@ -47,9 +47,21 @@ const reportTemplates = [
 
 function MobileReportDropdown() {
   const router = useRouter()
+  const pathname = usePathname()
   const { profile } = useUserProfile()
   const { isSubscribed, loading: subscriptionLoading } = useSubscription()
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
+
+  const basePath = pathname?.startsWith("/dashboard-creator")
+    ? "/dashboard-creator"
+    : pathname?.startsWith("/dashboard-sme")
+      ? "/dashboard-sme"
+      : "/dashboard"
+
+  const resolvedTemplates = reportTemplates.map(t => ({
+    ...t,
+    href: t.href.replace(/^\/dashboard/, basePath),
+  }))
 
   const handleGenerateClick = (href: string) => {
     if (subscriptionLoading) {
@@ -74,7 +86,7 @@ function MobileReportDropdown() {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent className="w-[calc(100vw-2rem)]">
-            {reportTemplates.map((template) => (
+            {resolvedTemplates.map((template) => (
               <DropdownMenuItem
                 key={template.id}
                 onClick={() => handleGenerateClick(template.href)}

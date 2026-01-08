@@ -4,9 +4,9 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Calculator, LayoutDashboard, Users, DollarSign, FileText, Settings, LogOut, ChevronLeft, ChevronRight, TrendingUp, Menu, Bell, User } from "lucide-react"
+import { Calculator, LayoutDashboard, Users, DollarSign, FileText, Settings, LogOut, ChevronLeft, ChevronRight, TrendingUp, Menu, Bell, User, Receipt, FileCheck, IdCardIcon, MessageSquare, Plus } from "lucide-react"
 import OtaxLogo from "../OtaxLogo"
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { toast } from "sonner"
@@ -16,10 +16,15 @@ import { useUserProfile } from "@/lib/contexts/user-profile-context"
 
 const navItems = [
   { href: "/dashboard-sme", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard-sme/transactions", label: "Transactions", icon: Receipt },
+  { href: "/dashboard-sme/invoices", label: "Invoices", icon: FileCheck },
+  { href: "/dashboard-sme/reports", label: "Reports", icon: TrendingUp },
+  { href: "/dashboard-sme/filing-requests", label: "Filing Requests", icon: MessageSquare },
+  { href: "/dashboard-sme/payment", label: "Payment", icon: IdCardIcon },
+  { href: "/dashboard-sme/documents", label: "Documents", icon: FileText },
   { href: "/dashboard-sme/employees", label: "Employees", icon: Users },
   { href: "/dashboard-sme/payroll", label: "Payroll", icon: DollarSign },
   { href: "/dashboard-sme/paye", label: "PAYE Tax", icon: FileText },
-  { href: "/dashboard-sme/reports", label: "Reports", icon: TrendingUp },
   { href: "/dashboard-sme/reminders", label: "Reminders", icon: Bell },
   { href: "/dashboard-sme/settings", label: "Settings", icon: Settings },
 ]
@@ -28,9 +33,57 @@ export function DashboardNavSME() {
   const pathname = usePathname()
   const router = useRouter()
   const { sidebarCollapsed, toggleSidebar } = useSidebar()
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
   const { profile } = useUserProfile()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
+  const [hasFilingRequests, setHasFilingRequests] = useState(false)
+  
+  // Get page info for mobile add button
+  const getMobileAddButton = () => {
+    switch (pathname) {
+      case "/dashboard-sme/transactions":
+        return { icon: Plus, action: () => {
+          const event = new CustomEvent('createTransaction')
+          window.dispatchEvent(event)
+        }, show: true }
+      case "/dashboard-sme/invoices":
+        return { icon: Plus, action: () => {
+          const event = new CustomEvent('createInvoice')
+          window.dispatchEvent(event)
+        }, show: true }
+      case "/dashboard-sme/payment":
+        return { icon: Plus, action: () => router.push("/dashboard-sme/payment/add"), show: true }
+      default:
+        return { icon: Plus, action: () => {}, show: false }
+    }
+  }
+  
+  const mobileAddButton = getMobileAddButton()
+  const AddButtonIcon = mobileAddButton.icon
+
+  useEffect(() => {
+    const checkFilingRequests = async () => {
+      if (!user?.uid) {
+        setHasFilingRequests(false)
+        return
+      }
+
+      try {
+        const response = await fetch(`/api/filing-requests?userId=${user.uid}`)
+        const result = await response.json()
+        if (result.success && result.data && result.data.length > 0) {
+          setHasFilingRequests(true)
+        } else {
+          setHasFilingRequests(false)
+        }
+      } catch (error) {
+        console.error("Error checking filing requests:", error)
+        setHasFilingRequests(false)
+      }
+    }
+
+    checkFilingRequests()
+  }, [user?.uid])
 
   const handleLogout = async () => {
     const result = await logout()
@@ -42,17 +95,24 @@ export function DashboardNavSME() {
     }
   }
 
-  // Items shown in bottom nav - only 4 items: Invoice, Transaction, Tax Calculator, Report
-  // For SME, we'll use: Employees (as Invoice equivalent), PAYE (as Transaction equivalent), Tax Calculator, Reports
+  // Filter nav items based on whether user has filing requests
+  const filteredNavItems = navItems.filter(item => {
+    if (item.href === "/dashboard-sme/filing-requests") {
+      return hasFilingRequests
+    }
+    return true
+  })
+
+  // Items shown in bottom nav - we keep high-frequency modules for SMEs
   const bottomNavItems = [
-    "/dashboard-sme/employees",
-    "/dashboard-sme/paye",
+    "/dashboard-sme/invoices",
     "/dashboard-sme/tax-calculator",
+    "/dashboard-sme/transactions",
     "/dashboard-sme/reports"
   ]
 
   // Items to show in the sidebar menu (all items except those in bottom nav)
-  const menuNavItems = navItems.filter(item => {
+  const menuNavItems = filteredNavItems.filter(item => {
     return !bottomNavItems.includes(item.href)
   })
 
@@ -89,8 +149,8 @@ export function DashboardNavSME() {
           </Button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-8">
-          {navItems.map((item) => {
+        <nav className="flex-1 px-4 space-y-8 overflow-y-auto overflow-x-hidden">
+          {filteredNavItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href
             return (
@@ -117,14 +177,48 @@ export function DashboardNavSME() {
           })}
         </nav>
 
-        <div className="p-4 border-t border-border">
+        <div className="p-4 border-t border-border space-y-3">
+          {/* User Info */}
+          {profile && (
+            <div className={cn(
+              "flex items-center gap-2 px-2 py-2 rounded-lg transition-all duration-200",
+              sidebarCollapsed ? "justify-center" : "justify-start"
+            )}>
+              <div className={cn(
+                "flex-shrink-0 rounded-full bg-primary/10 p-1.5 flex items-center justify-center",
+                sidebarCollapsed ? "w-8 h-8" : "w-9 h-9"
+              )}>
+                <User className={cn(
+                  "text-primary",
+                  sidebarCollapsed ? "w-4 h-4" : "w-5 h-5"
+                )} />
+              </div>
+              {!sidebarCollapsed && (
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">
+                    {profile.firstName && profile.lastName 
+                      ? `${profile.firstName} ${profile.lastName}`
+                      : profile.firstName || profile.lastName || profile.email?.split('@')[0] || 'User'
+                    }
+                  </p>
+                  {profile.email && (
+                    <p className="text-xs text-muted-foreground truncate">
+                      {profile.email}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+          
+          {/* Logout Button */}
           <Button 
             variant="ghost" 
             className={cn(
-              "w-full text-muted-foreground transition-all duration-200",
+              "w-full text-muted-foreground hover:text-foreground transition-all duration-200",
               sidebarCollapsed ? "justify-center px-2" : "justify-start"
             )} 
-            size="sm"
+            size="lg"
             title={sidebarCollapsed ? "Log out" : undefined}
             onClick={handleLogout}
           >
@@ -149,6 +243,16 @@ export function DashboardNavSME() {
           </button>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <NotificationBell />
+            {mobileAddButton.show && (
+              <Button 
+                variant="default"
+                size="icon"
+                onClick={mobileAddButton.action}
+                className="h-8 w-8"
+              >
+                <AddButtonIcon className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         </div>
       </header>
@@ -156,37 +260,37 @@ export function DashboardNavSME() {
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border safe-area-inset-bottom">
         <div className="flex items-center justify-around px-2 py-2">
-          <Link href="/dashboard-sme/employees" className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] rounded-lg transition-colors">
-            <Users className={cn(
+          <Link href="/dashboard-sme/invoices" className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] rounded-lg transition-colors">
+            <FileCheck className={cn(
               "w-5 h-5",
-              (pathname === "/dashboard-sme/employees" || pathname?.startsWith("/dashboard-sme/employees/")) 
+              (pathname === "/dashboard-sme/invoices" || pathname?.startsWith("/dashboard-sme/invoices/")) 
                 ? "text-primary" 
                 : "text-muted-foreground"
             )} />
             <span className={cn(
               "text-[10px] font-medium",
-              (pathname === "/dashboard-sme/employees" || pathname?.startsWith("/dashboard-sme/employees/")) 
+              (pathname === "/dashboard-sme/invoices" || pathname?.startsWith("/dashboard-sme/invoices/")) 
                 ? "text-primary" 
                 : "text-muted-foreground"
             )}>
-              Employees
+              Invoices
             </span>
           </Link>
 
-          <Link href="/dashboard-sme/paye" className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] rounded-lg transition-colors">
-            <FileText className={cn(
+          <Link href="/dashboard-sme/transactions" className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] rounded-lg transition-colors">
+            <Receipt className={cn(
               "w-5 h-5",
-              (pathname === "/dashboard-sme/paye" || pathname?.startsWith("/dashboard-sme/paye/")) 
+              (pathname === "/dashboard-sme/transactions" || pathname?.startsWith("/dashboard-sme/transactions/")) 
                 ? "text-primary" 
                 : "text-muted-foreground"
             )} />
             <span className={cn(
               "text-[10px] font-medium",
-              (pathname === "/dashboard-sme/paye" || pathname?.startsWith("/dashboard-sme/paye/")) 
+              (pathname === "/dashboard-sme/transactions" || pathname?.startsWith("/dashboard-sme/transactions/")) 
                 ? "text-primary" 
                 : "text-muted-foreground"
             )}>
-              PAYE
+              Transactions
             </span>
           </Link>
 
@@ -227,20 +331,20 @@ export function DashboardNavSME() {
             </span>
           </Link>
 
-          <Link href="/dashboard-sme/payroll" className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] rounded-lg transition-colors">
-            <DollarSign className={cn(
+          <Link href="/dashboard-sme/payment" className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] rounded-lg transition-colors">
+            <IdCardIcon className={cn(
               "w-5 h-5",
-              (pathname === "/dashboard-sme/payroll" || pathname?.startsWith("/dashboard-sme/payroll/")) 
+              (pathname === "/dashboard-sme/payment" || pathname?.startsWith("/dashboard-sme/payment/")) 
                 ? "text-primary" 
                 : "text-muted-foreground"
             )} />
             <span className={cn(
               "text-[10px] font-medium",
-              (pathname === "/dashboard-sme/payroll" || pathname?.startsWith("/dashboard-sme/payroll/")) 
+              (pathname === "/dashboard-sme/payment" || pathname?.startsWith("/dashboard-sme/payment/")) 
                 ? "text-primary" 
                 : "text-muted-foreground"
             )}>
-              Payroll
+              Payment
             </span>
           </Link>
         </div>

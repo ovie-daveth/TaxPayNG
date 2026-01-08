@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Eye, FileText, Trash2, Loader2, Edit, MessageSquare, CheckCircle2, ExternalLink, Download } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { reportService } from "@/lib/services"
@@ -22,9 +22,15 @@ import { useBusiness } from "@/lib/contexts/business-context"
 
 export function RecentReports() {
   const router = useRouter()
+  const pathname = usePathname()
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { activeEntityId } = useBusiness()
+  const basePath = pathname?.startsWith("/dashboard-creator")
+    ? "/dashboard-creator"
+    : pathname?.startsWith("/dashboard-sme")
+      ? "/dashboard-sme"
+      : "/dashboard"
   const [reports, setReports] = useState<SavedReport[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedReport, setSelectedReport] = useState<SavedReport | null>(null)
@@ -209,7 +215,7 @@ export function RecentReports() {
                   onClick={() => {
                     // Extract requestId from report metadata or navigate to filing requests list
                     // For now, navigate to filing requests page where user can find their request
-                    router.push('/dashboard/filing-requests')
+                    router.push(`${basePath}/filing-requests`)
                   }}
                   title="View filing request status"
                   className="h-8 w-8 sm:h-9 sm:w-9"

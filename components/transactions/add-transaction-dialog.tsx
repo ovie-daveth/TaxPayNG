@@ -963,7 +963,7 @@ export function AddTransactionDialog({
               attachmentFileIds.push(uploadResult.fileId)
             } catch (uploadError) {
               console.error('Error uploading file:', uploadError)
-              toast.error(`Failed to upload ${file.name}. Continuing with other files...`)
+              // Continue silently - transaction will save without attachments
             }
           }
 
@@ -990,13 +990,9 @@ export function AddTransactionDialog({
             }
           }
 
-          if (uploadResults.length > 0) {
-            toast.success(`Successfully uploaded ${uploadResults.length} file(s)`)
-          }
         } catch (error) {
           console.error('Error uploading documents:', error)
-          toast.error('Failed to upload some documents. Transaction will be saved with available attachments.')
-          // Continue with transaction creation even if some uploads fail
+          // Continue silently - transaction will save without attachments
         } finally {
           setUploadingImages(false)
         }

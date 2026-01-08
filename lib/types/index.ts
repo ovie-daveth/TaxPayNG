@@ -106,7 +106,7 @@ export interface PlatformConnection {
 }
 
 // Transaction Types
-export type TransactionType = 'income' | 'expense' | 'relief'
+export type TransactionType = 'income' | 'expense' | 'relief' | 'transfer' | 'adjustment'
 
 // Transaction Nature - for personal vs business separation
 export type TransactionNature = 'business' | 'personal' | 'mixed'
@@ -124,15 +124,31 @@ export interface TaxClassification {
   capitalAllowanceRate?: number // e.g., 25% for annual allowance
   initialAllowanceRate?: number // optional initial allowance rate for first year (tax version of depreciation)
   capitalAssetType?: 'it_equipment' | 'motor_vehicle' | 'plant_machinery' | 'furniture_fittings' | 'building' | 'intangible_software'
+  assetId?: string // Link to asset record if this transaction created/improved an asset
   
-  // VAT handling (future)
+  // VAT handling (comprehensive for SMEs)
   vatApplicable?: boolean
-  vatRate?: number
+  vatRate?: number // Default 7.5% for Nigeria
+  vatAmount?: number // Calculated VAT amount
+  vatType?: 'output' | 'input' // Output VAT for sales, Input VAT for purchases
+  vatExemptionReason?: string // Reason if VAT = 0 (exempt, zero-rated, etc.)
   
-  // Withholding Tax (WHT) credits
+  // Withholding Tax (WHT) credits (comprehensive for SMEs)
   whtCreditable?: boolean
-  whtRate?: number
-  whtAmount?: number
+  whtRate?: number // 5%, 10%, 2.5%, 2%, etc.
+  whtAmount?: number // Calculated WHT amount
+  whtCategory?: 'rent' | 'professional_service' | 'contract' | 'interest' | 'dividends' | 'royalties' | 'commissions' | 'directors_fees' | 'construction' | 'goods_supply' | 'other'
+  whtCreditClaimable?: boolean // Whether WHT credit can be claimed for CIT offset
+  whtCreditNoteUrl?: string // URL to uploaded WHT credit note (proof of WHT deduction for income transactions)
+  whtCreditNoteFileId?: string // ImageKit fileId for WHT credit note
+  
+  // Related tax head
+  relatedTaxHead?: 'CIT' | 'VAT' | 'PAYE' | 'WHT' | 'EDT' | 'none'
+  
+  // SME-specific intelligence
+  vatEligibilityStatus?: 'eligible' | 'exempt' | 'below_threshold' // Auto-locked if turnover < ₦100m
+  citImpact?: boolean // Does this affect profit for CIT?
+  isOperatingExpense?: boolean // Operating vs capital expense
 }
 
 // Tax Period - for time-based tax calculations
@@ -201,6 +217,29 @@ export interface Transaction {
   attachmentFileIds?: string[] // Array of ImageKit fileIds corresponding to attachments (same order)
   receiptUrl?: string
   documentId?: string
+  
+  // SME-specific fields
+  transactionId?: string // System-generated transaction ID (immutable)
+  postingDate?: string // When transaction was recorded (defaults to transactionDate if not set)
+  
+  // Supplier/Customer information (for compliance)
+  supplierName?: string
+  supplierTin?: string // Supplier TIN or RC number
+  customerName?: string
+  customerTin?: string // Customer TIN or RC number
+  
+  // Document type classification
+  documentType?: 'invoice' | 'receipt' | 'contract' | 'bank_alert' | 'other'
+  
+  // Payment status and settlement
+  paymentStatus?: 'unpaid' | 'paid' | 'part_paid'
+  paymentDate?: string
+  referenceNumber?: string // Bank ref, RRR, gateway ref, etc.
+  
+  // Source tracking
+  source?: 'manual_entry' | 'invoice' | 'bank_sync' | 'whatsapp_bot' | 'api'
+  createdBy?: string // User ID or 'agent' if created by agent
+  
   createdAt: string
   updatedAt: string
 }

@@ -269,7 +269,8 @@ export function AddInvoiceDialog({
         paymentTerms: invoice.paymentTerms || "Net 30",
         paymentInstructions: invoice.paymentInstructions || "",
         sendToOtaxUser: !!invoice.recipientUserId,
-        recipientEmail: invoice.recipientEmail || ""
+        recipientEmail: invoice.recipientEmail || "",
+        sendViaEmail: false // Default to false, user can enable if needed
       })
       
       // Initialize new invoice fields
@@ -340,7 +341,8 @@ export function AddInvoiceDialog({
         paymentTerms: "Net 30",
         paymentInstructions: "",
         sendToOtaxUser: false,
-        recipientEmail: ""
+        recipientEmail: "",
+        sendViaEmail: false
       })
       
       // Reset new invoice fields
@@ -1678,12 +1680,18 @@ export function AddInvoiceDialog({
                 <Label htmlFor="vat-rate" className="text-xs sm:text-sm">VAT Rate (%)</Label>
                 <Input
                   id="vat-rate"
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.1"
-                  value={formData.vatRate}
-                  onChange={(e) => setFormData(prev => ({ ...prev, vatRate: parseFloat(e.target.value) || 7.5 }))}
+                  type="text"
+                  inputMode="decimal"
+                  placeholder="7.5"
+                  value={formData.vatRate?.toString() || ''}
+                  onChange={(e) => {
+                    const value = e.target.value
+                    // Allow empty string, numbers, and decimals
+                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                      const rate = value === '' ? 7.5 : (parseFloat(value) || 7.5)
+                      setFormData(prev => ({ ...prev, vatRate: rate }))
+                    }
+                  }}
                   onKeyDown={handleInputKeyDown}
                   onClick={(e) => e.stopPropagation()}
                   className="h-9 sm:h-10 text-xs sm:text-sm"
@@ -1713,12 +1721,18 @@ export function AddInvoiceDialog({
               <Label htmlFor="discount" className="text-xs sm:text-sm">Discount %</Label>
               <Input
                 id="discount"
-                type="number"
-                min="0"
-                max="100"
-                step="0.1"
-                value={formData.discount}
-                onChange={(e) => setFormData(prev => ({ ...prev, discount: parseFloat(e.target.value) || 0 }))}
+                type="text"
+                inputMode="decimal"
+                placeholder="0"
+                value={formData.discount?.toString() || ''}
+                onChange={(e) => {
+                  const value = e.target.value
+                  // Allow empty string, numbers, and decimals
+                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                    const discount = value === '' ? 0 : (parseFloat(value) || 0)
+                    setFormData(prev => ({ ...prev, discount: discount }))
+                  }
+                }}
                 onKeyDown={handleInputKeyDown}
                 onClick={(e) => e.stopPropagation()}
                 className="h-9 sm:h-10 text-xs sm:text-sm"
@@ -1865,13 +1879,18 @@ export function AddInvoiceDialog({
                           <Label htmlFor="business-percentage" className="text-xs sm:text-sm">Business Percentage (%)</Label>
                           <Input
                             id="business-percentage"
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.1"
-                            value={businessPercentage || ""}
-                            onChange={(e) => setBusinessPercentage(e.target.value ? parseFloat(e.target.value) : undefined)}
-                            placeholder="e.g., 55"
+                            type="text"
+                            inputMode="decimal"
+                            placeholder="100"
+                            value={businessPercentage?.toString() || ''}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              // Allow empty string, numbers, and decimals
+                              if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                const percentage = value === '' ? undefined : parseFloat(value)
+                                setBusinessPercentage(percentage)
+                              }
+                            }}
                             className="h-9 sm:h-10 text-xs sm:text-sm"
                           />
                           <p className="text-xs text-muted-foreground">Enter the percentage that applies to business use (0-100)</p>

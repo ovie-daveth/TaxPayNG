@@ -293,9 +293,11 @@ export function SubscriptionRequiredModal({
                           console.error('Error in handleSubscribe:', err)
                         })
                       }}
-                      disabled={isProcessing}
+                      disabled={isProcessing || (businessType === 'sme' && planType === 'Big Business')}
                     >
-                      {isProcessing ? (
+                      {businessType === 'sme' && planType === 'Big Business' ? (
+                        "Coming Soon"
+                      ) : isProcessing ? (
                         <>
                           <span className="animate-spin mr-1.5 sm:mr-2">⏳</span>
                           Processing...

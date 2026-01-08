@@ -39,9 +39,13 @@ export function useTransactions(userId: string | null) {
   }, [userId, activeEntityId])
 
   const createTransaction = useCallback(async (transactionData: Omit<Transaction, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => {
-    if (!userId) return { success: false, error: 'User not authenticated' }
+    if (!userId) {
+      const errorResult = { success: false, error: 'User not authenticated' }
+      console.log('createTransaction (hook) returning error (no userId):', errorResult)
+      return errorResult
+    }
 
-    console.log("creating ", transactionData)
+    console.log("createTransaction (hook) creating:", transactionData)
     setLoading(true)
     setError(null)
 
@@ -51,6 +55,7 @@ export function useTransactions(userId: string | null) {
         entityId: (transactionData as any).entityId ?? activeEntityId ?? undefined,
       } as any
       const result = await transactionService.createTransaction(userId, payload)
+      console.log('createTransaction (hook) service result:', result)
       if (result.success && result.data) {
         // Add new transaction to the beginning of the list
         setTransactions(prev => {
@@ -65,11 +70,14 @@ export function useTransactions(userId: string | null) {
           totalPages: Math.ceil((prev.total + 1) / prev.limit)
         } : null)
       }
+      console.log('createTransaction (hook) returning:', result)
       return result
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create transaction'
       setError(errorMessage)
-      return { success: false, error: errorMessage }
+      const errorResult = { success: false, error: errorMessage }
+      console.log('createTransaction (hook) returning error:', errorResult)
+      return errorResult
     } finally {
       setLoading(false)
     }

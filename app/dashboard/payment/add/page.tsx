@@ -19,6 +19,7 @@ import { calculatePeriodTaxes } from "@/lib/utils/tax-period-calculation"
 import { formatCurrencyAmount } from "@/lib/utils/currency"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
+import { PaymentPortalSelectorModal } from "@/components/payment/payment-portal-selector-modal"
 
 interface PaymentData {
   amount: number
@@ -57,7 +58,11 @@ interface SystemCheck {
 export default function PaymentPage() {
   const router = useRouter()
   const pathname = usePathname()
-  const basePath = pathname?.startsWith("/dashboard-creator") ? "/dashboard-creator" : "/dashboard"
+  const basePath = pathname?.startsWith("/dashboard-creator")
+    ? "/dashboard-creator"
+    : pathname?.startsWith("/dashboard-sme")
+      ? "/dashboard-sme"
+      : "/dashboard"
   const { user } = useAuth()
   const { profile, loading: profileLoading } = useUserProfile()
   const [showReceipt, setShowReceipt] = useState(false)
@@ -65,6 +70,7 @@ export default function PaymentPage() {
   const [processing, setProcessing] = useState(false)
   const [paymentFormData, setPaymentFormData] = useState<PaymentFormData | null>(null)
   const [showValidation, setShowValidation] = useState(false)
+  const [showPortalSelector, setShowPortalSelector] = useState(false)
   const [showNrsPayModal, setShowNrsPayModal] = useState(false)
   const [recordingNrsPayment, setRecordingNrsPayment] = useState(false)
   const [showReceiptUploadModal, setShowReceiptUploadModal] = useState(false)
@@ -204,12 +210,26 @@ export default function PaymentPage() {
 
   const handleProceedToPay = () => {
     if (allChecksPassed) {
-      // RRR generation is no longer done in-app.
-      // User pays on NRS portal and then confirms payment here so we can record it.
-      setShowNrsPayModal(true)
+      // Show portal selector to choose between NRC and state IRS
+      setShowPortalSelector(true)
     } else {
       toast.error("Please complete all required checks before proceeding")
     }
+  }
+
+  const handleSelectNRC = () => {
+    setShowPortalSelector(false)
+    setShowNrsPayModal(true)
+  }
+
+  const handleSelectStateIRS = (irsUrl: string) => {
+    setShowPortalSelector(false)
+    // Open state IRS portal in new tab
+    window.open(irsUrl, "_blank")
+    // Show receipt upload modal after a brief delay
+    setTimeout(() => {
+      setShowReceiptUploadModal(true)
+    }, 500)
   }
 
   const openReceiptUploadForNrsPayment = () => {
@@ -569,6 +589,19 @@ export default function PaymentPage() {
 
   return (
     <>
+      {/* Payment Portal Selector Modal */}
+      <PaymentPortalSelectorModal
+        open={showPortalSelector}
+        onOpenChange={setShowPortalSelector}
+        userState={profile?.address?.state}
+        onSelectNRC={handleSelectNRC}
+        onSelectStateIRS={handleSelectStateIRS}
+        taxAmount={paymentFormData?.amount}
+        taxDescription={`${paymentFormData?.period.charAt(0).toUpperCase()}${paymentFormData?.period.slice(1)} Tax Payment`}
+        taxDuration={paymentFormData?.taxDuration}
+        period={paymentFormData?.period}
+      />
+
       {/* NRS Pay Modal (replaces in-app RRR generation) */}
       <Dialog open={showNrsPayModal} onOpenChange={setShowNrsPayModal}>
         <DialogContent className="w-[calc(100vw-1rem)] sm:max-w-3xl p-0 overflow-hidden sm:rounded-lg h-[92dvh] sm:h-auto">

@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { DeleteConfirmationModal } from "@/components/ui/delete-confirmation-modal"
 import { Transaction } from "@/lib/types"
 import { AddTransactionDialog } from "./add-transaction-dialog"
+import { AddSMETransactionDialog } from "./add-sme-transaction-dialog"
 import { ViewTransactionDialog } from "./view-transaction-dialog"
 import { ImageViewerModal } from "@/components/ui/image-viewer-modal"
 import { formatDate } from "@/lib/utils/date"
@@ -284,12 +285,21 @@ export function TransactionList({
           </div>
         </Card>
 
-        <AddTransactionDialog
-          open={isAddDialogOpen}
-          onOpenChange={setIsAddDialogOpen}
-          onSubmit={handleSubmit}
-          transaction={editingTransaction}
-        />
+        {profile?.businessType === 'sme' ? (
+          <AddSMETransactionDialog
+            open={isAddDialogOpen}
+            onOpenChange={setIsAddDialogOpen}
+            onSubmit={handleSubmit}
+            transaction={editingTransaction}
+          />
+        ) : (
+          <AddTransactionDialog
+            open={isAddDialogOpen}
+            onOpenChange={setIsAddDialogOpen}
+            onSubmit={handleSubmit}
+            transaction={editingTransaction}
+          />
+        )}
         <SubscriptionRequiredModal
           open={showSubscriptionModal && (profile?.businessType !== 'agent' || !profile)}
           onOpenChange={setShowSubscriptionModal}
@@ -795,17 +805,31 @@ export function TransactionList({
       />
 
       {/* Add Transaction Dialog */}
-      <AddTransactionDialog
-        open={isAddDialogOpen}
-        onOpenChange={(open) => {
-          setIsAddDialogOpen(open)
-          if (!open) {
-            setEditingTransaction(null)
-          }
-        }}
-        onSubmit={handleSubmit}
-        transaction={editingTransaction || null}
-      />
+      {profile?.businessType === 'sme' ? (
+        <AddSMETransactionDialog
+          open={isAddDialogOpen}
+          onOpenChange={(open) => {
+            setIsAddDialogOpen(open)
+            if (!open) {
+              setEditingTransaction(null)
+            }
+          }}
+          onSubmit={handleSubmit}
+          transaction={editingTransaction || null}
+        />
+      ) : (
+        <AddTransactionDialog
+          open={isAddDialogOpen}
+          onOpenChange={(open) => {
+            setIsAddDialogOpen(open)
+            if (!open) {
+              setEditingTransaction(null)
+            }
+          }}
+          onSubmit={handleSubmit}
+          transaction={editingTransaction || null}
+        />
+      )}
 
       {/* Image Viewer Modal */}
       <ImageViewerModal

@@ -58,7 +58,11 @@ type FilterCategory = "period" | "method" | "status"
 export default function PaymentHistoryPage() {
   const router = useRouter()
   const pathname = usePathname()
-  const basePath = pathname?.startsWith("/dashboard-creator") ? "/dashboard-creator" : "/dashboard"
+  const basePath = pathname?.startsWith("/dashboard-creator")
+    ? "/dashboard-creator"
+    : pathname?.startsWith("/dashboard-sme")
+      ? "/dashboard-sme"
+      : "/dashboard"
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { isSubscribed, loading: subscriptionLoading } = useSubscription()
@@ -170,6 +174,15 @@ export default function PaymentHistoryPage() {
   const handleCloseReceipt = () => {
     setShowReceipt(false)
     setSelectedPayment(null)
+  }
+
+  const handleMakePayment = () => {
+    if (!isSubscribed && profile && profile.businessType !== 'agent') {
+      setShowSubscriptionModal(true)
+      return
+    }
+
+    router.push(`${basePath}/payment/add`)
   }
 
   const getStatusBadge = (status: string) => {
@@ -432,7 +445,7 @@ export default function PaymentHistoryPage() {
                 : "Try adjusting your filters to see more results."}
             </p>
             {payments.length === 0 && (
-              <Button onClick={() => router.push(`${basePath}/payment/add`)} size="lg" className="h-9 sm:h-10 text-sm sm:text-base">
+              <Button onClick={handleMakePayment} size="lg" className="h-9 sm:h-10 text-sm sm:text-base">
                 Make Payment
               </Button>
             )}
