@@ -36,7 +36,7 @@ import { useSidebar } from "@/lib/contexts/sidebar-context"
 export default function SettingsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { user, loading: authLoading } = useAuth()
+  const { user, loading: authLoading, setPasswordForGoogleUser } = useAuth()
   const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
   const { isSubscribed, subscriptionType, isExpired, isExpiringSoon, subscriptionExpiryDate } = useSubscription()
   const { sidebarCollapsed } = useSidebar()
@@ -1822,139 +1822,255 @@ export default function SettingsPage() {
                     </p>
                   </div>
                   <div className="space-y-4 sm:space-y-5 md:space-y-6 max-w-2xl">
-                    <div className="space-y-1.5 sm:space-y-2">
-                      <Label htmlFor="current-password" className="text-xs sm:text-sm">Current Password</Label>
-                      <Input 
-                        id="current-password" 
-                        type="password" 
-                        placeholder="Enter your current password" 
-                        className="h-9 sm:h-10 text-xs sm:text-sm"
-                        value={passwordData.currentPassword}
-                        onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
-                        disabled={isUpdatingPassword}
-                      />
-                    </div>
-                    <div className="space-y-1.5 sm:space-y-2">
-                      <Label htmlFor="new-password" className="text-xs sm:text-sm">New Password</Label>
-                      <Input 
-                        id="new-password" 
-                        type="password" 
-                        placeholder="Enter your new password (min. 6 characters)" 
-                        className="h-9 sm:h-10 text-xs sm:text-sm"
-                        value={passwordData.newPassword}
-                        onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                        disabled={isUpdatingPassword}
-                      />
-                    </div>
-                    <div className="space-y-1.5 sm:space-y-2">
-                      <Label htmlFor="confirm-password" className="text-xs sm:text-sm">Confirm New Password</Label>
-                      <Input 
-                        id="confirm-password" 
-                        type="password" 
-                        placeholder="Confirm your new password" 
-                        className="h-9 sm:h-10 text-xs sm:text-sm"
-                        value={passwordData.confirmPassword}
-                        onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                        disabled={isUpdatingPassword}
-                      />
-                      {passwordData.newPassword && passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword && (
-                        <p className="text-xs text-destructive mt-1">Passwords do not match</p>
-                      )}
-                    </div>
-                    <div className="flex justify-end pt-2 sm:pt-4">
-                      <Button 
-                        size="lg" 
-                        className="h-9 sm:h-10 md:h-11 text-xs sm:text-sm md:text-base w-full sm:w-auto"
-                        onClick={async () => {
-                          if (!user?.email) {
-                            toast.error("User not authenticated")
-                            return
-                          }
+                    {(() => {
+                      // Check if user has Google provider but no password provider
+                      const hasPasswordProvider = user?.providerData?.some(
+                        provider => provider.providerId === 'password'
+                      ) ?? false
+                      const hasGoogleProvider = user?.providerData?.some(
+                        provider => provider.providerId === 'google.com'
+                      ) ?? false
+                      const isGoogleOnlyUser = hasGoogleProvider && !hasPasswordProvider
 
-                          // Validation
-                          if (!passwordData.currentPassword) {
-                            toast.error("Please enter your current password")
-                            return
-                          }
-
-                          if (!passwordData.newPassword) {
-                            toast.error("Please enter a new password")
-                            return
-                          }
-
-                          if (passwordData.newPassword.length < 6) {
-                            toast.error("Password must be at least 6 characters long")
-                            return
-                          }
-
-                          if (passwordData.newPassword !== passwordData.confirmPassword) {
-                            toast.error("Passwords do not match")
-                            return
-                          }
-
-                          if (passwordData.currentPassword === passwordData.newPassword) {
-                            toast.error("New password must be different from current password")
-                            return
-                          }
-
-                          setIsUpdatingPassword(true)
-                          try {
-                            const currentUser = auth.currentUser
-                            if (!currentUser || !currentUser.email) {
-                              toast.error("User not authenticated")
-                              return
-                            }
-
-                            // Reauthenticate user with current password
-                            const credential = EmailAuthProvider.credential(
-                              currentUser.email,
-                              passwordData.currentPassword
-                            )
-                            
-                            await reauthenticateWithCredential(currentUser, credential)
-
-                            // Update password
-                            await updatePassword(currentUser, passwordData.newPassword)
-
-                            toast.success("Password updated successfully!")
-                            
-                            // Clear form
-                            setPasswordData({
-                              currentPassword: '',
-                              newPassword: '',
-                              confirmPassword: ''
-                            })
-                          } catch (error: any) {
-                            console.error("Error updating password:", error)
-                            
-                            let errorMessage = "Failed to update password"
-                            if (error.code === 'auth/wrong-password') {
-                              errorMessage = "Current password is incorrect"
-                            } else if (error.code === 'auth/weak-password') {
-                              errorMessage = "Password is too weak. Please choose a stronger password"
-                            } else if (error.code === 'auth/requires-recent-login') {
-                              errorMessage = "Please log out and log back in before changing your password"
-                            } else if (error.message) {
-                              errorMessage = error.message
-                            }
-                            
-                            toast.error(errorMessage)
-                          } finally {
-                            setIsUpdatingPassword(false)
-                          }
-                        }}
-                        disabled={isUpdatingPassword || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword || passwordData.newPassword !== passwordData.confirmPassword}
-                      >
-                        {isUpdatingPassword ? (
+                      if (isGoogleOnlyUser) {
+                        // Show "Set Password" UI for Google users
+                        return (
                           <>
-                            <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-2 animate-spin" />
-                            Updating...
+                            <div className="p-3 sm:p-4 border rounded-lg bg-muted/20">
+                              <p className="text-xs sm:text-sm text-muted-foreground">
+                                You signed up with Google. Set a password to enable email/password login.
+                              </p>
+                            </div>
+                            <div className="space-y-1.5 sm:space-y-2">
+                              <Label htmlFor="new-password" className="text-xs sm:text-sm">New Password</Label>
+                              <Input 
+                                id="new-password" 
+                                type="password" 
+                                placeholder="Enter your password (min. 6 characters)" 
+                                className="h-9 sm:h-10 text-xs sm:text-sm"
+                                value={passwordData.newPassword}
+                                onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                                disabled={isUpdatingPassword}
+                              />
+                            </div>
+                            <div className="space-y-1.5 sm:space-y-2">
+                              <Label htmlFor="confirm-password" className="text-xs sm:text-sm">Confirm Password</Label>
+                              <Input 
+                                id="confirm-password" 
+                                type="password" 
+                                placeholder="Confirm your password" 
+                                className="h-9 sm:h-10 text-xs sm:text-sm"
+                                value={passwordData.confirmPassword}
+                                onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                                disabled={isUpdatingPassword}
+                              />
+                              {passwordData.newPassword && passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword && (
+                                <p className="text-xs text-destructive mt-1">Passwords do not match</p>
+                              )}
+                            </div>
+                            <div className="flex justify-end pt-2 sm:pt-4">
+                              <Button 
+                                size="lg" 
+                                className="h-9 sm:h-10 md:h-11 text-xs sm:text-sm md:text-base w-full sm:w-auto"
+                                onClick={async () => {
+                                  if (!user?.email) {
+                                    toast.error("User not authenticated")
+                                    return
+                                  }
+
+                                  if (!passwordData.newPassword) {
+                                    toast.error("Please enter a password")
+                                    return
+                                  }
+
+                                  if (passwordData.newPassword.length < 6) {
+                                    toast.error("Password must be at least 6 characters long")
+                                    return
+                                  }
+
+                                  if (passwordData.newPassword !== passwordData.confirmPassword) {
+                                    toast.error("Passwords do not match")
+                                    return
+                                  }
+
+                                  setIsUpdatingPassword(true)
+                                  try {
+                                    const result = await setPasswordForGoogleUser(passwordData.newPassword)
+                                    
+                                    if (result.success) {
+                                      toast.success(result.message || "Password set successfully! You can now sign in with email and password.")
+                                      
+                                      // Clear form
+                                      setPasswordData({
+                                        currentPassword: '',
+                                        newPassword: '',
+                                        confirmPassword: ''
+                                      })
+                                    } else {
+                                      toast.error(result.error || "Failed to set password")
+                                    }
+                                  } catch (error: any) {
+                                    console.error("Error setting password:", error)
+                                    toast.error(error.message || "Failed to set password")
+                                  } finally {
+                                    setIsUpdatingPassword(false)
+                                  }
+                                }}
+                                disabled={isUpdatingPassword || !passwordData.newPassword || !passwordData.confirmPassword || passwordData.newPassword !== passwordData.confirmPassword}
+                              >
+                                {isUpdatingPassword ? (
+                                  <>
+                                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-2 animate-spin" />
+                                    Setting...
+                                  </>
+                                ) : (
+                                  "Set Password"
+                                )}
+                              </Button>
+                            </div>
                           </>
-                        ) : (
-                          "Update Password"
-                        )}
-                      </Button>
-                    </div>
+                        )
+                      }
+
+                      // Show "Update Password" UI for users with password
+                      return (
+                        <>
+                          <div className="space-y-1.5 sm:space-y-2">
+                            <Label htmlFor="current-password" className="text-xs sm:text-sm">Current Password</Label>
+                            <Input 
+                              id="current-password" 
+                              type="password" 
+                              placeholder="Enter your current password" 
+                              className="h-9 sm:h-10 text-xs sm:text-sm"
+                              value={passwordData.currentPassword}
+                              onChange={(e) => setPasswordData(prev => ({ ...prev, currentPassword: e.target.value }))}
+                              disabled={isUpdatingPassword}
+                            />
+                          </div>
+                          <div className="space-y-1.5 sm:space-y-2">
+                            <Label htmlFor="new-password" className="text-xs sm:text-sm">New Password</Label>
+                            <Input 
+                              id="new-password" 
+                              type="password" 
+                              placeholder="Enter your new password (min. 6 characters)" 
+                              className="h-9 sm:h-10 text-xs sm:text-sm"
+                              value={passwordData.newPassword}
+                              onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
+                              disabled={isUpdatingPassword}
+                            />
+                          </div>
+                          <div className="space-y-1.5 sm:space-y-2">
+                            <Label htmlFor="confirm-password" className="text-xs sm:text-sm">Confirm New Password</Label>
+                            <Input 
+                              id="confirm-password" 
+                              type="password" 
+                              placeholder="Confirm your new password" 
+                              className="h-9 sm:h-10 text-xs sm:text-sm"
+                              value={passwordData.confirmPassword}
+                              onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                              disabled={isUpdatingPassword}
+                            />
+                            {passwordData.newPassword && passwordData.confirmPassword && passwordData.newPassword !== passwordData.confirmPassword && (
+                              <p className="text-xs text-destructive mt-1">Passwords do not match</p>
+                            )}
+                          </div>
+                          <div className="flex justify-end pt-2 sm:pt-4">
+                            <Button 
+                              size="lg" 
+                              className="h-9 sm:h-10 md:h-11 text-xs sm:text-sm md:text-base w-full sm:w-auto"
+                              onClick={async () => {
+                                if (!user?.email) {
+                                  toast.error("User not authenticated")
+                                  return
+                                }
+
+                                // Validation
+                                if (!passwordData.currentPassword) {
+                                  toast.error("Please enter your current password")
+                                  return
+                                }
+
+                                if (!passwordData.newPassword) {
+                                  toast.error("Please enter a new password")
+                                  return
+                                }
+
+                                if (passwordData.newPassword.length < 6) {
+                                  toast.error("Password must be at least 6 characters long")
+                                  return
+                                }
+
+                                if (passwordData.newPassword !== passwordData.confirmPassword) {
+                                  toast.error("Passwords do not match")
+                                  return
+                                }
+
+                                if (passwordData.currentPassword === passwordData.newPassword) {
+                                  toast.error("New password must be different from current password")
+                                  return
+                                }
+
+                                setIsUpdatingPassword(true)
+                                try {
+                                  const currentUser = auth.currentUser
+                                  if (!currentUser || !currentUser.email) {
+                                    toast.error("User not authenticated")
+                                    return
+                                  }
+
+                                  // Reauthenticate user with current password
+                                  const credential = EmailAuthProvider.credential(
+                                    currentUser.email,
+                                    passwordData.currentPassword
+                                  )
+                                  
+                                  await reauthenticateWithCredential(currentUser, credential)
+
+                                  // Update password
+                                  await updatePassword(currentUser, passwordData.newPassword)
+
+                                  toast.success("Password updated successfully!")
+                                  
+                                  // Clear form
+                                  setPasswordData({
+                                    currentPassword: '',
+                                    newPassword: '',
+                                    confirmPassword: ''
+                                  })
+                                } catch (error: any) {
+                                  console.error("Error updating password:", error)
+                                  
+                                  let errorMessage = "Failed to update password"
+                                  if (error.code === 'auth/wrong-password') {
+                                    errorMessage = "Current password is incorrect"
+                                  } else if (error.code === 'auth/weak-password') {
+                                    errorMessage = "Password is too weak. Please choose a stronger password"
+                                  } else if (error.code === 'auth/requires-recent-login') {
+                                    errorMessage = "Please log out and log back in before changing your password"
+                                  } else if (error.message) {
+                                    errorMessage = error.message
+                                  }
+                                  
+                                  toast.error(errorMessage)
+                                } finally {
+                                  setIsUpdatingPassword(false)
+                                }
+                              }}
+                              disabled={isUpdatingPassword || !passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword || passwordData.newPassword !== passwordData.confirmPassword}
+                            >
+                              {isUpdatingPassword ? (
+                                <>
+                                  <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-2 animate-spin" />
+                                  Updating...
+                                </>
+                              ) : (
+                                "Update Password"
+                              )}
+                            </Button>
+                          </div>
+                        </>
+                      )
+                    })()}
                   </div>
                 </Card>
               </TabsContent>
