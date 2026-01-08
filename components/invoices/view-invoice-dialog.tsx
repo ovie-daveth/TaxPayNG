@@ -51,7 +51,7 @@ export function ViewInvoiceDialog({
   const [isUploadingReceipt, setIsUploadingReceipt] = useState(false)
   const [taxDeductible, setTaxDeductible] = useState(true) // Default to true for bills
   const [showWHTForm, setShowWHTForm] = useState(false)
-  const [whtRate, setWhtRate] = useState(5)
+  const [whtRate, setWhtRate] = useState<number | undefined>(5)
   const [whtCertificateNumber, setWhtCertificateNumber] = useState("")
   const [whtNotes, setWhtNotes] = useState("")
   const [isDeductingWHT, setIsDeductingWHT] = useState(false)
@@ -1637,44 +1637,47 @@ export function ViewInvoiceDialog({
                     <div>
                       <Label className="text-xs text-muted-foreground mb-2 block">VAT Rate (%)</Label>
                       <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        value={editedInvoice.vatRate || 7.5}
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="7.5"
+                        value={editedInvoice.vatRate?.toString() || ''}
                         onChange={(e) => {
-                          const vatRate = parseFloat(e.target.value) || 7.5
-                          const subtotal = editedInvoice.subtotal
-                          const discountAmount = editedInvoice.discount ? subtotal * (editedInvoice.discount / 100) : 0
-                          const subtotalAfterDiscount = subtotal - discountAmount
-                          // Calculate vatable subtotal
-                          let vatableSubtotal = 0
-                          editedInvoice.items.forEach(item => {
-                            if (item.vatable && item.unitPrice > 0) {
-                              const itemCurrency = itemCurrencies[item.id] || (item.currency as CurrencyCode) || editedInvoice.currency
-                              const baseCurrency = editedInvoice.currency as CurrencyCode
-                              const basePrice = itemCurrency !== baseCurrency 
-                                ? (itemConvertedAmounts[item.id] || item.unitPrice)
-                                : item.unitPrice
-                              vatableSubtotal += item.quantity * basePrice
-                            }
-                          })
-                          const vatableDiscountAmount = vatableSubtotal > 0 && subtotal > 0 
-                            ? (vatableSubtotal / subtotal) * discountAmount 
-                            : 0
-                          const vatableSubtotalAfterDiscount = vatableSubtotal - vatableDiscountAmount
-                          const vatAmount = vatableSubtotalAfterDiscount * (vatRate / 100)
-                          const invoiceTotal = subtotalAfterDiscount + vatAmount
-                          // Note: WHT is deducted by client, not calculated here
-                          const total = invoiceTotal
-                          setEditedInvoice(prev => prev ? {
-                            ...prev,
-                            vatRate,
-                            vatAmount,
-                            taxAmount: vatAmount,
-                            invoiceTotal,
-                            total
-                          } : null)
+                          const value = e.target.value
+                          // Allow empty string, numbers, and decimals
+                          if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                            const vatRate = value === '' ? 7.5 : parseFloat(value) || 7.5
+                            const subtotal = editedInvoice.subtotal
+                            const discountAmount = editedInvoice.discount ? subtotal * (editedInvoice.discount / 100) : 0
+                            const subtotalAfterDiscount = subtotal - discountAmount
+                            // Calculate vatable subtotal
+                            let vatableSubtotal = 0
+                            editedInvoice.items.forEach(item => {
+                              if (item.vatable && item.unitPrice > 0) {
+                                const itemCurrency = itemCurrencies[item.id] || (item.currency as CurrencyCode) || editedInvoice.currency
+                                const baseCurrency = editedInvoice.currency as CurrencyCode
+                                const basePrice = itemCurrency !== baseCurrency 
+                                  ? (itemConvertedAmounts[item.id] || item.unitPrice)
+                                  : item.unitPrice
+                                vatableSubtotal += item.quantity * basePrice
+                              }
+                            })
+                            const vatableDiscountAmount = vatableSubtotal > 0 && subtotal > 0 
+                              ? (vatableSubtotal / subtotal) * discountAmount 
+                              : 0
+                            const vatableSubtotalAfterDiscount = vatableSubtotal - vatableDiscountAmount
+                            const vatAmount = vatableSubtotalAfterDiscount * (vatRate / 100)
+                            const invoiceTotal = subtotalAfterDiscount + vatAmount
+                            // Note: WHT is deducted by client, not calculated here
+                            const total = invoiceTotal
+                            setEditedInvoice(prev => prev ? {
+                              ...prev,
+                              vatRate,
+                              vatAmount,
+                              taxAmount: vatAmount,
+                              invoiceTotal,
+                              total
+                            } : null)
+                          }
                         }}
                         className="h-9"
                       />
@@ -1947,44 +1950,47 @@ export function ViewInvoiceDialog({
                     <div>
                       <Label className="text-xs text-muted-foreground mb-2 block">VAT Rate (%)</Label>
                       <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.1"
-                        value={editedInvoice.vatRate || 7.5}
+                        type="text"
+                        inputMode="decimal"
+                        placeholder="7.5"
+                        value={editedInvoice.vatRate?.toString() || ''}
                         onChange={(e) => {
-                          const vatRate = parseFloat(e.target.value) || 7.5
-                          const subtotal = editedInvoice.subtotal
-                          const discountAmount = editedInvoice.discount ? subtotal * (editedInvoice.discount / 100) : 0
-                          const subtotalAfterDiscount = subtotal - discountAmount
-                          // Calculate vatable subtotal
-                          let vatableSubtotal = 0
-                          editedInvoice.items.forEach(item => {
-                            if (item.vatable && item.unitPrice > 0) {
-                              const itemCurrency = itemCurrencies[item.id] || (item.currency as CurrencyCode) || editedInvoice.currency
-                              const baseCurrency = editedInvoice.currency as CurrencyCode
-                              const basePrice = itemCurrency !== baseCurrency 
-                                ? (itemConvertedAmounts[item.id] || item.unitPrice)
-                                : item.unitPrice
-                              vatableSubtotal += item.quantity * basePrice
-                            }
-                          })
-                          const vatableDiscountAmount = vatableSubtotal > 0 && subtotal > 0 
-                            ? (vatableSubtotal / subtotal) * discountAmount 
-                            : 0
-                          const vatableSubtotalAfterDiscount = vatableSubtotal - vatableDiscountAmount
-                          const vatAmount = vatableSubtotalAfterDiscount * (vatRate / 100)
-                          const invoiceTotal = subtotalAfterDiscount + vatAmount
-                          // Note: WHT is deducted by client, not calculated here
-                          const total = invoiceTotal
-                          setEditedInvoice(prev => prev ? {
-                            ...prev,
-                            vatRate,
-                            vatAmount,
-                            taxAmount: vatAmount,
-                            invoiceTotal,
-                            total
-                          } : null)
+                          const value = e.target.value
+                          // Allow empty string, numbers, and decimals
+                          if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                            const vatRate = value === '' ? 7.5 : parseFloat(value) || 7.5
+                            const subtotal = editedInvoice.subtotal
+                            const discountAmount = editedInvoice.discount ? subtotal * (editedInvoice.discount / 100) : 0
+                            const subtotalAfterDiscount = subtotal - discountAmount
+                            // Calculate vatable subtotal
+                            let vatableSubtotal = 0
+                            editedInvoice.items.forEach(item => {
+                              if (item.vatable && item.unitPrice > 0) {
+                                const itemCurrency = itemCurrencies[item.id] || (item.currency as CurrencyCode) || editedInvoice.currency
+                                const baseCurrency = editedInvoice.currency as CurrencyCode
+                                const basePrice = itemCurrency !== baseCurrency 
+                                  ? (itemConvertedAmounts[item.id] || item.unitPrice)
+                                  : item.unitPrice
+                                vatableSubtotal += item.quantity * basePrice
+                              }
+                            })
+                            const vatableDiscountAmount = vatableSubtotal > 0 && subtotal > 0 
+                              ? (vatableSubtotal / subtotal) * discountAmount 
+                              : 0
+                            const vatableSubtotalAfterDiscount = vatableSubtotal - vatableDiscountAmount
+                            const vatAmount = vatableSubtotalAfterDiscount * (vatRate / 100)
+                            const invoiceTotal = subtotalAfterDiscount + vatAmount
+                            // Note: WHT is deducted by client, not calculated here
+                            const total = invoiceTotal
+                            setEditedInvoice(prev => prev ? {
+                              ...prev,
+                              vatRate,
+                              vatAmount,
+                              taxAmount: vatAmount,
+                              invoiceTotal,
+                              total
+                            } : null)
+                          }
                         }}
                         className="h-9"
                       />
@@ -2115,13 +2121,18 @@ export function ViewInvoiceDialog({
                           <Label htmlFor="wht-rate" className="text-xs">WHT Rate (%)</Label>
                           <Input
                             id="wht-rate"
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.1"
-                            value={whtRate}
-                            onChange={(e) => setWhtRate(parseFloat(e.target.value) || 5)}
+                            type="text"
+                            inputMode="decimal"
                             placeholder="5"
+                            value={whtRate?.toString() || ''}
+                            onChange={(e) => {
+                              const value = e.target.value
+                              // Allow empty string, numbers, and decimals
+                              if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                const rate = value === '' ? undefined : parseFloat(value)
+                                setWhtRate(rate)
+                              }
+                            }}
                             className="h-9"
                           />
                           <p className="text-xs text-muted-foreground mt-1">
@@ -2155,12 +2166,12 @@ export function ViewInvoiceDialog({
                             <span>{formatCurrencyAmount((currentInvoice || invoice).invoiceTotal || ((currentInvoice || invoice).subtotal + (currentInvoice || invoice).vatAmount), (currentInvoice || invoice).currency as any)}</span>
                           </div>
                           <div className="flex justify-between text-sm text-destructive">
-                            <span>WHT ({whtRate}%):</span>
-                            <span>-{formatCurrencyAmount(((currentInvoice || invoice).invoiceTotal || ((currentInvoice || invoice).subtotal + (currentInvoice || invoice).vatAmount)) * (whtRate / 100), (currentInvoice || invoice).currency as any)}</span>
+                            <span>WHT ({whtRate || 5}%):</span>
+                            <span>-{formatCurrencyAmount(((currentInvoice || invoice).invoiceTotal || ((currentInvoice || invoice).subtotal + (currentInvoice || invoice).vatAmount)) * ((whtRate || 5) / 100), (currentInvoice || invoice).currency as any)}</span>
                           </div>
                           <div className="flex justify-between text-sm font-semibold border-t pt-2 mt-2">
                             <span>Amount to Pay:</span>
-                            <span>{formatCurrencyAmount(((currentInvoice || invoice).invoiceTotal || ((currentInvoice || invoice).subtotal + (currentInvoice || invoice).vatAmount)) * (1 - whtRate / 100), (currentInvoice || invoice).currency as any)}</span>
+                            <span>{formatCurrencyAmount(((currentInvoice || invoice).invoiceTotal || ((currentInvoice || invoice).subtotal + (currentInvoice || invoice).vatAmount)) * (1 - (whtRate || 5) / 100), (currentInvoice || invoice).currency as any)}</span>
                           </div>
                         </div>
                         <Button

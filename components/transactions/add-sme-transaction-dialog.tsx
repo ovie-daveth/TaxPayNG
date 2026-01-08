@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { Upload, Scan, Loader2, AlertCircle, HelpCircle } from "lucide-react"
+import { Upload, Scan, Loader2, AlertCircle, HelpCircle, FileText } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Transaction, TransactionNature, TaxPeriod, TaxClassification } from "@/lib/types"
 import { toast } from "sonner"
@@ -48,7 +48,7 @@ function getCapitalAllowanceRatesByAssetType(
   }
 }
 
-interface AddTransactionDialogProps {
+interface AddSMETransactionDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSubmit: (data: Omit<Transaction, 'id' | 'userId' | 'createdAt' | 'updatedAt'>) => Promise<any>
@@ -58,7 +58,7 @@ interface AddTransactionDialogProps {
   defaultDescription?: string
 }
 
-export function AddTransactionDialog({
+export function AddSMETransactionDialog({
   open,
   onOpenChange,
   onSubmit,
@@ -66,90 +66,72 @@ export function AddTransactionDialog({
   defaultType,
   defaultCategory,
   defaultDescription
-}: AddTransactionDialogProps) {
+}: AddSMETransactionDialogProps) {
   const { user } = useAuth()
   const { profile } = useUserProfile()
   
-  // Define base categories based on business type and transaction type
+  // Define base categories for SME business type and transaction type
   const getBaseCategories = () => {
-    const isCreator = profile?.businessType === 'creator'
     const isIncome = formData.type === 'income'
+    const isRelief = formData.type === 'relief'
     
-    if (isCreator) {
-      if (isIncome) {
-        return [
-          { value: "Brand Sponsorship", label: "Brand Sponsorship" },
-          { value: "Ad Revenue", label: "Ad Revenue (YouTube, Instagram, etc.)" },
-          { value: "Affiliate Income", label: "Affiliate Income" },
-          { value: "Brand Deal", label: "Brand Deal" },
-          { value: "Content Licensing", label: "Content Licensing" },
-          { value: "Merchandise Sales", label: "Merchandise Sales" },
-          { value: "Subscription Revenue", label: "Subscription Revenue (Patreon, etc.)" },
-          { value: "Online Courses", label: "Online Courses/Coaching" },
-          { value: "Events & Speaking", label: "Events & Speaking" },
-          { value: "Platform Payout", label: "Platform Payout (YouTube, TikTok, etc.)" },
-          { value: "Other", label: "Other" },
-        ]
-      } else {
-        return [
-          { value: "Equipment", label: "Equipment (Camera, Mic, etc.)" },
-          { value: "Software & Subscriptions", label: "Software & Subscriptions" },
-          { value: "Studio Rent", label: "Studio Rent/Setup" },
-          { value: "Co-working Space", label: "Co-working Space" },
-          { value: "Editing Services", label: "Editing Services" },
-          { value: "Marketing & Promotion", label: "Marketing & Promotion" },
-          { value: "Travel for Content", label: "Travel for Content" },
-          { value: "Props & Supplies", label: "Props & Supplies" },
-          { value: "Internet & Utilities", label: "Internet & Utilities" },
-          { value: "Staff/Contractor", label: "Staff/Contractor Payments" },
-          { value: "Professional Fees", label: "Professional Fees (Accountants, Lawyers)" },
-          { value: "Rent", label: "Rent" },
-          { value: "Food", label: "Food" },
-          { value: "Transport", label: "Transport" },
-          { value: "Healthcare", label: "Healthcare" },
-          { value: "Other", label: "Other" },
-        ]
-      }
+    if (isRelief) {
+      // Tax Relief Categories (from FAQ and Nigerian Tax Act)
+      return [
+        { value: "Pension Contribution", label: "Pension Contribution (Up to 8% of gross income)" },
+        { value: "National Housing Fund (NHF)", label: "National Housing Fund (NHF)" },
+        { value: "National Health Insurance Scheme (NHIS)", label: "National Health Insurance Scheme (NHIS)" },
+        { value: "Rent Relief", label: "Rent Relief (20% of rent paid, capped at ₦500,000)" },
+        { value: "Life Insurance Premium", label: "Life Insurance Premium" },
+        { value: "Interest on Housing Loan", label: "Interest on Housing Loan (for own residence)" },
+        { value: "Charitable Donation", label: "Charitable Donation (Up to 10% of gross income)" },
+        { value: "Other Relief", label: "Other Relief" },
+      ]
+    } else if (isIncome) {
+      // SME Income Categories
+      return [
+        { value: "Sales Revenue", label: "Sales Revenue" },
+        { value: "Service Revenue", label: "Service Revenue" },
+        { value: "Product Sales", label: "Product Sales" },
+        { value: "Rent Income", label: "Rent Income" },
+        { value: "Interest Income", label: "Interest Income" },
+        { value: "Commission Income", label: "Commission Income" },
+        { value: "Consulting Fees", label: "Consulting Fees" },
+        { value: "Contract Revenue", label: "Contract Revenue" },
+        { value: "Retainer Fees", label: "Retainer Fees" },
+        { value: "Licensing Revenue", label: "Licensing Revenue" },
+        { value: "Other Income", label: "Other Income" },
+      ]
     } else {
-      // Freelancer categories
-      if (isIncome) {
-        return [
-          { value: "Services", label: "Services" },
-          { value: "Consulting", label: "Consulting" },
-          { value: "Projects", label: "Projects" },
-          { value: "Platform Income", label: "Platform Income (Upwork, Fiverr, etc.)" },
-          { value: "Retainer", label: "Retainer Fees" },
-          { value: "Commission", label: "Commission-Based Income" },
-          { value: "Other", label: "Other" },
-        ]
-      } else {
-        return [
-          // Tax Deductible Categories (based on FAQ)
-          { value: "Office Rent", label: "Office Rent / Workspace" },
-          { value: "Software & Subscriptions", label: "Software & Subscriptions" },
-          { value: "Utilities", label: "Utilities (Internet, Electricity)" },
-          { value: "Marketing & Advertising", label: "Marketing & Advertising" },
-          { value: "Professional Fees", label: "Professional Fees (Accountants, Lawyers)" },
-          { value: "Business Travel", label: "Business Travel & Transport" },
-          { value: "Business Meals", label: "Business Meals (Client Meetings)" },
-          { value: "Training & Education", label: "Training & Education (Business-related)" },
-          { value: "Office Supplies", label: "Office Supplies" },
-          { value: "Office Equipment", label: "Office Equipment" },
-          { value: "Internet & Phone", label: "Internet & Phone (Business)" },
-          { value: "Business Insurance", label: "Business Insurance" },
-          { value: "Contractor Fees", label: "Contractor / Freelancer Fees" },
-          { value: "Bank Charges", label: "Bank Charges (Business Account)" },
-          { value: "Accounting Software", label: "Accounting Software" },
-          // Personal / Non-deductible Categories
-          { value: "Personal Expenses", label: "Personal Expenses" },
-          { value: "Personal Meals", label: "Personal Meals" },
-          { value: "Personal Transport", label: "Personal Transport" },
-          { value: "Entertainment", label: "Entertainment (Personal)" },
-          { value: "Healthcare", label: "Healthcare (Personal)" },
-          { value: "Education (Personal)", label: "Education (Personal)" },
-          { value: "Other", label: "Other" },
-        ]
-      }
+      // SME Expense Categories
+      return [
+        // Cost of Goods Sold
+        { value: "Cost of Goods Sold", label: "Cost of Goods Sold (COGS)" },
+        { value: "Raw Materials", label: "Raw Materials" },
+        { value: "Inventory", label: "Inventory" },
+        { value: "Direct Labor", label: "Direct Labor" },
+        // Operating Expenses
+        { value: "Salaries & Wages", label: "Salaries & Wages" },
+        { value: "Office Rent", label: "Office Rent / Workspace" },
+        { value: "Utilities", label: "Utilities (Electricity, Water, etc.)" },
+        { value: "Internet & Phone", label: "Internet & Phone" },
+        { value: "Software & Subscriptions", label: "Software & Subscriptions" },
+        { value: "Marketing & Advertising", label: "Marketing & Advertising" },
+        { value: "Professional Fees", label: "Professional Fees (Accountants, Lawyers)" },
+        { value: "Business Travel", label: "Business Travel & Transport" },
+        { value: "Business Meals", label: "Business Meals & Entertainment" },
+        { value: "Office Supplies", label: "Office Supplies" },
+        { value: "Office Equipment", label: "Office Equipment" },
+        { value: "Maintenance & Repairs", label: "Maintenance & Repairs" },
+        { value: "Insurance", label: "Business Insurance" },
+        { value: "Bank Charges", label: "Bank Charges & Fees" },
+        { value: "Accounting Software", label: "Accounting Software" },
+        { value: "Training & Education", label: "Training & Education" },
+        { value: "Contractor Fees", label: "Contractor / Freelancer Fees" },
+        { value: "Depreciation", label: "Depreciation" },
+        { value: "Taxes & Licenses", label: "Taxes & Licenses" },
+        { value: "Other", label: "Other Expenses" },
+      ]
     }
   }
 
@@ -168,6 +150,14 @@ export function AddTransactionDialog({
     }
     
     return baseCategories
+  }
+
+  // Helper function to check if a category is tax deductible (for display in dropdown)
+  const isCategoryTaxDeductible = (categoryValue: string): boolean => {
+    if (formData.type !== 'expense') {
+      return false // Income transactions don't have tax deductible status
+    }
+    return autoDetermineTaxDeductible(formData.type, categoryValue)
   }
 
   const [formData, setFormData] = useState({
@@ -247,15 +237,28 @@ export function AddTransactionDialog({
   
   // Tax Classification state (only for Gold+ users)
   const [taxClassification, setTaxClassification] = useState<TaxClassification | undefined>(undefined)
-  const [skipTaxClassification, setSkipTaxClassification] = useState(false)
   const [taxClassificationManuallyEdited, setTaxClassificationManuallyEdited] = useState(false)
   const [showCapitalAllowanceAdvanced, setShowCapitalAllowanceAdvanced] = useState(false)
+  
+  // WHT Credit Note (for income transactions - proof that WHT was deducted)
+  const [whtCreditNoteFile, setWhtCreditNoteFile] = useState<File | null>(null)
+  const [whtCreditNoteUrl, setWhtCreditNoteUrl] = useState<string | null>(null)
   
   // Track if any Select dropdown is open to prevent dialog from closing on mobile
   const [isAnySelectOpen, setIsAnySelectOpen] = useState(false)
   const selectOpenTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   
-  // Auto-determine tax deductible for freelancers based on category only
+  // Help modal state
+  const [helpModalOpen, setHelpModalOpen] = useState(false)
+  const [helpModalContent, setHelpModalContent] = useState<{ title: string; content: string } | null>(null)
+  
+  // Helper function to open help modal
+  const openHelpModal = (title: string, content: string) => {
+    setHelpModalContent({ title, content })
+    setHelpModalOpen(true)
+  }
+  
+  // Auto-determine tax deductible for SMEs based on category
   const autoDetermineTaxDeductible = (
     type: Transaction['type'],
     category: string
@@ -271,60 +274,51 @@ export function AddTransactionDialog({
 
     const categoryLower = category.toLowerCase()
 
-    // Tax Deductible Categories (based on FAQ - business expenses)
+    // Tax Deductible Categories for SMEs (business expenses)
     const taxDeductibleCategories = [
+      'cost of goods sold',
+      'raw materials',
+      'inventory',
+      'direct labor',
+      'salaries & wages',
       'office rent',
-      'software & subscriptions',
       'utilities',
+      'internet & phone',
+      'software & subscriptions',
       'marketing & advertising',
       'professional fees',
       'business travel',
       'business meals',
-      'training & education',
+      'business meals & entertainment',
       'office supplies',
       'office equipment',
-      'internet & phone',
+      'maintenance & repairs',
+      'insurance',
       'business insurance',
-      'contractor fees',
-      'contractor / freelancer fees',
       'bank charges',
-      'accounting software'
+      'bank charges & fees',
+      'accounting software',
+      'training & education',
+      'contractor fees',
+      'depreciation',
+      'taxes & licenses'
     ]
 
-    // Check if category is tax deductible (exact match)
+    // Check if category is tax deductible (exact match or contains)
     if (taxDeductibleCategories.some(tdc => {
       const tdcLower = tdc.toLowerCase().trim()
-      return categoryLower === tdcLower
+      return categoryLower === tdcLower || categoryLower.includes(tdcLower)
     })) {
       return true
     }
 
-    // Non-deductible Categories (personal expenses)
-    const nonDeductibleCategories = [
-      'personal expenses',
-      'personal meals',
-      'personal transport',
-      'entertainment',
-      'healthcare',
-      'education (personal)'
-    ]
-
-    // Check if category is non-deductible (exact match)
-    if (nonDeductibleCategories.some(ndc => {
-      const ndcLower = ndc.toLowerCase().trim()
-      return categoryLower === ndcLower
-    })) {
-      return false
+    // Default for "Other" category - assume deductible for SMEs (most business expenses are deductible)
+    if (categoryLower === 'other' || categoryLower === 'other expenses') {
+      return true
     }
 
-    // Default for "Other" category - assume not deductible (user can specify if needed)
-    if (categoryLower === 'other') {
-      return false
-    }
-
-    // Default: if category is not in the lists above, default to false (conservative approach)
-    // User can manually override if needed (but switch is removed, so this won't be visible)
-    return false
+    // Default: assume deductible for SME business expenses (conservative approach favors business)
+    return true
   }
 
   // Auto-populate tax classification based on transaction data (Gold+ only)
@@ -651,8 +645,19 @@ export function AddTransactionDialog({
       
       // Tax Classification (Gold+ only)
       if (hasTaxClassificationAccess) {
-        if (transaction.taxClassification) {
+        if (transaction.type === 'relief') {
+          // Relief transactions: set as allowable expense in background
+          setTaxClassification({
+            expenseType: 'allowable',
+            vatApplicable: false,
+            whtCreditable: false
+          })
+        } else if (transaction.taxClassification) {
           setTaxClassification(transaction.taxClassification)
+          // Load WHT credit note URL if it exists
+          if (transaction.taxClassification.whtCreditNoteUrl) {
+            setWhtCreditNoteUrl(transaction.taxClassification.whtCreditNoteUrl)
+          }
         } else {
           // Auto-populate if not set
           const autoClassification = autoPopulateTaxClassification(
@@ -666,39 +671,7 @@ export function AddTransactionDialog({
         }
       }
       
-      // Phase 2: Initialize platform fees and platform info
-      if (profile?.businessType === 'creator' && transaction.type === 'income') {
-        // Enable breakdown if platform fees data exists
-        const hasPlatformFees = !!(transaction.grossAmount || transaction.platformFees || transaction.platform)
-        setUsePlatformFeesBreakdown(hasPlatformFees)
-        
-        if (transaction.grossAmount) {
-          const gross = transaction.currency === 'NGN' 
-            ? transaction.grossAmount 
-            : (transaction.exchangeRate ? transaction.grossAmount * transaction.exchangeRate : transaction.grossAmount)
-          setGrossAmount(gross.toString())
-          setGrossAmountDisplay(formatCurrencyInput(gross.toString()))
-        }
-        if (transaction.platformFees) {
-          const fees = transaction.currency === 'NGN'
-            ? transaction.platformFees
-            : (transaction.exchangeRate ? transaction.platformFees * transaction.exchangeRate : transaction.platformFees)
-          setPlatformFees(fees.toString())
-          setPlatformFeesDisplay(formatCurrencyInput(fees.toString()))
-        }
-        if (transaction.netAmount !== undefined) {
-          const net = transaction.currency === 'NGN'
-            ? transaction.netAmount
-            : (transaction.exchangeRate ? transaction.netAmount * transaction.exchangeRate : transaction.netAmount)
-          setNetAmount(net)
-        }
-        if (transaction.platform) {
-          setPlatformName(transaction.platform.name)
-          setPlatformType(transaction.platform.platformType)
-          setPlatformAccountId(transaction.platform.accountId || '')
-          setPlatformAccountUrl(transaction.platform.accountUrl || '')
-        }
-      }
+      // Platform fees not applicable for SMEs
     } else {
       // New transaction - start with file input only
       const today = new Date().toISOString().split('T')[0]
@@ -712,7 +685,7 @@ export function AddTransactionDialog({
         category: defaultCategory ?? '',
         paymentMethod: 'Bank Transfer',
         notes: '',
-        taxDeductible: false,
+        taxDeductible: (defaultType ?? 'income') === 'relief' ? true : false, // Relief is always tax deductible
         tags: [],
         attachments: [],
         documentId: undefined
@@ -721,11 +694,11 @@ export function AddTransactionDialog({
       setUploadedImages([])
       setUploadedFiles([])
       setOcrResult(null)
-      // For freelancers (no OCR access), show form fields directly
-      // For creators (with OCR access), show upload screen first
+      // For SMEs (no OCR access by default), show form fields directly
+      // For users with OCR access, show upload screen first
       const shouldShowFormFields = !hasOcrAccess
       setShowFormFields(shouldShowFormFields)
-      setIsManualEntryMode(shouldShowFormFields) // Set manual mode for freelancers
+      setIsManualEntryMode(shouldShowFormFields) // Set manual mode for SMEs
       setConvertedAmountNGN(null)
       setExchangeRate(null)
       
@@ -738,33 +711,60 @@ export function AddTransactionDialog({
       // Invoice linking
       setSelectedInvoiceId('')
       
-      // Phase 2: Reset platform fees and platform info
-      setUsePlatformFeesBreakdown(false)
-      setGrossAmount('')
-      setGrossAmountDisplay('')
-      setPlatformFees('')
-      setPlatformFeesDisplay('')
-      setNetAmount(null)
-      setPlatformName('')
-      setPlatformType('social')
-      setPlatformAccountId('')
-      setPlatformAccountUrl('')
+      // Platform fees not applicable for SMEs
       
-      // Reset tax classification (Gold+ only)
+      // Initialize tax classification (Gold+ only) - Required
       if (hasTaxClassificationAccess) {
-        setTaxClassification(undefined)
-        setSkipTaxClassification(false)
+        // Auto-populate tax classification for new transactions
+        const autoClassification = autoPopulateTaxClassification(
+          defaultType ?? 'income',
+          defaultCategory ?? '',
+          'business',
+          defaultDescription ?? '',
+          ''
+        )
+        setTaxClassification(autoClassification)
         setTaxClassificationManuallyEdited(false)
       }
+      
+      // Reset WHT credit note
+      setWhtCreditNoteFile(null)
+      if (whtCreditNoteUrl && whtCreditNoteUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(whtCreditNoteUrl)
+      }
+      setWhtCreditNoteUrl(null)
     }
   }, [transaction, open, defaultType, defaultCategory, defaultDescription, hasOcrAccess, hasTaxClassificationAccess])
   
-  // Auto-populate tax classification when form data changes (Gold+ only)
+  // Auto-populate tax classification when form data changes (Gold+ only) - Required
   useEffect(() => {
     if (!hasTaxClassificationAccess) return
-    if (!formData.category || !formData.type) return
-    if (skipTaxClassification) return // Don't auto-populate if user skipped
+    if (formData.type === 'relief') {
+      // Relief transactions: set tax classification in background as allowable expense
+      setTaxClassification({
+        expenseType: 'allowable',
+        vatApplicable: false,
+        whtCreditable: false
+      })
+      return
+    }
     if (taxClassificationManuallyEdited) return // Don't overwrite user edits
+    
+    // If no category or type, initialize with defaults only if taxClassification doesn't exist
+    if (!formData.category || !formData.type) {
+      // Only set default if taxClassification is completely undefined
+      // Use a functional update to check current state
+      setTaxClassification(prev => {
+        if (prev) return prev // Don't overwrite existing
+        return {
+          incomeType: formData.type === 'income' ? 'taxable' : undefined,
+          expenseType: formData.type === 'expense' ? 'allowable' : undefined,
+          vatApplicable: false,
+          whtCreditable: false
+        }
+      })
+      return
+    }
     
     // Auto-populate tax classification
     const autoClassification = autoPopulateTaxClassification(
@@ -781,14 +781,24 @@ export function AddTransactionDialog({
       autoClassification.vatRate = undefined
     }
     
-    setTaxClassification(autoClassification)
-  }, [formData.type, formData.category, formData.description, formData.notes, transactionNature, hasTaxClassificationAccess, skipTaxClassification, taxClassificationManuallyEdited])
+    // Use functional update to avoid unnecessary re-renders
+    setTaxClassification(prev => {
+      // Only update if classification actually changed
+      if (prev && 
+          prev.incomeType === autoClassification.incomeType &&
+          prev.expenseType === autoClassification.expenseType &&
+          prev.vatApplicable === autoClassification.vatApplicable &&
+          prev.whtCreditable === autoClassification.whtCreditable) {
+        return prev
+      }
+      return autoClassification
+    })
+  }, [formData.type, formData.category, formData.description, formData.notes, transactionNature, hasTaxClassificationAccess, taxClassificationManuallyEdited])
 
-  // Auto-determine tax deductible for freelancers (non-creators, non-Gold users) - based on category only
+  // Auto-determine tax deductible for SMEs (non-Gold users) - based on category only
   useEffect(() => {
-    // Only apply to freelancers (non-creators) and non-Gold users (no tax classification access)
+    // Only apply to SMEs and non-Gold users (no tax classification access)
     // Only for expense transactions
-    if (profile?.businessType === 'creator') return // Creators use tax classification
     if (hasTaxClassificationAccess) return // Gold users use tax classification instead
     if (formData.type !== 'expense') return
     if (!formData.category) return // Skip if no category selected
@@ -807,7 +817,7 @@ export function AddTransactionDialog({
       }
       return prev
     })
-  }, [formData.type, formData.category, profile?.businessType, hasTaxClassificationAccess])
+  }, [formData.type, formData.category, hasTaxClassificationAccess])
 
   // Monitor for Select dropdowns opening/closing to prevent dialog from closing on mobile
   useEffect(() => {
@@ -909,11 +919,21 @@ export function AddTransactionDialog({
     }
 
     console.log("Before submission:", formData)
+    
+    // Validate tax classification is required (Gold+ only)
+    if (hasTaxClassificationAccess && !taxClassification) {
+      toast.error('Tax classification is required. Please fill in the tax classification section.')
+      setIsSubmitting(false)
+      return
+    }
+    
     setIsSubmitting(true)
     try {
       let documentId: string | undefined = undefined
       let imageUrl: string[] = []
       let attachmentFileIds: string[] = []
+      let uploadedWhtCreditNoteUrl: string | undefined = undefined
+      let uploadedWhtCreditNoteFileId: string | undefined = undefined
 
       // Handle multiple file uploads
       if (uploadedFiles.length > 0 && user?.uid) {
@@ -990,9 +1010,35 @@ export function AddTransactionDialog({
             }
           }
 
+
+          // Upload WHT Credit Note if present (for income transactions)
+          if (whtCreditNoteFile && user?.uid && formData.type === 'income' && taxClassification?.whtCreditable) {
+            try {
+              const whtUploadResult = await uploadToImageKit(whtCreditNoteFile, 'wht-credit-notes', user.uid)
+              uploadedWhtCreditNoteUrl = whtUploadResult.url
+              uploadedWhtCreditNoteFileId = whtUploadResult.fileId
+              // Update tax classification with WHT credit note
+              setTaxClassification(prev => prev ? {
+                ...prev,
+                whtCreditNoteUrl: whtUploadResult.url,
+                whtCreditNoteFileId: whtUploadResult.fileId
+              } : undefined)
+            } catch (whtError) {
+              console.error('Error uploading WHT credit note:', whtError)
+              // Continue silently - transaction will save without WHT credit note
+            }
+          } else if (whtCreditNoteUrl && !whtCreditNoteFile && taxClassification?.whtCreditable) {
+            // Existing credit note URL (from editing) - use existing URL
+            uploadedWhtCreditNoteUrl = whtCreditNoteUrl
+            // Get fileId from tax classification if available
+            if (taxClassification?.whtCreditNoteFileId) {
+              uploadedWhtCreditNoteFileId = taxClassification.whtCreditNoteFileId
+            }
+          }
         } catch (error) {
           console.error('Error uploading documents:', error)
-          // Continue silently - transaction will save without attachments
+          // Don't show error toast here - individual file errors are already handled above
+          // Transaction will continue to save without attachments
         } finally {
           setUploadingImages(false)
         }
@@ -1041,23 +1087,10 @@ export function AddTransactionDialog({
         attachmentFileIds = transaction.attachmentFileIds || []
       }
 
-      // Phase 2: For income transactions with platform fees breakdown enabled, use netAmount if available
-      // Otherwise use the regular amount
-      let amountToStore: number
-      if (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && grossAmount && platformFees) {
-        // Use net amount (gross - fees) for income with platform fees
-        const gross = parseFloat(grossAmount)
-        const fees = parseFloat(platformFees)
-        const net = gross - fees
-        amountToStore = formData.currency === 'NGN'
-          ? net
-          : (convertedAmountNGN ? (net * (convertedAmountNGN / gross)) : net)
-      } else {
-        // Use regular amount
-        amountToStore = formData.currency === 'NGN'
-          ? parseFloat(formData.amount)
-          : (convertedAmountNGN || parseFloat(formData.amount))
-      }
+      // Calculate amount to store (SMEs don't use platform fees breakdown)
+      const amountToStore = formData.currency === 'NGN'
+        ? parseFloat(formData.amount)
+        : (convertedAmountNGN || parseFloat(formData.amount))
 
       // Phase 1: Calculate tax period from transaction date
       const taxPeriod = calculateTaxPeriod(transactionDate || formData.date)
@@ -1095,25 +1128,7 @@ export function AddTransactionDialog({
         linkedInvoiceId: selectedInvoiceId || undefined,
         isFromInvoice: selectedInvoiceId ? true : undefined,
         invoiceStatus: selectedInvoiceId ? 'completed' : undefined,
-        // Phase 2: Platform fees tracking (for income transactions when breakdown is enabled)
-        grossAmount: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && grossAmount) 
-          ? (formData.currency === 'NGN' ? parseFloat(grossAmount) : (lockedExchangeRate ? parseFloat(grossAmount) * lockedExchangeRate : parseFloat(grossAmount)))
-          : undefined,
-        platformFees: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && platformFees)
-          ? (formData.currency === 'NGN' ? parseFloat(platformFees) : (lockedExchangeRate ? parseFloat(platformFees) * lockedExchangeRate : parseFloat(platformFees)))
-          : undefined,
-        netAmount: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && netAmount !== null)
-          ? (formData.currency === 'NGN' ? netAmount : (lockedExchangeRate ? netAmount * lockedExchangeRate : netAmount))
-          : undefined,
-        // Phase 2: Platform info (when breakdown is enabled)
-        platform: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && platformName && (platformName !== 'Other' || platformAccountId))
-          ? {
-              name: platformName === 'Other' ? (platformAccountId || 'Other') : platformName,
-              platformType: platformType,
-              accountId: platformName !== 'Other' ? (platformAccountId || undefined) : undefined,
-              accountUrl: platformAccountUrl || undefined
-            }
-          : undefined,
+        // Platform fees not applicable for SMEs
         category: formData.category,
         paymentMethod: formData.paymentMethod,
         notes: formData.notes,
@@ -1122,11 +1137,20 @@ export function AddTransactionDialog({
         attachments: imageUrl,
         attachmentFileIds: attachmentFileIds,
         documentId: documentId,
-        // Tax Classification (Gold+ only)
-        taxClassification: (hasTaxClassificationAccess && !skipTaxClassification) ? taxClassification : undefined
+        // Tax Classification (Gold+ only) - Required, include WHT credit note if uploaded
+        taxClassification: hasTaxClassificationAccess ? {
+          ...taxClassification,
+          ...(uploadedWhtCreditNoteUrl && { whtCreditNoteUrl: uploadedWhtCreditNoteUrl }),
+          ...(uploadedWhtCreditNoteFileId && { whtCreditNoteFileId: uploadedWhtCreditNoteFileId })
+        } : undefined
       })
 
       console.log("Result:", result)
+
+      if (!result) {
+        toast.error('Failed to save transaction: No response from server')
+        return
+      }
 
       if (result.success) {
         const hasAttachment = documentId !== undefined
@@ -1170,7 +1194,7 @@ export function AddTransactionDialog({
           window.dispatchEvent(docEvent)
         }
       } else {
-        toast.error(result.error || 'Failed to save transaction')
+        toast.error(result?.error || 'Failed to save transaction')
       }
     } catch (error) {
       console.error('Error submitting transaction:', error)
@@ -1555,14 +1579,24 @@ export function AddTransactionDialog({
                   <Label htmlFor="type" className="text-xs sm:text-sm">Transaction Type</Label>
                   <Select
                     value={formData.type}
-                    onValueChange={(value) => {
-                      const newType = value as Transaction['type']
-                      setFormData(prev => ({ 
-                        ...prev, 
-                        type: newType,
-                        category: '' // Reset category when type changes since categories differ by type
-                      }))
-                    }}
+                      onValueChange={(value) => {
+                        const newType = value as Transaction['type']
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          type: newType,
+                          category: '', // Reset category when type changes since categories differ by type
+                          taxDeductible: newType === 'relief' ? true : prev.taxDeductible // Relief is always tax deductible
+                        }))
+                        // Set tax classification for relief transactions in background
+                        if (newType === 'relief' && hasTaxClassificationAccess) {
+                          setTaxClassification({
+                            expenseType: 'allowable',
+                            vatApplicable: false,
+                            whtCreditable: false
+                          })
+                          setTaxClassificationManuallyEdited(false)
+                        }
+                      }}
                   >
                     <SelectTrigger id="type" className="text-xs sm:text-sm">
                       <SelectValue placeholder="Select type" />
@@ -1597,40 +1631,8 @@ export function AddTransactionDialog({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="amount" className="text-xs sm:text-sm">
-                    {profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown
-                      ? `Net Amount (${getCurrencySymbol(formData.currency)})` 
-                      : `Amount (${getCurrencySymbol(formData.currency)})`}
-                    {profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && (
-                      <span className="text-xs text-muted-foreground ml-1">(After platform fees)</span>
-                    )}
+                    Amount ({getCurrencySymbol(formData.currency)})
                   </Label>
-                  {/* Switch to toggle platform fees breakdown - Only for creators with income transactions */}
-                  {profile?.businessType === 'creator' && formData.type === 'income' && (
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="platform-fees-switch" className="text-xs text-muted-foreground cursor-pointer">
-                        Track platform fees
-                      </Label>
-                      <Switch
-                        id="platform-fees-switch"
-                        checked={usePlatformFeesBreakdown}
-                        onCheckedChange={(checked) => {
-                          setUsePlatformFeesBreakdown(checked)
-                          // If turning off, clear platform fees data
-                          if (!checked) {
-                            setGrossAmount('')
-                            setGrossAmountDisplay('')
-                            setPlatformFees('')
-                            setPlatformFeesDisplay('')
-                            setNetAmount(null)
-                            setPlatformName('')
-                            setPlatformType('social')
-                            setPlatformAccountId('')
-                            setPlatformAccountUrl('')
-                          }
-                        }}
-                      />
-                    </div>
-                  )}
                 </div>
                 <Input
                   id="amount"
@@ -1638,14 +1640,8 @@ export function AddTransactionDialog({
                   placeholder="0.00"
                   value={formData.amountDisplay}
                   onChange={(e) => {
-                    // If platform fees breakdown is enabled, don't allow manual entry
-                    if (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown) {
-                      return
-                    }
                     handleAmountChange(e.target.value)
                   }}
-                  readOnly={!!(profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown)}
-                  disabled={!!(profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown)}
                   required
                   className="text-xs sm:text-base md:text-lg font-medium"
                 />
@@ -1675,20 +1671,13 @@ export function AddTransactionDialog({
                 )}
                 {formData.currency === 'NGN' && formData.amount && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    {profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown
-                      ? 'Net amount (after platform fees) will be stored in NGN'
-                      : 'Amount will be stored in NGN'}
-                  </p>
-                )}
-                {profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && (
-                  <p className="text-xs text-amber-600 dark:text-amber-500 mt-1">
-                    💡 This field is auto-calculated from Gross Amount - Platform Fees. Enter values in the Platform Fees section below.
+                    Amount will be stored in NGN
                   </p>
                 )}
               </div>
 
-              {/* Phase 2: Platform Fees Tracking - Only for income transactions and creators when switch is ON */}
-              {profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && (
+              {/* Platform fees not applicable for SMEs */}
+              {false && (
                 <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
                   <div className="space-y-2">
                     <Label className="text-xs sm:text-sm font-semibold">Platform Fees (Optional)</Label>
@@ -1814,7 +1803,7 @@ export function AddTransactionDialog({
                       <div className="flex justify-between items-center">
                         <span className="text-xs sm:text-sm font-medium">Net Amount:</span>
                         <span className="text-base sm:text-lg font-semibold text-primary">
-                          {getCurrencySymbol(formData.currency)}{netAmount.toLocaleString('en-NG', {
+                          {getCurrencySymbol(formData.currency)}{netAmount!.toLocaleString('en-NG', {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
                           })}
@@ -1822,7 +1811,7 @@ export function AddTransactionDialog({
                       </div>
                       {formData.currency !== 'NGN' && convertedAmountNGN && grossAmount && netAmount !== null && (
                         <p className="text-xs text-muted-foreground mt-1">
-                          ≈ ₦{(netAmount * (convertedAmountNGN / (parseFloat(grossAmount) || 1))).toLocaleString('en-NG', {
+                          ≈ ₦{(netAmount! * (convertedAmountNGN! / (parseFloat(grossAmount) || 1))).toLocaleString('en-NG', {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2
                           })}
@@ -1928,10 +1917,20 @@ export function AddTransactionDialog({
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                        <button
+                          type="button"
+                          onClick={() => openHelpModal(
+                            "Category",
+                            "Select the category that best describes this transaction. This helps us organize your finances and apply the right tax rules. Categories are automatically classified as tax deductible or not based on Nigerian tax regulations."
+                          )}
+                          className="text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <HelpCircle className="w-4 h-4 cursor-pointer" />
+                        </button>
                       </TooltipTrigger>
                       <TooltipContent className="max-w-xs">
                         <p className="text-sm">Select the category that best describes this transaction. This helps us organize your finances and apply the right tax rules.</p>
+                        <p className="text-xs text-muted-foreground mt-1">Click for more details</p>
                       </TooltipContent>
                     </Tooltip>
                   </TooltipProvider>
@@ -1969,15 +1968,15 @@ export function AddTransactionDialog({
                     Custom: {formData.category}
                   </p>
                 )}
-                {/* Tax Deductible Status Indicator (for freelancers, expense transactions only) */}
-                {formData.type === 'expense' && profile?.businessType !== 'creator' && !hasTaxClassificationAccess && formData.category && (
+                {/* Tax Deductible Status Indicator - Show for expense and relief transactions when category is selected */}
+                {(formData.type === 'expense' || formData.type === 'relief') && formData.category && (
                   <div className="flex items-center gap-2 mt-2">
                     <p className="text-xs text-muted-foreground">Tax Status:</p>
                     <Badge 
-                      variant={formData.taxDeductible ? 'default' : 'secondary'} 
+                      variant={formData.type === 'relief' || isCategoryTaxDeductible(formData.category) ? 'default' : 'secondary'} 
                       className="text-xs"
                     >
-                      {formData.taxDeductible ? 'Tax Deductible' : 'Not Tax Deductible'}
+                      {formData.type === 'relief' || isCategoryTaxDeductible(formData.category) ? '✓ Tax Deductible' : 'Not Tax Deductible'}
                     </Badge>
                   </div>
                 )}
@@ -1988,13 +1987,9 @@ export function AddTransactionDialog({
                 <Input
                   id="description"
                   placeholder={
-                    profile?.businessType === 'creator'
-                      ? formData.type === 'income'
-                        ? "e.g., Brand sponsorship payment from XYZ Company"
-                        : "e.g., Camera equipment purchase"
-                      : formData.type === 'income'
-                        ? "e.g., Client payment for website design"
-                        : "e.g., Software subscription"
+                    formData.type === 'income'
+                      ? "e.g., Sales revenue from customer payment"
+                      : "e.g., Office rent payment"
                   }
                   value={formData.description}
                   onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
@@ -2042,8 +2037,8 @@ export function AddTransactionDialog({
                 </div>
               </div>
 
-              {/* Phase 1: Personal vs Business separation - Only for creators */}
-              {profile?.businessType === 'creator' && (
+              {/* Personal vs Business separation - SMEs are always business, but keeping for consistency */}
+              {false && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Label htmlFor="transaction-nature">Is this for business or personal use?</Label>
@@ -2227,49 +2222,43 @@ export function AddTransactionDialog({
                 />
               </div>
 
-              {/* Tax Classification Section (Gold+ only) */}
-              {hasTaxClassificationAccess && taxClassification && !skipTaxClassification && (
+              {/* Tax Classification Section (Gold+ only) - Required (not for relief transactions) */}
+              {hasTaxClassificationAccess && taxClassification && formData.type !== 'relief' && (
                 <div className="space-y-3 p-4 border rounded-lg bg-muted/30">
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <Label className="text-xs sm:text-sm font-semibold">Tax Classification (Optional</Label>
-                        <Button
-                          type="button"
-                          variant="link"
-                          size="sm"
-                          onClick={() => {
-                            setSkipTaxClassification(true)
-                            setTaxClassification(undefined)
-                            setTaxClassificationManuallyEdited(false)
-                          }}
-                          className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground underline"
-                        >
-                          - Skip for now
-                        </Button>
-                        <Label className="text-xs sm:text-sm font-semibold">)</Label>
-                      </div>
+                      <Label className="text-xs sm:text-sm font-semibold">Tax Classification</Label>
                       <p className="text-xs text-muted-foreground mt-1">
-                        Auto-populated based on transaction details. You can edit or skip this section - you can always update it later.
+                        Auto-populated based on transaction details. Please review and update as needed.
                       </p>
                     </div>
                   </div>
                   
                   {/* Editable form (always visible) */}
                   <div className="space-y-4 pt-2 border-t">
-                      {formData.type === 'income' && (
+                      {formData.type === 'income' && taxClassification && (
                         <div className="space-y-2">
                           <div className="flex items-center gap-2">
                             <Label>Income Type</Label>
                             <TooltipProvider>
                               <Tooltip>
                                 <TooltipTrigger asChild>
-                                  <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                                  <button
+                                    type="button"
+                                    onClick={() => openHelpModal(
+                                      "Income Type",
+                                      "Taxable: Regular income subject to tax.\n\nNon-taxable: Income that doesn't count toward your tax (e.g., gifts, grants).\n\nExempt: Income that's legally exempt from tax."
+                                    )}
+                                    className="text-muted-foreground hover:text-foreground transition-colors"
+                                  >
+                                    <HelpCircle className="w-4 h-4 cursor-pointer" />
+                                  </button>
                                 </TooltipTrigger>
                                 <TooltipContent className="max-w-xs">
                                   <p className="text-sm mb-1"><strong>Taxable:</strong> Regular income subject to tax</p>
-                                  <p className="text-sm mb-1"><strong>Non-taxable:</strong> Income that doesn't count toward your tax (e.g., gifts, grants)</p>
+                                  <p className="text-sm mb-1"><strong>Non-taxable:</strong> Income that doesn't count toward your tax</p>
                                   <p className="text-sm"><strong>Exempt:</strong> Income that's legally exempt from tax</p>
+                                  <p className="text-xs text-muted-foreground mt-1">Click for more details</p>
                                 </TooltipContent>
                               </Tooltip>
                             </TooltipProvider>
@@ -2304,12 +2293,22 @@ export function AddTransactionDialog({
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                                    <button
+                                      type="button"
+                                      onClick={() => openHelpModal(
+                                        "Expense Type",
+                                        "Allowable: Regular business expenses you can deduct (e.g., internet, software, rent).\n\nDisallowable: Expenses you cannot claim (e.g., personal expenses, fines).\n\nCapital: Long-term assets eligible for depreciation (e.g., equipment, vehicles)."
+                                      )}
+                                      className="text-muted-foreground hover:text-foreground transition-colors"
+                                    >
+                                      <HelpCircle className="w-4 h-4 cursor-pointer" />
+                                    </button>
                                   </TooltipTrigger>
                                   <TooltipContent className="max-w-xs">
-                                    <p className="text-sm mb-1"><strong>Allowable:</strong> Regular business expenses you can deduct (e.g., internet, software, rent)</p>
-                                    <p className="text-sm mb-1"><strong>Disallowable:</strong> Expenses you cannot claim (e.g., personal expenses, fines)</p>
-                                    <p className="text-sm"><strong>Capital:</strong> Long-term assets eligible for depreciation (e.g., equipment, vehicles)</p>
+                                    <p className="text-sm mb-1"><strong>Allowable:</strong> Regular business expenses you can deduct</p>
+                                    <p className="text-sm mb-1"><strong>Disallowable:</strong> Expenses you cannot claim</p>
+                                    <p className="text-sm"><strong>Capital:</strong> Long-term assets eligible for depreciation</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Click for more details</p>
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
@@ -2380,10 +2379,20 @@ export function AddTransactionDialog({
                                 <TooltipProvider>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
-                                      <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                                      <button
+                                        type="button"
+                                        onClick={() => openHelpModal(
+                                          "Long-term Asset",
+                                          "Long-term assets (like equipment or vehicles) can be depreciated over multiple years instead of claiming the full cost immediately. This can help spread out your tax benefits.\n\nExamples: Equipment, vehicles, furniture, software licenses.\n\nNOT Capital Assets: Rent, subscriptions, services, utilities, repairs."
+                                        )}
+                                        className="text-muted-foreground hover:text-foreground transition-colors"
+                                      >
+                                        <HelpCircle className="w-4 h-4 cursor-pointer" />
+                                      </button>
                                     </TooltipTrigger>
                                     <TooltipContent className="max-w-xs">
-                                      <p className="text-sm">Long-term assets (like equipment or vehicles) can be depreciated over multiple years instead of claiming the full cost immediately. This can help spread out your tax benefits.</p>
+                                      <p className="text-sm">Long-term assets can be depreciated over multiple years instead of claiming the full cost immediately.</p>
+                                      <p className="text-xs text-muted-foreground mt-1">Click for more details</p>
                                     </TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
@@ -2475,35 +2484,44 @@ export function AddTransactionDialog({
                                 <div className="space-y-2 pt-2 border-t">
                                   <Label>Annual Allowance Rate (%)</Label>
                                   <Input
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    step="0.1"
-                                    value={taxClassification.capitalAllowanceRate || 25}
-                                    onChange={(e) => setTaxClassification(prev => {
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder="25"
+                                    value={taxClassification.capitalAllowanceRate?.toString() || ''}
+                                    onChange={(e) => {
                                       setTaxClassificationManuallyEdited(true)
-                                      const rate = parseFloat(e.target.value) || 25
-                                      const next: any = { ...prev, capitalAllowanceRate: rate }
-                                      if (next.initialAllowanceRate === undefined) {
-                                        next.initialAllowanceRate = 50
+                                      const value = e.target.value
+                                      // Allow empty string, numbers, and decimals
+                                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                        const rate = value === '' ? undefined : parseFloat(value)
+                                        setTaxClassification(prev => {
+                                          const next: any = { ...prev, capitalAllowanceRate: rate }
+                                          if (next.initialAllowanceRate === undefined && rate !== undefined) {
+                                            next.initialAllowanceRate = 50
+                                          }
+                                          return next
+                                        })
                                       }
-                                      return next
-                                    })}
+                                    }}
                                     className="text-xs sm:text-sm"
                                   />
                                   <Label>Initial Allowance Rate (%)</Label>
                                   <Input
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    step="0.1"
-                                    value={taxClassification.initialAllowanceRate ?? 50}
+                                    type="text"
+                                    inputMode="decimal"
+                                    placeholder="50"
+                                    value={taxClassification.initialAllowanceRate?.toString() || ''}
                                     onChange={(e) => {
                                       setTaxClassificationManuallyEdited(true)
-                                      setTaxClassification(prev => ({
-                                        ...prev,
-                                        initialAllowanceRate: parseFloat(e.target.value) || 0
-                                      }))
+                                      const value = e.target.value
+                                      // Allow empty string, numbers, and decimals
+                                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                        const rate = value === '' ? undefined : parseFloat(value)
+                                        setTaxClassification(prev => ({
+                                          ...prev,
+                                          initialAllowanceRate: rate
+                                        }))
+                                      }
                                     }}
                                     className="text-xs sm:text-sm"
                                   />
@@ -2527,17 +2545,50 @@ export function AddTransactionDialog({
                               whtCreditable: checked,
                               whtRate: checked ? (prev?.whtRate || 5) : undefined
                             }))
+                            if (!checked) {
+                              // Clear credit note when WHT is disabled
+                              setWhtCreditNoteFile(null)
+                              setWhtCreditNoteUrl(null)
+                            }
                           }}
                         />
                         <div className="flex items-center gap-2 flex-1">
-                          <Label className="text-sm">Was withholding tax deducted from this?</Label>
+                          <Label className="text-sm">
+                            {formData.type === 'income' 
+                              ? 'Was withholding tax deducted from your payment?' 
+                              : 'Did you deduct withholding tax from this payment?'}
+                          </Label>
                           <TooltipProvider>
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                                <button
+                                  type="button"
+                                  onClick={() => openHelpModal(
+                                    "Withholding Tax (WHT)",
+                                    formData.type === 'income'
+                                      ? "What is Withholding Tax?\n\nWithholding Tax (WHT) is tax that your customer or client deducts from your payment BEFORE paying you. It's a way for the government to collect taxes in advance.\n\nExample: If you provide consulting services worth ₦100,000 and WHT is 10%, your client will:\n- Deduct ₦10,000 as WHT\n- Pay you ₦90,000\n- Remit the ₦10,000 to the tax authority\n\nWhy it matters:\n\nWhen you file your annual tax return, you can claim the WHT that was deducted as a CREDIT against your final tax bill. This means you've already paid part of your taxes, so you'll owe less (or get a refund if you overpaid).\n\nCommon WHT rates in Nigeria:\n- Professional services (consulting, legal, accounting): 10%\n- Other services: 5%\n- Dividends: 10%\n- Interest: 10%\n\nWhen to use this:\n\nEnable this option if your customer/client deducted WHT from your payment. You'll need to enter the WHT rate that was applied."
+                                      : "Withholding Tax (WHT) on Expenses\n\nWhen you pay for services or goods, you may be required to deduct WHT from the payment and remit it to the tax authority.\n\nExample: If you pay ₦100,000 for consulting services and WHT is 10%:\n- You deduct ₦10,000 as WHT\n- Pay your supplier ₦90,000\n- You remit the ₦10,000 to the tax authority\n\nWhy it matters:\n\nAs the person deducting WHT, you are responsible for remitting it to the tax authority. This is a compliance requirement and helps track tax payments.\n\nCommon WHT rates in Nigeria:\n- Professional services (consulting, legal, accounting): 10%\n- Other services: 5%\n- Dividends: 10%\n- Interest: 10%\n\nWhen to use this:\n\nEnable this option if you deducted WHT from a payment you made to a supplier or vendor."
+                                  )}
+                                  className="text-muted-foreground hover:text-foreground transition-colors"
+                                >
+                                  <HelpCircle className="w-4 h-4 cursor-pointer" />
+                                </button>
                               </TooltipTrigger>
                               <TooltipContent className="max-w-xs">
-                                <p className="text-sm">If tax was already deducted at source (withholding tax), you can claim it as a credit against your final tax bill. This reduces how much tax you need to pay.</p>
+                                <p className="text-sm">
+                                  <strong>Withholding Tax (WHT)</strong> {
+                                    formData.type === 'income'
+                                      ? 'is tax deducted from your payment by your customer. You can claim it as a credit against your final tax bill.'
+                                      : 'is tax you deduct from payments you make. You must remit it to the tax authority.'
+                                  }
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  {formData.type === 'income'
+                                    ? 'Example: ₦100,000 payment with 10% WHT = ₦10,000 deducted, you receive ₦90,000'
+                                    : 'Example: ₦100,000 payment with 10% WHT = you deduct ₦10,000, pay supplier ₦90,000'
+                                  }
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">Click for more details</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -2545,23 +2596,107 @@ export function AddTransactionDialog({
                       </div>
                       
                       {taxClassification.whtCreditable && (
-                        <div className="space-y-2">
-                          <Label>WHT Rate (%)</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.1"
-                            value={taxClassification.whtRate || 5}
-                            onChange={(e) => {
-                              setTaxClassificationManuallyEdited(true)
-                              setTaxClassification(prev => ({
-                                ...prev,
-                                whtRate: parseFloat(e.target.value) || 5
-                              }))
-                            }}
-                            className="text-xs sm:text-sm"
-                          />
+                        <div className="space-y-3">
+                          <div className="space-y-2">
+                            <Label>WHT Rate (%)</Label>
+                            <Input
+                              type="text"
+                              inputMode="decimal"
+                              placeholder="5"
+                              value={taxClassification.whtRate?.toString() || ''}
+                              onChange={(e) => {
+                                setTaxClassificationManuallyEdited(true)
+                                const value = e.target.value
+                                // Allow empty string, numbers, and decimals
+                                if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                  const rate = value === '' ? undefined : parseFloat(value)
+                                  setTaxClassification(prev => ({
+                                    ...prev,
+                                    whtRate: rate
+                                  }))
+                                }
+                              }}
+                              className="text-xs sm:text-sm"
+                            />
+                          </div>
+                          
+                          {/* WHT Credit Note Upload - Only for income transactions */}
+                          {formData.type === 'income' && (
+                            <div className="space-y-2">
+                              <Label className="text-xs sm:text-sm">
+                                WHT Credit Note (Optional)
+                                <span className="text-xs text-muted-foreground ml-1">- Upload proof of WHT deduction</span>
+                              </Label>
+                              <input
+                                type="file"
+                                id="wht-credit-note-upload"
+                                className="hidden"
+                                accept="image/*,.pdf"
+                                onChange={(e) => {
+                                  if (e.target.files && e.target.files[0]) {
+                                    const file = e.target.files[0]
+                                    setWhtCreditNoteFile(file)
+                                    // Create preview URL
+                                    const url = URL.createObjectURL(file)
+                                    setWhtCreditNoteUrl(url)
+                                  }
+                                }}
+                              />
+                              {!whtCreditNoteFile && !whtCreditNoteUrl ? (
+                                <label
+                                  htmlFor="wht-credit-note-upload"
+                                  className="border-2 border-dashed border-border rounded-lg p-4 text-center hover:border-primary transition-colors block cursor-pointer"
+                                >
+                                  <Upload className="w-6 h-6 mx-auto mb-2 text-muted-foreground" />
+                                  <p className="text-xs sm:text-sm text-muted-foreground">
+                                    Click to upload WHT credit note
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-1">Image or PDF (optional - can add later)</p>
+                                </label>
+                              ) : (
+                                <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg border">
+                                  <div className="flex items-center gap-2">
+                                    <FileText className="w-5 h-5 text-primary" />
+                                    <div>
+                                      <p className="text-xs sm:text-sm font-medium">
+                                        {whtCreditNoteFile?.name || 'WHT Credit Note'}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {whtCreditNoteFile ? 'Ready to upload' : 'Credit Note uploaded'}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setWhtCreditNoteFile(null)
+                                      if (whtCreditNoteUrl && whtCreditNoteUrl.startsWith('blob:')) {
+                                        URL.revokeObjectURL(whtCreditNoteUrl)
+                                      }
+                                      setWhtCreditNoteUrl(null)
+                                      // Update tax classification to remove credit note
+                                      setTaxClassification(prev => prev ? {
+                                        ...prev,
+                                        whtCreditNoteUrl: undefined,
+                                        whtCreditNoteFileId: undefined
+                                      } : undefined)
+                                      // Reset file input
+                                      const input = document.getElementById('wht-credit-note-upload') as HTMLInputElement
+                                      if (input) input.value = ''
+                                    }}
+                                    className="text-destructive hover:text-destructive/80"
+                                  >
+                                    Remove
+                                  </Button>
+                                </div>
+                              )}
+                              <p className="text-xs text-muted-foreground">
+                                💡 Upload the credit note you received from your customer showing WHT was deducted. You can add this later if you don't have it now.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       )}
                       
@@ -2585,10 +2720,20 @@ export function AddTransactionDialog({
                               <TooltipProvider>
                                 <Tooltip>
                                   <TooltipTrigger asChild>
-                                    <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                                    <button
+                                      type="button"
+                                      onClick={() => openHelpModal(
+                                        "Value Added Tax (VAT)",
+                                        "If you're VAT-registered and this income includes VAT, you'll need to remit the VAT amount to the government. The VAT portion will be excluded from your taxable income.\n\nStandard VAT rate in Nigeria: 7.5%\n\nNote: VAT only applies to income transactions, not expenses."
+                                      )}
+                                      className="text-muted-foreground hover:text-foreground transition-colors"
+                                    >
+                                      <HelpCircle className="w-4 h-4 cursor-pointer" />
+                                    </button>
                                   </TooltipTrigger>
                                   <TooltipContent className="max-w-xs">
-                                    <p className="text-sm">If you're VAT-registered and this income includes VAT, you'll need to remit the VAT amount to the government. The VAT portion will be excluded from your taxable income.</p>
+                                    <p className="text-sm">If you're VAT-registered and this income includes VAT, you'll need to remit the VAT amount to the government.</p>
+                                    <p className="text-xs text-muted-foreground mt-1">Click for more details</p>
                                   </TooltipContent>
                                 </Tooltip>
                               </TooltipProvider>
@@ -2599,17 +2744,21 @@ export function AddTransactionDialog({
                             <div className="space-y-2">
                               <Label>VAT Rate (%)</Label>
                               <Input
-                                type="number"
-                                min="0"
-                                max="100"
-                                step="0.1"
-                                value={taxClassification.vatRate || 7.5}
+                                type="text"
+                                inputMode="decimal"
+                                placeholder="7.5"
+                                value={taxClassification.vatRate?.toString() || ''}
                                 onChange={(e) => {
                                   setTaxClassificationManuallyEdited(true)
-                                  setTaxClassification(prev => ({
-                                    ...prev,
-                                    vatRate: parseFloat(e.target.value) || 7.5
-                                  }))
+                                  const value = e.target.value
+                                  // Allow empty string, numbers, and decimals
+                                  if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                                    const rate = value === '' ? undefined : parseFloat(value)
+                                    setTaxClassification(prev => ({
+                                      ...prev,
+                                      vatRate: rate
+                                    }))
+                                  }
                                 }}
                                 className="text-xs sm:text-sm"
                               />
@@ -2769,6 +2918,25 @@ export function AddTransactionDialog({
                 disabled={!customCategory.trim()}
               >
                 Confirm
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Help Modal */}
+      <Dialog open={helpModalOpen} onOpenChange={setHelpModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{helpModalContent?.title || "Help"}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="text-sm text-muted-foreground whitespace-pre-line">
+              {helpModalContent?.content}
+            </div>
+            <div className="flex justify-end">
+              <Button onClick={() => setHelpModalOpen(false)}>
+                Got it
               </Button>
             </div>
           </div>

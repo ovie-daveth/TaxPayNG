@@ -49,10 +49,15 @@ export function DashboardHeader() {
   }
 
   const getPageInfo = (path: string) => {
-    // Normalize path for matching (handle both /dashboard and /dashboard-creator)
+    // Normalize path for matching (handle /dashboard, /dashboard-creator, and /dashboard-sme)
     const isCreator = path.startsWith("/dashboard-creator")
-    const normalizedPath = isCreator ? path.replace("/dashboard-creator", "/dashboard") : path
-    const basePath = isCreator ? "/dashboard-creator" : "/dashboard"
+    const isSME = path.startsWith("/dashboard-sme")
+    const normalizedPath = isCreator 
+      ? path.replace("/dashboard-creator", "/dashboard")
+      : isSME
+      ? path.replace("/dashboard-sme", "/dashboard")
+      : path
+    const basePath = isCreator ? "/dashboard-creator" : isSME ? "/dashboard-sme" : "/dashboard"
     
     // Handle dynamic routes first
     if ((path.startsWith("/dashboard/filing-requests/") || path.startsWith("/dashboard-creator/filing-requests/")) && path !== "/dashboard/filing-requests" && path !== "/dashboard-creator/filing-requests") {
@@ -77,10 +82,20 @@ export function DashboardHeader() {
       case "/dashboard/transactions":
         return {
           title: "Transactions",
-          subtitle: "Track and manage your income and expenses",
+          subtitle: isSME 
+            ? "Record and manage all business transactions with complete tax compliance"
+            : "Track and manage your income and expenses",
           buttonText: "Add Transaction",
           buttonIcon: Plus,
-          buttonAction: () => checkSubscription(() => setIsAddDialogOpen(true)),
+          buttonAction: () => {
+            if (isSME) {
+              // For SME, dispatch event to be handled by the transactions page
+              const event = new CustomEvent('createTransaction')
+              window.dispatchEvent(event)
+            } else {
+              checkSubscription(() => setIsAddDialogOpen(true))
+            }
+          },
           showExportButton: true
         }
       case "/dashboard/invoices":

@@ -2176,8 +2176,4 @@ export default function SettingsPage() {
   )
 }
 
-"use client"
-
-export { default } from "@/app/dashboard/settings/page"
-
 

@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Calculator, LayoutDashboard, Users, DollarSign, FileText, Settings, LogOut, ChevronLeft, ChevronRight, TrendingUp, Menu, Bell, User, Receipt, FileCheck, IdCardIcon, MessageSquare } from "lucide-react"
+import { Calculator, LayoutDashboard, Users, DollarSign, FileText, Settings, LogOut, ChevronLeft, ChevronRight, TrendingUp, Menu, Bell, User, Receipt, FileCheck, IdCardIcon, MessageSquare, Plus } from "lucide-react"
 import OtaxLogo from "../OtaxLogo"
 import { useState, useEffect } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
@@ -37,6 +37,29 @@ export function DashboardNavSME() {
   const { profile } = useUserProfile()
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [hasFilingRequests, setHasFilingRequests] = useState(false)
+  
+  // Get page info for mobile add button
+  const getMobileAddButton = () => {
+    switch (pathname) {
+      case "/dashboard-sme/transactions":
+        return { icon: Plus, action: () => {
+          const event = new CustomEvent('createTransaction')
+          window.dispatchEvent(event)
+        }, show: true }
+      case "/dashboard-sme/invoices":
+        return { icon: Plus, action: () => {
+          const event = new CustomEvent('createInvoice')
+          window.dispatchEvent(event)
+        }, show: true }
+      case "/dashboard-sme/payment":
+        return { icon: Plus, action: () => router.push("/dashboard-sme/payment/add"), show: true }
+      default:
+        return { icon: Plus, action: () => {}, show: false }
+    }
+  }
+  
+  const mobileAddButton = getMobileAddButton()
+  const AddButtonIcon = mobileAddButton.icon
 
   useEffect(() => {
     const checkFilingRequests = async () => {
@@ -220,6 +243,16 @@ export function DashboardNavSME() {
           </button>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             <NotificationBell />
+            {mobileAddButton.show && (
+              <Button 
+                variant="default"
+                size="icon"
+                onClick={mobileAddButton.action}
+                className="h-8 w-8"
+              >
+                <AddButtonIcon className="w-4 h-4" />
+              </Button>
+            )}
           </div>
         </div>
       </header>
