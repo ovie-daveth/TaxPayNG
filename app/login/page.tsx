@@ -35,6 +35,7 @@ export default function LoginPage() {
     password: ''
   })
   const [showPassword, setShowPassword] = useState(false)
+  const [isGoogleOnlyUser, setIsGoogleOnlyUser] = useState(false)
 
   useEffect(() => {
     console.log("Login redirect effect - user:", !!user, "loading:", loading, "profileLoading:", profileLoading, "profile:", !!profile)
@@ -134,6 +135,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
+    setIsGoogleOnlyUser(false) // Reset Google-only user state
 
     const result = await signIn({
       email: formData.email,
@@ -143,11 +145,27 @@ export default function LoginPage() {
     setIsLoading(false)
 
     if (result.success) {
+      setIsGoogleOnlyUser(false)
       toast.success('Logged in successfully!')
       // Refetch profile to ensure it's loaded for redirect
       await refetchProfile()
       // Don't redirect here - useEffect will handle it based on TIN verification status
     } else {
+      // Check if this is a Google-only user FIRST, before any toast
+      console.log('Login error:', result.error, 'isGoogleOnlyUser:', result.isGoogleOnlyUser)
+      const isGoogleOnly = result.error === 'GOOGLE_ONLY_USER' || result.isGoogleOnlyUser === true
+      console.log('isGoogleOnly check:', isGoogleOnly)
+      
+      if (isGoogleOnly) {
+        console.log('Detected Google-only user, showing form message, NOT toast')
+        setIsGoogleOnlyUser(true)
+        // Don't show toast, show message in form instead
+        return // Exit early to prevent any toast
+      }
+      
+      // Only show toast for non-Google-only errors
+      console.log('Not Google-only user, showing toast')
+      setIsGoogleOnlyUser(false)
       toast.error(result.error || 'Failed to log in')
     }
   }
@@ -238,7 +256,10 @@ export default function LoginPage() {
                   type={showPassword ? "text" : "password"} 
                   placeholder="••••••••" 
                   value={formData.password}
-                  onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, password: e.target.value }))
+                    setIsGoogleOnlyUser(false) // Clear error when user types
+                  }}
                   required 
                   className="h-11 sm:h-12 text-base border-2 pr-12 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
                 />
@@ -251,6 +272,25 @@ export default function LoginPage() {
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
+              {isGoogleOnlyUser && (
+                <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-3">
+                  <p className="text-sm text-amber-900 dark:text-amber-100 font-medium">
+                    You signed up with Google
+                  </p>
+                  <p className="text-xs text-amber-800 dark:text-amber-200">
+                    You don't have a password set yet. Please continue signing in with Google. After logging in, you can set a password in your account settings to enable password login in the future.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGoogleSignIn}
+                    className="w-full sm:w-auto text-xs sm:text-sm border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-100 hover:bg-amber-100 dark:hover:bg-amber-900/50"
+                  >
+                    Continue with Google
+                  </Button>
+                </div>
+              )}
             </div>
 
             <Button 
