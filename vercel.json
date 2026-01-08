@@ -1,12 +1,8 @@
 {
     "crons": [
       {
-        "path": "/api/cron/check-reminders",
+        "path": "/api/cron/daily-tasks",
         "schedule": "0 4 * * *"
-      },
-      {
-        "path": "/api/cron/check-subscription-expiry",
-        "schedule": "0 9 * * *"
       }
     ]
 }
