@@ -685,21 +685,21 @@ export function AnalyticsInsights({
   }
 
   return (
-    <Card className="p-3 sm:p-5 md:p-6 space-y-3 sm:space-y-4 overflow-hidden">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5 sm:gap-2">
+    <Card className="p-3 sm:p-5 md:p-6 space-y-3 sm:space-y-4 overflow-hidden w-full max-w-full">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 min-w-0">
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
             <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary flex-shrink-0" />
-            <h3 className="text-sm sm:text-base md:text-lg font-semibold truncate">Analytics insights</h3>
+            <h3 className="text-sm sm:text-base md:text-lg font-semibold truncate min-w-0">Analytics insights</h3>
           </div>
-          <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground mt-0.5 sm:mt-1">{headerText}</p>
+          <p className="text-[10px] sm:text-xs md:text-sm text-muted-foreground mt-0.5 sm:mt-1 break-words">{headerText}</p>
         </div>
-        <Badge variant="outline" className="text-[10px] sm:text-xs md:text-sm self-start sm:self-auto flex-shrink-0">
+        <Badge variant="outline" className="text-[10px] sm:text-xs md:text-sm self-start sm:self-auto flex-shrink-0 whitespace-nowrap">
           {periodType === "year" ? "Year view" : `Q${effectiveQuarter} ${effectiveYear}`}
         </Badge>
       </div>
 
-      <div className={`grid gap-2 sm:gap-3 md:gap-4 ${!sidebarCollapsed ? 'md:grid-cols-1' : 'md:grid-cols-2'}`}>
+      <div className={`grid gap-2 sm:gap-3 md:gap-4 grid-cols-1 ${!sidebarCollapsed ? 'lg:grid-cols-1' : 'lg:grid-cols-2'} w-full max-w-full overflow-hidden`}>
         {loading
           ? Array.from({ length: 4 }).map((_, index) => (
               <div key={index} className="border border-border rounded-xl p-4 space-y-3 animate-pulse">
@@ -712,24 +712,24 @@ export function AnalyticsInsights({
           : insights.map((insight) => {
               const tone = toneStyles[insight.tone]
               return (
-                <div key={insight.id} className="border border-border rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3 relative overflow-hidden">
-                  <div className="flex items-start sm:items-center justify-between gap-2 min-w-0">
-                    <Badge variant="secondary" className={`gap-1 sm:gap-2 flex-shrink-0 ${tone.badge}`}>
+                <div key={insight.id} className="border border-border rounded-xl p-3 sm:p-4 space-y-2 sm:space-y-3 relative overflow-hidden w-full max-w-full">
+                  <div className="flex items-start sm:items-center justify-between gap-2 min-w-0 w-full">
+                    <Badge variant="secondary" className={`gap-1 sm:gap-2 flex-shrink-0 min-w-0 ${tone.badge}`}>
                       <span className="flex-shrink-0">{tone.icon}</span>
-                      <span className="text-[9px] sm:text-[10px] md:text-xs uppercase tracking-wide whitespace-nowrap">{insight.title}</span>
+                      <span className="text-[9px] sm:text-[10px] md:text-xs uppercase tracking-wide truncate">{insight.title}</span>
                     </Badge>
                     <span className="text-xs sm:text-sm font-semibold whitespace-nowrap flex-shrink-0 ml-1">{insight.metric}</span>
                   </div>
-                  <div className="text-[11px] sm:text-xs md:text-sm text-muted-foreground break-words leading-relaxed">{insight.description}</div>
+                  <div className="text-[11px] sm:text-xs md:text-sm text-muted-foreground break-words leading-relaxed w-full">{insight.description}</div>
                   {insight.action && (
                     <Button
                       variant="link"
                       size="sm"
-                      className="h-auto px-0 text-[10px] sm:text-xs md:text-sm font-medium justify-start"
+                      className="h-auto px-0 text-[10px] sm:text-xs md:text-sm font-medium justify-start w-full max-w-full"
                       onClick={() => handleActionClick(insight)}
                     >
                       <Lightbulb className="h-3 w-3 sm:h-3.5 sm:w-3.5 mr-1 text-primary flex-shrink-0" />
-                      <span className="break-words">{insight.action}</span>
+                      <span className="break-words text-left">{insight.action}</span>
                     </Button>
                   )}
                   {insight.calculationDetails && (
@@ -751,9 +751,9 @@ export function AnalyticsInsights({
             })}
       </div>
 
-      <p className="text-[10px] sm:text-[11px] md:text-xs text-muted-foreground flex items-start gap-1.5 sm:gap-2 pt-2 border-t border-border">
+      <p className="text-[10px] sm:text-[11px] md:text-xs text-muted-foreground flex items-start gap-1.5 sm:gap-2 pt-2 border-t border-border w-full max-w-full">
         <ShieldCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-primary flex-shrink-0 mt-0.5" />
-        <span className="break-words leading-relaxed">Insights combine your logged income, expenses, and tax reliefs to surface growth and compliance opportunities.</span>
+        <span className="break-words leading-relaxed min-w-0 flex-1">Insights combine your logged income, expenses, and tax reliefs to surface growth and compliance opportunities.</span>
       </p>
 
       <AuditSubscriptionsDialog
