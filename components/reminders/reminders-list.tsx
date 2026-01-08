@@ -1,11 +1,12 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Calendar, DollarSign, FileText, Bell, MoreVertical, Pencil, Trash2, Loader2 } from "lucide-react"
+import { Calendar, DollarSign, FileText, Bell, MoreVertical, Pencil, Trash2, Loader2, ArrowRight } from "lucide-react"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { DeleteConfirmationModal } from "@/components/ui/delete-confirmation-modal"
 import { Reminder } from "@/lib/types"
@@ -73,6 +74,7 @@ export function RemindersList({
   onMarkIncomplete,
   onEdit
 }: RemindersListProps) {
+  const router = useRouter()
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [reminderToDelete, setReminderToDelete] = useState<Reminder | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -287,7 +289,20 @@ export function RemindersList({
                     </div>
                   </div>
 
-                  <DropdownMenu>
+                  <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+                    {reminder.actionUrl && reminder.actionLabel && (
+                      <Button
+                        size="sm"
+                        variant="default"
+                        onClick={() => router.push(reminder.actionUrl!)}
+                        className="h-7 sm:h-8 text-xs sm:text-sm whitespace-nowrap"
+                      >
+                        <span className="hidden sm:inline">{reminder.actionLabel}</span>
+                        <span className="sm:hidden">Action</span>
+                        <ArrowRight className="w-3 h-3 sm:w-3.5 sm:h-3.5 ml-1 sm:ml-1.5" />
+                      </Button>
+                    )}
+                    <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" className="flex-shrink-0 h-7 w-7 sm:h-8 sm:w-8">
                         <MoreVertical className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -307,6 +322,7 @@ export function RemindersList({
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
+                  </div>
                 </div>
               )
             })

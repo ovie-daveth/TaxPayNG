@@ -45,6 +45,10 @@ export interface UserProfile {
   isSubscribe?: boolean
   subscriptionType?: SubscriptionType
   subscriptionExpiryDate?: string // ISO string - when subscription expires (31 days from payment)
+  // Free Trial fields
+  freeTrialStartDate?: string // ISO string - when free trial started
+  freeTrialEndDate?: string // ISO string - when free trial ends (7 days from start)
+  freeTrialUsed?: boolean // Whether user has used their free trial
   /**
    * Multi-Entity Business Management (PLATINUM):
    * The currently active business entity context for this user.
@@ -320,6 +324,8 @@ export interface Reminder {
   completedAt?: string
   emailSent?: boolean // Whether reminder email has been sent
   emailSentAt?: string // Timestamp when email was sent
+  actionUrl?: string // URL to navigate to when user clicks action button
+  actionLabel?: string // Label for the action button (e.g., "File Tax", "Make Payment")
   recurring?: {
     frequency: 'daily' | 'weekly' | 'monthly' | 'yearly'
     interval: number

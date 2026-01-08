@@ -1,6 +1,67 @@
 "use client"
 
-export { default } from "@/app/dashboard/payment/page"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { Card, CardContent } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { PaymentReceipt } from "@/components/tax-payment/payment-receipt"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { useSubscription } from "@/lib/hooks/useSubscription"
+import { useSidebar } from "@/lib/contexts/sidebar-context"
+import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
+import { taxPaymentService } from "@/lib/services"
+import { TaxPayment } from "@/lib/types"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { 
+  Download, 
+  Search, 
+  X, 
+  LayoutGrid, 
+  Table2, 
+  Filter,
+  Calendar,
+  TrendingUp,
+  Wallet,
+  CheckCircle2,
+  Loader2,
+  Sparkles,
+  MoreVertical,
+  Eye,
+  Copy
+} from "lucide-react"
+import { toast } from "sonner"
+import { formatCurrency, cn } from "@/lib/utils"
+
+type ViewMode = "grid" | "table"
+type FilterCategory = "period" | "method" | "status"
+
+interface PaymentData {
+  id: string
+  amount: number
+  tips: string[]
+  status: string
+  transactionId: string
+  method: string
+  taxDuration: string
+  timestamp: string
+  receiptUrl?: string
+}
+
+export default function PaymentPage() {
+  const router = useRouter()
+  const { user } = useAuth()
+  const { profile } = useUserProfile()
+  const { isSubscribed, loading: subscriptionLoading } = useSubscription()
+  const { sidebarCollapsed } = useSidebar()
+  
+  const [payments, setPayments] = useState<TaxPayment[]>([])
+  const [filteredPayments, setFilteredPayments] = useState<TaxPayment[]>([])
+  const [loading, setLoading] = useState(true)
+  const [showReceipt, setShowReceipt] = useState(false)
+  const [selectedPayment, setSelectedPayment] = useState<PaymentData | null>(null)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   
   // View mode
   const [viewMode, setViewMode] = useState<ViewMode>("table")
