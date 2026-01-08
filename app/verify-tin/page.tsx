@@ -526,6 +526,8 @@ export default function VerifyTaxIdPage() {
                 onClick={() => {
                   if (profile?.businessType === 'sme') {
                     router.push("/dashboard-sme")
+                  } else if (profile?.businessType === 'creator') {
+                    router.push("/dashboard-creator")
                   } else {
                     router.push("/dashboard")
                   }

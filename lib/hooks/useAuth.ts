@@ -13,7 +13,8 @@ import {
   GoogleAuthProvider,
   linkWithCredential,
   EmailAuthProvider,
-  reauthenticateWithCredential
+  reauthenticateWithCredential,
+  fetchSignInMethodsForEmail
 } from 'firebase/auth'
 import { FirebaseError } from 'firebase/app'
 import { auth } from '@/firebase/firebase'
@@ -186,12 +187,43 @@ export function useAuth() {
       return { success: true }
     } catch (error: unknown) {
       let errorMessage = 'An error occurred during sign in'
+      let isGoogleOnlyUser = false
+      
       if (error instanceof FirebaseError) {
+        console.log('Firebase error code:', error.code)
         // Check if account might exist with Google provider
-        if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
-          // Try to provide a helpful message - we can't definitively know if it's a Google account
-          // without trying to fetch the account, but we can suggest both options
-          errorMessage = 'Email or password is incorrect. If you signed up with Google, please use "Continue with Google" to sign in.'
+        if (error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+          // Check if the email has Google as a sign-in method
+          try {
+            const signInMethods = await fetchSignInMethodsForEmail(auth, data.email)
+            console.log('Sign-in methods for email:', signInMethods)
+            console.log('Sign-in methods type:', typeof signInMethods, Array.isArray(signInMethods))
+            console.log('Has google.com:', signInMethods.includes('google.com'))
+            console.log('Has password:', signInMethods.includes('password'))
+            
+            // Check if user has Google provider but no password provider
+            const hasGoogle = signInMethods.includes('google.com')
+            const hasPassword = signInMethods.includes('password')
+            
+            if (hasGoogle && !hasPassword) {
+              // User signed up with Google only, no password set
+              console.log('Detected Google-only user')
+              isGoogleOnlyUser = true
+              errorMessage = 'GOOGLE_ONLY_USER' // Special error code for Google-only users
+            } else if (hasGoogle && hasPassword) {
+              // User has both, so password might be wrong
+              console.log('User has both Google and password, password might be incorrect')
+              errorMessage = 'Email or password is incorrect. Please try again.'
+            } else {
+              console.log('Not Google-only, regular password error')
+              errorMessage = 'Email or password is incorrect. Please try again.'
+            }
+          } catch (fetchError) {
+            console.error('Error fetching sign-in methods:', fetchError)
+            // If we can't fetch sign-in methods, try to check if it's a known Google account
+            // For now, use generic error
+            errorMessage = 'Email or password is incorrect. If you signed up with Google, please use "Continue with Google" to sign in.'
+          }
         } else {
           errorMessage = mapFirebaseAuthError(error.code, error.message)
         }
@@ -199,7 +231,8 @@ export function useAuth() {
         errorMessage = String((error as { message?: unknown }).message) || errorMessage
       }
       setAuthState(prev => ({ ...prev, loading: false, error: errorMessage }))
-      return { success: false, error: errorMessage }
+      console.log('Returning from signIn:', { success: false, error: errorMessage, isGoogleOnlyUser })
+      return { success: false, error: errorMessage, isGoogleOnlyUser }
     }
   }
 
@@ -241,8 +274,28 @@ export function useAuth() {
         return { success: false, error: 'Failed to sign in with Google' }
       }
 
-      // Check if user profile exists
+      // Check if this is a new Firebase auth account or existing one
+      // Compare creationTime with lastSignInTime - if they're the same (or very close), it's a new account
+      const creationTime = user.metadata.creationTime ? new Date(user.metadata.creationTime).getTime() : 0
+      const lastSignInTime = user.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime).getTime() : 0
+      const timeDifference = Math.abs(lastSignInTime - creationTime)
+      const isNewFirebaseAccount = timeDifference < 5000 // 5 seconds threshold - if creation and last sign in are within 5 seconds, it's new
+
+      // Check if user profile exists in Firestore
       const existingProfile = await userService.getProfile(user.uid)
+
+      // If account is not new (created more than 5 seconds before last sign in) and we're on signup page, it's an existing user
+      // businessType is only passed when called from signup page
+      if (!isNewFirebaseAccount && businessType !== undefined) {
+        // User is trying to sign up but account already exists
+        // Sign them out and return error
+        await signOut(auth)
+        setAuthState(prev => ({ ...prev, loading: false, error: null }))
+        return { 
+          success: false, 
+          error: 'An account with this email already exists. Please sign in instead.' 
+        }
+      }
 
       if (!existingProfile) {
         // New user - create profile

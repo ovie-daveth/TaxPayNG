@@ -19,7 +19,7 @@ import { Separator } from "@/components/ui/separator"
 export default function LoginPage() {
   const router = useRouter()
   const { signIn, signInWithGoogle, user, loading } = useAuth()
-  const { profile, loading: profileLoading } = useUserProfile()
+  const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
   const { theme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -35,29 +35,45 @@ export default function LoginPage() {
     password: ''
   })
   const [showPassword, setShowPassword] = useState(false)
+  const [isGoogleOnlyUser, setIsGoogleOnlyUser] = useState(false)
 
   useEffect(() => {
+    console.log("Login redirect effect - user:", !!user, "loading:", loading, "profileLoading:", profileLoading, "profile:", !!profile)
+    
     // Wait for loading to complete
     if (loading || profileLoading) {
-      return
-    }
-
-    // If user is logged in but profile is null, wait a bit more
-    if (user && !profile) {
-      console.log("Login page - user logged in but profile is null, waiting...")
+      console.log("Login redirect - still loading, waiting...")
       return
     }
 
     // If user is not logged in, don't redirect
     if (!user) {
+      console.log("Login redirect - no user, not redirecting")
       return
+    }
+
+    // If user is logged in but profile is null, wait a bit more and try to refetch
+    if (user && !profile) {
+      console.log("Login page - user logged in but profile is null, waiting...")
+      // Try to refetch the profile
+      refetchProfile().catch(console.error)
+      // Set a timeout to retry after a short delay
+      const timeout = setTimeout(() => {
+        console.log("Login redirect - profile still null after wait, checking again...")
+        // Try refetching again
+        refetchProfile().catch(console.error)
+      }, 1000)
+      return () => clearTimeout(timeout)
     }
 
     // If profile is still null after user is logged in, something might be wrong
     // But don't redirect in a loop - just return
     if (!profile) {
+      console.log("Login redirect - profile is null, cannot redirect")
       return
     }
+
+    console.log("Login redirect - profile loaded, businessType:", profile.businessType, "taxId:", !!profile.taxId)
 
     // Check if user needs to select business type
     // This happens when a user signs in with Google and a profile was created with default 'freelancer' but no taxId
@@ -89,31 +105,37 @@ export default function LoginPage() {
 
     // Check if user needs to verify TIN or upload documents
     if (!profile.taxId) {
+      console.log("Login redirect - no taxId, redirecting to verify-tin")
       router.push("/verify-tin")
       return
     }
 
     if (profile.businessType === 'sme' && !profile.businessDocuments) {
+      console.log("Login redirect - SME without documents, redirecting to verify-tin")
       router.push("/verify-tin")
       return
     }
 
     if (profile.businessType === 'creator') {
+      console.log("Login redirect - creator, redirecting to dashboard-creator")
       router.push("/dashboard-creator")
       return
     }
 
     if (profile.businessType === 'sme') {
+      console.log("Login redirect - SME, redirecting to dashboard-sme")
       router.push("/dashboard-sme")
       return
     }
 
+    console.log("Login redirect - default, redirecting to dashboard")
     router.push("/dashboard")
-  }, [user, loading, profile, profileLoading, router])
+  }, [user, loading, profile, profileLoading, router, refetchProfile])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setIsLoading(true)
+    setIsGoogleOnlyUser(false) // Reset Google-only user state
 
     const result = await signIn({
       email: formData.email,
@@ -123,9 +145,27 @@ export default function LoginPage() {
     setIsLoading(false)
 
     if (result.success) {
+      setIsGoogleOnlyUser(false)
       toast.success('Logged in successfully!')
+      // Refetch profile to ensure it's loaded for redirect
+      await refetchProfile()
       // Don't redirect here - useEffect will handle it based on TIN verification status
     } else {
+      // Check if this is a Google-only user FIRST, before any toast
+      console.log('Login error:', result.error, 'isGoogleOnlyUser:', result.isGoogleOnlyUser)
+      const isGoogleOnly = result.error === 'GOOGLE_ONLY_USER' || result.isGoogleOnlyUser === true
+      console.log('isGoogleOnly check:', isGoogleOnly)
+      
+      if (isGoogleOnly) {
+        console.log('Detected Google-only user, showing form message, NOT toast')
+        setIsGoogleOnlyUser(true)
+        // Don't show toast, show message in form instead
+        return // Exit early to prevent any toast
+      }
+      
+      // Only show toast for non-Google-only errors
+      console.log('Not Google-only user, showing toast')
+      setIsGoogleOnlyUser(false)
       toast.error(result.error || 'Failed to log in')
     }
   }
@@ -135,13 +175,23 @@ export default function LoginPage() {
     try {
       const result = await signInWithGoogle()
       if (result.success) {
+        // Refetch profile to ensure it's loaded for redirect
+        await refetchProfile()
+        
+        // Wait a moment for the profile state to update in the context
+        // The useEffect will trigger when profile changes and handle the redirect
+        setTimeout(() => {
+          // Force another refetch to ensure profile is loaded
+          refetchProfile().catch(console.error)
+        }, 300)
+        
         // Check if user needs to select business type
         if (result.needsBusinessTypeSelection) {
           toast.success('Signed in with Google! Please select your business type.')
           // Redirect will be handled by useEffect after profile loads
         } else {
           toast.success('Signed in with Google successfully!')
-          // Don't redirect here - useEffect will handle it based on TIN verification status
+          // Redirect will be handled by useEffect after profile loads
         }
       } else {
         toast.error(result.error || 'Failed to sign in with Google')
@@ -206,7 +256,10 @@ export default function LoginPage() {
                   type={showPassword ? "text" : "password"} 
                   placeholder="••••••••" 
                   value={formData.password}
-                  onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
+                  onChange={(e) => {
+                    setFormData(prev => ({ ...prev, password: e.target.value }))
+                    setIsGoogleOnlyUser(false) // Clear error when user types
+                  }}
                   required 
                   className="h-11 sm:h-12 text-base border-2 pr-12 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
                 />
@@ -219,6 +272,25 @@ export default function LoginPage() {
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
+              {isGoogleOnlyUser && (
+                <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 space-y-3">
+                  <p className="text-sm text-amber-900 dark:text-amber-100 font-medium">
+                    You signed up with Google
+                  </p>
+                  <p className="text-xs text-amber-800 dark:text-amber-200">
+                    You don't have a password set yet. Please continue signing in with Google. After logging in, you can set a password in your account settings to enable password login in the future.
+                  </p>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleGoogleSignIn}
+                    className="w-full sm:w-auto text-xs sm:text-sm border-amber-300 dark:border-amber-700 text-amber-900 dark:text-amber-100 hover:bg-amber-100 dark:hover:bg-amber-900/50"
+                  >
+                    Continue with Google
+                  </Button>
+                </div>
+              )}
             </div>
 
             <Button 

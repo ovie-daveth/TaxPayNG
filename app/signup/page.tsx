@@ -83,7 +83,7 @@ function SignupPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { signUp, signInWithGoogle, user, loading } = useAuth()
-  const { profile, loading: profileLoading } = useUserProfile()
+  const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
   const [isLoading, setIsLoading] = useState(false)
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)
   const [showComingSoonModal, setShowComingSoonModal] = useState(false)
@@ -142,20 +142,33 @@ function SignupPageContent() {
 
   // Redirect after Google signup (user is already logged in)
   useEffect(() => {
+    console.log("Signup redirect effect - user:", !!user, "loading:", loading, "profileLoading:", profileLoading, "profile:", !!profile, "signupSuccess:", signupSuccess)
+    
     // Wait for profile to load
     if (loading || profileLoading || !user) {
+      console.log("Signup redirect - still loading or no user, waiting...")
       return
     }
 
     // Only redirect if this was a Google signup (user is logged in but we're still on signup page)
     if (!user || !signupSuccess) {
+      console.log("Signup redirect - no user or not signup success, not redirecting")
       return
     }
 
-    // If profile is null, wait a bit more
+    // If profile is null, wait a bit more and try to refetch
     if (!profile) {
-      return
+      console.log("Signup redirect - profile is null, refetching...")
+      refetchProfile().catch(console.error)
+      // Set a timeout to retry after a short delay
+      const timeout = setTimeout(() => {
+        console.log("Signup redirect - profile still null after wait, refetching again...")
+        refetchProfile().catch(console.error)
+      }, 1000)
+      return () => clearTimeout(timeout)
     }
+
+    console.log("Signup redirect - profile loaded, businessType:", profile.businessType, "taxId:", !!profile.taxId)
 
     // Agent-specific redirects
     if (profile.businessType === 'agent') {
@@ -190,8 +203,9 @@ function SignupPageContent() {
     }
 
     // Default to freelancer dashboard
+    console.log("Signup redirect - default, redirecting to dashboard")
     router.push("/dashboard")
-  }, [user, profile, loading, profileLoading, signupSuccess, router])
+  }, [user, profile, loading, profileLoading, signupSuccess, router, refetchProfile])
 
   const isSME = formData.businessType === 'sme'
   const isCreator = formData.businessType === 'creator'
@@ -393,6 +407,15 @@ function SignupPageContent() {
       const result = await signInWithGoogle(businessType)
       
       if (result.success) {
+        // Refetch profile to ensure it's loaded for redirect
+        await refetchProfile()
+        
+        // Wait a moment for the profile state to update in the context
+        setTimeout(() => {
+          // Force another refetch to ensure profile is loaded
+          refetchProfile().catch(console.error)
+        }, 300)
+        
         if (result.isNewUser) {
           toast.success('Account created successfully with Google!')
           setSignupSuccess(true)
