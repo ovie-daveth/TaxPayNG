@@ -28,7 +28,7 @@ export function DashboardHeader() {
   
   const { user } = useAuth()
   const { profile } = useUserProfile()
-  const { isSubscribed, isExpired, loading: subscriptionLoading } = useSubscription()
+  const { hasAccess, isSubscribedOnly, loading: subscriptionLoading } = useSubscription()
   const { uploadDocument } = useDocumentsFirebase()
   const { createTransaction } = useTransactions(user?.uid || null)
   // Load reminders hook for header actions
@@ -39,12 +39,12 @@ export function DashboardHeader() {
     if (subscriptionLoading) {
       return
     }
-    // Check if user is subscribed or expired - if not, show modal
-    if (!isSubscribed || isExpired) {
+    // Check if user has access (free trial or subscribed) - if not, show modal
+    if (!hasAccess()) {
       setShowSubscriptionModal(true)
       return
     }
-    // User is subscribed and not expired, proceed with action
+    // User has access (free trial or subscribed), proceed with action
     action()
   }
 
@@ -208,7 +208,15 @@ export function DashboardHeader() {
           subtitle: "Manage your tax payments and receipts",
           buttonText: "New Payment",
           buttonIcon: Plus,
-          buttonAction: () => router.push(`${basePath}/payment/add`)
+          buttonAction: () => {
+            // Check subscription before navigating
+            if (subscriptionLoading) return
+            if (!isSubscribedOnly()) {
+              setShowSubscriptionModal(true)
+              return
+            }
+            router.push(`${basePath}/payment/add`)
+          }
         }
       case "/dashboard/settings":
         return {

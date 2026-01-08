@@ -32,7 +32,7 @@ export default function InvoicesPage() {
   const searchParams = useSearchParams()
   const { user } = useAuth()
   const { profile } = useUserProfile()
-  const { isSubscribed } = useSubscription()
+  const { hasAccess } = useSubscription()
   const { sidebarCollapsed } = useSidebar()
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [loading, setLoading] = useState(true)
@@ -60,7 +60,7 @@ export default function InvoicesPage() {
   })
 
   const handleCreateInvoiceClick = () => {
-    if (!isSubscribed && profile && (profile.businessType === 'freelancer' || profile.businessType === 'creator')) {
+    if (!hasAccess() && profile && (profile.businessType === 'freelancer' || profile.businessType === 'creator')) {
       setShowSubscriptionModal(true)
       return
     }
@@ -101,7 +101,7 @@ export default function InvoicesPage() {
   // Listen for create invoice event from header
   useEffect(() => {
     const handleCreateInvoice = () => {
-      if (!isSubscribed && profile && (profile.businessType === 'freelancer' || profile.businessType === 'creator')) {
+      if (!hasAccess() && profile && (profile.businessType === 'freelancer' || profile.businessType === 'creator')) {
         setShowSubscriptionModal(true)
         return
       }
@@ -109,7 +109,7 @@ export default function InvoicesPage() {
     }
     window.addEventListener('createInvoice', handleCreateInvoice)
     return () => window.removeEventListener('createInvoice', handleCreateInvoice)
-  }, [isSubscribed, profile])
+  }, [hasAccess, profile])
 
   // Handle invoiceId query parameter to open specific invoice
   useEffect(() => {

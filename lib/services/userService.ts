@@ -128,6 +128,11 @@ export class UserService extends BaseService {
           transactionCountResetDate: profileData.transactionCountResetDate !== undefined ? profileData.transactionCountResetDate : existingProfile.transactionCountResetDate,
           storageLimit: profileData.storageLimit !== undefined ? profileData.storageLimit : existingProfile.storageLimit,
           storageUsed: profileData.storageUsed !== undefined ? profileData.storageUsed : existingProfile.storageUsed,
+          // SECURITY: Preserve free trial fields to prevent manipulation
+          // These fields should only be set during signup or by server-side code
+          freeTrialStartDate: profileData.freeTrialStartDate !== undefined ? profileData.freeTrialStartDate : existingProfile.freeTrialStartDate,
+          freeTrialEndDate: profileData.freeTrialEndDate !== undefined ? profileData.freeTrialEndDate : existingProfile.freeTrialEndDate,
+          freeTrialUsed: profileData.freeTrialUsed !== undefined ? profileData.freeTrialUsed : existingProfile.freeTrialUsed,
         }
         
         // If subscription type changed, update storage limit

@@ -47,7 +47,7 @@ export function DashboardNav() {
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   
-  const { isSubscribed, isExpired, loading: subscriptionLoading } = useSubscription()
+  const { hasAccess, isSubscribedOnly, loading: subscriptionLoading } = useSubscription()
   const { createTransaction } = useTransactions(user?.uid || null)
   const { createReminder } = useReminders(user?.uid || null)
   
@@ -70,7 +70,18 @@ export function DashboardNav() {
       case "/dashboard/reports":
         return { icon: Plus, action: () => router.push("/dashboard/reports/generate/self-assessment"), show: true }
       case "/dashboard/payment":
-        return { icon: Plus, action: () => router.push("/dashboard/payment/add"), show: true }
+        return { 
+          icon: Plus, 
+          action: () => {
+            if (subscriptionLoading) return
+            if (!isSubscribedOnly()) {
+              setShowSubscriptionModal(true)
+              return
+            }
+            router.push("/dashboard/payment/add")
+          }, 
+          show: true 
+        }
       default:
         return { icon: Plus, action: () => {}, show: false }
     }
@@ -118,12 +129,12 @@ export function DashboardNav() {
     if (subscriptionLoading) {
       return
     }
-    // Check if user is subscribed or expired - if not, show modal
-    if (!isSubscribed || isExpired) {
+    // Check if user has access (free trial or subscribed) - if not, show modal
+    if (!hasAccess()) {
       setShowSubscriptionModal(true)
       return
     }
-    // User is subscribed and not expired, proceed with action
+    // User has access (free trial or subscribed), proceed with action
     action()
   }
 

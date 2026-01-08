@@ -16,11 +16,11 @@ export function FreeTrialWarningModal({ open, onOpenChange, daysRemaining }: Fre
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-full">
-              <AlertTriangle className="h-6 w-6 text-yellow-600 dark:text-yellow-500" />
-            </div>
+          <div className="flex items-center justify-center gap-1 mb-2">
             <DialogTitle className="text-xl">Free Trial Ending Soon</DialogTitle>
+            <div className="p-2 bg-yellow-100 dark:bg-yellow-900/20 rounded-full">
+              <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
+            </div>
           </div>
           <DialogDescription className="text-base pt-2">
             Your free trial ends in {daysRemaining} day{daysRemaining !== 1 ? 's' : ''}. 

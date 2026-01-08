@@ -18,7 +18,9 @@ import {
   X,
   LogOut,
   DollarSign,
-  ClipboardList
+  ClipboardList,
+  UserPlus,
+  Shield
 } from "lucide-react"
 import { signOut } from "firebase/auth"
 import { auth } from "@/firebase/firebase"
@@ -31,6 +33,8 @@ import OtaxLogo from "../OtaxLogo"
 const navItems = [
   { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/dashboard/users", label: "Users", icon: Users },
+  { href: "/admin/dashboard/signups", label: "Signups", icon: UserPlus },
+  { href: "/admin/dashboard/activity-logs", label: "Activity Logs", icon: Shield },
   { href: "/admin/dashboard/blog", label: "Blog Posts", icon: BookOpen },
   { href: "/admin/dashboard/transactions", label: "Transactions", icon: Receipt },
   { href: "/admin/dashboard/documents", label: "Documents", icon: FolderOpen },

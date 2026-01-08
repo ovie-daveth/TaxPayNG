@@ -46,14 +46,14 @@ const reportTemplates = [
 function MobileReportDropdown() {
   const router = useRouter()
   const { profile } = useUserProfile()
-  const { isSubscribed, loading: subscriptionLoading } = useSubscription()
+  const { isSubscribedOnly, loading: subscriptionLoading } = useSubscription()
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
 
   const handleGenerateClick = (href: string) => {
     if (subscriptionLoading) {
       return
     }
-    if (!isSubscribed) {
+    if (!isSubscribedOnly()) {
       setShowSubscriptionModal(true)
       return
     }

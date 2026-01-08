@@ -67,18 +67,8 @@ function LayoutContent({
       return
     }
     
-    // Check if user has verified TIN - if not, redirect to verify-tin
-    if (!profile.taxId) {
-      console.log("No TIN found for SME, redirecting to /verify-tin")
-      router.push('/verify-tin')
-      return
-    }
-    
-    // For SMEs, also check if they have uploaded business documents
-    if (!profile.businessDocuments) {
-      console.log("No business documents found for SME, redirecting to /verify-tin")
-      router.push('/verify-tin')
-    }
+    // TIN verification and business documents are optional - users can skip and add them later in settings
+    // Removed the redirect to /verify-tin to allow users to use the dashboard without TIN
   }, [profile, profileLoading, router])
 
   if (loading || profileLoading) {

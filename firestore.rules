@@ -47,20 +47,49 @@ service cloud.firestore {
       return isAuthenticated();
     }
     
+    // Helper function to validate subscription/trial status using SERVER TIME
+    // This prevents users from manipulating their system clock to extend free trial
+    // FIXED: Using expression syntax instead of procedural if statements
+    function profileHasValidAccess(profile) {
+      return (profile.isSubscribe == true && 
+              profile.subscriptionExpiryDate != null && 
+              timestamp.value(profile.subscriptionExpiryDate) > request.time) ||
+             (profile.freeTrialUsed == true && 
+              profile.freeTrialEndDate != null && 
+              timestamp.value(profile.freeTrialEndDate) > request.time);
+    }
+
     // User Profiles Collection
     match /userProfiles/{profileId} {
       // Users can read their own profile
-      // For admin access, we allow authenticated users (admin checks done at app level)
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
-      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
-      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
+      
+      // Create: Only during signup - prevent setting subscription fields
+      allow create: if isAuthenticated() && 
+                      request.resource.data.userId == request.auth.uid &&
+                      !('isSubscribe' in request.resource.data) &&
+                      !('subscriptionType' in request.resource.data) &&
+                      !('subscriptionExpiryDate' in request.resource.data) &&
+                      !('freeTrialStartDate' in request.resource.data) &&
+                      !('freeTrialEndDate' in request.resource.data) &&
+                      !('freeTrialUsed' in request.resource.data);
+      
+      // Update: Lock subscription fields - prevent modification
+      allow update: if isAuthenticated() && 
+                      (resource.data.userId == request.auth.uid || isAuthenticatedUser()) &&
+                      request.resource.data.isSubscribe == resource.data.isSubscribe &&
+                      request.resource.data.subscriptionType == resource.data.subscriptionType &&
+                      request.resource.data.subscriptionExpiryDate == resource.data.subscriptionExpiryDate &&
+                      request.resource.data.freeTrialStartDate == resource.data.freeTrialStartDate &&
+                      request.resource.data.freeTrialEndDate == resource.data.freeTrialEndDate &&
+                      request.resource.data.freeTrialUsed == resource.data.freeTrialUsed &&
+                      request.resource.data.role == resource.data.role;
+      
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
     }
     
     // Transactions Collection
     match /transactions/{transactionId} {
-      // Users can read their own transactions
-      // For admin access, we allow authenticated users (admin checks done at app level)
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
@@ -69,8 +98,6 @@ service cloud.firestore {
     
     // Documents Collection
     match /documents/{documentId} {
-      // Users can read their own documents
-      // For admin access, we allow authenticated users (admin checks done at app level)
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
@@ -79,8 +106,6 @@ service cloud.firestore {
     
     // Reminders Collection
     match /reminders/{reminderId} {
-      // Users can read their own reminders
-      // For admin access, we allow authenticated users (admin checks done at app level)
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
@@ -89,8 +114,6 @@ service cloud.firestore {
     
     // Tax Calculations Collection
     match /taxCalculations/{calculationId} {
-      // Users can read their own calculations
-      // For admin access, we allow authenticated users (admin checks done at app level)
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
@@ -99,8 +122,6 @@ service cloud.firestore {
     
     // Tax Payments Collection
     match /taxPayments/{paymentId} {
-      // Users can read their own payments
-      // For admin access, we allow authenticated users (admin checks done at app level)
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
@@ -109,8 +130,6 @@ service cloud.firestore {
     
     // Reports Collection
     match /reports/{reportId} {
-      // Users can read their own reports
-      // For admin access, we allow authenticated users (admin checks done at app level)
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
@@ -151,8 +170,6 @@ service cloud.firestore {
     
     // Capital Assets Collection
     match /capitalAssets/{assetId} {
-      // Users can read their own capital assets
-      // For admin access, we allow authenticated users (admin checks done at app level)
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
@@ -161,27 +178,14 @@ service cloud.firestore {
     
     // Invoices Collection
     match /invoices/{invoiceId} {
-      // Users can read their own invoices
-      // For admin access, we allow authenticated users (admin checks done at app level)
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
-      
-      // Allow create if:
-      // 1. User is creating their own invoice (userId matches auth.uid), OR
-      // 2. User is sending an invoice to another user (senderUserId matches auth.uid for incoming invoices)
-      allow create: if isAuthenticated() && (
-        request.resource.data.userId == request.auth.uid ||
-        (request.resource.data.invoiceType == 'incoming' && 
-         request.resource.data.senderUserId == request.auth.uid)
-      );
-      
+      allow create: if isAuthenticated() && (request.resource.data.userId == request.auth.uid || (request.resource.data.invoiceType == 'incoming' && request.resource.data.senderUserId == request.auth.uid));
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
     }
     
     // Brand Deals Collection
     match /brandDeals/{dealId} {
-      // Users can read their own brand deals
-      // For admin access, we allow authenticated users (admin checks done at app level)
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
@@ -190,8 +194,6 @@ service cloud.firestore {
 
     // Business Entities Collection (Multi-Entity Business Management)
     match /businessEntities/{entityId} {
-      // Users can read their own business entities
-      // Admin checks are handled at app level (same pattern as other collections)
       allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
@@ -199,9 +201,7 @@ service cloud.firestore {
     }
     
     // Waitlist Verifications Collection (temporary, server-side only)
-    // Stores verification tokens before adding to waitlist
     match /waitlistVerifications/{emailId} {
-      // Helper function to validate verification entry structure
       function isValidVerificationEntry() {
         let hasRequiredFields = request.resource.data.keys().hasAll(['name', 'email', 'verificationToken', 'createdAt', 'expiresAt', 'attempts']);
         let nameValid = request.resource.data.name is string && request.resource.data.name.size() > 0;
@@ -211,11 +211,9 @@ service cloud.firestore {
         let attemptsValid = request.resource.data.attempts is int && request.resource.data.attempts >= 0 && request.resource.data.attempts <= 10;
         let phoneValid = !('phone' in request.resource.data) || request.resource.data.phone == null || request.resource.data.phone is string;
         let emailMatchesId = request.resource.data.email == emailId;
-        
         return hasRequiredFields && nameValid && emailValid && tokenValid && datesValid && attemptsValid && phoneValid && emailMatchesId;
       }
       
-      // Helper function to validate update (can only increment attempts, not modify token)
       function isValidUpdate() {
         return request.resource.data.name == resource.data.name &&
                request.resource.data.email == resource.data.email &&
@@ -223,34 +221,18 @@ service cloud.firestore {
                request.resource.data.createdAt == resource.data.createdAt &&
                request.resource.data.expiresAt == resource.data.expiresAt &&
                request.resource.data.attempts is int &&
-               request.resource.data.attempts > resource.data.attempts && // Can only increment
+               request.resource.data.attempts > resource.data.attempts &&
                request.resource.data.attempts <= 10;
       }
       
-      // Allow API routes to create verification entries (with strict validation)
-      // Note: Client SDK in API routes doesn't have auth context, so validation is key
-      // For production, use Firebase Admin SDK to bypass rules entirely
-      allow create: if isValidVerificationEntry() || 
-                    // Fallback: allow if basic structure is valid (for development)
-                    (request.resource.data.email is string && 
-                     request.resource.data.verificationToken is string &&
-                     request.resource.data.verificationToken.size() == 6);
-      
-      // Allow API routes to read verification entries (for token verification)
-      // Allow reads for server-side operations (no client-side direct access needed)
-      allow read: if true; // API routes need to read for verification
-      
-      // Allow API routes to update (for incrementing attempts on failed verification)
+      allow create: if isValidVerificationEntry() || (request.resource.data.email is string && request.resource.data.verificationToken is string && request.resource.data.verificationToken.size() == 6);
+      allow read: if true;
       allow update: if isValidUpdate();
-      
-      // Allow API routes to delete (after successful verification or expiry)
-      allow delete: if true; // API routes need to delete after verification
+      allow delete: if true;
     }
     
     // Waitlist Collection (verified entries only)
     match /waitlist/{waitlistId} {
-      // Helper function to validate waitlist entry structure
-      // Updated to require emailVerified: true (only verified entries allowed)
       function isValidWaitlistEntry() {
         return request.resource.data.keys().hasAll(['name', 'email', 'createdAt', 'status', 'notified', 'emailVerified']) &&
                request.resource.data.name is string &&
@@ -260,40 +242,19 @@ service cloud.firestore {
                request.resource.data.createdAt is string &&
                request.resource.data.status is string &&
                request.resource.data.notified is bool &&
-               request.resource.data.emailVerified == true && // Must be verified
+               request.resource.data.emailVerified == true &&
                (request.resource.data.phone == null || request.resource.data.phone is string) &&
                (request.resource.data.verifiedAt == null || request.resource.data.verifiedAt is string);
       }
       
-      // Only server-side API routes can create waitlist entries (after token verification)
-      // This ensures only verified emails are added to waitlist
-      // Note: API routes should use Firebase Admin SDK to bypass these rules
-      // If using client SDK in API routes, this will need to be adjusted
-      allow create: if isValidWaitlistEntry(); // Allow if entry is valid and verified
-      
-      // Allow reads for checking duplicate emails (needed for public form)
-      // In production, consider using a Cloud Function for better security
+      allow create: if isValidWaitlistEntry();
       allow read: if true;
-      
-      // Only authenticated users (admins) can update (for status/notified updates)
-      allow update: if isAuthenticated() &&
-                    // Prevent modifying immutable fields (name, email, createdAt, emailVerified must remain unchanged)
-                    request.resource.data.createdAt == resource.data.createdAt &&
-                    request.resource.data.name == resource.data.name &&
-                    request.resource.data.email == resource.data.email &&
-                    request.resource.data.emailVerified == true && // emailVerified must stay true
-                    // Allow updating status, notified, verifiedAt
-                    (request.resource.data.status == resource.data.status || true) &&
-                    (request.resource.data.notified == resource.data.notified || true) &&
-                    (request.resource.data.verifiedAt == resource.data.verifiedAt || true);
-      
-      // Only authenticated users (admins) can delete
+      allow update: if isAuthenticated() && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.name == resource.data.name && request.resource.data.email == resource.data.email && request.resource.data.emailVerified == true;
       allow delete: if isAuthenticated();
     }
     
     // Blog Comments Collection
     match /blogComments/{commentId} {
-      // Helper function to validate comment structure
       function isValidComment() {
         return request.resource.data.keys().hasAll(['blogId', 'name', 'email', 'comment', 'createdAt']) &&
                request.resource.data.blogId is string &&
@@ -306,31 +267,14 @@ service cloud.firestore {
                request.resource.data.createdAt is string;
       }
       
-      // Anyone can read comments (public)
       allow read: if true;
-      
-      // Anyone can create comments (waitlist check is done in app logic)
       allow create: if isValidComment();
-      
-      // Users can update their own comments (by email match)
-      allow update: if isValidComment() &&
-                    request.resource.data.email == resource.data.email &&
-                    request.resource.data.createdAt == resource.data.createdAt &&
-                    request.resource.data.blogId == resource.data.blogId;
-      
-      // Only authenticated users (admins) can delete comments
-      // Note: User deletion by email would require a custom security rule or Cloud Function
+      allow update: if isValidComment() && request.resource.data.email == resource.data.email && request.resource.data.createdAt == resource.data.createdAt && request.resource.data.blogId == resource.data.blogId;
       allow delete: if isAuthenticated();
     }
     
-    // Note: Admin verification is primarily handled at app level
-    // Firestore rules allow authenticated users to read collections
-    // App-level checks ensure only admins can access admin features
-    
     // Blog Posts Collection
     match /blogPosts/{postId} {
-      // Helper function to validate blog post structure
-      // Updated to accommodate isPublished field and nullable publishedAt for drafts
       function isValidBlogPost() {
         return request.resource.data.keys().hasAll(['title', 'excerpt', 'category', 'author', 'content', 'createdAt', 'readTime', 'status', 'isPublished']) &&
                request.resource.data.title is string &&
@@ -345,39 +289,21 @@ service cloud.firestore {
                request.resource.data.readTime is string &&
                request.resource.data.status is string &&
                request.resource.data.isPublished is bool &&
-               // publishedAt can be null for drafts, or a string for published posts
                (!('publishedAt' in request.resource.data) || request.resource.data.publishedAt == null || request.resource.data.publishedAt is string) &&
-               // Optional fields
                (!('featuredImage' in request.resource.data) || request.resource.data.featuredImage == null || request.resource.data.featuredImage is string) &&
                (!('views' in request.resource.data) || request.resource.data.views == null || request.resource.data.views is int) &&
                (!('authorId' in request.resource.data) || request.resource.data.authorId == null || request.resource.data.authorId is string) &&
                (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt == null || request.resource.data.updatedAt is string);
       }
       
-      // Anyone can read published posts (isPublished == true)
-      // Authenticated users can read all posts (including drafts) for admin/editor management
       allow read: if resource.data.isPublished == true || isAuthenticated();
-      
-      // Authenticated users can create posts
-      // Editor and admin role checks are done at app level (via adminService.isEditor/isAdmin)
-      // Only users with 'editor' or 'admin' role in their userProfile can create posts
       allow create: if isAuthenticated() && isValidBlogPost();
-      
-      // Authenticated users can update posts
-      // Editors can update their own posts or any post (if they are the author)
-      // Admins can update any post
-      // Role checks are done at app level
       allow update: if isAuthenticated() && isValidBlogPost();
-      
-      // Authenticated users can delete posts
-      // Only admins can delete posts (checked at app level)
-      // Editors can only delete their own posts (checked at app level)
       allow delete: if isAuthenticated();
     }
     
-    // Exchange Rates Collection (public read for tax calculator, authenticated write for admin)
+    // Exchange Rates Collection
     match /exchangeRates/{rateId} {
-      // Helper function to validate exchange rate structure
       function isValidExchangeRate() {
         return request.resource.data.keys().hasAll(['currency', 'rate', 'lastUpdated', 'updatedBy']) &&
                request.resource.data.currency is string &&
@@ -388,22 +314,14 @@ service cloud.firestore {
                request.resource.data.updatedBy is string;
       }
       
-      // Anyone can read exchange rates (needed for tax calculator to work)
       allow read: if true;
-      
-      // Authenticated users can create rates (admin check done at app level)
       allow create: if isAuthenticated() && isValidExchangeRate();
-      
-      // Authenticated users can update rates (admin check done at app level)
       allow update: if isAuthenticated() && isValidExchangeRate();
-      
-      // Authenticated users can delete rates (admin check done at app level)
       allow delete: if isAuthenticated();
     }
     
-    // Newsletter Collection (public signup, admin management)
+    // Newsletter Collection
     match /newsletter/{emailId} {
-      // Helper function to validate newsletter subscription structure
       function isValidNewsletterEntry() {
         return request.resource.data.keys().hasAll(['email', 'subscribedAt', 'status']) &&
                request.resource.data.email is string &&
@@ -413,60 +331,44 @@ service cloud.firestore {
                (request.resource.data.source == null || request.resource.data.source is string);
       }
       
-      // Anyone can create a newsletter subscription (public signup)
       allow create: if isValidNewsletterEntry();
-      
-      // Allow reads for checking duplicate emails (needed for public form)
-      // In production, consider using a Cloud Function for better security
       allow read: if true;
-      
-      // Only authenticated users can update (for status updates, unsubscribing)
-      allow update: if isAuthenticated() &&
-                    // Prevent modifying immutable fields (email, subscribedAt must remain unchanged)
-                    request.resource.data.subscribedAt == resource.data.subscribedAt &&
-                    request.resource.data.email == resource.data.email;
-      
-      // Only authenticated users can delete
+      allow update: if isAuthenticated() && request.resource.data.subscribedAt == resource.data.subscribedAt && request.resource.data.email == resource.data.email;
       allow delete: if isAuthenticated();
     }
     
-    // FAQ Conversations Collection (public read for shared conversations, authenticated write)
+    // FAQ Conversations Collection
     match /faqConversations/{conversationId} {
-      // Helper function to validate conversation structure
       function isValidConversation() {
-        // Basic structure validation
         let isValid = request.resource.data.keys().hasAll(['category', 'messages']) &&
                       request.resource.data.category is string &&
                       (request.resource.data.category == 'individuals' || request.resource.data.category == 'businesses') &&
                       request.resource.data.messages is list &&
                       request.resource.data.messages.size() > 0 &&
-                      request.resource.data.messages.size() <= 100; // Limit to prevent abuse
-        
-        // Validate that messages array contains valid objects (basic check)
-        // Note: Firestore rules don't support iteration, so we validate structure exists
-        // Detailed message validation should be done at application level
-        
+                      request.resource.data.messages.size() <= 100;
         return isValid;
       }
       
-      // Helper function to validate that update doesn't reduce messages (prevents deletion)
       function isValidUpdate() {
         return request.resource.data.messages.size() >= resource.data.messages.size() &&
                request.resource.data.category == resource.data.category;
       }
       
-      // Anyone can read conversations (for sharing via link)
       allow read: if true;
-      
-      // Anyone can create conversations (for saving FAQ conversations) - but must be valid
       allow create: if isValidConversation();
-      
-      // Anyone can update conversations (for continuing conversations) - but must be valid
-      // Must maintain message count (can only add, not remove) and preserve category
       allow update: if isValidConversation() && isValidUpdate();
-      
-      // Only authenticated users can delete conversations
       allow delete: if isAuthenticated();
+    }
+    
+    // Security Logs Collection (Admin only - read access)
+    // Note: Write access is handled server-side via Admin SDK
+    match /securityLogs/{logId} {
+      // Only authenticated users can read (app-level checks ensure only admins access)
+      allow read: if isAuthenticated();
+      // Write operations are handled server-side only
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
     }
   }
 }

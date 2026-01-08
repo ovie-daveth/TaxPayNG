@@ -55,7 +55,7 @@ export function TransactionList({
 
   const { user } = useAuth()
   const { profile } = useUserProfile()
-  const { isSubscribed, loading: subscriptionLoading, hasAccess } = useSubscription()
+  const { loading: subscriptionLoading, hasAccess } = useSubscription()
   const { sidebarCollapsed } = useSidebar()
   const { createTransaction } = useTransactions(user?.uid || null)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
@@ -215,7 +215,7 @@ export function TransactionList({
   }
 
   const handleAddTransaction = () => {
-    if (!isSubscribed && profile && profile.businessType !== 'agent') {
+    if (!hasAccess() && profile && profile.businessType !== 'agent') {
       setShowSubscriptionModal(true)
       return
     }
