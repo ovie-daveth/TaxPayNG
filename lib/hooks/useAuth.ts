@@ -241,8 +241,28 @@ export function useAuth() {
         return { success: false, error: 'Failed to sign in with Google' }
       }
 
-      // Check if user profile exists
+      // Check if this is a new Firebase auth account or existing one
+      // Compare creationTime with lastSignInTime - if they're the same (or very close), it's a new account
+      const creationTime = user.metadata.creationTime ? new Date(user.metadata.creationTime).getTime() : 0
+      const lastSignInTime = user.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime).getTime() : 0
+      const timeDifference = Math.abs(lastSignInTime - creationTime)
+      const isNewFirebaseAccount = timeDifference < 5000 // 5 seconds threshold - if creation and last sign in are within 5 seconds, it's new
+
+      // Check if user profile exists in Firestore
       const existingProfile = await userService.getProfile(user.uid)
+
+      // If account is not new (created more than 5 seconds before last sign in) and we're on signup page, it's an existing user
+      // businessType is only passed when called from signup page
+      if (!isNewFirebaseAccount && businessType !== undefined) {
+        // User is trying to sign up but account already exists
+        // Sign them out and return error
+        await signOut(auth)
+        setAuthState(prev => ({ ...prev, loading: false, error: null }))
+        return { 
+          success: false, 
+          error: 'An account with this email already exists. Please sign in instead.' 
+        }
+      }
 
       if (!existingProfile) {
         // New user - create profile

@@ -19,7 +19,7 @@ import { Separator } from "@/components/ui/separator"
 export default function LoginPage() {
   const router = useRouter()
   const { signIn, signInWithGoogle, user, loading } = useAuth()
-  const { profile, loading: profileLoading } = useUserProfile()
+  const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
   const { theme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -37,27 +37,42 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
+    console.log("Login redirect effect - user:", !!user, "loading:", loading, "profileLoading:", profileLoading, "profile:", !!profile)
+    
     // Wait for loading to complete
     if (loading || profileLoading) {
-      return
-    }
-
-    // If user is logged in but profile is null, wait a bit more
-    if (user && !profile) {
-      console.log("Login page - user logged in but profile is null, waiting...")
+      console.log("Login redirect - still loading, waiting...")
       return
     }
 
     // If user is not logged in, don't redirect
     if (!user) {
+      console.log("Login redirect - no user, not redirecting")
       return
+    }
+
+    // If user is logged in but profile is null, wait a bit more and try to refetch
+    if (user && !profile) {
+      console.log("Login page - user logged in but profile is null, waiting...")
+      // Try to refetch the profile
+      refetchProfile().catch(console.error)
+      // Set a timeout to retry after a short delay
+      const timeout = setTimeout(() => {
+        console.log("Login redirect - profile still null after wait, checking again...")
+        // Try refetching again
+        refetchProfile().catch(console.error)
+      }, 1000)
+      return () => clearTimeout(timeout)
     }
 
     // If profile is still null after user is logged in, something might be wrong
     // But don't redirect in a loop - just return
     if (!profile) {
+      console.log("Login redirect - profile is null, cannot redirect")
       return
     }
+
+    console.log("Login redirect - profile loaded, businessType:", profile.businessType, "taxId:", !!profile.taxId)
 
     // Check if user needs to select business type
     // This happens when a user signs in with Google and a profile was created with default 'freelancer' but no taxId
@@ -89,27 +104,32 @@ export default function LoginPage() {
 
     // Check if user needs to verify TIN or upload documents
     if (!profile.taxId) {
+      console.log("Login redirect - no taxId, redirecting to verify-tin")
       router.push("/verify-tin")
       return
     }
 
     if (profile.businessType === 'sme' && !profile.businessDocuments) {
+      console.log("Login redirect - SME without documents, redirecting to verify-tin")
       router.push("/verify-tin")
       return
     }
 
     if (profile.businessType === 'creator') {
+      console.log("Login redirect - creator, redirecting to dashboard-creator")
       router.push("/dashboard-creator")
       return
     }
 
     if (profile.businessType === 'sme') {
+      console.log("Login redirect - SME, redirecting to dashboard-sme")
       router.push("/dashboard-sme")
       return
     }
 
+    console.log("Login redirect - default, redirecting to dashboard")
     router.push("/dashboard")
-  }, [user, loading, profile, profileLoading, router])
+  }, [user, loading, profile, profileLoading, router, refetchProfile])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -124,6 +144,8 @@ export default function LoginPage() {
 
     if (result.success) {
       toast.success('Logged in successfully!')
+      // Refetch profile to ensure it's loaded for redirect
+      await refetchProfile()
       // Don't redirect here - useEffect will handle it based on TIN verification status
     } else {
       toast.error(result.error || 'Failed to log in')
@@ -135,13 +157,23 @@ export default function LoginPage() {
     try {
       const result = await signInWithGoogle()
       if (result.success) {
+        // Refetch profile to ensure it's loaded for redirect
+        await refetchProfile()
+        
+        // Wait a moment for the profile state to update in the context
+        // The useEffect will trigger when profile changes and handle the redirect
+        setTimeout(() => {
+          // Force another refetch to ensure profile is loaded
+          refetchProfile().catch(console.error)
+        }, 300)
+        
         // Check if user needs to select business type
         if (result.needsBusinessTypeSelection) {
           toast.success('Signed in with Google! Please select your business type.')
           // Redirect will be handled by useEffect after profile loads
         } else {
           toast.success('Signed in with Google successfully!')
-          // Don't redirect here - useEffect will handle it based on TIN verification status
+          // Redirect will be handled by useEffect after profile loads
         }
       } else {
         toast.error(result.error || 'Failed to sign in with Google')

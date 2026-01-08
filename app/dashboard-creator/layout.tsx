@@ -65,9 +65,8 @@ function LayoutContent({
       return
     }
 
-    if (!profile.taxId) {
-      router.push('/verify-tin')
-    }
+    // TIN verification is optional - users can skip it and add it later in settings
+    // Removed the redirect to /verify-tin to allow users to use the dashboard without TIN
   }, [profile, profileLoading, router])
 
   if (loading || profileLoading) {
