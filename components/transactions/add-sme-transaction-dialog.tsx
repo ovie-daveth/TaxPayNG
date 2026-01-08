@@ -192,7 +192,7 @@ export function AddSMETransactionDialog({
   const [isManualEntryMode, setIsManualEntryMode] = useState(false) // Track if user explicitly chose manual entry
   const [customCategory, setCustomCategory] = useState('') // For "Other" category custom input
   const [showCustomCategoryModal, setShowCustomCategoryModal] = useState(false) // Modal for custom category
-  const { isSubscribed, subscriptionType, hasAccess } = useSubscription()
+  const { subscriptionType, hasAccess } = useSubscription()
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   
   // Phase 1: New fields for tax compliance
@@ -913,7 +913,7 @@ export function AddSMETransactionDialog({
     }
 
     // Check subscription before submitting
-    if (!isSubscribed && !transaction) {
+    if (!hasAccess() && !transaction) {
       toast.error("Please subscribe to add transactions")
       return
     }
@@ -1319,7 +1319,7 @@ export function AddSMETransactionDialog({
           {/* Content */}
           <div className="overflow-y-auto p-3 sm:p-4 md:p-6">
         <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4 mt-2 sm:mt-4">
-          {!isSubscribed && !transaction && (
+          {!hasAccess() && !transaction && (
             <SubscriptionAlert 
               message="You need an active subscription to add transactions. Subscribe to unlock this feature."
               onUpgrade={() => setShowSubscriptionModal(true)}

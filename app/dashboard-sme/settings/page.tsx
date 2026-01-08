@@ -109,28 +109,23 @@ export default function SettingsPage() {
   const [isSendingSupport, setIsSendingSupport] = useState(false)
   const [businessDocuments, setBusinessDocuments] = useState({
     cac: '',
-    taxCertificate: '',
-    businessLicense: ''
+    memorandum: ''
   })
   const [businessDocumentFileIds, setBusinessDocumentFileIds] = useState({
     cac: '',
-    taxCertificate: '',
-    businessLicense: ''
+    memorandum: ''
   })
   const [businessDocumentSizes, setBusinessDocumentSizes] = useState({
     cac: 0,
-    taxCertificate: 0,
-    businessLicense: 0
+    memorandum: 0
   })
   const [uploadingBusinessDoc, setUploadingBusinessDoc] = useState({
     cac: false,
-    taxCertificate: false,
-    businessLicense: false
+    memorandum: false
   })
   const [deletingBusinessDoc, setDeletingBusinessDoc] = useState({
     cac: false,
-    taxCertificate: false,
-    businessLicense: false
+    memorandum: false
   })
 
   // Loading state: show skeleton while auth or profile is loading
@@ -172,8 +167,7 @@ export default function SettingsPage() {
     if (profile.businessDocuments) {
       setBusinessDocuments({
         cac: profile.businessDocuments.cac || '',
-        taxCertificate: profile.businessDocuments.taxCertificate || '',
-        businessLicense: profile.businessDocuments.businessLicense || ''
+        memorandum: profile.businessDocuments.memorandum || ''
       })
     }
   }, [profile, profileLoading])
@@ -614,10 +608,10 @@ export default function SettingsPage() {
                         <div>
                           <h3 className="text-base sm:text-lg font-semibold">Business Documents</h3>
                           <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                            Upload your business documents for verification (CAC Certificate, Tax Clearance Certificate, or Business License)
+                            Upload your business documents for verification (CAC Certificate and Memorandum & Articles of Association)
                           </p>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                           {/* CAC Certificate */}
                           <div className="space-y-1.5 sm:space-y-2">
                             <Label className="text-xs sm:text-sm">CAC Certificate</Label>
@@ -705,11 +699,11 @@ export default function SettingsPage() {
                             </div>
                           </div>
 
-                          {/* Tax Clearance Certificate */}
+                          {/* Memorandum & Articles of Association */}
                           <div className="space-y-1.5 sm:space-y-2">
-                            <Label className="text-xs sm:text-sm">Tax Clearance Certificate</Label>
+                            <Label className="text-xs sm:text-sm">Memorandum & Articles of Association</Label>
                             <div className="border-2 border-dashed rounded-lg p-3 sm:p-4 flex flex-col items-center justify-center min-h-[100px] sm:min-h-[120px]">
-                              {businessDocuments.taxCertificate ? (
+                              {businessDocuments.memorandum ? (
                                 <div className="flex flex-col items-center gap-1.5 sm:gap-2 w-full">
                                   <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
                                   <p className="text-xs sm:text-sm text-muted-foreground text-center">Document uploaded</p>
@@ -717,7 +711,7 @@ export default function SettingsPage() {
                                     <Button
                                       variant="outline"
                                       size="sm"
-                                      onClick={() => window.open(businessDocuments.taxCertificate, '_blank')}
+                                      onClick={() => window.open(businessDocuments.memorandum, '_blank')}
                                       className="h-7 sm:h-8 text-xs sm:text-sm"
                                     >
                                       View
@@ -727,24 +721,24 @@ export default function SettingsPage() {
                                       size="sm"
                                       onClick={async () => {
                                         if (!user?.uid) return
-                                        setDeletingBusinessDoc(prev => ({ ...prev, taxCertificate: true }))
+                                        setDeletingBusinessDoc(prev => ({ ...prev, memorandum: true }))
                                         try {
                                           await userService.upsertProfile(user.uid, {
-                                            businessDocuments: { ...businessDocuments, taxCertificate: undefined }
+                                            businessDocuments: { ...businessDocuments, memorandum: undefined }
                                           })
-                                          setBusinessDocuments(prev => ({ ...prev, taxCertificate: '' }))
-                                          toast.success("Tax Clearance Certificate deleted")
+                                          setBusinessDocuments(prev => ({ ...prev, memorandum: '' }))
+                                          toast.success("Memorandum & Articles of Association deleted")
                                           await refetchProfile()
                                         } catch (error) {
                                           toast.error("Failed to delete document")
                                         } finally {
-                                          setDeletingBusinessDoc(prev => ({ ...prev, taxCertificate: false }))
+                                          setDeletingBusinessDoc(prev => ({ ...prev, memorandum: false }))
                                         }
                                       }}
-                                      disabled={deletingBusinessDoc.taxCertificate}
+                                      disabled={deletingBusinessDoc.memorandum}
                                       className="h-7 sm:h-8 text-xs sm:text-sm"
                                     >
-                                      {deletingBusinessDoc.taxCertificate ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
+                                      {deletingBusinessDoc.memorandum ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
                                     </Button>
                                   </div>
                                 </div>
@@ -759,18 +753,18 @@ export default function SettingsPage() {
                                     onChange={async (e) => {
                                       const file = e.target.files?.[0]
                                       if (!file || !user?.uid) return
-                                      setUploadingBusinessDoc(prev => ({ ...prev, taxCertificate: true }))
+                                      setUploadingBusinessDoc(prev => ({ ...prev, memorandum: true }))
                                       try {
                                         const result = await uploadToImageKit(file, 'business-documents', user.uid)
                                         await userService.upsertProfile(user.uid, {
-                                          businessDocuments: { ...businessDocuments, taxCertificate: result.url }
+                                          businessDocuments: { ...businessDocuments, memorandum: result.url }
                                         })
-                                        setBusinessDocuments(prev => ({ ...prev, taxCertificate: result.url }))
-                                        toast.success("Tax Clearance Certificate uploaded successfully")
+                                        setBusinessDocuments(prev => ({ ...prev, memorandum: result.url }))
+                                        toast.success("Memorandum & Articles of Association uploaded successfully")
                                         await refetchProfile()
                                         await documentService.uploadDocument(user.uid, {
                                           file,
-                                          name: 'Tax Clearance Certificate',
+                                          name: 'Memorandum & Articles of Association',
                                           type: 'proof',
                                           imageKitUrl: result.url,
                                           imageKitFileId: result.fileId,
@@ -780,100 +774,13 @@ export default function SettingsPage() {
                                         console.error("Upload error:", error)
                                         toast.error(error instanceof Error ? error.message : "Failed to upload document")
                                       } finally {
-                                        setUploadingBusinessDoc(prev => ({ ...prev, taxCertificate: false }))
+                                        setUploadingBusinessDoc(prev => ({ ...prev, memorandum: false }))
                                         e.target.value = ''
                                       }
                                     }}
-                                    disabled={uploadingBusinessDoc.taxCertificate}
+                                    disabled={uploadingBusinessDoc.memorandum}
                                   />
-                                  {uploadingBusinessDoc.taxCertificate && <span className="text-xs text-muted-foreground">Uploading...</span>}
-                                </label>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Business License */}
-                          <div className="space-y-1.5 sm:space-y-2">
-                            <Label className="text-xs sm:text-sm">Business License</Label>
-                            <div className="border-2 border-dashed rounded-lg p-3 sm:p-4 flex flex-col items-center justify-center min-h-[100px] sm:min-h-[120px]">
-                              {businessDocuments.businessLicense ? (
-                                <div className="flex flex-col items-center gap-1.5 sm:gap-2 w-full">
-                                  <CheckCircle2 className="w-6 h-6 sm:w-8 sm:h-8 text-green-500" />
-                                  <p className="text-xs sm:text-sm text-muted-foreground text-center">Document uploaded</p>
-                                  <div className="flex gap-1.5 sm:gap-2 mt-1.5 sm:mt-2">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => window.open(businessDocuments.businessLicense, '_blank')}
-                                      className="h-7 sm:h-8 text-xs sm:text-sm"
-                                    >
-                                      View
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={async () => {
-                                        if (!user?.uid) return
-                                        setDeletingBusinessDoc(prev => ({ ...prev, businessLicense: true }))
-                                        try {
-                                          await userService.upsertProfile(user.uid, {
-                                            businessDocuments: { ...businessDocuments, businessLicense: undefined }
-                                          })
-                                          setBusinessDocuments(prev => ({ ...prev, businessLicense: '' }))
-                                          toast.success("Business License deleted")
-                                          await refetchProfile()
-                                        } catch (error) {
-                                          toast.error("Failed to delete document")
-                                        } finally {
-                                          setDeletingBusinessDoc(prev => ({ ...prev, businessLicense: false }))
-                                        }
-                                      }}
-                                      disabled={deletingBusinessDoc.businessLicense}
-                                      className="h-7 sm:h-8 text-xs sm:text-sm"
-                                    >
-                                      {deletingBusinessDoc.businessLicense ? <Loader2 className="w-3 h-3 animate-spin" /> : <X className="w-3 h-3" />}
-                                    </Button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <label className="cursor-pointer flex flex-col items-center gap-1.5 sm:gap-2 w-full">
-                                  <Upload className="w-6 h-6 sm:w-8 sm:h-8 text-muted-foreground" />
-                                  <span className="text-xs sm:text-sm text-muted-foreground text-center">Click to upload</span>
-                                  <Input
-                                    type="file"
-                                    accept=".pdf,.jpg,.jpeg,.png"
-                                    className="hidden"
-                                    onChange={async (e) => {
-                                      const file = e.target.files?.[0]
-                                      if (!file || !user?.uid) return
-                                      setUploadingBusinessDoc(prev => ({ ...prev, businessLicense: true }))
-                                      try {
-                                        const result = await uploadToImageKit(file, 'business-documents', user.uid)
-                                        await userService.upsertProfile(user.uid, {
-                                          businessDocuments: { ...businessDocuments, businessLicense: result.url }
-                                        })
-                                        setBusinessDocuments(prev => ({ ...prev, businessLicense: result.url }))
-                                        toast.success("Business License uploaded successfully")
-                                        await refetchProfile()
-                                        await documentService.uploadDocument(user.uid, {
-                                          file,
-                                          name: 'Business License',
-                                          type: 'proof',
-                                          imageKitUrl: result.url,
-                                          imageKitFileId: result.fileId,
-                                          fileSize: result.size
-                                        })
-                                      } catch (error) {
-                                        console.error("Upload error:", error)
-                                        toast.error(error instanceof Error ? error.message : "Failed to upload document")
-                                      } finally {
-                                        setUploadingBusinessDoc(prev => ({ ...prev, businessLicense: false }))
-                                        e.target.value = ''
-                                      }
-                                    }}
-                                    disabled={uploadingBusinessDoc.businessLicense}
-                                  />
-                                  {uploadingBusinessDoc.businessLicense && <span className="text-xs text-muted-foreground">Uploading...</span>}
+                                  {uploadingBusinessDoc.memorandum && <span className="text-xs text-muted-foreground">Uploading...</span>}
                                 </label>
                               )}
                             </div>

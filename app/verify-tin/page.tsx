@@ -25,8 +25,7 @@ export default function VerifyTaxIdPage() {
   const [showDocumentUpload, setShowDocumentUpload] = useState(false)
   const [businessDocuments, setBusinessDocuments] = useState<{
     cac?: File
-    taxCertificate?: File
-    businessLicense?: File
+    memorandum?: File
   }>({})
   const [popupBlocked, setPopupBlocked] = useState(false)
   const [uploadingDocuments, setUploadingDocuments] = useState(false)
@@ -55,8 +54,7 @@ export default function VerifyTaxIdPage() {
     // Check if businessDocuments exists and has at least one document
     const hasBusinessDocuments = profile.businessDocuments && (
       profile.businessDocuments.cac || 
-      profile.businessDocuments.taxCertificate || 
-      profile.businessDocuments.businessLicense
+      profile.businessDocuments.memorandum
     )
 
     // If user has TIN and is SME with documents, redirect to dashboard
@@ -214,14 +212,14 @@ export default function VerifyTaxIdPage() {
     }
   }
 
-  const handleFileChange = (type: 'cac' | 'taxCertificate' | 'businessLicense', file: File | null) => {
+  const handleFileChange = (type: 'cac' | 'memorandum', file: File | null) => {
     setBusinessDocuments(prev => ({ ...prev, [type]: file || undefined }))
   }
 
   const handleUploadDocuments = async () => {
     if (!user) return
 
-    const requiredDocs = ['cac', 'taxCertificate', 'businessLicense']
+    const requiredDocs = ['cac', 'memorandum']
     const hasAtLeastOne = requiredDocs.some(doc => businessDocuments[doc as keyof typeof businessDocuments])
 
     if (!hasAtLeastOne) {
@@ -266,7 +264,7 @@ export default function VerifyTaxIdPage() {
 
       // Save business document URLs to user profile
       await userService.upsertProfile(user.uid, {
-        businessDocuments: uploadedDocUrls as { cac?: string; taxCertificate?: string; businessLicense?: string }
+        businessDocuments: uploadedDocUrls as { cac?: string; memorandum?: string }
       })
 
       // Refetch profile to update the local state
@@ -344,45 +342,24 @@ export default function VerifyTaxIdPage() {
                   </p>
                 </div>
 
-                {/* Tax Certificate */}
+                {/* Memorandum & Articles of Association */}
                 <div className="space-y-2">
-                  <Label htmlFor="taxCertificate" className="text-sm sm:text-base">Tax Clearance Certificate</Label>
+                  <Label htmlFor="memorandum" className="text-sm sm:text-base">Memorandum & Articles of Association</Label>
                   <div className="flex items-center gap-2">
                     <Input
-                      id="taxCertificate"
+                      id="memorandum"
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => handleFileChange('taxCertificate', e.target.files?.[0] || null)}
+                      onChange={(e) => handleFileChange('memorandum', e.target.files?.[0] || null)}
                       disabled={uploadingDocuments}
                       className="flex-1 text-xs sm:text-sm"
                     />
-                    {businessDocuments.taxCertificate && (
+                    {businessDocuments.memorandum && (
                       <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
                     )}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Valid tax clearance certificate from FIRS
-                  </p>
-                </div>
-
-                {/* Business License */}
-                <div className="space-y-2">
-                  <Label htmlFor="businessLicense" className="text-sm sm:text-base">Business License</Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      id="businessLicense"
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => handleFileChange('businessLicense', e.target.files?.[0] || null)}
-                      disabled={uploadingDocuments}
-                      className="flex-1 text-xs sm:text-sm"
-                    />
-                    {businessDocuments.businessLicense && (
-                      <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Valid business operating license (if applicable)
+                    Memorandum and Articles of Association from Corporate Affairs Commission
                   </p>
                 </div>
               </div>
@@ -412,6 +389,30 @@ export default function VerifyTaxIdPage() {
               <p className="text-xs text-center text-muted-foreground">
                 You can upload additional documents later in your dashboard
               </p>
+
+              {/* Skip Option */}
+              <div className="text-center">
+                <Button 
+                  variant="ghost" 
+                  type="button"
+                  onClick={() => {
+                    if (profile?.businessType === 'sme') {
+                      router.push("/dashboard-sme")
+                    } else if (profile?.businessType === 'creator') {
+                      router.push("/dashboard-creator")
+                    } else {
+                      router.push("/dashboard")
+                    }
+                  }}
+                  disabled={uploadingDocuments}
+                  className="text-sm sm:text-base"
+                >
+                  Skip for now
+                </Button>
+                <p className="text-xs text-muted-foreground mt-2">
+                  You can add your business documents later in settings
+                </p>
+              </div>
             </div>
           ) : (
             /* Tax ID Section */

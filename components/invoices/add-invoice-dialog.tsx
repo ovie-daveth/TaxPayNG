@@ -40,7 +40,7 @@ export function AddInvoiceDialog({
 }: AddInvoiceDialogProps) {
   const { user } = useAuth()
   const { profile } = useUserProfile()
-  const { isSubscribed } = useSubscription()
+  const { hasAccess } = useSubscription()
   const { activeEntityId } = useBusiness()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
@@ -670,7 +670,7 @@ export function AddInvoiceDialog({
 
   const handleSubmit = async () => {
     // Check subscription before submitting (only for new invoices, not edits)
-    if (!invoice && !isSubscribed) {
+    if (!invoice && !hasAccess()) {
       setShowSubscriptionModal(true)
       return
     }

@@ -48,7 +48,7 @@ export function DashboardNavCreator() {
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   
-  const { isSubscribed, isExpired, loading: subscriptionLoading } = useSubscription()
+  const { hasAccess, loading: subscriptionLoading } = useSubscription()
   const { createTransaction } = useTransactions(user?.uid || null)
   const { createReminder } = useReminders(user?.uid || null)
   
@@ -57,8 +57,8 @@ export function DashboardNavCreator() {
     if (subscriptionLoading) {
       return
     }
-    // Check if user is subscribed or expired - if not, show modal
-    if (!isSubscribed || isExpired) {
+    // Check if user has access (free trial or subscribed) - if not, show modal
+    if (!hasAccess()) {
       setShowSubscriptionModal(true)
       return
     }

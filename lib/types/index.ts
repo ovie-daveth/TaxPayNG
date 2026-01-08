@@ -22,8 +22,7 @@ export interface UserProfile {
   taxId?: string
   businessDocuments?: {
     cac?: string
-    taxCertificate?: string
-    businessLicense?: string
+    memorandum?: string
   }
   kycDocuments?: {
     id?: string // National ID, Voter's Card, etc.
