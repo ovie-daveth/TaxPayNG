@@ -335,9 +335,18 @@ export class InvoiceService extends BaseService {
         }
       }
       
-      // Recipients can only update recipientEntityId
+      // Recipients can update recipientEntityId and payment-related fields
       if (isRecipient && !isSender) {
-        const allowedFields = ['recipientEntityId']
+        const allowedFields = [
+          'recipientEntityId',
+          // Payment-related fields that recipients can update when marking payment
+          'clientPaymentStatus',
+          'clientPaidAt',
+          'clientPaymentMethod',
+          'clientPaymentReference',
+          'clientReceiptUrl',
+          'taxDeductible' // Allow recipients to mark if payment is tax deductible
+        ]
         const updateKeys = Object.keys(updateData)
         const disallowedFields = updateKeys.filter(key => !allowedFields.includes(key))
         if (disallowedFields.length > 0) {

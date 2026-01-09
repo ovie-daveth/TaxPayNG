@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Calculator, Eye, EyeOff } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useState, useEffect } from "react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
@@ -18,7 +19,7 @@ import { Separator } from "@/components/ui/separator"
 
 export default function LoginPage() {
   const router = useRouter()
-  const { signIn, signInWithGoogle, user, loading } = useAuth()
+  const { signIn, signInWithGoogle, linkGoogleToEmailAccount, user, loading } = useAuth()
   const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
   const { theme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -36,6 +37,12 @@ export default function LoginPage() {
   })
   const [showPassword, setShowPassword] = useState(false)
   const [isGoogleOnlyUser, setIsGoogleOnlyUser] = useState(false)
+  const [showLinkAccountDialog, setShowLinkAccountDialog] = useState(false)
+  const [linkAccountEmail, setLinkAccountEmail] = useState('')
+  const [linkAccountPassword, setLinkAccountPassword] = useState('')
+  const [linkAccountCredential, setLinkAccountCredential] = useState<any>(null)
+  const [isLinkingAccount, setIsLinkingAccount] = useState(false)
+  const [showLinkPassword, setShowLinkPassword] = useState(false)
 
   useEffect(() => {
     console.log("Login redirect effect - user:", !!user, "loading:", loading, "profileLoading:", profileLoading, "profile:", !!profile)
@@ -214,6 +221,11 @@ export default function LoginPage() {
           toast.success('Signed in with Google successfully!')
           // Redirect will be handled by useEffect after profile loads
         }
+      } else if (result.error === 'ACCOUNT_LINKING_REQUIRED' && result.needsPassword && result.email && result.credential) {
+        // Account exists with email/password - show dialog to link accounts
+        setLinkAccountEmail(result.email)
+        setLinkAccountCredential(result.credential)
+        setShowLinkAccountDialog(true)
       } else {
         toast.error(result.error || 'Failed to sign in with Google')
       }
@@ -222,6 +234,39 @@ export default function LoginPage() {
       toast.error('Failed to sign in with Google')
     } finally {
       setIsGoogleLoading(false)
+    }
+  }
+
+  const handleLinkAccount = async () => {
+    if (!linkAccountPassword || !linkAccountCredential) {
+      toast.error('Please enter your password')
+      return
+    }
+
+    setIsLinkingAccount(true)
+    try {
+      const result = await linkGoogleToEmailAccount(linkAccountEmail, linkAccountPassword, linkAccountCredential)
+      
+      if (result.success) {
+        toast.success(result.message || 'Accounts linked successfully!')
+        setShowLinkAccountDialog(false)
+        setLinkAccountPassword('')
+        setLinkAccountCredential(null)
+        
+        // Refetch profile to ensure it's loaded for redirect
+        await refetchProfile()
+        
+        setTimeout(() => {
+          refetchProfile().catch(console.error)
+        }, 300)
+      } else {
+        toast.error(result.error || 'Failed to link accounts')
+      }
+    } catch (error) {
+      console.error('Account linking error:', error)
+      toast.error('Failed to link accounts')
+    } finally {
+      setIsLinkingAccount(false)
     }
   }
 
@@ -393,6 +438,74 @@ export default function LoginPage() {
           <Link href="/privacy" className="underline hover:text-foreground transition-colors">Privacy Policy</Link>
         </p>
       </div>
+
+      {/* Account Linking Dialog */}
+      <Dialog open={showLinkAccountDialog} onOpenChange={setShowLinkAccountDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Link Your Accounts</DialogTitle>
+            <DialogDescription>
+              An account with this email already exists. Enter your password to link your Google account so you can sign in with either method.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label htmlFor="link-email">Email</Label>
+              <Input
+                id="link-email"
+                type="email"
+                value={linkAccountEmail}
+                disabled
+                className="mt-1 bg-muted"
+              />
+            </div>
+            <div>
+              <Label htmlFor="link-password">Password</Label>
+              <div className="relative mt-1">
+                <Input
+                  id="link-password"
+                  type={showLinkPassword ? "text" : "password"}
+                  value={linkAccountPassword}
+                  onChange={(e) => setLinkAccountPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  className="pr-10"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && linkAccountPassword) {
+                      handleLinkAccount()
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowLinkPassword(!showLinkPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showLinkPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setShowLinkAccountDialog(false)
+                setLinkAccountPassword('')
+                setLinkAccountCredential(null)
+              }}
+              disabled={isLinkingAccount}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleLinkAccount}
+              disabled={isLinkingAccount || !linkAccountPassword}
+            >
+              {isLinkingAccount ? 'Linking...' : 'Link Accounts'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

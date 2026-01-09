@@ -283,7 +283,22 @@ export function useAuth() {
       setAuthState(prev => ({ ...prev, loading: true, error: null }))
 
       const provider = new GoogleAuthProvider()
-      const result = await signInWithPopup(auth, provider)
+      let result
+      let googleCredential = null
+      
+      try {
+        result = await signInWithPopup(auth, provider)
+        googleCredential = GoogleAuthProvider.credentialFromResult(result)
+      } catch (popupError: any) {
+        // If account exists with different credential, extract the credential from error
+        if (popupError.code === 'auth/account-exists-with-different-credential') {
+          googleCredential = GoogleAuthProvider.credentialFromError(popupError)
+          // Re-throw to handle in outer catch block
+          throw popupError
+        }
+        throw popupError
+      }
+      
       const user = result.user
 
       if (!user) {
@@ -392,7 +407,97 @@ export function useAuth() {
         if (error.code === 'auth/popup-closed-by-user') {
           errorMessage = 'Sign in cancelled'
         } else if (error.code === 'auth/account-exists-with-different-credential') {
-          errorMessage = 'An account with this email already exists. Please sign in with your email and password.'
+          // Account exists with different provider - try to link accounts
+          // Extract email and credential from error
+          const email = (error as any).customData?.email || (error as any).email
+          const credential = GoogleAuthProvider.credentialFromError(error) || (error as any).credential
+          
+          console.log('Account exists with different credential:', { email, hasCredential: !!credential })
+          
+          if (email) {
+            // Check what sign-in methods exist for this email
+            try {
+              const signInMethods = await fetchSignInMethodsForEmail(auth, email)
+              console.log('Sign-in methods for existing account:', signInMethods)
+              
+              // If password provider exists, we need password to link
+              if (signInMethods.includes('password')) {
+                // If we have the credential, return special response indicating linking is needed
+                if (credential) {
+                  setAuthState(prev => ({ ...prev, loading: false, error: null }))
+                  return { 
+                    success: false, 
+                    error: 'ACCOUNT_LINKING_REQUIRED',
+                    needsPassword: true,
+                    email: email,
+                    credential: credential
+                  }
+                } else {
+                  // Credential not available - show message
+                  errorMessage = 'An account with this email already exists. Please enter your password to link your Google account.'
+                }
+              } else {
+                // Other providers exist but not password - can't auto-link
+                errorMessage = 'An account with this email already exists with a different sign-in method.'
+              }
+            } catch (fetchError) {
+              console.error('Error fetching sign-in methods:', fetchError)
+              errorMessage = 'An account with this email already exists. Please sign in with your email and password.'
+            }
+          } else {
+            errorMessage = 'An account with this email already exists. Please sign in with your email and password.'
+          }
+        } else {
+          errorMessage = mapFirebaseAuthError(error.code, error.message)
+        }
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = String((error as { message?: unknown }).message) || errorMessage
+      }
+      setAuthState(prev => ({ ...prev, loading: false, error: errorMessage }))
+      return { success: false, error: errorMessage }
+    }
+  }
+
+  /**
+   * Link Google credential to existing email/password account
+   * This is called when a user tries to sign in with Google but has an email/password account
+   */
+  const linkGoogleToEmailAccount = async (email: string, password: string, googleCredential: any) => {
+    try {
+      setAuthState(prev => ({ ...prev, loading: true, error: null }))
+
+      // First, sign in with email/password
+      const emailCredential = await signInWithEmailAndPassword(auth, email, password)
+      const user = emailCredential.user
+
+      if (!user) {
+        return { success: false, error: 'Failed to sign in with email and password' }
+      }
+
+      // Now link the Google credential to this account
+      await linkWithCredential(user, googleCredential)
+
+      // Refresh user data to get updated providers
+      await user.reload()
+
+      setAuthState({
+        user: auth.currentUser,
+        loading: false,
+        error: null
+      })
+
+      return { 
+        success: true, 
+        message: 'Accounts linked successfully! You can now sign in with either method.',
+        userId: user.uid
+      }
+    } catch (error: unknown) {
+      let errorMessage = 'Failed to link accounts'
+      if (error instanceof FirebaseError) {
+        if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+          errorMessage = 'Incorrect password. Please try again.'
+        } else if (error.code === 'auth/credential-already-in-use') {
+          errorMessage = 'This Google account is already linked to another account.'
         } else {
           errorMessage = mapFirebaseAuthError(error.code, error.message)
         }
@@ -475,6 +580,7 @@ export function useAuth() {
     logout,
     resetPassword,
     setPasswordForGoogleUser,
+    linkGoogleToEmailAccount,
     clearError,
     isAuthenticated: !!authState.user
   }
