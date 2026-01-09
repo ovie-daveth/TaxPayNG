@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "athena-bb111"
+    "default": "trust-66319",
+    "production": "trust-66319",
+    "preview": "athena-bb111",
+    "development": "athena-bb111"
   }
 }

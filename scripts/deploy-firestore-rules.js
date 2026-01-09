@@ -15,6 +15,11 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
+// Parse command line arguments
+const args = process.argv.slice(2);
+const rulesOnly = args.includes('--rules-only');
+const indexesOnly = args.includes('--indexes-only');
+
 console.log('🔥 Starting Firestore rules deployment...');
 
 // Check if firebase.json exists
@@ -64,18 +69,75 @@ try {
     }
   }
 
-  // Deploy Firestore rules and indexes
-  console.log('📤 Deploying Firestore rules and indexes...');
-  execSync(
-    `${firebaseCmd} deploy --only firestore --token "${firebaseToken}" --non-interactive`,
-    { stdio: 'inherit' }
-  );
+  // Determine which Firebase project to use based on environment
+  const vercelEnv = process.env.VERCEL_ENV || 'development'; // production, preview, development
+  let firebaseProject = 'trust-66319'; // default to production
+  
+  // Map Vercel environments to Firebase projects
+  if (vercelEnv === 'production') {
+    firebaseProject = 'trust-66319'; // Production project
+  } else {
+    firebaseProject = 'athena-bb111'; // Test/Preview/Development project
+  }
+  
+  // Allow override via environment variable
+  if (process.env.FIREBASE_PROJECT_ID) {
+    firebaseProject = process.env.FIREBASE_PROJECT_ID;
+  }
 
-  console.log('✅ Firestore rules and indexes deployed successfully!');
+  console.log(`🔍 Using Firebase project: ${firebaseProject} (Environment: ${vercelEnv})`);
+
+  // Determine what to deploy
+  let deployTarget = 'firestore'; // Deploy both by default
+  if (rulesOnly) {
+    deployTarget = 'firestore:rules';
+  } else if (indexesOnly) {
+    deployTarget = 'firestore:indexes';
+  }
+
+  // Deploy Firestore rules and indexes
+  console.log(`📤 Deploying ${deployTarget === 'firestore' ? 'Firestore rules and indexes' : deployTarget}...`);
+  console.log(`Using command: ${firebaseCmd}`);
+  console.log(`Target project: ${firebaseProject}`);
+  
+  try {
+    execSync(
+      `${firebaseCmd} deploy --only ${deployTarget} --token "${firebaseToken}" --non-interactive --project ${firebaseProject}`,
+      { stdio: 'inherit' }
+    );
+    console.log(`✅ ${deployTarget === 'firestore' ? 'Firestore rules and indexes' : deployTarget} deployed successfully!`);
+    if (deployTarget === 'firestore' || deployTarget === 'firestore:indexes') {
+      console.log('📝 Note: Index creation may take a few minutes. Check Firebase Console → Firestore → Indexes');
+    }
+  } catch (deployError) {
+    console.error('❌ Error deploying Firestore rules and indexes:');
+    console.error(deployError.message);
+    if (deployError.stdout) console.error('STDOUT:', deployError.stdout.toString());
+    if (deployError.stderr) console.error('STDERR:', deployError.stderr.toString());
+    
+    // Try deploying indexes separately to see specific errors (only if not already trying indexes only)
+    if (!indexesOnly) {
+      console.log('\n🔄 Attempting to deploy indexes separately...');
+      try {
+        execSync(
+          `${firebaseCmd} deploy --only firestore:indexes --token "${firebaseToken}" --non-interactive --project ${firebaseProject}`,
+          { stdio: 'inherit' }
+        );
+        console.log('✅ Indexes deployed successfully!');
+      } catch (indexError) {
+        console.error('❌ Index deployment failed:', indexError.message);
+        throw indexError;
+      }
+    } else {
+      throw deployError;
+    }
+  }
 } catch (error) {
-  console.error('❌ Error deploying Firestore rules:', error.message);
+  console.error('❌ Fatal error deploying Firestore:', error.message);
+  console.error('Full error:', error);
   // Don't fail the build if Firestore deployment fails
   console.warn('⚠️  Continuing with build despite Firestore deployment error...');
+  console.warn('💡 You can manually deploy indexes using: pnpm run deploy:firestore:indexes');
   process.exit(0);
 }
 

@@ -11,9 +11,11 @@
     "lint": "next lint",
     "start": "next start",
     "deploy:firestore": "node scripts/deploy-firestore-rules.js",
-    "deploy:firestore:rules": "firebase deploy --only firestore:rules",
-    "deploy:firestore:indexes": "firebase deploy --only firestore:indexes",
-    "deploy:firestore:all": "firebase deploy --only firestore",
+    "deploy:firestore:rules": "node scripts/deploy-firestore-rules.js --rules-only",
+    "deploy:firestore:indexes": "node scripts/deploy-firestore-rules.js --indexes-only",
+    "deploy:firestore:all": "node scripts/deploy-firestore-rules.js",
+    "deploy:firestore:prod": "firebase deploy --only firestore --project trust-66319",
+    "deploy:firestore:test": "firebase deploy --only firestore --project athena-bb111",
     "postbuild": "pnpm run deploy:firestore"
   },
   "dependencies": {
