@@ -718,6 +718,46 @@ export class InvoiceService extends BaseService {
       }
 
       const result = await this.updateInvoice(invoiceId, userId, updateData)
+      
+      // Create notification for the invoice sender when client confirms payment
+      // Only notify if this is the first time the invoice is being marked as paid
+      if (result.success && invoice.userId && invoice.userId !== userId && invoice.clientPaymentStatus !== 'paid') {
+        try {
+          const clientName = invoice.client?.name || 'Client'
+          const currencySymbol = invoice.currency === 'NGN' ? '₦' : invoice.currency === 'USD' ? '$' : invoice.currency === 'GBP' ? '£' : invoice.currency === 'EUR' ? '€' : invoice.currency
+          const formattedAmount = `${currencySymbol}${invoice.invoiceTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+          
+          // Determine the correct invoice page link based on sender's business type
+          // We'll use a generic link that will be redirected by the layout
+          const invoiceLink = `/dashboard/invoices?invoiceId=${invoiceId}`
+          
+          await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/notifications/create`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              userId: invoice.userId,
+              type: 'payment',
+              title: `Payment confirmed for invoice ${invoice.invoiceNumber}`,
+              message: `${clientName} has confirmed payment of ${formattedAmount} for invoice ${invoice.invoiceNumber}`,
+              link: invoiceLink,
+              metadata: {
+                invoiceId,
+                invoiceNumber: invoice.invoiceNumber,
+                clientId: userId,
+                clientName,
+                amount: invoice.invoiceTotal,
+                currency: invoice.currency
+              }
+            })
+          })
+        } catch (error) {
+          console.error('Error creating payment notification:', error)
+          // Don't fail the payment confirmation if notification creation fails
+        }
+      }
+      
       return result
     } catch (error) {
       console.error('Error marking invoice as paid:', error)
