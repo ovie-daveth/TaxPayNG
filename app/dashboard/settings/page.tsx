@@ -1508,7 +1508,7 @@ export default function SettingsPage() {
                           <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
                             Select a plan to unlock all features and start managing your taxes efficiently.
                           </p>
-                          <div className={`grid gap-3 sm:gap-4 ${!sidebarCollapsed ? 'grid-cols-1 md:grid-cols-1 lg:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
+                          <div className={`grid gap-3 sm:gap-4 ${!sidebarCollapsed ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
                             {(() => {
                               // Get plans based on business type
                               const availablePlans = profile?.businessType === 'sme' 

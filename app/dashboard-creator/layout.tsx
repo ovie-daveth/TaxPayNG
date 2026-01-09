@@ -56,11 +56,18 @@ function LayoutContent({
   useEffect(() => {
     if (!profile || profileLoading) return
 
+    // Preserve query parameters (especially invoiceId for invoice notifications)
+    const searchParams = new URLSearchParams(window.location.search)
+    const queryString = searchParams.toString()
+    const querySuffix = queryString ? `?${queryString}` : ''
+
     if (profile.businessType !== 'creator') {
       if (profile.businessType === 'sme') {
-        router.push('/dashboard-sme')
+        const targetPath = window.location.pathname.replace('/dashboard-creator', '/dashboard-sme')
+        router.push(targetPath + querySuffix)
       } else {
-        router.push('/dashboard')
+        const targetPath = window.location.pathname.replace('/dashboard-creator', '/dashboard')
+        router.push(targetPath + querySuffix)
       }
       return
     }

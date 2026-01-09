@@ -114,18 +114,23 @@ export default function InvoicesPage() {
   // Handle invoiceId query parameter to open specific invoice
   useEffect(() => {
     const invoiceId = searchParams?.get('invoiceId')
-    if (invoiceId && invoices.length > 0 && !isViewDialogOpen) {
-      const invoice = invoices.find(inv => inv.id === invoiceId)
-      if (invoice) {
-        setSelectedInvoice(invoice)
-        setIsViewDialogOpen(true)
-        // Remove query parameter from URL after opening
-        const newUrl = new URL(window.location.href)
-        newUrl.searchParams.delete('invoiceId')
-        router.replace(newUrl.pathname + newUrl.search, { scroll: false })
+    if (invoiceId && !isViewDialogOpen) {
+      // Wait for invoices to load before trying to find the invoice
+      if (invoices.length > 0) {
+        const invoice = invoices.find(inv => inv.id === invoiceId)
+        if (invoice) {
+          setSelectedInvoice(invoice)
+          setIsViewDialogOpen(true)
+          // Remove query parameter from URL after opening
+          const newUrl = new URL(window.location.href)
+          newUrl.searchParams.delete('invoiceId')
+          router.replace(newUrl.pathname + newUrl.search, { scroll: false })
+        }
       }
+      // If invoices haven't loaded yet, the effect will re-run when invoices are loaded
+      // (because invoices is in the dependency array)
     }
-  }, [searchParams, invoices, router, isViewDialogOpen])
+  }, [searchParams, invoices, router, isViewDialogOpen, loading])
 
   const getStatusBadge = (status: InvoiceStatus, invoiceType?: InvoiceType) => {
     const variants: Record<InvoiceStatus, { variant: "default" | "secondary" | "destructive" | "outline", icon: any }> = {

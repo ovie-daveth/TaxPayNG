@@ -56,14 +56,21 @@ function LayoutContent({
   useEffect(() => {
     if (!profile || profileLoading) return
     
+    // Preserve query parameters (especially invoiceId for invoice notifications)
+    const searchParams = new URLSearchParams(window.location.search)
+    const queryString = searchParams.toString()
+    const querySuffix = queryString ? `?${queryString}` : ''
+    
     // Redirect freelancers to their dashboard if they somehow access SME dashboard
     if (profile.businessType === 'freelancer' && window.location.pathname.startsWith('/dashboard-sme')) {
-      router.push('/dashboard')
+      const targetPath = window.location.pathname.replace('/dashboard-sme', '/dashboard')
+      router.push(targetPath + querySuffix)
       return
     }
 
     if (profile.businessType === 'creator') {
-      router.push('/dashboard-creator')
+      const targetPath = window.location.pathname.replace('/dashboard-sme', '/dashboard-creator')
+      router.push(targetPath + querySuffix)
       return
     }
     

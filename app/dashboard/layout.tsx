@@ -65,6 +65,10 @@ function LayoutContent({
     }
     
     const currentPath = window.location.pathname
+    // Preserve query parameters (especially invoiceId for invoice notifications)
+    const searchParams = new URLSearchParams(window.location.search)
+    const queryString = searchParams.toString()
+    const querySuffix = queryString ? `?${queryString}` : ''
     
     // Agent redirects - agents have their own pages, redirect them away from dashboard
     if (profile.businessType === 'agent') {
@@ -73,11 +77,11 @@ function LayoutContent({
         // If KYC not completed, go to KYC page
         console.log("Agent KYC completed:", profile.agentKycCompleted)
         if (profile.agentKycCompleted !== true) {
-          router.push('/agent/kyc')
+          router.push('/agent/kyc' + querySuffix)
           return
         }
         // If KYC completed, go to agent dashboard
-        router.push('/agent/dashboard')
+        router.push('/agent/dashboard' + querySuffix)
         return
       }
       // Already on agent pages, don't interfere
@@ -86,7 +90,9 @@ function LayoutContent({
     
     if (profile.businessType === 'sme' && !currentPath.startsWith('/dashboard-sme')) {
       console.log("Redirecting SME to /dashboard-sme")
-      router.push('/dashboard-sme')
+      // Preserve the path and query params when redirecting
+      const targetPath = currentPath.replace('/dashboard', '/dashboard-sme')
+      router.push(targetPath + querySuffix)
       return
     }
 
@@ -94,30 +100,34 @@ function LayoutContent({
     if (profile.businessType === 'creator') {
       if (currentPath === '/dashboard' || currentPath === '/dashboard/') {
         console.log("Redirecting creator from /dashboard to /dashboard-creator")
-        router.push('/dashboard-creator')
+        router.push('/dashboard-creator' + querySuffix)
         return
       }
       if (currentPath.startsWith('/dashboard-sme')) {
         console.log("Redirecting creator from /dashboard-sme to /dashboard-creator")
-        router.push('/dashboard-creator')
+        const targetPath = currentPath.replace('/dashboard-sme', '/dashboard-creator')
+        router.push(targetPath + querySuffix)
         return
       }
       if (!currentPath.startsWith('/dashboard-creator')) {
         console.log("Redirecting creator to /dashboard-creator")
-        router.push('/dashboard-creator')
+        const targetPath = currentPath.replace('/dashboard', '/dashboard-creator')
+        router.push(targetPath + querySuffix)
         return
       }
     }
 
     if (profile.businessType === 'freelancer' && currentPath.startsWith('/dashboard-sme')) {
       console.log("Redirecting freelancer from /dashboard-sme to /dashboard")
-      router.push('/dashboard')
+      const targetPath = currentPath.replace('/dashboard-sme', '/dashboard')
+      router.push(targetPath + querySuffix)
       return
     }
 
     if (profile.businessType === 'freelancer' && currentPath.startsWith('/dashboard-creator')) {
       console.log("Redirecting freelancer from /dashboard-creator to /dashboard")
-      router.push('/dashboard')
+      const targetPath = currentPath.replace('/dashboard-creator', '/dashboard')
+      router.push(targetPath + querySuffix)
       return
     }
   }, [profile, router])

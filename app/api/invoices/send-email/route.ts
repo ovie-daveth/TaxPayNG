@@ -79,29 +79,88 @@ export async function POST(request: NextRequest) {
 
     // Convert Firestore timestamps to ISO strings
     const convertTimestamp = (value: any): string => {
-      if (!value) return new Date().toISOString()
-      if (typeof value === 'string') return value
-      if (value.toDate && typeof value.toDate === 'function') {
-        return value.toDate().toISOString()
+      try {
+        if (!value) return new Date().toISOString()
+        if (typeof value === 'string') {
+          // Validate it's a valid ISO string or date string
+          const date = new Date(value)
+          if (isNaN(date.getTime())) {
+            return new Date().toISOString()
+          }
+          return date.toISOString()
+        }
+        if (value.toDate && typeof value.toDate === 'function') {
+          const date = value.toDate()
+          if (isNaN(date.getTime())) {
+            return new Date().toISOString()
+          }
+          return date.toISOString()
+        }
+        if (value.seconds) {
+          const date = new Date(value.seconds * 1000)
+          if (isNaN(date.getTime())) {
+            return new Date().toISOString()
+          }
+          return date.toISOString()
+        }
+        const date = new Date(value)
+        if (isNaN(date.getTime())) {
+          return new Date().toISOString()
+        }
+        return date.toISOString()
+      } catch (error) {
+        console.error('Error converting timestamp:', error, value)
+        return new Date().toISOString()
       }
-      if (value.seconds) {
-        return new Date(value.seconds * 1000).toISOString()
-      }
-      return new Date(value).toISOString()
     }
 
     // Helper to convert date value to string (handles both date strings and timestamps)
     const convertDateValue = (value: any, fallback?: string): string => {
-      if (!value) return fallback || new Date().toISOString().split('T')[0]
-      if (typeof value === 'string') return value
-      // If it's a timestamp, convert to date string
-      if (value.toDate && typeof value.toDate === 'function') {
-        return value.toDate().toISOString().split('T')[0]
+      try {
+        if (!value) {
+          const fallbackDate = fallback || new Date().toISOString().split('T')[0]
+          return fallbackDate
+        }
+        if (typeof value === 'string') {
+          // Validate it's a valid date string (YYYY-MM-DD format)
+          if (value.match(/^\d{4}-\d{2}-\d{2}$/)) {
+            const date = new Date(value + 'T00:00:00')
+            if (isNaN(date.getTime())) {
+              return fallback || new Date().toISOString().split('T')[0]
+            }
+            return value
+          }
+          // Try parsing as ISO string
+          const date = new Date(value)
+          if (isNaN(date.getTime())) {
+            return fallback || new Date().toISOString().split('T')[0]
+          }
+          return date.toISOString().split('T')[0]
+        }
+        // If it's a timestamp, convert to date string
+        if (value.toDate && typeof value.toDate === 'function') {
+          const date = value.toDate()
+          if (isNaN(date.getTime())) {
+            return fallback || new Date().toISOString().split('T')[0]
+          }
+          return date.toISOString().split('T')[0]
+        }
+        if (value.seconds) {
+          const date = new Date(value.seconds * 1000)
+          if (isNaN(date.getTime())) {
+            return fallback || new Date().toISOString().split('T')[0]
+          }
+          return date.toISOString().split('T')[0]
+        }
+        const date = new Date(value)
+        if (isNaN(date.getTime())) {
+          return fallback || new Date().toISOString().split('T')[0]
+        }
+        return date.toISOString().split('T')[0]
+      } catch (error) {
+        console.error('Error converting date value:', error, value)
+        return fallback || new Date().toISOString().split('T')[0]
       }
-      if (value.seconds) {
-        return new Date(value.seconds * 1000).toISOString().split('T')[0]
-      }
-      return fallback || new Date().toISOString().split('T')[0]
     }
 
     const invoice = {

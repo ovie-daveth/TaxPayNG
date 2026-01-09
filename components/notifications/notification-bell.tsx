@@ -98,11 +98,6 @@ export function NotificationBell() {
       markAsRead(notification.id)
     }
     
-    // For invoice notifications, don't redirect - just mark as read
-    if (notification.type === 'invoice') {
-      return
-    }
-    
     if (notification.link) {
       setOpen(false)
       router.push(notification.link)
