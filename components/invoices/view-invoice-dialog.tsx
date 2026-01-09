@@ -582,29 +582,27 @@ export function ViewInvoiceDialog({
       let receiptUrl: string | undefined
       let uploadResult: ImageUploadResult | null = null
 
-      // Get ImageKit URL from file if already uploaded, otherwise upload now
+      // Upload receipt to ImageKit when confirming payment
       if (receiptFile) {
-        // Use stored upload result if available
-        if (receiptUploadResult) {
-          receiptUrl = receiptUploadResult.url
-          uploadResult = receiptUploadResult
-        } else if ((receiptFile as any).imageKitUrl) {
-          // Fallback: check if file already has ImageKit URL (uploaded when selected)
-          receiptUrl = (receiptFile as any).imageKitUrl
-          // Try to get upload result from file metadata
-          uploadResult = (receiptFile as any).uploadResult || null
-        } else {
-          // Fallback: upload now if not already uploaded
-          const uploadedUrl = await handleReceiptUpload(receiptFile)
-          if (uploadedUrl && receiptUploadResult) {
-            receiptUrl = uploadedUrl
-            uploadResult = receiptUploadResult
-          }
+        try {
+          setIsUploadingReceipt(true)
+          const result = await uploadToImageKit(receiptFile, 'invoices/receipts', user?.uid)
+          receiptUrl = result.url
+          uploadResult = result
+          setReceiptUploadResult(result)
+        } catch (error) {
+          console.error("Error uploading receipt:", error)
+          toast.error("Failed to upload receipt. Please try again.")
+          setIsMarkingPaid(false)
+          setIsUploadingReceipt(false)
+          return
+        } finally {
+          setIsUploadingReceipt(false)
         }
       }
 
       if (!receiptUrl) {
-        toast.error("Please upload a receipt")
+        toast.error("Please select a receipt file")
         setIsMarkingPaid(false)
         return
       }
@@ -824,7 +822,7 @@ export function ViewInvoiceDialog({
       return
     }
 
-    if (whtRate <= 0) {
+    if (!whtRate || whtRate <= 0) {
       toast.error("Please enter a valid WHT rate")
       return
     }
@@ -835,7 +833,7 @@ export function ViewInvoiceDialog({
       const result = await invoiceService.deductWHT(
         invoice.id,
         profile.userId,
-        whtRate,
+        whtRate, // TypeScript now knows whtRate is a number (not undefined) after the check above
         whtCertificateNumber || undefined,
         whtNotes || undefined
       )
@@ -2176,7 +2174,7 @@ export function ViewInvoiceDialog({
                         </div>
                         <Button
                           onClick={handleDeductWHT}
-                          disabled={isDeductingWHT || whtRate <= 0}
+                          disabled={isDeductingWHT || !whtRate || whtRate <= 0}
                           className="w-full"
                         >
                           {isDeductingWHT ? (
@@ -2209,13 +2207,22 @@ export function ViewInvoiceDialog({
                         <div className="space-y-3">
                           <div>
                             <Label htmlFor="payment-method" className="text-xs">Payment Method</Label>
-                            <Input
-                              id="payment-method"
-                              placeholder="e.g., Bank Transfer, Cash, Card"
+                            <Select
                               value={paymentMethod}
-                              onChange={(e) => setPaymentMethod(e.target.value)}
-                              className="h-9"
-                            />
+                              onValueChange={(value) => setPaymentMethod(value)}
+                            >
+                              <SelectTrigger id="payment-method" className="h-9 text-xs">
+                                <SelectValue placeholder="Select payment method" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Bank Transfer">Bank Transfer</SelectItem>
+                                <SelectItem value="Cash">Cash</SelectItem>
+                                <SelectItem value="Card">Card</SelectItem>
+                                <SelectItem value="Mobile Money">Mobile Money</SelectItem>
+                                <SelectItem value="Check">Check</SelectItem>
+                                <SelectItem value="Other">Other</SelectItem>
+                              </SelectContent>
+                            </Select>
                           </div>
                           <div>
                             <Label htmlFor="payment-reference" className="text-xs">Payment Reference (Optional)</Label>
@@ -2229,48 +2236,37 @@ export function ViewInvoiceDialog({
                           </div>
                           <div>
                             <Label htmlFor="receipt-upload" className="text-xs">Upload Receipt (Required)</Label>
-                            <div className="flex items-center gap-2">
+                            <div className="space-y-2">
                               <Input
                                 id="receipt-upload"
                                 type="file"
                                 accept="image/*,.pdf"
-                                onChange={async (e) => {
+                                onChange={(e) => {
                                   const file = e.target.files?.[0]
                                   if (file) {
                                     setReceiptFile(file)
-                                    setIsUploadingReceipt(true)
-                                    try {
-                                      const result = await uploadToImageKit(file, 'invoices/receipts', user?.uid)
-                                      ;(file as any).imageKitUrl = result.url
-                                      ;(file as any).uploadResult = result
-                                      setReceiptUploadResult(result)
-                                      toast.success("Receipt uploaded successfully")
-                                    } catch (error) {
-                                      console.error("Error uploading receipt:", error)
-                                      toast.error("Failed to upload receipt")
-                                      setReceiptFile(null)
-                                      setReceiptUploadResult(null)
-                                    } finally {
-                                      setIsUploadingReceipt(false)
-                                    }
+                                    // Don't upload yet - will upload when confirming payment
                                   }
                                 }}
-                                disabled={isUploadingReceipt}
-                                className="flex-1 h-9"
+                                disabled={isMarkingPaid}
+                                className="h-9"
                               />
-                              {receiptFile && !isUploadingReceipt && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => setReceiptFile(null)}
-                                  className="h-9"
-                                >
-                                  <X className="w-4 h-4" />
-                                </Button>
-                              )}
-                              {isUploadingReceipt && (
-                                <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-muted h-9">
-                                  <Loader2 className="w-4 h-4 animate-spin" />
+                              {receiptFile && (
+                                <div className="flex items-center gap-2 px-3 py-2 border rounded-md bg-muted text-xs">
+                                  <FileText className="w-4 h-4 text-muted-foreground" />
+                                  <span className="flex-1 truncate text-muted-foreground">{receiptFile.name}</span>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => {
+                                      setReceiptFile(null)
+                                      setReceiptUploadResult(null)
+                                    }}
+                                    className="h-6 w-6 p-0"
+                                    disabled={isMarkingPaid}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
                                 </div>
                               )}
                             </div>
@@ -2297,7 +2293,7 @@ export function ViewInvoiceDialog({
                               {isMarkingPaid || isUploadingReceipt ? (
                                 <>
                                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                  Processing...
+                                  {isUploadingReceipt ? 'Uploading Receipt...' : 'Processing...'}
                                 </>
                               ) : (
                                 "Confirm Payment"
@@ -2310,6 +2306,7 @@ export function ViewInvoiceDialog({
                                 setPaymentMethod("")
                                 setPaymentReference("")
                                 setReceiptFile(null)
+                                setReceiptUploadResult(null)
                                 setTaxDeductible(true)
                               }}
                             >

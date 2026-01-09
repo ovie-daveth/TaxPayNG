@@ -345,7 +345,8 @@ export class InvoiceService extends BaseService {
           'clientPaymentMethod',
           'clientPaymentReference',
           'clientReceiptUrl',
-          'taxDeductible' // Allow recipients to mark if payment is tax deductible
+          'taxDeductible', // Allow recipients to mark if payment is tax deductible
+          'linkedTransactionId' // Allow linking transaction when payment is marked
         ]
         const updateKeys = Object.keys(updateData)
         const disallowedFields = updateKeys.filter(key => !allowedFields.includes(key))
@@ -641,7 +642,8 @@ export class InvoiceService extends BaseService {
         const description = `Bill payment made: ${invoice.invoiceNumber}`
         
         const transactionData: any = {
-          entityId: invoice.entityId,
+          // Only include entityId if invoice has one (for platinum users with business entities)
+          ...(invoice.entityId && { entityId: invoice.entityId }),
           type: 'expense' as const,
           category: 'purchases',
           amount: invoice.total,
@@ -797,7 +799,8 @@ export class InvoiceService extends BaseService {
         const clientReceiptUrl = invoice.clientReceiptUrl
         
         const transactionData: any = {
-          entityId: invoice.entityId,
+          // Only include entityId if invoice has one (for platinum users with business entities)
+          ...(invoice.entityId && { entityId: invoice.entityId }),
           type: 'income' as const,
           category: invoice.items[0]?.description || 'sales',
           amount: invoice.netAmount || invoice.total, // Use net amount if platform fees exist

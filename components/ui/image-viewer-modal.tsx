@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { ChevronLeft, ChevronRight, X, Download, ExternalLink, FileText } from "lucide-react"
@@ -20,23 +20,57 @@ export function ImageViewerModal({
   title = "Receipt Images" 
 }: ImageViewerModalProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
+  const [pdfLoadError, setPdfLoadError] = useState(false)
 
   const currentImage = images[currentIndex]
   const hasMultipleImages = images.length > 1
   
-  // Check if current file is a PDF
+  // Check if current file is a PDF - improved detection
   const isPdf = (url: string) => {
-    return url.toLowerCase().endsWith('.pdf') || url.toLowerCase().includes('.pdf?') || url.toLowerCase().includes('application/pdf')
+    if (!url) return false
+    const lowerUrl = url.toLowerCase()
+    
+    // Check for .pdf extension (with or without query parameters, hash, etc.)
+    if (lowerUrl.match(/\.pdf(\?|#|$)/) || lowerUrl.endsWith('.pdf')) {
+      return true
+    }
+    
+    // Check for application/pdf in content-type
+    if (lowerUrl.includes('application/pdf') || lowerUrl.includes('content-type=application%2Fpdf')) {
+      return true
+    }
+    
+    // Check if URL contains PDF indicators in query params
+    if (lowerUrl.includes('pdf') && (lowerUrl.includes('content-type') || lowerUrl.includes('contenttype'))) {
+      return true
+    }
+    
+    return false
   }
   
   const currentIsPdf = currentImage ? isPdf(currentImage) : false
 
+  // Reset PDF error when image changes
+  useEffect(() => {
+    if (currentImage) {
+      setPdfLoadError(false)
+    }
+  }, [currentImage])
+
   const goToPrevious = () => {
-    setCurrentIndex(prev => prev === 0 ? images.length - 1 : prev - 1)
+    setCurrentIndex(prev => {
+      const newIndex = prev === 0 ? images.length - 1 : prev - 1
+      setPdfLoadError(false) // Reset error when changing files
+      return newIndex
+    })
   }
 
   const goToNext = () => {
-    setCurrentIndex(prev => prev === images.length - 1 ? 0 : prev + 1)
+    setCurrentIndex(prev => {
+      const newIndex = prev === images.length - 1 ? 0 : prev + 1
+      setPdfLoadError(false) // Reset error when changing files
+      return newIndex
+    })
   }
 
   const downloadFile = async () => {
@@ -102,18 +136,56 @@ export function ImageViewerModal({
           <div className="relative h-[60vh] flex items-center justify-center bg-black/5 overflow-auto">
             {currentImage ? (
               currentIsPdf ? (
-                <iframe
-                  src={currentImage}
-                  className="w-full h-full border-0 rounded-lg"
-                  title={`Receipt PDF ${currentIndex + 1}`}
-                />
+                <div className="w-full h-full flex items-center justify-center relative">
+                  {pdfLoadError ? (
+                    <div className="text-center p-8">
+                      <FileText className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+                      <p className="text-muted-foreground mb-4">Unable to display PDF in viewer</p>
+                      <Button
+                        onClick={() => window.open(currentImage, '_blank')}
+                        className="gap-2"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        Open PDF in New Tab
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <iframe
+                        src={`${currentImage}#toolbar=1`}
+                        className="w-full h-full border-0 rounded-lg"
+                        title={`Receipt PDF ${currentIndex + 1}`}
+                        onLoad={() => setPdfLoadError(false)}
+                      />
+                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/70 text-white px-4 py-2 rounded-lg text-sm flex items-center gap-2 z-10">
+                        <FileText className="w-4 h-4" />
+                        <span>PDF Document</span>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.open(currentImage, '_blank')}
+                          className="text-white hover:text-white hover:bg-white/20 h-6 px-2 ml-2"
+                        >
+                          Open in New Tab
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
               ) : (
                 <img
                   src={currentImage}
                   alt={`Receipt ${currentIndex + 1}`}
                   className="max-h-full max-w-full object-contain rounded-lg shadow-lg"
                   onError={(e) => {
-                    e.currentTarget.src = '/placeholder-image.png'
+                    // If image fails to load, check if it might be a PDF
+                    const url = (e.target as HTMLImageElement).src
+                    if (url.toLowerCase().includes('pdf') || url.toLowerCase().includes('.pdf')) {
+                      // It's likely a PDF, reload as iframe
+                      window.location.href = url
+                    } else {
+                      e.currentTarget.src = '/placeholder-image.png'
+                    }
                   }}
                 />
               )
