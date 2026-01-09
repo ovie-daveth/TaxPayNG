@@ -98,7 +98,7 @@ export function ImageViewerModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] p-0 overflow-hidden">
-        <DialogHeader className="p-6 pb-4 border-b pr-12">
+        {/* <DialogHeader className="p-6 pb-4 border-b pr-12">
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2">
               {title}
@@ -126,6 +126,40 @@ export function ImageViewerModal({
               >
                 <ExternalLink className="w-4 h-4" />
                 Open
+              </Button>
+            </div>
+          </div>
+        </DialogHeader> */}
+                <DialogHeader className="p-4 sm:p-6 pb-4 border-b pr-10 sm:pr-12">
+          {/* Mobile responsive header layout */}
+          <div className="flex flex-row items-center justify-between gap-3">
+            <DialogTitle className="text-base sm:text-lg flex items-center gap-2 flex-wrap min-w-0">
+              <span className="break-words min-w-0 flex-1 hidden sm:block">{title}</span>
+              <span className="break-words min-w-0 flex-1 block sm:hidden">{title.slice(0, 18)}</span>
+              {hasMultipleImages && (
+                <Badge variant="secondary" className="flex-shrink-0">
+                  {currentIndex + 1} of {images.length}
+                </Badge>
+              )}
+            </DialogTitle>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={downloadFile}
+                className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm"
+              >
+                <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden xs:inline">Download</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={openInNewTab}
+                className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm"
+              >
+                <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                <span className="hidden xs:inline">Open</span>
               </Button>
             </div>
           </div>

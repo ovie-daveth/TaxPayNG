@@ -197,7 +197,7 @@ export default function PricingPage() {
           <div className="text-center mb-8 sm:mb-12 md:mb-16">
             <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-2 sm:mb-3 md:mb-4">Simple, Transparent Pricing</h1>
             <p className="text-sm sm:text-base md:text-lg text-muted-foreground max-w-2xl mx-auto px-4">
-              Choose the plan that fits your business needs. All plans include a 7-day free trial.
+              Choose the plan that fits your business needs. All plans include a 3-day free trial.
             </p>
           </div>
 
@@ -580,7 +580,7 @@ export default function PricingPage() {
                     Do you offer a free trial?
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground text-xs sm:text-sm">
-                    Yes! All plans come with a 7-day free trial. No credit card required to start. You can explore all features and see how OTax simplifies your tax management before committing.
+                    Yes! All plans come with a 3-day free trial. No credit card required to start. You can explore all features and see how OTax simplifies your tax management before committing.
                   </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="general-2" className="border border-border rounded-lg px-3 sm:px-4 mb-3 sm:mb-4">

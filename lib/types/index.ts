@@ -46,7 +46,7 @@ export interface UserProfile {
   subscriptionExpiryDate?: string // ISO string - when subscription expires (31 days from payment)
   // Free Trial fields
   freeTrialStartDate?: string // ISO string - when free trial started
-  freeTrialEndDate?: string // ISO string - when free trial ends (7 days from start)
+  freeTrialEndDate?: string // ISO string - when free trial ends (3 days from start)
   freeTrialUsed?: boolean // Whether user has used their free trial
   /**
    * Multi-Entity Business Management (PLATINUM):

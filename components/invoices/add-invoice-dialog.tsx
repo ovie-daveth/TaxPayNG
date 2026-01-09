@@ -218,7 +218,6 @@ export function AddInvoiceDialog({
     // Note: WHT is deducted by the client/buyer, not set by the issuer
     notes: "",
     terms: "",
-    paymentTerms: "Net 30",
     paymentInstructions: ""
   })
 
@@ -266,7 +265,6 @@ export function AddInvoiceDialog({
         // Note: WHT fields are not editable by issuer - they are set by client when deducting
         notes: invoice.notes || "",
         terms: invoice.terms || "",
-        paymentTerms: invoice.paymentTerms || "Net 30",
         paymentInstructions: invoice.paymentInstructions || "",
         sendToOtaxUser: !!invoice.recipientUserId,
         recipientEmail: invoice.recipientEmail || "",
@@ -338,7 +336,6 @@ export function AddInvoiceDialog({
         // Note: WHT is deducted by the client/buyer, not set by the issuer
         notes: "",
         terms: "",
-        paymentTerms: "Net 30",
         paymentInstructions: "",
         sendToOtaxUser: false,
         recipientEmail: "",
@@ -764,7 +761,6 @@ export function AddInvoiceDialog({
         discount: formData.discount || undefined,
         notes: formData.notes || undefined,
         terms: formData.terms || undefined,
-        paymentTerms: formData.paymentTerms,
         paymentInstructions: formData.paymentInstructions || undefined,
         status: 'draft' as const,
         subtotal: totals.subtotal,
@@ -1380,35 +1376,6 @@ export function AddInvoiceDialog({
             </div>
           </div>
 
-          {/* Payment Summary Totals */}
-          <div className="space-y-3 border-t pt-4 bg-muted/30 p-4 rounded-lg">
-            <h4 className="font-semibold text-xs sm:text-sm mb-3">Payment Summary</h4>
-            <div className="flex justify-between items-center text-xs sm:text-sm">
-              <span>Subtotal:</span>
-              <span className="font-medium">{getCurrencySymbol(formData.currency)} {totals.subtotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-            {formData.discount > 0 && (
-              <div className="flex justify-between items-center text-xs sm:text-sm text-destructive">
-                <span>Discount ({formData.discount}%):</span>
-                <span>-{getCurrencySymbol(formData.currency)} {(totals.subtotal * formData.discount / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              </div>
-            )}
-            {profile?.businessType !== 'creator' && profile?.businessType !== 'freelancer' && (
-              <div className="flex justify-between items-center text-xs sm:text-sm">
-                <span>VAT ({formData.vatRate || 7.5}%):</span>
-                <span className="font-medium">{getCurrencySymbol(formData.currency)} {totals.vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-              </div>
-            )}
-            <div className="flex justify-between items-center text-xs sm:text-sm font-semibold border-t pt-2 mt-2">
-              <span>Invoice Total:</span>
-              <span>{getCurrencySymbol(formData.currency)} {totals.invoiceTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-            <div className="flex justify-between items-center text-base sm:text-lg font-bold border-t pt-2 mt-2">
-              <span>Amount Payable:</span>
-              <span className="text-primary">{getCurrencySymbol(formData.currency)} {totals.total.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-            </div>
-          </div>
-
           {/* Invoice Items */}
           <div className="space-y-3 sm:space-y-4">
             <h3 className="text-base sm:text-lg font-semibold">Items</h3>
@@ -1964,21 +1931,6 @@ export function AddInvoiceDialog({
             <p className="text-xs text-muted-foreground">How you expect to receive payment for this invoice</p>
           </div>
 
-          {/* Additional Fields */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="payment-terms" className="text-xs sm:text-sm">Payment Terms</Label>
-              <Input
-                id="payment-terms"
-                value={formData.paymentTerms}
-                onChange={(e) => setFormData(prev => ({ ...prev, paymentTerms: e.target.value }))}
-                onKeyDown={handleInputKeyDown}
-                onClick={(e) => e.stopPropagation()}
-                placeholder="e.g., Net 30"
-                className="h-9 sm:h-10 text-xs sm:text-sm"
-              />
-            </div>
-          </div>
 
           <div className="space-y-2">
             <Label htmlFor="notes" className="text-xs sm:text-sm">Notes</Label>

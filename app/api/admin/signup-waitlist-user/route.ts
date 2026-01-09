@@ -89,7 +89,7 @@ async function sendSignupEmail(
     </div>
     
     <p style="font-size: 16px; margin-top: 30px;">
-      You're starting with a <strong>7-day free trial</strong> to explore all features. Enjoy!
+      You're starting with a <strong>3-day free trial</strong> to explore all features. Enjoy!
     </p>
     
     <p style="font-size: 16px; margin-top: 20px;">
@@ -124,7 +124,7 @@ Login here: ${appUrl}/login
 
 ⚠️ Important: For security reasons, please change your password after your first login. You can do this in your account settings.
 
-You're starting with a 7-day free trial to explore all features. Enjoy!
+You're starting with a 3-day free trial to explore all features. Enjoy!
 
 If you have any questions, feel free to reach out to our support team.
 
@@ -305,10 +305,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Set up free trial (7 days from now)
+    // Set up free trial (3 days from now)
     const now = new Date()
     const freeTrialEndDate = new Date(now)
-    freeTrialEndDate.setDate(freeTrialEndDate.getDate() + 7)
+    freeTrialEndDate.setDate(freeTrialEndDate.getDate() + 3)
 
     // Create user profile
     const userProfileData = {

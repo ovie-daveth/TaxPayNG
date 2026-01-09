@@ -83,12 +83,12 @@ export async function validateTrialFields(
           warnings.push(`Trial end date is ${daysFromNow.toFixed(1)} days in the future - suspicious`);
         }
 
-        // Check if trial duration is suspicious (should be 7 days)
+        // Check if trial duration is suspicious (should be 3 days)
         if (existingProfile.freeTrialStartDate) {
           const startDate = new Date(existingProfile.freeTrialStartDate);
           const trialDuration = (proposedEnd.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24);
-          if (Math.abs(trialDuration - 7) > 1) {
-            warnings.push(`Trial duration is ${trialDuration.toFixed(1)} days (expected 7 days)`);
+          if (Math.abs(trialDuration - 3) > 1) {
+            warnings.push(`Trial duration is ${trialDuration.toFixed(1)} days (expected 3 days)`);
           }
         }
       }
