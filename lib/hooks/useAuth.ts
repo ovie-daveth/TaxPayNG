@@ -100,19 +100,12 @@ export function useAuth() {
       })
 
       // Create user profile in Firestore
-      // Set up free trial (7 days from signup)
-      const now = new Date()
-      const freeTrialEndDate = new Date(now)
-      freeTrialEndDate.setDate(freeTrialEndDate.getDate() + 7)
-      
+      // Free trial will be initialized via API endpoint after profile creation
       const profileData: any = {
         email: data.email,
         firstName: data.firstName,
         lastName: data.lastName,
         businessType: data.businessType,
-        freeTrialStartDate: now.toISOString(),
-        freeTrialEndDate: freeTrialEndDate.toISOString(),
-        freeTrialUsed: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
@@ -131,6 +124,29 @@ export function useAuth() {
 
       if (profileResult && profileResult.success) {
         console.log("Profile updated successfully")
+        
+        // Initialize free trial (if profile was just created, not updated)
+        // Get ID token before signing out
+        try {
+          const idToken = await user.getIdToken()
+          const initTrialResponse = await fetch('/api/user/init-free-trial', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${idToken}`,
+              'Content-Type': 'application/json'
+            }
+          })
+          
+          if (initTrialResponse.ok) {
+            const trialData = await initTrialResponse.json()
+            console.log("Free trial initialized:", trialData)
+          } else {
+            console.warn('Failed to initialize free trial, but signup succeeded')
+          }
+        } catch (trialError) {
+          console.error('Error initializing free trial:', trialError)
+          // Don't fail signup if free trial initialization fails
+        }
         
         // Create default reminders for the user
         try {
@@ -305,19 +321,12 @@ export function useAuth() {
         const firstName = nameParts[0] || ''
         const lastName = nameParts.slice(1).join(' ') || ''
 
-        // Set up free trial (7 days from signup)
-        const now = new Date()
-        const freeTrialEndDate = new Date(now)
-        freeTrialEndDate.setDate(freeTrialEndDate.getDate() + 7)
-
+        // Create profile data (free trial will be initialized via API endpoint)
         const profileData: any = {
           email: user.email || '',
           firstName: firstName,
           lastName: lastName,
           businessType: businessType || 'freelancer', // Default to freelancer if not provided
-          freeTrialStartDate: now.toISOString(),
-          freeTrialEndDate: freeTrialEndDate.toISOString(),
-          freeTrialUsed: true,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         }
@@ -332,6 +341,28 @@ export function useAuth() {
         const profileResult = await userService.upsertProfile(user.uid, profileData)
 
         if (profileResult && profileResult.success) {
+          // Initialize free trial for new users
+          try {
+            const idToken = await user.getIdToken()
+            const initTrialResponse = await fetch('/api/user/init-free-trial', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${idToken}`,
+                'Content-Type': 'application/json'
+              }
+            })
+            
+            if (initTrialResponse.ok) {
+              const trialData = await initTrialResponse.json()
+              console.log("Free trial initialized:", trialData)
+            } else {
+              console.warn('Failed to initialize free trial, but signup succeeded')
+            }
+          } catch (trialError) {
+            console.error('Error initializing free trial:', trialError)
+            // Don't fail signup if free trial initialization fails
+          }
+          
           // Create default reminders for the user
           try {
             const { createDefaultReminders } = await import('@/lib/utils/defaultReminders')

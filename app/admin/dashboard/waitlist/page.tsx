@@ -379,43 +379,102 @@ export default function AdminWaitlistPage() {
         return
       }
 
-      // Send emails one by one
-      const results: Array<{ id: string; email?: string; success: boolean; error?: string }> = []
+      // Use bulk email API for faster parallel sending
+      const waitlistIds = filteredWaitlist
+        .filter(entry => entry.email)
+        .map(entry => entry.id)
+
+      if (waitlistIds.length === 0) {
+        toast.error("No valid emails found to send")
+        setBulkSending(false)
+        return
+      }
+
+      // For custom emails, we need to send individually (or create a custom bulk endpoint)
+      // For template emails, use the fast bulk API
+      const isCustom = bulkTemplate === "custom"
       
-      for (const entry of filteredWaitlist) {
-        if (!entry.email) {
-          results.push({ id: entry.id, success: false, error: "Email missing" })
-          continue
+      let results: Array<{ id: string; email?: string; success: boolean; error?: string }> = []
+
+      if (isCustom) {
+        // Custom emails - send in parallel batches (faster than sequential)
+        const batchSize = 10
+        const batches = []
+        for (let i = 0; i < filteredWaitlist.length; i += batchSize) {
+          batches.push(filteredWaitlist.slice(i, i + batchSize))
         }
 
+        for (const batch of batches) {
+          const batchPromises = batch.map(async (entry) => {
+            if (!entry.email) {
+              return { id: entry.id, success: false, error: "Email missing" }
+            }
+
+            try {
+              const response = await fetch("/api/admin/send-waitlist-email", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  ...(token ? { Authorization: `Bearer ${token}` } : {})
+                },
+                body: JSON.stringify({
+                  waitlistId: entry.id,
+                  recipientEmail: entry.email,
+                  recipientName: entry.name,
+                  customSubject: bulkEditableSubject.trim(),
+                  customBody: bulkEditableBody.trim(),
+                  isCustomEmail: true,
+                })
+              })
+
+              const data = await response.json()
+              return {
+                id: entry.id,
+                email: entry.email,
+                success: response.ok,
+                error: response.ok ? undefined : (data.error || "Failed to send")
+              }
+            } catch (error: any) {
+              return {
+                id: entry.id,
+                email: entry.email,
+                success: false,
+                error: error.message || "Failed to send"
+              }
+            }
+          })
+
+          const batchResults = await Promise.all(batchPromises)
+          results.push(...batchResults)
+        }
+      } else {
+        // Template emails - use fast bulk API
         try {
-          const isCustom = bulkTemplate === "custom"
-          const response = await fetch("/api/admin/send-waitlist-email", {
+          const response = await fetch("/api/admin/send-waitlist-bulk-emails", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
               ...(token ? { Authorization: `Bearer ${token}` } : {})
             },
             body: JSON.stringify({
-              waitlistId: entry.id,
-              recipientEmail: entry.email,
-              recipientName: entry.name,
-              templateKey: isCustom ? undefined : (bulkTemplate as WaitlistTemplateKey),
-              customSubject: bulkEditableSubject.trim(),
-              customBody: bulkEditableBody.trim(),
-              isCustomEmail: isCustom,
+              waitlistIds,
+              templateKey: bulkTemplate as WaitlistTemplateKey
             })
           })
 
           const data = await response.json()
 
-          if (response.ok) {
-            results.push({ id: entry.id, email: entry.email, success: true })
+          if (response.ok && data.results) {
+            results = data.results
+            console.log(`✅ Bulk email sent via ${data.service || 'email service'}: ${data.successful} successful, ${data.failed} failed`)
           } else {
-            results.push({ id: entry.id, email: entry.email, success: false, error: data.error || "Failed to send" })
+            throw new Error(data.error || "Failed to send bulk emails")
           }
         } catch (error: any) {
-          results.push({ id: entry.id, email: entry.email, success: false, error: error.message || "Failed to send" })
+          console.error("Bulk email API error:", error)
+          toast.error(error.message || "Failed to send bulk emails")
+          setBulkSending(false)
+          return
         }
       }
 

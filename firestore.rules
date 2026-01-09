@@ -75,15 +75,22 @@ service cloud.firestore {
                       !('freeTrialUsed' in request.resource.data);
       
       // Update: Lock subscription fields - prevent modification
+      // Allow role to be set if it's currently null/undefined, or if it matches existing value
+      // Handle missing/null fields by checking if field exists or matches
       allow update: if isAuthenticated() && 
                       (resource.data.userId == request.auth.uid || isAuthenticatedUser()) &&
-                      request.resource.data.isSubscribe == resource.data.isSubscribe &&
-                      request.resource.data.subscriptionType == resource.data.subscriptionType &&
-                      request.resource.data.subscriptionExpiryDate == resource.data.subscriptionExpiryDate &&
-                      request.resource.data.freeTrialStartDate == resource.data.freeTrialStartDate &&
-                      request.resource.data.freeTrialEndDate == resource.data.freeTrialEndDate &&
-                      request.resource.data.freeTrialUsed == resource.data.freeTrialUsed &&
-                      request.resource.data.role == resource.data.role;
+                      // Check subscription fields - allow if field doesn't exist in both or matches
+                      (!('isSubscribe' in resource.data) || !('isSubscribe' in request.resource.data) || request.resource.data.isSubscribe == resource.data.isSubscribe) &&
+                      (!('subscriptionType' in resource.data) || !('subscriptionType' in request.resource.data) || request.resource.data.subscriptionType == resource.data.subscriptionType) &&
+                      (!('subscriptionExpiryDate' in resource.data) || !('subscriptionExpiryDate' in request.resource.data) || request.resource.data.subscriptionExpiryDate == resource.data.subscriptionExpiryDate) &&
+                      (!('freeTrialStartDate' in resource.data) || !('freeTrialStartDate' in request.resource.data) || request.resource.data.freeTrialStartDate == resource.data.freeTrialStartDate) &&
+                      (!('freeTrialEndDate' in resource.data) || !('freeTrialEndDate' in request.resource.data) || request.resource.data.freeTrialEndDate == resource.data.freeTrialEndDate) &&
+                      (!('freeTrialUsed' in resource.data) || !('freeTrialUsed' in request.resource.data) || request.resource.data.freeTrialUsed == resource.data.freeTrialUsed) &&
+                      // Allow role update if: role doesn't exist in existing profile, OR new role matches existing role
+                      (!('role' in resource.data) || 
+                       resource.data.role == null || 
+                       !('role' in request.resource.data) ||
+                       request.resource.data.role == resource.data.role);
       
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
     }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getAdminAuth, getAdminDb } from "@/lib/firebase-admin"
-import { createTransporter } from "@/lib/utils/nodemailer"
+import { sendBulkEmails, getEmailServiceName } from "@/lib/utils/email-service"
 import { buildWaitlistEmail, type WaitlistTemplateKey } from "@/lib/emails/waitlist-templates"
 
 const auth = getAdminAuth()
@@ -88,23 +88,31 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const transporter = createTransporter()
-    if (!transporter) {
-      return NextResponse.json(
-        { error: "Email service not configured. Please set SMTP credentials." },
-        { status: 500 }
-      )
-    }
-
-    const fromEmail = process.env.SMTP_FROM || process.env.SMTP_USER || "noreply@otax.com"
+    const fromEmail = process.env.RESEND_FROM || process.env.SMTP_FROM || process.env.SMTP_USER || "noreply@otax.com"
     const now = new Date().toISOString()
+    const emailService = getEmailServiceName()
 
-    const waitlistDocs = await adminDb.getAll(
-      ...waitlistIds.map((id) => adminDb.collection("waitlist").doc(id))
+    console.log(`📧 Starting bulk email send using ${emailService}...`)
+    console.log(`📊 Total emails to send: ${waitlistIds.length}`)
+
+    // Fetch all waitlist entries in parallel
+    const waitlistDocPromises = waitlistIds.map(id => 
+      adminDb.collection("waitlist").doc(id).get()
     )
+    const waitlistDocs = await Promise.all(waitlistDocPromises)
+
+    // Prepare email options for batch sending
+    const emailOptions: Array<{
+      to: string
+      subject: string
+      html: string
+      waitlistId: string
+      recipientName?: string
+    }> = []
 
     const results: Array<{ id: string; email?: string; success: boolean; error?: string }> = []
 
+    // Prepare all emails first
     for (let i = 0; i < waitlistDocs.length; i++) {
       const docSnapshot = waitlistDocs[i]
       const waitlistId = waitlistIds[i]
@@ -128,41 +136,84 @@ export async function POST(request: NextRequest) {
         email: recipientEmail
       })
 
-      try {
-        await transporter.sendMail({
-          from: `"OTax" <${fromEmail}>`,
-          to: recipientEmail,
-          subject,
-          text: emailBody,
-          html: emailBody.replace(/\n/g, "<br />")
-        })
-
-        await adminDb.collection("waitlist").doc(waitlistId).set(
-          {
-            notified: true,
-            status: templateKey,
-            lastNotifiedAt: now,
-            lastNotificationTemplate: templateKey,
-            updatedAt: now
-          },
-          { merge: true }
-        )
-
-        results.push({ id: waitlistId, email: recipientEmail, success: true })
-      } catch (error: any) {
-        console.error(`Bulk email send failed for ${recipientEmail}:`, error)
-        results.push({
-          id: waitlistId,
-          email: recipientEmail,
-          success: false,
-          error: error.message || "Failed to send email"
-        })
-      }
+      emailOptions.push({
+        to: recipientEmail,
+        subject,
+        html: emailBody.replace(/\n/g, "<br />"),
+        waitlistId,
+        recipientName
+      })
     }
+
+    if (emailOptions.length === 0) {
+      return NextResponse.json({
+        success: false,
+        error: "No valid email addresses found in waitlist entries",
+        results
+      })
+    }
+
+    // Send all emails in parallel batches (much faster!)
+    console.log(`🚀 Sending ${emailOptions.length} emails in parallel batches...`)
+    const startTime = Date.now()
+    
+    const emailResults = await sendBulkEmails(
+      emailOptions.map(opt => ({
+        to: opt.to,
+        subject: opt.subject,
+        html: opt.html,
+        from: fromEmail
+      })),
+      20 // Send 20 emails in parallel at a time
+    )
+
+    const sendDuration = Date.now() - startTime
+    console.log(`✅ Email sending completed in ${sendDuration}ms (${emailService})`)
+
+    // Update waitlist entries and collect results
+    const updatePromises = emailOptions.map(async (opt, index) => {
+      const emailResult = emailResults[index]
+      const result = {
+        id: opt.waitlistId,
+        email: opt.to,
+        success: emailResult.success,
+        error: emailResult.error
+      }
+
+      if (emailResult.success) {
+        // Update waitlist entry as notified
+        try {
+          await adminDb.collection("waitlist").doc(opt.waitlistId).set(
+            {
+              notified: true,
+              status: templateKey,
+              lastNotifiedAt: now,
+              lastNotificationTemplate: templateKey,
+              updatedAt: now
+            },
+            { merge: true }
+          )
+        } catch (updateError) {
+          console.error(`Failed to update waitlist entry ${opt.waitlistId}:`, updateError)
+        }
+      }
+
+      return result
+    })
+
+    const finalResults = await Promise.all(updatePromises)
+    results.push(...finalResults)
+
+    const successCount = results.filter(r => r.success).length
+    const failureCount = results.length - successCount
 
     return NextResponse.json({
       success: true,
-      message: "Bulk email operation completed",
+      message: `Bulk email operation completed: ${successCount} sent, ${failureCount} failed`,
+      service: emailService,
+      total: results.length,
+      successful: successCount,
+      failed: failureCount,
       results
     })
   } catch (error: any) {

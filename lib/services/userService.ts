@@ -143,10 +143,19 @@ export class UserService extends BaseService {
         // Initialize any missing subscription fields with defaults
         const subscriptionFields = this.initializeSubscriptionFields(subscriptionFieldsToPreserve)
         
-        // Update existing profile - preserve subscription fields
+        // Preserve role field - only allow changing if current role is undefined/null
+        // This prevents Firestore rule violations while allowing initial role assignment
+        const roleToSet = profileData.role !== undefined 
+          ? (existingProfile.role === undefined || existingProfile.role === null 
+              ? profileData.role  // Allow setting if not previously set
+              : existingProfile.role)  // Preserve existing role
+          : existingProfile.role  // Preserve if not in update data
+        
+        // Update existing profile - preserve subscription fields and role
         await this.update(existingProfile.id, {
           ...profileData,
           ...subscriptionFields,
+          role: roleToSet,  // Ensure role is preserved or set correctly
           userId,
           updatedAt: new Date().toISOString()
         })
@@ -162,15 +171,30 @@ export class UserService extends BaseService {
           message: 'Profile updated successfully'
         }
       } else {
-        // Create new profile with subscription defaults
-        const subscriptionFields = this.initializeSubscriptionFields(profileData)
+        // Create new profile - exclude subscription fields (forbidden by Firestore rules during creation)
+        // Only include non-restricted subscription-related fields
+        const { isSubscribe, subscriptionType, subscriptionExpiryDate, subscriptionStartDate, 
+                lastSubscriptionDate, renewalCount, freeTrialStartDate, freeTrialEndDate, 
+                freeTrialUsed, ...profileDataWithoutSubscription } = profileData
+        
+        // Only include safe subscription-related fields that are allowed during creation
+        const safeSubscriptionFields = {
+          transactionCount: profileData.transactionCount ?? 0,
+          transactionCountResetDate: profileData.transactionCountResetDate ?? new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(),
+          storageLimit: profileData.storageLimit ?? 500 * 1024 * 1024, // Default 500MB
+          storageUsed: profileData.storageUsed ?? 0,
+        }
+        
         const newProfileData = {
-          ...profileData,
-          ...subscriptionFields,
+          ...profileDataWithoutSubscription,
+          ...safeSubscriptionFields,
           userId,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString()
         }
+        
+        // Log businessType to debug
+        console.log('Creating profile with businessType:', newProfileData.businessType, 'Full data:', newProfileData)
         
         const profileId = await this.create(newProfileData)
         const newProfile = await this.getById(profileId)

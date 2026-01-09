@@ -73,21 +73,42 @@ export default function LoginPage() {
       return
     }
 
-    console.log("Login redirect - profile loaded, businessType:", profile.businessType, "taxId:", !!profile.taxId)
+    console.log("Login redirect - profile loaded, businessType:", profile.businessType, "taxId:", !!profile.taxId, "createdAt:", profile.createdAt)
 
     // Check if user needs to select business type
-    // This happens when a user signs in with Google and a profile was created with default 'freelancer' but no taxId
-    // We check if businessType is 'freelancer' and no taxId exists, which indicates they need to select business type
+    // This should ONLY happen for Google signups where:
+    // 1. Profile was created very recently (within 30 seconds - indicates immediate Google signup)
+    // 2. businessType is 'freelancer' (default for Google signups without selection)
+    // 3. No taxId exists (user hasn't completed onboarding)
+    // 
+    // Email/password signups: User signs up → gets signed out → logs in later (minutes/hours later)
+    // Google signups: User signs up → immediately logged in (within seconds)
+    // So we only redirect VERY new profiles (30 seconds) to catch Google signups only
     if (profile.businessType === 'freelancer' && !profile.taxId) {
-      // Check if this is a newly created profile (created recently, within last minute)
+      // Check if user signed in with Google by checking provider data
+      const isGoogleUser = user?.providerData?.some((provider: any) => provider.providerId === 'google.com') || false
+      
       const createdAt = profile.createdAt ? new Date(profile.createdAt) : null
       const now = new Date()
-      const isNewProfile = createdAt && (now.getTime() - createdAt.getTime()) < 60000 // Created within last minute
+      const profileAge = createdAt ? (now.getTime() - createdAt.getTime()) : Infinity
+      const isVeryNewProfile = profileAge < 30000 // Created within last 30 seconds
       
-      if (isNewProfile) {
+      // Only redirect if: Google user AND very new profile
+      // Email/password signups will have profileAge > 30 seconds (they sign up, get signed out, then log in later)
+      if (isGoogleUser && isVeryNewProfile) {
+        console.log("Redirecting to select-business-type - Google signup with freelancer type")
         router.push("/select-business-type")
         return
+      } else {
+        console.log("Skipping business type redirect - isGoogleUser:", isGoogleUser, "profileAge:", profileAge, "ms")
       }
+    }
+    
+    // If businessType is null/undefined, redirect (shouldn't happen, but handle it)
+    if (!profile.businessType) {
+      console.log("Redirecting to select-business-type - profile missing businessType")
+      router.push("/select-business-type")
+      return
     }
 
     // Agent-specific redirects
