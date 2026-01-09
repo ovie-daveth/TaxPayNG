@@ -24,6 +24,7 @@ import { formatDateForInput } from "@/lib/utils/date"
 import { SUPPORTED_CURRENCIES, CurrencyCode, getCurrencySymbol, formatCurrencyInput, parseCurrencyInput, formatCurrencyAmount, fetchExchangeRate, convertCurrency } from "@/lib/utils/currency"
 import { Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
 import { useBusiness } from "@/lib/contexts/business-context"
+import { canChargeVAT, getVATEligibility } from "@/lib/utils/vatEligibility"
 
 interface AddInvoiceDialogProps {
   open: boolean
@@ -75,6 +76,9 @@ export function AddInvoiceDialog({
   const [itemGrossAmounts, setItemGrossAmounts] = useState<Record<string, number | undefined>>({})
   const [itemPlatformFees, setItemPlatformFees] = useState<Record<string, number | undefined>>({})
   const [itemPlatformFeesDisplay, setItemPlatformFeesDisplay] = useState<Record<string, string>>({})
+  
+  // Store discount display value to allow decimal input while typing (e.g., "10." before "10.5")
+  const [discountDisplayValue, setDiscountDisplayValue] = useState("")
   
   // Initialize supplier info from user profile
   const getInitialSupplier = useCallback((): InvoiceSupplier => {
@@ -246,8 +250,10 @@ export function AddInvoiceDialog({
       setItemDisplayValues(displayValues)
       setItemCurrencies(currencies)
       setItemConvertedAmounts(convertedAmounts)
-      // For creators and freelancers, ensure vatable is false for all items
-      const itemsWithoutVAT = (profile?.businessType === 'creator' || profile?.businessType === 'freelancer')
+      // For users who cannot charge VAT (e.g., freelancers/creators below ₦100M threshold or not VAT-registered),
+      // ensure vatable is false for all items. Users who qualify can charge VAT - see canChargeVAT().
+      const userCanChargeVAT = canChargeVAT(profile)
+      const itemsWithVATEligibility = !userCanChargeVAT
         ? items.map(item => ({ ...item, vatable: false }))
         : items
       
@@ -259,7 +265,7 @@ export function AddInvoiceDialog({
         issueDate: invoice.issueDate.split('T')[0],
         dueDate: invoice.dueDate.split('T')[0],
         currency: invoice.currency as CurrencyCode,
-        items: itemsWithoutVAT,
+        items: itemsWithVATEligibility,
         discount: invoice.discount || 0,
         vatRate: invoice.vatRate || 7.5,
         // Note: WHT fields are not editable by issuer - they are set by client when deducting
@@ -296,6 +302,9 @@ export function AddInvoiceDialog({
       setItemGrossAmounts(grossAmounts)
       setItemPlatformFees(platformFees)
       setItemPlatformFeesDisplay(platformFeesDisplay)
+      
+      // Initialize discount display value (preserves decimals from existing invoice)
+      setDiscountDisplayValue((invoice.discount ?? 0).toString())
     } else {
       // Reset form
       const newItemId = crypto.randomUUID()
@@ -356,6 +365,9 @@ export function AddInvoiceDialog({
       setItemGrossAmounts({})
       setItemPlatformFees({})
       setItemPlatformFeesDisplay({})
+      
+      // Reset discount display value
+      setDiscountDisplayValue("")
     }
   }, [invoice, open])
 
@@ -442,8 +454,9 @@ export function AddInvoiceDialog({
         if (item.id === itemId) {
           const updated = { ...item, ...updates }
           
-          // For creators and freelancers, always set vatable to false
-          if (profile?.businessType === 'creator' || profile?.businessType === 'freelancer') {
+          // For users who cannot charge VAT (below ₦100M threshold or not VAT-registered),
+          // keep vatable as false. Qualified users can set vatable per item.
+          if (!canChargeVAT(profile)) {
             updated.vatable = false
           }
           
@@ -1380,13 +1393,22 @@ export function AddInvoiceDialog({
           <div className="space-y-3 sm:space-y-4">
             <h3 className="text-base sm:text-lg font-semibold">Items</h3>
             
-            {/* Note about Item Tax (for non-VAT items) */}
-            <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
-              <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
-              <AlertDescription className="text-xs sm:text-sm text-blue-900 dark:text-blue-100">
-                <strong>Note:</strong> Item-level tax is for specific item taxes only. VAT (7.5%) will be calculated at invoice level and added to the subtotal.
-              </AlertDescription>
-            </Alert>
+            {/* Note about VAT - different message based on user's VAT eligibility */}
+            {canChargeVAT(profile) ? (
+              <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
+                <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
+                <AlertDescription className="text-xs sm:text-sm text-blue-900 dark:text-blue-100">
+                  <strong>Note:</strong> Mark items as "Vatable" if they are subject to VAT. VAT (7.5%) will be calculated at invoice level and added to the subtotal. VAT is collected on behalf of government—remember to remit to FIRS.
+                </AlertDescription>
+              </Alert>
+            ) : (profile?.businessType === 'freelancer' || profile?.businessType === 'creator') && (
+              <Alert className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
+                <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600 dark:text-amber-400" />
+                <AlertDescription className="text-xs sm:text-sm text-amber-900 dark:text-amber-100">
+                  <strong>VAT Qualification:</strong> {getVATEligibility(profile).reason} Go to Settings → VAT &amp; Turnover to update your annual turnover and VAT registration if you qualify (₦100M+ turnover + FIRS VAT registration).
+                </AlertDescription>
+              </Alert>
+            )}
             
             <div className="space-y-3 sm:space-y-4">
               {formData.items.map((item, index) => (
@@ -1516,8 +1538,8 @@ export function AddInvoiceDialog({
                       </Tooltip>
                       {/* <p className="text-xs text-muted-foreground">Qty × Unit Price</p> */}
                     </div>
-                    {/* VAT checkbox - only for registered businesses (not creators/freelancers) */}
-                    {profile?.businessType !== 'creator' && profile?.businessType !== 'freelancer' && (
+                    {/* VAT checkbox - shown only if user can charge VAT (₦100M+ turnover AND VAT-registered for freelancers/creators) */}
+                    {canChargeVAT(profile) && (
                       <div className="space-y-2 flex flex-col justify-end flex-shrink-0">
                         <div className="flex items-center space-x-2 sm:pt-0 pt-2">
                           <Checkbox
@@ -1640,8 +1662,8 @@ export function AddInvoiceDialog({
             </div>
           </div>
 
-          {/* VAT Section - only for registered businesses (not creators/freelancers) */}
-          {profile?.businessType !== 'creator' && profile?.businessType !== 'freelancer' && (
+          {/* VAT Section - shown only if user can charge VAT (qualifies per Nigerian VAT Act: ₦100M+ turnover + VAT registration) */}
+          {canChargeVAT(profile) && (
             <div className="space-y-3 sm:space-y-4 border-t pt-3 sm:pt-4">
               <div className="space-y-2">
                 <Label htmlFor="vat-rate" className="text-xs sm:text-sm">VAT Rate (%)</Label>
@@ -1666,17 +1688,17 @@ export function AddInvoiceDialog({
                 <p className="text-xs text-muted-foreground">Default: 7.5% (Nigeria VAT rate)</p>
               </div>
               
-              {/* VAT Eligibility Information */}
+              {/* VAT Eligibility Information - Only shown to users who qualify to charge VAT */}
               <Alert className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-800">
                 <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
                 <AlertDescription className="text-xs sm:text-sm text-blue-900 dark:text-blue-100">
-                  <strong>VAT Eligibility Rules:</strong>
+                  <strong>VAT Compliance (Nigeria VAT Act):</strong>
                   <ul className="mt-1.5 space-y-1 list-disc list-inside">
-                    <li><strong>Salary earners</strong> → Cannot charge VAT</li>
-                    <li><strong>Small freelancers/creators under ₦100m turnover</strong> → Cannot charge VAT</li>
-                    <li><strong>Registered businesses or individuals over ₦100m turnover</strong> → Must charge VAT (7.5%)</li>
+                    <li><strong>₦100M+ annual turnover + VAT registered</strong> → You may charge VAT (you qualify)</li>
+                    <li><strong>Below ₦100M turnover</strong> → VAT-exempt, must NOT charge VAT</li>
+                    <li><strong>Freelancers &amp; creators</strong> → Can qualify if turnover ≥₦100M and VAT-registered with FIRS</li>
                   </ul>
-                  <p className="mt-1.5"><strong>Important:</strong> Only VAT-registered businesses with annual turnover above ₦100 million can legally charge VAT. VAT is collected on behalf of the government, not earned as revenue. Make sure you are VAT-registered before charging VAT on your invoices.</p>
+                  <p className="mt-1.5"><strong>Important:</strong> VAT is collected on behalf of government, not earned as income. You must remit collected VAT to FIRS. Update your annual turnover and VAT registration in Settings to qualify.</p>
                 </AlertDescription>
               </Alert>
             </div>
@@ -1691,12 +1713,15 @@ export function AddInvoiceDialog({
                 type="text"
                 inputMode="decimal"
                 placeholder="0"
-                value={formData.discount?.toString() || ''}
+                value={discountDisplayValue}
                 onChange={(e) => {
                   const value = e.target.value
-                  // Allow empty string, numbers, and decimals
+                  // Allow empty string, numbers, and decimals (including intermediate states like "10." or ".5")
+                  // Regex: optional digits, optional decimal point, optional digits after decimal
                   if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                    const discount = value === '' ? 0 : (parseFloat(value) || 0)
+                    setDiscountDisplayValue(value)
+                    // Update formData.discount for calculations (parseFloat handles "10." as 10, "10.5" as 10.5)
+                    const discount = value === '' || value === '.' ? 0 : (parseFloat(value) || 0)
                     setFormData(prev => ({ ...prev, discount: discount }))
                   }
                 }}
@@ -1704,6 +1729,7 @@ export function AddInvoiceDialog({
                 onClick={(e) => e.stopPropagation()}
                 className="h-9 sm:h-10 text-xs sm:text-sm"
               />
+              <p className="text-xs text-muted-foreground">Enter percentage (e.g., 5, 10.5, 15.25)</p>
             </div>
           </div>
 
@@ -1720,7 +1746,7 @@ export function AddInvoiceDialog({
                 <span className="whitespace-nowrap">-{getCurrencySymbol(formData.currency)} {(totals.subtotal * formData.discount / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
               </div>
             )}
-            {profile?.businessType !== 'creator' && profile?.businessType !== 'freelancer' && (
+            {canChargeVAT(profile) && (
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-1 sm:gap-0 text-xs sm:text-sm">
                 <span>VAT ({formData.vatRate || 7.5}%):</span>
                 <span className="font-medium whitespace-nowrap">{getCurrencySymbol(formData.currency)} {totals.vatAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>

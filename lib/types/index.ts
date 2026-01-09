@@ -25,7 +25,12 @@ export interface UserProfile {
     memorandum?: string
   }
   kycDocuments?: {
-    id?: string // National ID, Voter's Card, etc.
+    // Means of identification: NIN, International Passport, Voter's Card, Driver's License, etc.
+    // Single field - upload any valid government-issued ID
+    id?: string // URL to uploaded identification document (NIN, passport, voter's card, etc.)
+    // Proof of address: NEPA bill, utility bill, bank statement, etc.
+    proofOfAddress?: string // URL to uploaded proof of address document
+    // Legacy fields - kept for backward compatibility when reading existing user data
     passport?: string
     driverLicense?: string
   }
@@ -75,10 +80,12 @@ export interface UserProfile {
   // Creator-specific fields
   platformConnections?: PlatformConnection[] // Saved platform connections for creators
   // VAT Compliance fields (for freelancers and creators)
-  vatRegistered?: boolean // Whether user is registered for VAT
+  // Per Nigeria VAT Act: Only "taxable persons" can charge VAT
+  // For individuals/freelancers/creators: need ₦100M+ annual turnover AND VAT registration
+  vatRegistered?: boolean // Whether user is registered for VAT with FIRS
   vatRegistrationNumber?: string // VAT registration number (if registered)
-  annualTurnover?: number // Annual turnover in NGN (used to determine VAT eligibility - threshold is ₦100M)
-  vatEligibilityStatus?: 'eligible' | 'exempt' | 'below_threshold' // Auto-calculated based on annualTurnover
+  annualTurnover?: number // Annual turnover in NGN over 12 months - threshold is ₦100M to charge VAT
+  vatEligibilityStatus?: 'eligible' | 'exempt' | 'below_threshold' // Auto-calculated: eligible if turnover ≥₦100M and VAT registered
 }
 
 // Business Entity (Multi-Entity Business Management)
