@@ -74,6 +74,11 @@ export interface UserProfile {
   agentKycCompleted?: boolean // Whether agent has completed KYC
   // Creator-specific fields
   platformConnections?: PlatformConnection[] // Saved platform connections for creators
+  // VAT Compliance fields (for freelancers and creators)
+  vatRegistered?: boolean // Whether user is registered for VAT
+  vatRegistrationNumber?: string // VAT registration number (if registered)
+  annualTurnover?: number // Annual turnover in NGN (used to determine VAT eligibility - threshold is ₦100M)
+  vatEligibilityStatus?: 'eligible' | 'exempt' | 'below_threshold' // Auto-calculated based on annualTurnover
 }
 
 // Business Entity (Multi-Entity Business Management)

@@ -346,7 +346,17 @@ export class InvoiceService extends BaseService {
           'clientPaymentReference',
           'clientReceiptUrl',
           'taxDeductible', // Allow recipients to mark if payment is tax deductible
-          'linkedTransactionId' // Allow linking transaction when payment is marked
+          'linkedTransactionId', // Allow linking transaction when payment is marked
+          // WHT-related fields that recipients can update when deducting WHT
+          'whtDeducted',
+          'whtRate',
+          'whtAmount',
+          'whtDeductionDate',
+          'whtDeductedBy',
+          'whtCertificateNumber',
+          'whtCreditNote',
+          'total', // Allow updating total when WHT is deducted
+          'updatedAt' // Allow updating timestamp
         ]
         const updateKeys = Object.keys(updateData)
         const disallowedFields = updateKeys.filter(key => !allowedFields.includes(key))
