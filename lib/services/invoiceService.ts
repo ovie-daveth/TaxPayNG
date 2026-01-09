@@ -10,6 +10,60 @@ export class InvoiceService extends BaseService {
     super('invoices')
   }
 
+  // Override prepareData to ensure createdAt is always an ISO string, never serverTimestamp
+  protected prepareData(data: any, includeTimestamps = true): any {
+    const prepared = { ...data }
+    
+    if (includeTimestamps) {
+      // Always use ISO string for createdAt (never serverTimestamp)
+      // This ensures proper sorting and prevents Firestore timestamp conversion issues
+      if (!prepared.id && !prepared.createdAt) {
+        // New document without createdAt - set it as ISO string
+        prepared.createdAt = new Date().toISOString()
+      } else if (prepared.createdAt && typeof prepared.createdAt !== 'string') {
+        // If createdAt exists but is not a string, convert it to ISO string
+        if (prepared.createdAt.toDate && typeof prepared.createdAt.toDate === 'function') {
+          // Firestore Timestamp
+          prepared.createdAt = prepared.createdAt.toDate().toISOString()
+        } else if (prepared.createdAt.seconds) {
+          // Plain object with seconds
+          prepared.createdAt = new Date(prepared.createdAt.seconds * 1000).toISOString()
+        } else {
+          // Fallback
+          prepared.createdAt = new Date().toISOString()
+        }
+      }
+      
+      // Always use ISO string for updatedAt
+      if (typeof prepared.updatedAt !== 'string') {
+        prepared.updatedAt = new Date().toISOString()
+      }
+    }
+
+    // Convert date strings to timestamps (for issueDate, dueDate, etc.)
+    if (prepared.issueDate && typeof prepared.issueDate === 'string') {
+      // Keep issueDate as string (it's already in YYYY-MM-DD format)
+      // Don't convert to timestamp
+    }
+    if (prepared.dueDate && typeof prepared.dueDate === 'string') {
+      // Keep dueDate as string (it's already in YYYY-MM-DD format)
+      // Don't convert to timestamp
+    }
+    if (prepared.date && typeof prepared.date === 'string' && prepared.date.includes('-') && prepared.date.split('-').length === 3) {
+      // This is a date string (YYYY-MM-DD), convert to timestamp
+      prepared.date = this.convertToTimestamp(prepared.date)
+    }
+    if (prepared.completedAt && typeof prepared.completedAt === 'string') {
+      prepared.completedAt = this.convertToTimestamp(prepared.completedAt)
+    }
+    if (prepared.uploadedAt && typeof prepared.uploadedAt === 'string') {
+      prepared.uploadedAt = this.convertToTimestamp(prepared.uploadedAt)
+    }
+
+    // Remove undefined values (Firestore doesn't accept undefined)
+    return this.removeUndefined(prepared)
+  }
+
   // Generate invoice number (format: INV-YYYY-NNN or BILL-YYYY-NNN)
   private async generateInvoiceNumber(userId: string, invoiceType: 'outgoing' | 'incoming' = 'outgoing'): Promise<string> {
     try {
@@ -210,11 +264,12 @@ export class InvoiceService extends BaseService {
         )
       }
 
-      // Sort by issue date descending (newest first)
+      // Sort by createdAt descending (newest first) - this ensures proper chronological ordering
+      // createdAt represents when the invoice was actually created, which is more reliable than issueDate
       filtered.sort((a, b) => {
-        const dateA = a.issueDate ? new Date(a.issueDate).getTime() : new Date(a.createdAt).getTime()
-        const dateB = b.issueDate ? new Date(b.issueDate).getTime() : new Date(b.createdAt).getTime()
-        return dateB - dateA
+        const dateA = new Date(a.createdAt || a.issueDate || 0).getTime()
+        const dateB = new Date(b.createdAt || b.issueDate || 0).getTime()
+        return dateB - dateA // Descending order (newest first)
       })
 
       // Apply pagination
@@ -333,6 +388,11 @@ export class InvoiceService extends BaseService {
           success: false,
           error: 'Unauthorized: You can only update invoices you sent or received'
         }
+      }
+      
+      // Preserve createdAt when updating (never allow it to be changed)
+      if (!updateData.createdAt) {
+        updateData.createdAt = existingInvoice.createdAt
       }
       
       // Recipients can update recipientEntityId and payment-related fields
