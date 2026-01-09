@@ -43,18 +43,31 @@ if (!firebaseToken) {
 }
 
 try {
-  // Check if firebase-tools is installed
+  // Check if firebase-tools is available (local or global)
+  let firebaseCmd = 'firebase';
   try {
     execSync('firebase --version', { stdio: 'ignore' });
   } catch (error) {
-    console.log('📦 Installing firebase-tools...');
-    execSync('npm install -g firebase-tools', { stdio: 'inherit' });
+    // Try using npx/pnpm exec to use local version
+    try {
+      execSync('pnpm exec firebase --version', { stdio: 'ignore' });
+      firebaseCmd = 'pnpm exec firebase';
+    } catch (error2) {
+      // Try npx as fallback
+      try {
+        execSync('npx firebase --version', { stdio: 'ignore' });
+        firebaseCmd = 'npx firebase';
+      } catch (error3) {
+        console.log('📦 Installing firebase-tools globally...');
+        execSync('npm install -g firebase-tools', { stdio: 'inherit' });
+      }
+    }
   }
 
   // Deploy Firestore rules and indexes
   console.log('📤 Deploying Firestore rules and indexes...');
   execSync(
-    `firebase deploy --only firestore --token "${firebaseToken}" --non-interactive`,
+    `${firebaseCmd} deploy --only firestore --token "${firebaseToken}" --non-interactive`,
     { stdio: 'inherit' }
   );
 
