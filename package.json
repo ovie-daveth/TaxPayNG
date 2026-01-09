@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "next build",
-    "build:deploy": "next build && npm run deploy:firestore",
+    "build:deploy": "next build && pnpm run deploy:firestore",
     "dev": "next dev --webpack",
     "backend": "afrihub start --port 3001",
     "frontend": "next dev --webpack",
@@ -14,7 +14,7 @@
     "deploy:firestore:rules": "firebase deploy --only firestore:rules",
     "deploy:firestore:indexes": "firebase deploy --only firestore:indexes",
     "deploy:firestore:all": "firebase deploy --only firestore",
-    "postbuild": "npm run deploy:firestore"
+    "postbuild": "pnpm run deploy:firestore"
   },
   "dependencies": {
     "@hookform/resolvers": "3.10.0",
