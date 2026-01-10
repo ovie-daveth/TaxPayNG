@@ -120,15 +120,38 @@ export class ReportService extends BaseService {
     periodEnd.setHours(23, 59, 59, 999)
 
     // Filter transactions by platform, entity and period
+    // Include transactions if their transaction date is in the period OR if their createdAt date is in the period
+    // This ensures future-dated transactions (like brand deals) created in the current period are included
     const filteredTransactions = allTransactions.filter((txn) => {
       if (entityId) {
         const isLegacyDefault = !txn.entityId && defaultEntityId && entityId === defaultEntityId
         if (txn.entityId !== entityId && !isLegacyDefault) return false
       }
-      const txnDate = txn.date ? new Date(txn.date) : new Date(txn.createdAt)
-      const inPeriod = txnDate >= periodStart && txnDate <= periodEnd
+      
       const matchesPlatform = txn.platform?.name === platformName
-      return inPeriod && matchesPlatform
+      if (!matchesPlatform) return false
+      
+      // Get transaction date and created date
+      const txnDateStr = txn.date || txn.transactionDate || txn.valueDate
+      const txnDate = txnDateStr ? new Date(txnDateStr) : null
+      const createdDate = txn.createdAt ? new Date(txn.createdAt) : null
+      
+      // Include if transaction date is in period (normal case)
+      if (txnDate && !isNaN(txnDate.getTime())) {
+        if (txnDate >= periodStart && txnDate <= periodEnd) {
+          return true
+        }
+      }
+      
+      // Include if created date is in period (for future-dated transactions created in current period)
+      // This ensures brand deals and future transactions created now are included in current period reports
+      if (createdDate && !isNaN(createdDate.getTime())) {
+        if (createdDate >= periodStart && createdDate <= periodEnd) {
+          return true
+        }
+      }
+      
+      return false
     })
 
     // Get invoices for the period (filtered by platform if possible)
@@ -176,14 +199,20 @@ export class ReportService extends BaseService {
       console.error('Error calculating tax classification benefits:', error)
     }
 
+    // Extract relief transactions and calculate relief amounts by category
+    const reliefTransactions = filteredTransactions.filter(txn => txn.type === 'relief')
+    const reliefAmounts = this.calculateReliefAmounts(reliefTransactions, incomeData.totalIncome)
+
     // Calculate tax data
+    // Relief amounts are automatically included from transactions
     const taxData = await this.calculateTaxData(
       userId,
       incomeData.totalIncome,
       expenseData.totalExpenses,
       expenseData.taxDeductibleExpenses,
       profile,
-      taxClassification
+      taxClassification,
+      reliefAmounts
     )
 
     // Initialize personalInfo from user profile
@@ -215,13 +244,13 @@ export class ReportService extends BaseService {
       generatedAt: new Date().toISOString()
     }
     
-    // Initialize metadata with personalInfo from profile
+    // Initialize metadata with personalInfo from profile and relief amounts from transactions
     result.metadata = {
       personalInfo,
       attachments: {},
       reliefEvidence: {},
       reliefNotes: {},
-      reliefAmounts: {},
+      reliefAmounts: reliefAmounts, // Auto-populated from relief transactions
       manualTaxCredits: [],
       taxCreditEvidence: {},
       declarationInfo: {}
@@ -267,14 +296,14 @@ export class ReportService extends BaseService {
       periodEnd.setHours(23, 59, 59, 999) // End of day
 
       // Filter transactions by period
+      // Include transactions if their transaction date is in the period OR if their createdAt date is in the period
+      // This ensures future-dated transactions (like brand deals) created in the current period are included
       // BUT: Include capital asset transactions from previous years (for depreciation calculation)
       const filteredTransactions = allTransactions.filter((txn) => {
         if (entityId) {
           const isLegacyDefault = !txn.entityId && defaultEntityId && entityId === defaultEntityId
           if (txn.entityId !== entityId && !isLegacyDefault) return false
         }
-        const txnDate = txn.date ? new Date(txn.date) : new Date(txn.createdAt)
-        const isInPeriod = txnDate >= periodStart && txnDate <= periodEnd
         
         // If it's a capital asset, include it even if it's from a previous year
         // (depreciation is calculated for the current tax year regardless of purchase date)
@@ -283,25 +312,52 @@ export class ReportService extends BaseService {
           return true // Include all capital assets for depreciation calculation
         }
         
-        return isInPeriod
+        // Get transaction date and created date
+        const txnDateStr = txn.date || txn.transactionDate || txn.valueDate
+        const txnDate = txnDateStr ? new Date(txnDateStr) : null
+        const createdDate = txn.createdAt ? new Date(txn.createdAt) : null
+        
+        // Include if transaction date is in period (normal case)
+        if (txnDate && !isNaN(txnDate.getTime())) {
+          if (txnDate >= periodStart && txnDate <= periodEnd) {
+            return true
+          }
+        }
+        
+        // Include if created date is in period (for future-dated transactions created in current period)
+        // This ensures brand deals and future transactions created now are included in current period reports
+        if (createdDate && !isNaN(createdDate.getTime())) {
+          if (createdDate >= periodStart && createdDate <= periodEnd) {
+            return true
+          }
+        }
+        
+        return false
       })
       
       console.log('🔍 [ReportService] Filtered transactions by period:', {
         periodStart: periodStart.toISOString(),
         periodEnd: periodEnd.toISOString(),
         totalFiltered: filteredTransactions.length,
-        expenseTransactions: filteredTransactions.filter(t => t.type === 'expense').map(t => ({
-          id: t.id,
-          description: t.description,
-          date: t.date,
-          createdAt: t.createdAt,
-          amount: t.amount,
-          isCapitalAsset: t.taxClassification?.isCapitalAsset,
-          isInPeriod: (() => {
-            const txnDate = t.date ? new Date(t.date) : new Date(t.createdAt)
-            return txnDate >= periodStart && txnDate <= periodEnd
-          })()
-        }))
+        expenseTransactions: filteredTransactions.filter(t => t.type === 'expense').map(t => {
+          const txnDateStr = t.date || t.transactionDate || t.valueDate
+          const txnDate = txnDateStr ? new Date(txnDateStr) : null
+          const createdDate = t.createdAt ? new Date(t.createdAt) : null
+          const txnDateInPeriod = txnDate && !isNaN(txnDate.getTime()) && txnDate >= periodStart && txnDate <= periodEnd
+          const createdDateInPeriod = createdDate && !isNaN(createdDate.getTime()) && createdDate >= periodStart && createdDate <= periodEnd
+          
+          return {
+            id: t.id,
+            description: t.description,
+            date: t.date,
+            createdAt: t.createdAt,
+            amount: t.amount,
+            isCapitalAsset: t.taxClassification?.isCapitalAsset,
+            txnDateInPeriod,
+            createdDateInPeriod,
+            included: txnDateInPeriod || createdDateInPeriod
+          }
+        })
       })
 
       // Get invoices for the period
@@ -353,14 +409,20 @@ export class ReportService extends BaseService {
         // Continue without tax classification if calculation fails
       }
 
+      // Extract relief transactions and calculate relief amounts by category
+      const reliefTransactions = filteredTransactions.filter(txn => txn.type === 'relief')
+      const reliefAmounts = this.calculateReliefAmounts(reliefTransactions, incomeData.totalIncome)
+
       // Calculate tax data (now includes capital allowances and WHT credits if available)
+      // Relief amounts are automatically included from transactions
       const taxData = await this.calculateTaxData(
         userId,
         incomeData.totalIncome,
         expenseData.totalExpenses,
         expenseData.taxDeductibleExpenses,
         profile,
-        taxClassificationSummary
+        taxClassificationSummary,
+        reliefAmounts
       )
 
       // Initialize personalInfo from user profile
@@ -392,13 +454,13 @@ export class ReportService extends BaseService {
         generatedAt: new Date().toISOString()
       }
       
-      // Initialize metadata with personalInfo from profile
+      // Initialize metadata with personalInfo from profile and relief amounts from transactions
       result.metadata = {
         personalInfo,
         attachments: {},
         reliefEvidence: {},
         reliefNotes: {},
-        reliefAmounts: {},
+        reliefAmounts: reliefAmounts, // Auto-populated from relief transactions
         manualTaxCredits: [],
         taxCreditEvidence: {},
         declarationInfo: {}
@@ -833,19 +895,108 @@ export class ReportService extends BaseService {
       // Continue without tax classification if calculation fails
     }
     
+    // Extract relief transactions and calculate relief amounts by category
+    const reliefTransactions = filteredTransactions.filter(txn => txn.type === 'relief')
+    const reliefAmounts = this.calculateReliefAmounts(reliefTransactions, incomeData.totalIncome)
+    
     // Calculate tax data using the same engine as self-assessment
+    // Relief amounts are automatically included from transactions
     const taxData = await this.calculateTaxData(
       userId,
       incomeData.totalIncome,
       expenseData.totalExpenses,
       expenseData.taxDeductibleExpenses,
       profile,
-      taxClassificationSummary
+      taxClassificationSummary,
+      reliefAmounts
     )
     
     return {
       ...taxData,
       taxClassification: taxClassificationSummary
+    }
+  }
+
+  /**
+   * Calculate relief amounts from relief transactions, mapping categories to relief types
+   */
+  private calculateReliefAmounts(
+    reliefTransactions: Transaction[],
+    grossIncome: number
+  ): { [key: string]: number } {
+    const amounts: { [key: string]: number } = {
+      pensionContribution: 0,
+      nhfContribution: 0,
+      healthInsurance: 0,
+      rentPaid: 0, // This is the actual rent paid, not the relief amount (relief is calculated as 20% capped at ₦500k)
+      lifeInsurance: 0,
+      charitableDonations: 0,
+      otherRelief: 0
+    }
+
+    reliefTransactions.forEach(txn => {
+      // Use ngnEquivalent for foreign currency transactions, otherwise use amount
+      const amount = txn.ngnEquivalent !== undefined && txn.ngnEquivalent !== null
+        ? txn.ngnEquivalent
+        : (txn.amount || 0)
+      
+      const category = txn.category || ''
+      const normalizedCategory = category.toLowerCase()
+
+      // Map transaction categories to relief types
+      if (normalizedCategory.includes('pension')) {
+        amounts.pensionContribution += amount
+      } else if (normalizedCategory.includes('housing fund') || normalizedCategory.includes('nhf')) {
+        amounts.nhfContribution += amount
+      } else if (normalizedCategory.includes('health insurance') || normalizedCategory.includes('nhis') || normalizedCategory.includes('national health')) {
+        amounts.healthInsurance += amount
+      } else if (normalizedCategory === 'rent relief' || normalizedCategory.startsWith('rent relief') || normalizedCategory.includes('rent relief')) {
+        // For rent relief, store the actual rent paid (the relief is calculated as 20% of this, capped at ₦500k)
+        amounts.rentPaid += amount
+      } else if (normalizedCategory.includes('life insurance')) {
+        amounts.lifeInsurance += amount
+      } else if (normalizedCategory.includes('charitable') || normalizedCategory.includes('donation')) {
+        amounts.charitableDonations += amount
+      } else if (normalizedCategory.includes('interest on housing loan') || normalizedCategory.includes('housing loan')) {
+        // Interest on housing loan can be treated as part of rent relief
+        amounts.rentPaid += amount
+      } else {
+        // For "Other Relief" or unrecognized categories, sum into otherRelief
+        amounts.otherRelief += amount
+      }
+    })
+
+    // Apply caps and limits as per Nigerian tax law
+    // Pension: capped at 8% of gross income
+    if (amounts.pensionContribution > 0 && grossIncome > 0) {
+      const maxPension = grossIncome * 0.08
+      if (amounts.pensionContribution > maxPension) {
+        amounts.pensionContribution = maxPension
+      }
+    }
+
+    // Charitable donations: capped at 10% of gross income
+    if (amounts.charitableDonations > 0 && grossIncome > 0) {
+      const maxCharitable = grossIncome * 0.1
+      if (amounts.charitableDonations > maxCharitable) {
+        amounts.charitableDonations = maxCharitable
+      }
+    }
+
+    // Rent relief: 20% of rent paid, capped at ₦500,000
+    // Note: We store the actual rent paid, the tax calculator will apply the 20% and cap
+    // But we can pre-calculate it here for the reliefAmounts display
+    const rentReliefAmount = Math.min(amounts.rentPaid * 0.2, 500000)
+    
+    return {
+      pensionContribution: amounts.pensionContribution,
+      nhfContribution: amounts.nhfContribution,
+      healthInsurance: amounts.healthInsurance,
+      rentPaid: amounts.rentPaid, // Actual rent paid (for user reference)
+      rentRelief: rentReliefAmount, // Calculated relief amount (20% capped at ₦500k)
+      lifeInsurance: amounts.lifeInsurance,
+      charitableDonations: amounts.charitableDonations,
+      otherRelief: amounts.otherRelief
     }
   }
 
@@ -855,26 +1006,36 @@ export class ReportService extends BaseService {
     totalExpenses: number,
     businessExpenses: number,
     profile: any,
-    taxClassification?: TaxClassificationSummary
+    taxClassification?: TaxClassificationSummary,
+    reliefAmounts?: { [key: string]: number }
   ): Promise<TaxData> {
     const netIncome = grossIncome - totalExpenses
+
+    // Extract relief amounts from transactions (if provided)
+    // If not provided, defaults to 0 (for backward compatibility)
+    const pensionContribution = reliefAmounts?.pensionContribution || 0
+    const nhfContribution = reliefAmounts?.nhfContribution || 0
+    const healthInsurance = reliefAmounts?.healthInsurance || 0
+    const rentPaid = reliefAmounts?.rentPaid || 0 // Actual rent paid (tax calculator will apply 20% and cap at ₦500k)
+    const lifeInsurance = reliefAmounts?.lifeInsurance || 0
+    const charitableDonations = reliefAmounts?.charitableDonations || 0
 
     // Prepare tax calculation data
     // Note: calculateNigerianTax expects gross income, not net income
     // It will subtract businessExpenses internally
-    // Reliefs are NOT automatically added - users must manually add them in the self-assessment report
+    // Reliefs are automatically extracted from relief transactions with type='relief'
     const taxCalcData = {
       businessType: profile.businessType || 'freelancer',
       period: 'yearly' as const,
       income: grossIncome, // Pass gross income, not net income
-      rentPaid: 0, // Users can add this manually in the report
-      pensionContribution: 0, // Users can add this manually in the report
-      healthInsurance: 0, // Users can add this manually in the report
-      housingFund: 0, // NHF - users can add this manually in the report
-      lifeInsurance: 0, // Users can add this manually in the report
-      charitableDonations: 0, // Users can add this manually in the report
+      rentPaid: rentPaid, // Actual rent paid (calculator applies 20% relief, capped at ₦500k)
+      pensionContribution: pensionContribution, // Auto-extracted from relief transactions
+      healthInsurance: healthInsurance, // Auto-extracted from relief transactions
+      housingFund: nhfContribution, // Auto-extracted from relief transactions (NHF)
+      lifeInsurance: lifeInsurance, // Auto-extracted from relief transactions
+      charitableDonations: charitableDonations, // Auto-extracted from relief transactions
       businessExpenses: businessExpenses, // This will be subtracted from gross income in the calculator
-      dependents: 0, // Users can add this manually in the report
+      dependents: 0, // Users can add this manually in the report (not typically tracked as transactions)
       // Add tax classification benefits if available (Gold+ feature)
       capitalAllowances: taxClassification?.capitalAllowances || undefined,
       whtCredits: taxClassification?.whtCredits || undefined

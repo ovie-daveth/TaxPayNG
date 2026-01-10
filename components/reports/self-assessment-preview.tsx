@@ -150,6 +150,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
     nhfContribution: false,
     lifeInsurance: false,
     healthInsurance: false,
+    rentPaid: false,
     businessExpenses: false,
     depreciation: false,
     charitableDonations: false,
@@ -162,6 +163,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
     nhfContribution: '',
     lifeInsurance: '',
     healthInsurance: '',
+    rentPaid: '',
     businessExpenses: '',
     depreciation: '',
     charitableDonations: '',
@@ -174,6 +176,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
     nhfContribution: 0,
     lifeInsurance: 0,
     healthInsurance: 0,
+    rentPaid: 0, // Actual rent paid (used to calculate 20% relief, capped at ₦500k)
     depreciation: 0,
     charitableDonations: 0,
     otherRelief: 0
@@ -433,6 +436,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
       nhfContribution: savedReliefAmounts.nhfContribution || 0,
       lifeInsurance: savedReliefAmounts.lifeInsurance || 0,
       healthInsurance: savedReliefAmounts.healthInsurance || 0,
+      rentPaid: savedReliefAmounts.rentPaid || (savedReliefAmounts as any).rentRelief ? ((savedReliefAmounts as any).rentRelief / 0.2) : 0, // Convert relief back to rent paid if needed
       depreciation: savedReliefAmounts.depreciation || autoDepreciation, // Use saved value or auto-populate
       charitableDonations: savedReliefAmounts.charitableDonations || 0,
       otherRelief: savedReliefAmounts.otherRelief || 0
@@ -441,9 +445,22 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
       nhfContribution: reportData.tax.reliefs.nhfContribution || 0,
       lifeInsurance: reportData.tax.reliefs.lifeInsurance || 0,
       healthInsurance: reportData.tax.reliefs.healthInsurance || 0,
+      rentPaid: (reportData as any).metadata?.reliefAmounts?.rentPaid || 0, // Get rentPaid from metadata (auto-extracted from transactions)
       depreciation: autoDepreciation, // Auto-populate from capital allowances
       charitableDonations: reportData.tax.reliefs.charitableDonations || 0,
       otherRelief: 0
+    }
+    
+    // If rentPaid is not set, check if rentRelief was calculated (backward compatibility)
+    if (!newReliefAmounts.rentPaid && (reportData as any).metadata?.reliefAmounts?.rentRelief) {
+      // If we have rentRelief but not rentPaid, estimate rentPaid (rentRelief is 20% of rentPaid, capped at ₦500k)
+      const rentRelief = (reportData as any).metadata.reliefAmounts.rentRelief
+      // If relief is capped at ₦500k, rentPaid was at least ₦2,500,000
+      if (rentRelief >= 500000) {
+        newReliefAmounts.rentPaid = 2500000 // Minimum rent to get max relief
+      } else {
+        newReliefAmounts.rentPaid = rentRelief / 0.2 // Calculate back from 20%
+      }
     }
     
     // Always update depreciation if capital allowances are available and depreciation is 0 or not set
@@ -594,7 +611,7 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
         businessType: (reportData as any).userInfo?.businessType || 'freelancer',
         period: 'yearly' as const,
         income: reportData.tax.grossIncome,
-        rentPaid: 0,
+        rentPaid: (reliefAmounts as any).rentPaid || reliefAmounts.rentPaid || 0, // Rent paid from relief transactions (tax calculator applies 20% relief, capped at ₦500k)
         pensionContribution: reliefAmounts.pensionContribution || 0,
         healthInsurance: reliefAmounts.healthInsurance || 0,
         housingFund: reliefAmounts.nhfContribution || 0,
@@ -2392,6 +2409,14 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
                       value: reliefAmounts.healthInsurance,
                       note: reliefNotes.healthInsurance,
                       evidence: reliefEvidence.healthInsurance
+                    },
+                    {
+                      key: "rentPaid",
+                      label: "Rent Relief",
+                      value: Math.min((reliefAmounts.rentPaid || 0) * 0.2, 500000), // Show calculated relief amount (20% capped at ₦500k)
+                      note: reliefNotes.rentPaid || '',
+                      evidence: reliefEvidence.rentPaid || false,
+                      subtitle: reliefAmounts.rentPaid > 0 ? `20% of ₦${formatCurrency(reliefAmounts.rentPaid)}, capped at ₦500,000` : undefined
                     }
                   ].map((item) => (
                     <AccordionItem key={item.key} value={item.key}>
@@ -2399,6 +2424,9 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
                         <div className="flex items-start justify-between gap-3 w-full">
                           <div className="min-w-0">
                             <p className="text-xs font-semibold leading-snug">{item.label}</p>
+                            {item.subtitle && (
+                              <p className="text-[9px] text-muted-foreground mt-0.5">{item.subtitle}</p>
+                            )}
                             <p className="text-[10px] text-muted-foreground">Amount (₦)</p>
                           </div>
                           <div
@@ -2406,7 +2434,28 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
                             onPointerDownCapture={(e) => e.stopPropagation()}
                             onClick={(e) => e.stopPropagation()}
                           >
-                            {isEditing ? (
+                            {isEditing && item.key === 'rentPaid' ? (
+                              <div className="flex flex-col items-end gap-1">
+                                <Input
+                                  type="text"
+                                  inputMode="decimal"
+                                  placeholder="Rent paid"
+                                  value={formatCurrencyInput(String(reliefAmounts.rentPaid || 0))}
+                                  onChange={(e) => {
+                                    const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                                    if (!isValid) return
+                                    const parsed = parseFloat(rawValue) || 0
+                                    setReliefAmounts((prev) => ({ ...prev, rentPaid: parsed }))
+                                  }}
+                                  className="h-9 w-[120px] text-xs text-right placeholder:text-xs"
+                                />
+                                {reliefAmounts.rentPaid > 0 && (
+                                  <span className="text-[9px] text-muted-foreground">
+                                    Relief: {formatCurrency(Math.min(reliefAmounts.rentPaid * 0.2, 500000))}
+                                  </span>
+                                )}
+                              </div>
+                            ) : isEditing ? (
                               <Input
                                 type="text"
                                 inputMode="decimal"
@@ -2428,6 +2477,11 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
                       </AccordionTrigger>
                       <AccordionContent className="px-3">
                         <div className="space-y-2">
+                          {item.key === 'rentPaid' && isEditing && (
+                            <div className="text-[10px] text-muted-foreground p-2 bg-muted/50 rounded">
+                              <p>Enter the total rent paid. Relief will be calculated as 20% of rent paid, capped at ₦500,000.</p>
+                            </div>
+                          )}
                           <div className="flex items-center justify-between">
                             <span className="text-[10px] text-muted-foreground">Evidence attached</span>
                             {isEditing ? (
@@ -2762,6 +2816,65 @@ export const SelfAssessmentPreview = forwardRef<SelfAssessmentPreviewHandle, Sel
                       )}
                     </td>
                   </tr>
+                <tr>
+                  <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">
+                    Rent Relief
+                    {isEditing && reliefAmounts.rentPaid > 0 && (
+                      <span className="block text-[10px] text-muted-foreground mt-0.5">
+                        (20% of ₦{formatCurrency(reliefAmounts.rentPaid)}, capped at ₦500,000)
+                      </span>
+                    )}
+                  </td>
+                  <td className="border border-border p-2 text-right font-medium">
+                    {isEditing ? (
+                      <div className="space-y-1">
+                        <Input
+                          type="text"
+                          inputMode="decimal"
+                          placeholder="Rent paid amount"
+                          value={formatCurrencyInput((reliefAmounts.rentPaid || 0).toString())}
+                          onChange={(e) => {
+                            const { isValid, rawValue } = handleCurrencyInputChange(e.target.value)
+                            if (isValid) {
+                              const rentPaid = parseFloat(rawValue) || 0
+                              setReliefAmounts(prev => ({ ...prev, rentPaid }))
+                            }
+                          }}
+                          className="h-8 sm:h-9 text-xs sm:text-sm text-right"
+                        />
+                        {reliefAmounts.rentPaid > 0 && (
+                          <div className="text-[10px] text-muted-foreground">
+                            Relief: {formatCurrency(Math.min(reliefAmounts.rentPaid * 0.2, 500000))}
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      formatCurrency(Math.min((reliefAmounts.rentPaid || 0) * 0.2, 500000))
+                    )}
+                  </td>
+                  <td className="border border-border p-2 text-center">
+                    {isEditing ? (
+                      <Checkbox 
+                        checked={reliefEvidence.rentPaid || false}
+                        onCheckedChange={(checked) => setReliefEvidence(prev => ({ ...prev, rentPaid: !!checked }))}
+                      />
+                    ) : (
+                      (reliefEvidence.rentPaid || false) ? '☑' : '☐'
+                    )}
+                  </td>
+                  <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">
+                    {isEditing ? (
+                      <Input 
+                        value={reliefNotes.rentPaid || ''}
+                        onChange={(e) => setReliefNotes(prev => ({ ...prev, rentPaid: e.target.value }))}
+                        placeholder="Notes"
+                        className="h-8 sm:h-9 text-xs sm:text-sm"
+                      />
+                    ) : (
+                      reliefNotes.rentPaid || ''
+                    )}
+                  </td>
+                </tr>
                 <tr>
                   <td className="border border-border p-1.5 sm:p-2 text-xs sm:text-sm">Health Insurance / Medical contributions</td>
                     <td className="border border-border p-2 text-right font-medium">

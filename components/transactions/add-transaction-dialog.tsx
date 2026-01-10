@@ -658,15 +658,24 @@ export function AddTransactionDialog({
       // Phase 1: Initialize new fields from existing transaction
       setTransactionDate(transaction.transactionDate || transaction.date)
       setValueDate(transaction.valueDate || transaction.date)
-      setTransactionNature(transaction.transactionNature || 'business')
-      setBusinessPercentage(transaction.businessPercentage || 100)
+      // Transaction nature is not applicable for relief transactions
+      if (transaction.type !== 'relief') {
+        setTransactionNature(transaction.transactionNature || 'business')
+        setBusinessPercentage(transaction.businessPercentage || 100)
+      } else {
+        setTransactionNature('business') // Default, but won't be shown or used
+        setBusinessPercentage(100)
+      }
       
       // Invoice linking
       setSelectedInvoiceId(transaction.linkedInvoiceId || '')
       
       // Tax Classification (Gold+ only)
       if (hasTaxClassificationAccess) {
-        if (transaction.taxClassification) {
+        if (transaction.type === 'relief') {
+          // Relief transactions don't have tax classification (no WHT, no capital assets, etc.)
+          setTaxClassification({})
+        } else if (transaction.taxClassification) {
           setTaxClassification(transaction.taxClassification)
         } else {
           // Auto-populate if not set
@@ -780,6 +789,12 @@ export function AddTransactionDialog({
     if (!formData.category || !formData.type) return
     if (skipTaxClassification) return // Don't auto-populate if user skipped
     if (taxClassificationManuallyEdited) return // Don't overwrite user edits
+    
+    // For relief transactions, clear tax classification (no WHT, no VAT, no capital assets)
+    if (formData.type === 'relief') {
+      setTaxClassification({})
+      return
+    }
     
     // Auto-populate tax classification
     const autoClassification = autoPopulateTaxClassification(
@@ -1098,9 +1113,9 @@ export function AddTransactionDialog({
         transactionDate: primaryDate,
         valueDate: valueDate || primaryDate,
         taxPeriod: taxPeriod,
-        // Phase 1: Personal vs Business
-        transactionNature: transactionNature,
-        businessPercentage: transactionNature === 'mixed' ? businessPercentage : undefined,
+        // Phase 1: Personal vs Business (not applicable for relief transactions)
+        transactionNature: formData.type !== 'relief' ? transactionNature : undefined,
+        businessPercentage: formData.type !== 'relief' && transactionNature === 'mixed' ? businessPercentage : undefined,
         // Phase 1: Locked exchange rates
         currency: formData.currency,
         exchangeRate: formData.currency !== 'NGN' ? lockedExchangeRate : undefined,
@@ -1137,8 +1152,8 @@ export function AddTransactionDialog({
         attachments: imageUrl,
         attachmentFileIds: attachmentFileIds,
         documentId: documentId,
-        // Tax Classification (Gold+ only)
-        taxClassification: (hasTaxClassificationAccess && !skipTaxClassification) ? taxClassification : undefined
+        // Tax Classification (Gold+ only) - not applicable for relief transactions
+        taxClassification: (hasTaxClassificationAccess && !skipTaxClassification && formData.type !== 'relief') ? taxClassification : undefined
       })
 
       console.log("Result:", result)
@@ -1577,6 +1592,19 @@ export function AddTransactionDialog({
                         type: newType,
                         category: '' // Reset category when type changes since categories differ by type
                       }))
+                      
+                      // Reset transaction nature and clear WHT settings when switching to relief
+                      if (newType === 'relief') {
+                        setTransactionNature('business') // Reset to default, but won't be shown
+                        // Clear WHT settings in tax classification
+                        if (hasTaxClassificationAccess) {
+                          setTaxClassification(prev => prev ? {
+                            ...prev,
+                            whtCreditable: false,
+                            whtRate: undefined
+                          } : {})
+                        }
+                      }
                     }}
                   >
                     <SelectTrigger id="type" className="text-xs sm:text-sm">
@@ -1984,18 +2012,67 @@ export function AddTransactionDialog({
                     Custom: {formData.category}
                   </p>
                 )}
-                {/* Tax Deductible Status Indicator (for freelancers, expense transactions only) */}
-                {formData.type === 'expense' && profile?.businessType !== 'creator' && !hasTaxClassificationAccess && formData.category && (
-                  <div className="flex items-center gap-2 mt-2">
-                    <p className="text-xs text-muted-foreground">Tax Status:</p>
-                    <Badge 
-                      variant={formData.taxDeductible ? 'default' : 'secondary'} 
-                      className="text-xs"
-                    >
-                      {formData.taxDeductible ? 'Tax Deductible' : 'Not Tax Deductible'}
-                    </Badge>
-                  </div>
-                )}
+                {/* Tax Status Indicator - Shows tax deductible status for all transaction types */}
+                {formData.category && (() => {
+                  // For relief transactions, always show as tax deductible
+                  if (formData.type === 'relief') {
+                    return (
+                      <div className="flex items-center gap-2 mt-2">
+                        <p className="text-xs text-muted-foreground">Tax Status:</p>
+                        <Badge variant="default" className="text-xs bg-green-600 hover:bg-green-600">
+                          Tax Deductible
+                        </Badge>
+                      </div>
+                    )
+                  }
+                  
+                  // For income transactions, show taxable status
+                  if (formData.type === 'income') {
+                    const isTaxable = !taxClassification || (taxClassification.incomeType !== 'non-taxable' && taxClassification.incomeType !== 'exempt')
+                    return (
+                      <div className="flex items-center gap-2 mt-2">
+                        <p className="text-xs text-muted-foreground">Tax Status:</p>
+                        <Badge 
+                          variant={isTaxable ? 'secondary' : 'default'} 
+                          className={`text-xs ${isTaxable ? '' : 'bg-green-600 hover:bg-green-600'}`}
+                        >
+                          {isTaxable ? 'Taxable Income' : taxClassification?.incomeType === 'exempt' ? 'Tax Exempt' : 'Non-taxable Income'}
+                        </Badge>
+                      </div>
+                    )
+                  }
+                  
+                  // For expense transactions, show tax deductible status
+                  if (formData.type === 'expense') {
+                    let isTaxDeductible = false
+                    
+                    // Check tax classification first (Gold+ users)
+                    if (hasTaxClassificationAccess && taxClassification) {
+                      if (taxClassification.expenseType === 'allowable' || taxClassification.expenseType === 'capital') {
+                        isTaxDeductible = true
+                      } else if (taxClassification.expenseType === 'disallowable') {
+                        isTaxDeductible = false
+                      }
+                    } else {
+                      // Fall back to taxDeductible field (non-Gold users)
+                      isTaxDeductible = formData.taxDeductible
+                    }
+                    
+                    return (
+                      <div className="flex items-center gap-2 mt-2">
+                        <p className="text-xs text-muted-foreground">Tax Status:</p>
+                        <Badge 
+                          variant={isTaxDeductible ? 'default' : 'secondary'} 
+                          className={`text-xs ${isTaxDeductible ? 'bg-green-600 hover:bg-green-600' : ''}`}
+                        >
+                          {isTaxDeductible ? 'Tax Deductible' : 'Not Tax Deductible'}
+                        </Badge>
+                      </div>
+                    )
+                  }
+                  
+                  return null
+                })()}
               </div>
 
               <div className="space-y-2">
@@ -2057,8 +2134,8 @@ export function AddTransactionDialog({
                 </div>
               </div>
 
-              {/* Phase 1: Personal vs Business separation - Only for creators */}
-              {profile?.businessType === 'creator' && (
+              {/* Phase 1: Personal vs Business separation - Only for creators, and disabled for relief */}
+              {profile?.businessType === 'creator' && formData.type !== 'relief' && (
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Label htmlFor="transaction-nature">Is this for business or personal use?</Label>
@@ -2532,52 +2609,57 @@ export function AddTransactionDialog({
                         </>
                       )}
                       
-                      <div className="flex items-center space-x-2">
-                        <Switch
-                          checked={taxClassification.whtCreditable || false}
-                          onCheckedChange={(checked) => {
-                            setTaxClassificationManuallyEdited(true)
-                            setTaxClassification(prev => ({
-                              ...prev,
-                              whtCreditable: checked,
-                              whtRate: checked ? (prev?.whtRate || 5) : undefined
-                            }))
-                          }}
-                        />
-                        <div className="flex items-center gap-2 flex-1">
-                          <Label className="text-sm">Was withholding tax deducted from this?</Label>
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
-                              </TooltipTrigger>
-                              <TooltipContent className="max-w-xs">
-                                <p className="text-sm">If tax was already deducted at source (withholding tax), you can claim it as a credit against your final tax bill. This reduces how much tax you need to pay.</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-                        </div>
-                      </div>
-                      
-                      {taxClassification.whtCreditable && (
-                        <div className="space-y-2">
-                          <Label>WHT Rate (%)</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            max="100"
-                            step="0.1"
-                            value={taxClassification.whtRate || 5}
-                            onChange={(e) => {
-                              setTaxClassificationManuallyEdited(true)
-                              setTaxClassification(prev => ({
-                                ...prev,
-                                whtRate: parseFloat(e.target.value) || 5
-                              }))
-                            }}
-                            className="text-xs sm:text-sm"
-                          />
-                        </div>
+                      {/* WHT switch - disabled for relief transactions */}
+                      {formData.type !== 'relief' && (
+                        <>
+                          <div className="flex items-center space-x-2">
+                            <Switch
+                              checked={taxClassification.whtCreditable || false}
+                              onCheckedChange={(checked) => {
+                                setTaxClassificationManuallyEdited(true)
+                                setTaxClassification(prev => ({
+                                  ...prev,
+                                  whtCreditable: checked,
+                                  whtRate: checked ? (prev?.whtRate || 5) : undefined
+                                }))
+                              }}
+                            />
+                            <div className="flex items-center gap-2 flex-1">
+                              <Label className="text-sm">Was withholding tax deducted from this?</Label>
+                              <TooltipProvider>
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <HelpCircle className="w-4 h-4 text-muted-foreground cursor-help" />
+                                  </TooltipTrigger>
+                                  <TooltipContent className="max-w-xs">
+                                    <p className="text-sm">If tax was already deducted at source (withholding tax), you can claim it as a credit against your final tax bill. This reduces how much tax you need to pay.</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              </TooltipProvider>
+                            </div>
+                          </div>
+                          
+                          {taxClassification.whtCreditable && (
+                            <div className="space-y-2">
+                              <Label>WHT Rate (%)</Label>
+                              <Input
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                value={taxClassification.whtRate || 5}
+                                onChange={(e) => {
+                                  setTaxClassificationManuallyEdited(true)
+                                  setTaxClassification(prev => ({
+                                    ...prev,
+                                    whtRate: parseFloat(e.target.value) || 5
+                                  }))
+                                }}
+                                className="text-xs sm:text-sm"
+                              />
+                            </div>
+                          )}
+                        </>
                       )}
                       
                       {/* VAT Applicable - only show for income transactions, not expenses */}

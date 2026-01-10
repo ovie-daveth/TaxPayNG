@@ -67,9 +67,34 @@ export async function POST(request: NextRequest) {
       : allTransactions
     const whtFromTransactions = scopedTransactions
       .filter((txn: any) => {
-        if (!txn.txnDate) return false
-        const txnDate = txn.txnDate?.toDate ? txn.txnDate.toDate() : new Date(txn.txnDate)
-        if (txnDate < periodStart || txnDate > periodEnd) return false
+        // Check if transaction date is in period
+        const txnDateStr = txn.txnDate || txn.date || txn.transactionDate || txn.valueDate
+        const txnDate = txnDateStr 
+          ? (txnDateStr?.toDate ? txnDateStr.toDate() : new Date(txnDateStr))
+          : null
+        
+        // Check if created date is in period (for future-dated transactions)
+        const createdDateStr = txn.createdAt
+        const createdDate = createdDateStr 
+          ? (createdDateStr?.toDate ? createdDateStr.toDate() : new Date(createdDateStr))
+          : null
+        
+        // Include if transaction date is in period
+        let isInPeriod = false
+        if (txnDate && !isNaN(txnDate.getTime())) {
+          if (txnDate >= periodStart && txnDate <= periodEnd) {
+            isInPeriod = true
+          }
+        }
+        
+        // Include if created date is in period (for future-dated transactions created in current period)
+        if (!isInPeriod && createdDate && !isNaN(createdDate.getTime())) {
+          if (createdDate >= periodStart && createdDate <= periodEnd) {
+            isInPeriod = true
+          }
+        }
+        
+        if (!isInPeriod) return false
         
         const desc = (txn.description || '').toLowerCase()
         const notes = (txn.notes || '').toLowerCase()
