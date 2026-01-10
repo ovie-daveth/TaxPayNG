@@ -162,19 +162,57 @@ export function IncomeExpenseChart({
         }, {})
 
         transactions.forEach((transaction) => {
-          const dateString = transaction.transactionDate || transaction.valueDate || transaction.date
-          const txnDate = new Date(dateString)
-          const bucketKey = `${txnDate.getFullYear()}-${txnDate.getMonth()}`
+          // For chart bucketing, use transaction date if available and within period,
+          // otherwise use createdAt to ensure future-dated transactions are shown in current period
+          const transactionDate = transaction.transactionDate || transaction.valueDate || transaction.date
+          const createdAt = transaction.createdAt
+          
+          let dateToUse: Date
+          if (transactionDate) {
+            const txnDate = new Date(transactionDate)
+            // If transaction date is within the period and not in the future beyond now, use it
+            // Otherwise, use createdAt to ensure transactions are visible in the period they were recorded
+            if (txnDate >= periodStart && txnDate <= periodEnd && txnDate <= now) {
+              dateToUse = txnDate
+            } else {
+              // Future transaction date or outside period - use createdAt (which should be within period)
+              // Fallback to transaction date if createdAt is invalid
+              dateToUse = createdAt ? new Date(createdAt) : txnDate
+            }
+          } else {
+            dateToUse = createdAt ? new Date(createdAt) : new Date()
+          }
+          
+          // Ensure dateToUse is within the period for bucketing (cap at periodEnd)
+          if (dateToUse > periodEnd) {
+            dateToUse = periodEnd
+          }
+          if (dateToUse < periodStart) {
+            dateToUse = periodStart
+          }
+          
+          const bucketKey = `${dateToUse.getFullYear()}-${dateToUse.getMonth()}`
           const bucket = buckets[bucketKey]
 
-          if (!bucket) return
+          // If bucket doesn't exist (shouldn't happen, but safety check), skip or create it
+          if (!bucket) {
+            // Try to find the closest bucket or skip
+            return
+          }
 
           if (transaction.type === "income") {
             const amt = transaction.ngnEquivalent ?? transaction.amount
-            bucket.income += Number(amt) || 0
+            const numAmount = Number(amt) || 0
+            if (numAmount > 0) {
+              bucket.income += numAmount
+            }
           } else if (transaction.type === "expense") {
             const amt = transaction.ngnEquivalent ?? transaction.amount
-            bucket.expenses += Number(amt) || 0
+            // Ensure expenses are always positive for chart display
+            const numAmount = Math.abs(Number(amt) || 0)
+            if (numAmount > 0) {
+              bucket.expenses += numAmount
+            }
           }
         })
 

@@ -253,18 +253,54 @@ export function AnalyticsInsights({
       effectiveYear: number,
       effectiveQuarter: number
     ) => {
+      // Filter transactions by period
+      // Include transactions if they were created in the period OR if their transaction date is in the period
+      // This ensures future-dated transactions (like brand deals) created in the current period are included
       const currentPeriodTransactions = transactions.filter((txn) => {
-        const txnDate = new Date(txn.date)
-        return txnDate >= currentPeriodStart && txnDate <= currentPeriodEnd
+        const transactionDate = txn.transactionDate || txn.valueDate || txn.date
+        const txnDate = transactionDate ? new Date(transactionDate) : null
+        const createdDate = txn.createdAt ? new Date(txn.createdAt) : null
+        
+        // Include if transaction date is in period
+        if (txnDate && !isNaN(txnDate.getTime()) && txnDate >= currentPeriodStart && txnDate <= currentPeriodEnd) {
+          return true
+        }
+        
+        // Include if created date is in period (for future-dated transactions created in current period)
+        if (createdDate && !isNaN(createdDate.getTime()) && createdDate >= currentPeriodStart && createdDate <= currentPeriodEnd) {
+          return true
+        }
+        
+        return false
       })
 
       const previousPeriodTransactions = transactions.filter((txn) => {
-        const txnDate = new Date(txn.date)
-        return txnDate >= previousPeriodStart && txnDate <= previousPeriodEnd
+        const transactionDate = txn.transactionDate || txn.valueDate || txn.date
+        const txnDate = transactionDate ? new Date(transactionDate) : null
+        const createdDate = txn.createdAt ? new Date(txn.createdAt) : null
+        
+        // Include if transaction date is in period
+        if (txnDate && !isNaN(txnDate.getTime()) && txnDate >= previousPeriodStart && txnDate <= previousPeriodEnd) {
+          return true
+        }
+        
+        // Include if created date is in period (for future-dated transactions created in previous period)
+        if (createdDate && !isNaN(createdDate.getTime()) && createdDate >= previousPeriodStart && createdDate <= previousPeriodEnd) {
+          return true
+        }
+        
+        return false
       })
 
       const sumAmount = (txns: Transaction[], predicate: (txn: Transaction) => boolean) =>
-        txns.reduce((total, txn) => (predicate(txn) ? total + Number(txn.amount || 0) : total), 0)
+        txns.reduce((total, txn) => {
+          if (!predicate(txn)) return total
+          // Use ngnEquivalent for foreign currency transactions, otherwise use amount
+          const amt = txn.ngnEquivalent !== undefined && txn.ngnEquivalent !== null
+            ? txn.ngnEquivalent
+            : (txn.amount || 0)
+          return total + Number(amt)
+        }, 0)
 
       const currentIncomeTotal = sumAmount(currentPeriodTransactions, (txn) => txn.type === "income")
       const previousIncomeTotal = sumAmount(previousPeriodTransactions, (txn) => txn.type === "income")
@@ -296,7 +332,14 @@ export function AnalyticsInsights({
       
       // Calculate intelligent tax recommendation based on projected annual income
       const sumAmountHelper = (txns: Transaction[], predicate: (txn: Transaction) => boolean) =>
-        txns.reduce((total, txn) => (predicate(txn) ? total + Number(txn.amount || 0) : total), 0)
+        txns.reduce((total, txn) => {
+          if (!predicate(txn)) return total
+          // Use ngnEquivalent for foreign currency transactions, otherwise use amount
+          const amt = txn.ngnEquivalent !== undefined && txn.ngnEquivalent !== null
+            ? txn.ngnEquivalent
+            : (txn.amount || 0)
+          return total + Number(amt)
+        }, 0)
       
       const ytdIncome = sumAmountHelper(yearToDateTransactions, (txn) => txn.type === "income")
       const ytdExpenses = sumAmountHelper(yearToDateTransactions, (txn) => txn.type === "expense")
@@ -634,11 +677,21 @@ export function AnalyticsInsights({
 
       const incomeTotal = transactions
         .filter((txn) => txn.type === "income")
-        .reduce((sum, txn) => sum + (txn.amount || 0), 0)
+        .reduce((sum, txn) => {
+          const amt = txn.ngnEquivalent !== undefined && txn.ngnEquivalent !== null
+            ? txn.ngnEquivalent
+            : (txn.amount || 0)
+          return sum + Number(amt)
+        }, 0)
 
       setAuditTransactions(subscriptionTransactions)
       setAuditTotalSpend(
-        subscriptionTransactions.reduce((sum, txn) => sum + (txn.amount || 0), 0)
+        subscriptionTransactions.reduce((sum, txn) => {
+          const amt = txn.ngnEquivalent !== undefined && txn.ngnEquivalent !== null
+            ? txn.ngnEquivalent
+            : (txn.amount || 0)
+          return sum + Number(amt)
+        }, 0)
       )
       setAuditPeriodLabel(`${formatDateLabel(periodStart)} – ${formatDateLabel(periodEnd)}`)
       setAuditGrossIncome(incomeTotal)

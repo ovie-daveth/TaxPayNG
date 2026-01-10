@@ -789,10 +789,32 @@ export class ReportService extends BaseService {
     ])
     
     // Filter transactions by period
+    // Include transactions if they were created in the period OR if their transaction date is in the period
+    // This ensures future-dated transactions (created now) are included in current period calculations
+    // For tax calculations, we include transactions created in the current period, even if their transaction date is future
     const filteredTransactions = allTransactions.filter(txn => {
       if (entityId && txn.entityId !== entityId) return false
-      const txnDate = txn.date ? new Date(txn.date) : new Date(txn.createdAt)
-      return txnDate >= startDate && txnDate <= endDate
+      
+      const txnDateStr = txn.date || txn.transactionDate || txn.valueDate
+      const txnDate = txnDateStr ? new Date(txnDateStr) : null
+      const createdDate = txn.createdAt ? new Date(txn.createdAt) : null
+      
+      // Include if transaction date is in period (normal case)
+      if (txnDate && !isNaN(txnDate.getTime())) {
+        if (txnDate >= startDate && txnDate <= endDate) {
+          return true
+        }
+      }
+      
+      // Include if created date is in period (for future-dated transactions created in current period)
+      // This ensures brand deals and future transactions created now are included in current period tax calculations
+      if (createdDate && !isNaN(createdDate.getTime())) {
+        if (createdDate >= startDate && createdDate <= endDate) {
+          return true
+        }
+      }
+      
+      return false
     })
     
     // Calculate income data (excluding VAT for income transactions)

@@ -74,6 +74,21 @@ export function AddTransactionDialog({
   const getBaseCategories = () => {
     const isCreator = profile?.businessType === 'creator'
     const isIncome = formData.type === 'income'
+    const isRelief = formData.type === 'relief'
+    
+    // Tax Relief Categories (same for both freelancers and creators)
+    if (isRelief) {
+      return [
+        { value: "Pension Contribution", label: "Pension Contribution (Up to 8% of gross income)" },
+        { value: "National Housing Fund (NHF)", label: "National Housing Fund (NHF)" },
+        { value: "National Health Insurance Scheme (NHIS)", label: "National Health Insurance Scheme (NHIS)" },
+        { value: "Rent Relief", label: "Rent Relief (20% of rent paid, capped at ₦500,000)" },
+        { value: "Life Insurance Premium", label: "Life Insurance Premium" },
+        { value: "Interest on Housing Loan", label: "Interest on Housing Loan (for own residence)" },
+        { value: "Charitable Donation", label: "Charitable Donation (Up to 10% of gross income)" },
+        { value: "Other Relief", label: "Other Relief" },
+      ]
+    }
     
     if (isCreator) {
       if (isIncome) {
