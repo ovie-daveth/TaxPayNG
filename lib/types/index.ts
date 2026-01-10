@@ -747,6 +747,18 @@ export type FilingRequestStatus = 'pending' | 'assigned' | 'in_progress' | 'comp
 export type BrandDealStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled'
 export type BrandDealType = 'sponsorship' | 'collaboration' | 'endorsement' | 'affiliate' | 'other'
 
+// Execution expense categories for brand deals (comprehensive tax-compliant categories)
+export type BrandDealExpenseCategory = 
+  | 'production'           // Camera rental, studio, lighting, props, set design
+  | 'editing'              // Video editing, color grading, sound, captions, thumbnails
+  | 'talent'               // Videographer, photographer, stylist, makeup, voice-over, co-creators
+  | 'logistics'            // Transport, fuel, accommodation, meals on shoot days
+  | 'wardrobe'             // Clothes, accessories, grooming (if deal-specific)
+  | 'equipment_depreciation' // Depreciation allocation for camera, laptop, equipment used
+  | 'platform_fees'        // Payment gateway fees, platform charges, exchange rate losses
+  | 'professional'         // Contracts, legal review, agent/manager commission
+  | 'other'                // Other deal-related expenses
+
 export interface BrandDeal {
   id: string
   userId: string
@@ -768,10 +780,35 @@ export interface BrandDeal {
   description?: string
   
   // Financial details
-  amount: number
+  amount: number // Gross amount of the brand deal
   currency: string
   exchangeRate?: number // Exchange rate used to convert to NGN (locked at deal creation)
   ngnEquivalent?: number // NGN equivalent amount (locked at deal creation)
+  
+  // Execution expenses (costs incurred to execute the brand deal)
+  executionExpenses?: number // Total execution expenses in the same currency as amount
+  executionExpensesCurrency?: string // Currency of execution expenses (defaults to deal currency)
+  executionExpensesDetails?: Array<{
+    description: string
+    amount: number
+    category?: BrandDealExpenseCategory // Predefined categories for proper tax classification
+    date?: string // Date expense was incurred
+  }>
+  
+  // Withholding Tax (WHT) - deducted by brand before payment
+  // WHT is NOT an expense, it's a tax credit that reduces cash received but not taxable income
+  whtDeducted?: boolean // Whether brand deducted WHT before payment
+  whtRate?: number // WHT rate applied (e.g., 5% or 10%)
+  whtAmount?: number // WHT amount deducted: amount * whtRate / 100
+  whtDeductionDate?: string // Date WHT was deducted
+  whtCertificateNumber?: string // WHT certificate/reference number provided by brand
+  
+  // Calculated net income (gross amount - execution expenses)
+  // Note: WHT is tracked separately as a tax credit, not subtracted from net income
+  // Real profit = Brand deal fee - deal-related expenses (WHT is separate tax credit)
+  netIncome?: number // Net income = amount - (executionExpenses || 0)
+  netIncomeNgnEquivalent?: number // NGN equivalent of net income
+  
   paymentTerms?: string // e.g., "Net 30", "50% upfront, 50% on completion"
   paymentSchedule?: {
     type: 'single' | 'milestone' | 'recurring'

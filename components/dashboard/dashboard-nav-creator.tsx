@@ -21,6 +21,7 @@ import { useReminders } from "@/lib/hooks/useReminders"
 import { useSubscription } from "@/lib/hooks/useSubscription"
 import { SubscriptionRequiredModal } from "../subscription/subscription-required-modal"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { BusinessSwitcher } from "@/components/business/business-switcher"
 
 const navItems = [
   { href: "/dashboard-creator", label: "Dashboard", icon: LayoutDashboard },
@@ -76,6 +77,11 @@ export function DashboardNavCreator() {
       case "/dashboard-creator/invoices":
         return { icon: Plus, action: () => {
           const event = new CustomEvent('createInvoice')
+          window.dispatchEvent(event)
+        }, show: true }
+      case "/dashboard-creator/brand-deals":
+        return { icon: Handshake, action: () => {
+          const event = new CustomEvent('createBrandDeal')
           window.dispatchEvent(event)
         }, show: true }
       case "/dashboard-creator/documents":
@@ -227,6 +233,11 @@ export function DashboardNavCreator() {
         </nav>
 
         <div className="p-4 border-t border-border space-y-3">
+          {/* Business Switcher - visible on mobile and tablet view, hidden on desktop */}
+          <div className="block md:block lg:hidden mb-2">
+            <BusinessSwitcher />
+          </div>
+          
           {/* User Info */}
           {profile && (
             <div className={cn(
@@ -454,8 +465,6 @@ export function DashboardNavCreator() {
                 )}
               </div>
             </div>
-
-            {/* Business switcher lives in the header; removed from sidebar/menu for creators */}
           </div>
 
           {/* Menu Items */}
@@ -487,8 +496,14 @@ export function DashboardNavCreator() {
             })}
           </nav>
 
-          {/* Logout Button */}
-          <div className="p-4 border-t border-border">
+          {/* Bottom Section - Business Switcher and Logout */}
+          <div className="p-4 border-t border-border space-y-3">
+            {/* Business Switcher - at bottom of sidebar, before logout */}
+            <div className="w-full">
+              <BusinessSwitcher className="w-full" triggerClassName="w-full" />
+            </div>
+            
+            {/* Logout Button */}
             <Button
               variant="ghost"
               onClick={() => {
@@ -519,8 +534,6 @@ export function DashboardNavCreator() {
         onSubmit={createReminder}
       />
 
-      {/* Business switcher lives in the header; removed from sidebar/menu for creators */}
-      
       {/* Subscription Required Modal */}
       {(profile?.businessType !== 'agent' || !profile) && (
         <SubscriptionRequiredModal

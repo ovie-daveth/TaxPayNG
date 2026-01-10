@@ -28,7 +28,7 @@ export function BusinessSwitcher({
   if (!entities.length) return null
 
   return (
-    <div className={cn("flex items-center gap-2", className)}>
+    <div className={cn("flex items-center gap-2 flex-wrap", className)}>
       <Select
         value={activeEntityId ?? undefined}
         onValueChange={(value) => {
@@ -37,7 +37,7 @@ export function BusinessSwitcher({
         }}
         disabled={loading}
       >
-        <SelectTrigger className={cn("h-9 w-[210px] text-xs sm:text-sm", triggerClassName)}>
+        <SelectTrigger className={cn("h-9 w-[210px] text-xs sm:text-sm flex-1 min-w-0", triggerClassName)}>
           <SelectValue placeholder="Select business" />
         </SelectTrigger>
         <SelectContent>

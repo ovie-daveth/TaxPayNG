@@ -17,6 +17,8 @@ import { useSubscription } from "@/lib/hooks/useSubscription"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { SubscriptionRequiredModal } from "../subscription/subscription-required-modal"
 import { BusinessSwitcher } from "@/components/business/business-switcher"
+import { useSidebar } from "@/lib/contexts/sidebar-context"
+import { cn } from "@/lib/utils"
 
 export function DashboardHeader() {
   const pathname = usePathname()
@@ -33,6 +35,7 @@ export function DashboardHeader() {
   const { createTransaction } = useTransactions(user?.uid || null)
   // Load reminders hook for header actions
   const { createReminder } = useReminders(user?.uid || null)
+  const { sidebarCollapsed } = useSidebar()
 
   const checkSubscription = (action: () => void) => {
     // Wait for subscription status to load
@@ -242,11 +245,23 @@ export function DashboardHeader() {
   const showBackButton = pathname !== "/dashboard" && pathname !== "/dashboard/"
 
   return (
-    <div className="border-b border-border bg-card w-full hidden md:block">
-      <div className="w-full px-3 sm:px-4 md:px-4 lg:px-8 py-2.5 sm:py-3 md:py-3 lg:py-4">
-        <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-2 lg:gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 sm:block">
+    <div className="border-b border-border bg-card w-full">
+      <div className={cn(
+        "w-full",
+        sidebarCollapsed 
+          ? "px-3 py-2 md:py-2.5 lg:px-8 lg:py-4" 
+          : "px-3 sm:px-4 md:px-4 lg:px-8 py-2.5 sm:py-3 md:py-3 lg:py-4"
+      )}>
+        <div className={cn(
+          "flex",
+          // Mobile: always flex-col, Tablet/Desktop: depends on sidebar state
+          " items-center",
+          sidebarCollapsed 
+            ? "gap-2 md:gap-2 lg:gap-4" 
+            : "gap-2 md:gap-2 lg:gap-4"
+        )}>
+          <div className="flex-1 min-w-0 w-full md:w-auto">
+            <div className="flex items-center gap-2">
               {/* Back button beside title - Mobile only */}
               {showBackButton && (
                 <Button
@@ -259,22 +274,32 @@ export function DashboardHeader() {
                 </Button>
               )}
               <div className="flex-1 min-w-0">
-                <h1 className="text-lg sm:text-xl md:text-lg lg:text-2xl font-bold">{pageInfo.title}</h1>
-                <p className="hidden sm:block text-xs sm:text-sm md:text-xs lg:text-sm text-muted-foreground mt-0.5 sm:mt-1 line-clamp-1">{pageInfo.subtitle}</p>
+                <h1 className={cn(
+                  "font-bold",
+                  sidebarCollapsed 
+                    ? "text-base md:text-base lg:text-2xl" 
+                    : "text-lg sm:text-xl md:text-lg lg:text-2xl"
+                )}>{pageInfo.title}</h1>
+                <p className={cn(
+                  "text-muted-foreground mt-0.5 sm:mt-1 line-clamp-1",
+                  sidebarCollapsed
+                    ? "hidden md:block text-xs md:text-xs lg:text-sm"
+                    : "text-xs sm:text-sm md:text-xs lg:text-sm"
+                )}>{pageInfo.subtitle}</p>
               </div>
             </div>
-            {showBackButton && (
-              <div className="sm:hidden ml-9">
-                <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{pageInfo.subtitle}</p>
-              </div>
-            )}
-            {!showBackButton && (
-              <p className="sm:hidden text-xs text-muted-foreground mt-0.5 line-clamp-1">{pageInfo.subtitle}</p>
-            )}
           </div>
-          <div className="hidden md:flex md:flex-row items-center gap-1 md:gap-1 lg:gap-2 flex-shrink-0 justify-end md:justify-start">
-            <BusinessSwitcher className="mr-2" />
-            <div className="hidden md:flex items-center gap-1">
+          <div className={cn(
+            "flex-row items-center shrink-0 justify-end w-full md:w-auto hidden md:flex",
+            sidebarCollapsed 
+              ? "gap-1 lg:gap-2" 
+              : "gap-1 md:gap-1 lg:gap-2"
+          )}>
+            {/* BusinessSwitcher: visible on desktop only, hidden on mobile and tablet */}
+            <div className="hidden md:hidden lg:block">
+              <BusinessSwitcher className="mr-1 md:mr-2" />
+            </div>
+            <div className="flex items-center gap-1">
               <NotificationBell />
               <ThemeToggle />
             </div>
@@ -283,7 +308,12 @@ export function DashboardHeader() {
                 variant="outline" 
                 size="sm"
                 onClick={() => console.log("Export transactions")}
-                className="h-8 md:h-8 lg:h-10 text-xs md:text-xs lg:text-sm px-1.5 md:px-2 lg:px-3"
+                className={cn(
+                  "h-8 text-xs whitespace-nowrap",
+                  sidebarCollapsed 
+                    ? "md:h-8 lg:h-10 md:px-1.5 lg:px-3 lg:text-sm" 
+                    : "md:h-8 lg:h-10 md:px-2 lg:px-3 lg:text-sm"
+                )}
               >
                 <Download className="w-3.5 h-3.5 md:w-3.5 md:h-3.5 lg:w-4 lg:h-4 md:mr-0 lg:mr-2" />
                 <span className="hidden lg:inline">Export</span>
@@ -294,7 +324,12 @@ export function DashboardHeader() {
               <Button 
                 onClick={pageInfo.buttonAction}
                 size="sm"
-                className="h-8 md:h-8 lg:h-10 text-xs md:text-xs lg:text-sm whitespace-nowrap px-1.5 md:px-2 lg:px-3"
+                className={cn(
+                  "h-8 text-xs whitespace-nowrap",
+                  sidebarCollapsed 
+                    ? "md:h-8 lg:h-10 md:px-1.5 lg:px-3 lg:text-sm" 
+                    : "md:h-8 lg:h-10 md:px-2 lg:px-3 lg:text-sm"
+                )}
               >
                 {ButtonIcon && <ButtonIcon className="w-3.5 h-3.5 md:w-3.5 md:h-3.5 lg:w-4 lg:h-4 md:mr-0 lg:mr-2" />}
                 <span className="hidden lg:inline">{pageInfo.buttonText}</span>

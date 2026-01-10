@@ -13,6 +13,7 @@ import { toast } from "sonner"
 import { NotificationBell } from "../notifications/notification-bell"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useUserProfile } from "@/lib/contexts/user-profile-context"
+import { BusinessSwitcher } from "@/components/business/business-switcher"
 
 const navItems = [
   { href: "/dashboard-sme", label: "Dashboard", icon: LayoutDashboard },
@@ -178,6 +179,11 @@ export function DashboardNavSME() {
         </nav>
 
         <div className="p-4 border-t border-border space-y-3">
+          {/* Business Switcher - visible on mobile and tablet view, hidden on desktop */}
+          <div className="block md:block lg:hidden mb-2">
+            <BusinessSwitcher />
+          </div>
+          
           {/* User Info */}
           {profile && (
             <div className={cn(
@@ -407,8 +413,14 @@ export function DashboardNavSME() {
             })}
           </nav>
 
-          {/* Logout Button */}
-          <div className="p-4 border-t border-border">
+          {/* Bottom Section - Business Switcher and Logout */}
+          <div className="p-4 border-t border-border space-y-3">
+            {/* Business Switcher - at bottom of sidebar, before logout */}
+            <div className="w-full">
+              <BusinessSwitcher className="w-full" triggerClassName="w-full" />
+            </div>
+            
+            {/* Logout Button */}
             <Button
               variant="ghost"
               onClick={() => {

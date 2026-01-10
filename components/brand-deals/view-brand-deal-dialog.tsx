@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Edit, Trash2, ExternalLink, CheckCircle2, Clock, X, Calendar, DollarSign, Mail, Phone, Building2, User, Loader2 } from "lucide-react"
-import { BrandDeal, BrandDealStatus, BrandDealType } from "@/lib/types"
+import { BrandDeal, BrandDealStatus, BrandDealType, Transaction } from "@/lib/types"
 import { format } from "date-fns"
 import { formatCurrencyAmount, CurrencyCode, fetchExchangeRate } from "@/lib/utils/currency"
 import { brandDealService } from "@/lib/services"
@@ -157,37 +157,60 @@ export function ViewBrandDealDialog({
       const transactionCurrency = (currentDeal.currency || 'NGN') as CurrencyCode
       const transactionDate = currentDeal.paymentDate || currentDeal.endDate || new Date().toISOString()
       
+      // Calculate financial breakdown
+      const grossAmount = currentDeal.amount
+      const executionExpenses = currentDeal.executionExpenses || 0
+      const whtAmount = currentDeal.whtAmount || 0
+      const cashReceived = grossAmount - whtAmount
+      // Taxable income = cash received - expenses (this is what you pay tax on)
+      const taxableIncome = cashReceived - executionExpenses
+      
+      // Use taxable income for transaction amount (this is the actual income to the creator)
+      // Fallback to stored netIncome for backward compatibility
+      const transactionAmount = currentDeal.netIncome !== undefined 
+        ? currentDeal.netIncome 
+        : (taxableIncome > 0 ? taxableIncome : cashReceived)
+      
       // Calculate NGN equivalent if currency is not NGN
       // Use the brand deal's stored conversion data if available, otherwise calculate it
       let ngnEquivalent: number | undefined = undefined
       let exchangeRate: number | undefined = undefined
       
       if (transactionCurrency !== 'NGN') {
-        // First, try to use the brand deal's stored conversion data
-        if (currentDeal.ngnEquivalent !== undefined && currentDeal.ngnEquivalent !== null) {
-          ngnEquivalent = currentDeal.ngnEquivalent
+        // First, try to use the brand deal's stored net income NGN equivalent
+        if (currentDeal.netIncomeNgnEquivalent !== undefined && currentDeal.netIncomeNgnEquivalent !== null) {
+          ngnEquivalent = currentDeal.netIncomeNgnEquivalent
+          // Calculate exchange rate from net income and its NGN equivalent
+          exchangeRate = transactionAmount > 0 ? ngnEquivalent / transactionAmount : currentDeal.exchangeRate
+        } else if (currentDeal.ngnEquivalent !== undefined && currentDeal.ngnEquivalent !== null) {
+          // Fallback to gross amount NGN equivalent, but adjust for net income
+          const grossNgn = currentDeal.ngnEquivalent
+          const expensesNgn = executionExpenses > 0 && currentDeal.exchangeRate
+            ? executionExpenses * currentDeal.exchangeRate
+            : executionExpenses
+          ngnEquivalent = grossNgn - expensesNgn
           exchangeRate = currentDeal.exchangeRate
         } else {
           // If not available, calculate it now
           try {
             exchangeRate = await fetchExchangeRate(transactionCurrency, 'NGN')
-            ngnEquivalent = currentDeal.amount * exchangeRate
+            ngnEquivalent = transactionAmount * exchangeRate
           } catch (error) {
             console.error('Error fetching exchange rate:', error)
             // Continue without conversion if rate fetch fails
           }
         }
       } else {
-        // If currency is NGN, ngnEquivalent is the same as amount
-        ngnEquivalent = currentDeal.amount
+        // If currency is NGN, ngnEquivalent is the same as net income
+        ngnEquivalent = transactionAmount
         exchangeRate = 1 // NGN to NGN is 1:1
       }
       
       const transactionData = {
         entityId: currentDeal.entityId,
         type: 'income' as const,
-        description: `${currentDeal.title} - ${currentDeal.brandName}`,
-        amount: currentDeal.amount,
+        description: `${currentDeal.title} - ${currentDeal.brandName}${executionExpenses > 0 ? ` (Net: ${formatCurrencyAmount(transactionAmount, transactionCurrency)} after expenses)` : ''}`,
+        amount: transactionAmount, // Use net income instead of gross amount
         currency: transactionCurrency,
         exchangeRate: exchangeRate,
         exchangeRateDate: exchangeRate ? transactionDate.split('T')[0] : undefined,
@@ -195,7 +218,7 @@ export function ViewBrandDealDialog({
         date: transactionDate,
         category: currentDeal.dealType === 'sponsorship' ? 'Brand Sponsorship' : 'Brand Deal',
         paymentMethod: '',
-        notes: `Brand deal: ${currentDeal.title}`,
+        notes: `Brand deal: ${currentDeal.title}${executionExpenses > 0 || currentDeal.whtAmount ? `\nGross: ${formatCurrencyAmount(grossAmount, transactionCurrency)}${executionExpenses > 0 ? `\nExpenses: ${formatCurrencyAmount(executionExpenses, transactionCurrency)}` : ''}${currentDeal.whtAmount && currentDeal.whtAmount > 0 ? `\nWHT (Tax Credit): ${formatCurrencyAmount(currentDeal.whtAmount, transactionCurrency)} (Rate: ${currentDeal.whtRate || 0}%)${currentDeal.whtCertificateNumber ? `, Cert: ${currentDeal.whtCertificateNumber}` : ''}` : ''}\nNet Income: ${formatCurrencyAmount(transactionAmount, transactionCurrency)}` : ''}`,
         tags: currentDeal.tags || [],
         taxDeductible: false
       }
@@ -210,10 +233,12 @@ export function ViewBrandDealDialog({
       })
 
       const result = await createTransaction(transactionData)
-      if (result.success && result.data) {
+      if (result.success && 'data' in result && result.data) {
+        // TypeScript narrowing: if success is true and data exists, it's ApiResponse<Transaction>
+        const transaction = (result as { success: true; data: Transaction }).data
         // Link the transaction to the brand deal
         const updateResult = await brandDealService.updateBrandDeal(currentDeal.id, profile.userId, {
-          linkedTransactionId: result.data.id,
+          linkedTransactionId: transaction.id,
           paymentDate: new Date().toISOString()
         })
         if (updateResult.success && updateResult.data) {
@@ -224,7 +249,7 @@ export function ViewBrandDealDialog({
         const event = new CustomEvent('transactionChanged', {
           detail: {
             action: 'created',
-            transactionId: result.data.id
+            transactionId: transaction.id
           }
         })
         window.dispatchEvent(event)
@@ -232,7 +257,7 @@ export function ViewBrandDealDialog({
         toast.success("Transaction created and linked to brand deal")
         onUpdate?.()
       } else {
-        toast.error(result.error || "Failed to create transaction")
+        toast.error('error' in result ? result.error || "Failed to create transaction" : "Failed to create transaction")
       }
     } catch (error) {
       console.error("Error creating transaction:", error)
@@ -326,16 +351,117 @@ export function ViewBrandDealDialog({
           {/* Financial Details */}
           <div className="space-y-4">
             <h3 className="text-sm font-semibold">Financial Details</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex items-center gap-2">
-                <DollarSign className="w-4 h-4 text-muted-foreground" />
-                <div>
-                  <p className="text-xs text-muted-foreground">Amount</p>
-                  <p className="text-lg font-bold text-primary">
+            
+            {/* Financial Breakdown: Gross → WHT → Cash Received → Expenses → Taxable Income */}
+            <div className="p-4 bg-muted/30 rounded-lg border space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Gross Amount</p>
+                  <p className="text-xl font-bold">
                     {formatCurrencyAmount(currentDeal.amount, currentDeal.currency as any)}
                   </p>
+                  {currentDeal.ngnEquivalent !== undefined && currentDeal.currency !== 'NGN' && (
+                    <p className="text-xs text-muted-foreground">
+                      ≈ {formatCurrencyAmount(currentDeal.ngnEquivalent, 'NGN')}
+                    </p>
+                  )}
+                </div>
+                
+                {currentDeal.whtDeducted && currentDeal.whtAmount && currentDeal.whtAmount > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground">WHT (Tax Credit)</p>
+                    <p className="text-xl font-bold text-blue-600">
+                      {formatCurrencyAmount(currentDeal.whtAmount, currentDeal.currency as any)}
+                    </p>
+                    {currentDeal.whtRate && (
+                      <p className="text-xs text-muted-foreground">Rate: {currentDeal.whtRate}%</p>
+                    )}
+                    {currentDeal.whtCertificateNumber && (
+                      <p className="text-xs text-muted-foreground">Cert: {currentDeal.whtCertificateNumber}</p>
+                    )}
+                  </div>
+                )}
+                
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Cash Received</p>
+                  <p className="text-xl font-bold text-purple-600">
+                    {formatCurrencyAmount(
+                      currentDeal.amount - (currentDeal.whtAmount || 0),
+                      currentDeal.currency as any
+                    )}
+                  </p>
+                  {currentDeal.whtAmount && (
+                    <p className="text-xs text-muted-foreground">Gross − WHT</p>
+                  )}
+                </div>
+                
+                {currentDeal.executionExpenses && currentDeal.executionExpenses > 0 && (
+                  <div className="space-y-1">
+                    <p className="text-xs font-medium text-muted-foreground">Total Expenses</p>
+                    <p className="text-xl font-bold text-orange-600">
+                      {formatCurrencyAmount(currentDeal.executionExpenses, (currentDeal.executionExpensesCurrency || currentDeal.currency) as any)}
+                    </p>
+                  </div>
+                )}
+                
+                <div className="space-y-1 sm:col-span-2">
+                  <p className="text-xs font-medium text-muted-foreground">Taxable Income</p>
+                  <p className="text-xl font-bold text-green-600">
+                    {formatCurrencyAmount(
+                      (() => {
+                        const cashReceived = currentDeal.amount - (currentDeal.whtAmount || 0)
+                        const expenses = currentDeal.executionExpenses || 0
+                        const calculatedTaxableIncome = cashReceived - expenses
+                        return currentDeal.netIncome !== undefined 
+                          ? currentDeal.netIncome 
+                          : (calculatedTaxableIncome > 0 ? calculatedTaxableIncome : cashReceived)
+                      })(),
+                      currentDeal.currency as any
+                    )}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Cash Received − Expenses (this is what you pay tax on)</p>
+                  {(currentDeal.netIncomeNgnEquivalent !== undefined || (currentDeal.netIncome !== undefined && currentDeal.ngnEquivalent)) && currentDeal.currency !== 'NGN' && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      ≈ {formatCurrencyAmount(
+                        currentDeal.netIncomeNgnEquivalent || (currentDeal.netIncome ? currentDeal.netIncome * (currentDeal.exchangeRate || 1) : 0),
+                        'NGN'
+                      )}
+                    </p>
+                  )}
                 </div>
               </div>
+              
+              {/* Execution Expenses Details */}
+              {currentDeal.executionExpensesDetails && currentDeal.executionExpensesDetails.length > 0 && (
+                <details className="mt-3">
+                  <summary className="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground">
+                    View expense details ({currentDeal.executionExpensesDetails.length} items)
+                  </summary>
+                  <div className="mt-2 space-y-2">
+                    {currentDeal.executionExpensesDetails.map((expense, idx) => (
+                      <div key={idx} className="text-xs p-2 bg-background rounded border">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <p className="font-medium">{expense.description}</p>
+                            <div className="flex gap-2 text-muted-foreground mt-1">
+                              {expense.category && (
+                                <span>• {expense.category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}</span>
+                              )}
+                              {expense.date && <span>• {format(new Date(expense.date), "MMM dd, yyyy")}</span>}
+                            </div>
+                          </div>
+                          <span className="font-semibold ml-2">
+                            {formatCurrencyAmount(expense.amount, currentDeal.currency as any)}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {currentDeal.paymentTerms && (
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Payment Terms</p>
@@ -343,10 +469,11 @@ export function ViewBrandDealDialog({
                 </div>
               )}
             </div>
+          </div>
 
-            {/* Payment Schedule */}
-            {currentDeal.paymentSchedule && currentDeal.paymentSchedule.type !== "single" && currentDeal.paymentSchedule.milestones && currentDeal.paymentSchedule.milestones.length > 0 && (
-              <div className="mt-4">
+          {/* Payment Schedule */}
+          {currentDeal.paymentSchedule && currentDeal.paymentSchedule.type !== "single" && currentDeal.paymentSchedule.milestones && currentDeal.paymentSchedule.milestones.length > 0 && (
+            <div className="mt-4">
                 <p className="text-xs text-muted-foreground mb-2">Payment Milestones</p>
                 <div className="space-y-2">
                   {currentDeal.paymentSchedule.milestones.map((milestone, index) => (
@@ -362,7 +489,7 @@ export function ViewBrandDealDialog({
                           </p>
                         )}
                       </div>
-                      <div className="flex items-center gap-3 flex-shrink-0">
+                      <div className="flex items-center gap-3 shrink-0">
                         <span className="text-sm font-semibold">
                           {formatCurrencyAmount(milestone.amount, currentDeal.currency as any)}
                         </span>
@@ -401,7 +528,6 @@ export function ViewBrandDealDialog({
                 </div>
               </div>
             )}
-          </div>
 
           {/* Dates */}
           <div className="space-y-4">
