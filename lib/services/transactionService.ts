@@ -458,24 +458,14 @@ export class TransactionService extends BaseService {
       const end = endDate ? new Date(endDate) : null
       const filteredTransactions = transactions
         .map((transaction) => {
-          // Use ngnEquivalent if available (for foreign currency transactions), otherwise use amount
-          const baseAmount = transaction.ngnEquivalent !== undefined && transaction.ngnEquivalent !== null
-            ? transaction.ngnEquivalent
-            : transaction.amount
-          
-          const coercedAmount =
-            typeof baseAmount === 'number'
-              ? baseAmount
-              : Number(String(baseAmount).replace(/[\u20A6,]/g, '').trim()) || 0
-
           // For income stats, filter by createdAt (when transaction was recorded)
           // This ensures transactions are included in the period they were recorded,
           // regardless of their transaction date (which may be in the future)
           const recordDate = transaction.createdAt ? new Date(transaction.createdAt) : null
 
+          // Preserve original transaction data for calculation (netAmount, transactionNature, taxClassification, etc.)
           return {
             ...transaction,
-            amount: coercedAmount,
             category: transaction.category || 'uncategorized',
             recordDate,
           }
@@ -520,24 +510,93 @@ export class TransactionService extends BaseService {
 
       filteredTransactions.forEach((transaction) => {
         if (transaction.type === 'income') {
-          summary.totalIncome += transaction.amount
+          // Use same logic as tax calculation for consistency
+          // Determine the base amount to use (netAmount if available for platform fees, otherwise amount)
+          let baseAmount = 0
+          if (transaction.currency && transaction.currency !== 'NGN' && transaction.ngnEquivalent !== undefined && transaction.ngnEquivalent !== null) {
+            // For foreign currency transactions, use ngnEquivalent
+            baseAmount = typeof transaction.ngnEquivalent === 'number' 
+              ? transaction.ngnEquivalent 
+              : Number(String(transaction.ngnEquivalent).replace(/[\u20A6,]/g, '').trim()) || 0
+          } else {
+            // For NGN transactions, use netAmount if available (after platform fees), otherwise use amount
+            const rawAmount = transaction.netAmount !== undefined ? transaction.netAmount : transaction.amount
+            baseAmount = typeof rawAmount === 'number'
+              ? rawAmount
+              : Number(String(rawAmount).replace(/[\u20A6,]/g, '').trim()) || 0
+          }
+          
+          // Apply transaction nature percentage for mixed transactions (creators only)
+          let taxableAmount = baseAmount
+          if (transaction.transactionNature === 'mixed' && transaction.businessPercentage !== undefined) {
+            taxableAmount = baseAmount * (transaction.businessPercentage / 100)
+          } else if (transaction.transactionNature === 'personal') {
+            // Personal transactions are not taxable income - exclude from gross income for tax purposes
+            taxableAmount = 0
+          }
+          
+          // For income transactions with VAT, exclude VAT amount from taxable income
+          // VAT must be remitted to government, so it shouldn't be counted as income for tax purposes
+          if (transaction.taxClassification?.vatApplicable && transaction.taxClassification?.vatRate) {
+            const vatRate = transaction.taxClassification.vatRate / 100
+            taxableAmount = taxableAmount * (1 - vatRate)
+          }
+          
+          summary.totalIncome += taxableAmount
+          
+          // Category breakdown uses taxable amount
+          const categoryKey = transaction.category || 'uncategorized'
+          if (!summary.categories[categoryKey]) {
+            summary.categories[categoryKey] = { income: 0, expenses: 0, count: 0 }
+          }
+          summary.categories[categoryKey].count++
+          summary.categories[categoryKey].income += taxableAmount
         } else if (transaction.type === 'expense') {
-          summary.totalExpenses += transaction.amount
+          // For expenses, apply same logic as tax calculation
+          let baseAmount = 0
+          if (transaction.currency && transaction.currency !== 'NGN' && transaction.ngnEquivalent !== undefined && transaction.ngnEquivalent !== null) {
+            // For foreign currency transactions, use ngnEquivalent
+            baseAmount = typeof transaction.ngnEquivalent === 'number'
+              ? transaction.ngnEquivalent
+              : Number(String(transaction.ngnEquivalent).replace(/[\u20A6,]/g, '').trim()) || 0
+          } else {
+            // For NGN transactions, use netAmount if available (after platform fees), otherwise use amount
+            const rawAmount = transaction.netAmount !== undefined ? transaction.netAmount : transaction.amount
+            baseAmount = typeof rawAmount === 'number'
+              ? rawAmount
+              : Number(String(rawAmount).replace(/[\u20A6,]/g, '').trim()) || 0
+          }
+          
+          // Apply transaction nature percentage for mixed transactions
+          let deductibleAmount = baseAmount
+          if (transaction.transactionNature === 'mixed' && transaction.businessPercentage !== undefined) {
+            deductibleAmount = baseAmount * (transaction.businessPercentage / 100)
+          } else if (transaction.transactionNature === 'personal') {
+            // Personal transactions are not tax deductible - exclude from expenses for tax purposes
+            deductibleAmount = 0
+          }
+          
+          // Exclude capital assets from expenses (they're claimed as depreciation)
+          const isCapitalAsset = transaction.taxClassification?.isCapitalAsset && transaction.taxClassification?.capitalAllowanceRate
+          if (!isCapitalAsset) {
+            summary.totalExpenses += deductibleAmount
+          }
+          
+          // Category breakdown uses deductible amount (excluding capital assets)
+          const categoryKey = transaction.category || 'uncategorized'
+          if (!summary.categories[categoryKey]) {
+            summary.categories[categoryKey] = { income: 0, expenses: 0, count: 0 }
+          }
+          summary.categories[categoryKey].count++
+          if (!isCapitalAsset) {
+            summary.categories[categoryKey].expenses += deductibleAmount
+          }
         } else if (transaction.type === 'relief') {
-          summary.totalReliefs += transaction.amount
+          const reliefAmount = typeof transaction.amount === 'number'
+            ? transaction.amount
+            : Number(String(transaction.amount).replace(/[\u20A6,]/g, '').trim()) || 0
+          summary.totalReliefs += reliefAmount
           return
-        }
-        // Category breakdown
-        const categoryKey = transaction.category || 'uncategorized'
-        if (!summary.categories[categoryKey]) {
-          summary.categories[categoryKey] = { income: 0, expenses: 0, count: 0 }
-        }
-
-        summary.categories[categoryKey].count++
-        if (transaction.type === 'income') {
-          summary.categories[categoryKey].income += transaction.amount
-        } else if (transaction.type === 'expense') {
-          summary.categories[categoryKey].expenses += transaction.amount
         }
       })
 
