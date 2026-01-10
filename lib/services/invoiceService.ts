@@ -420,14 +420,16 @@ export class InvoiceService extends BaseService {
           'whtCreditNote',
           'total', // Allow updating total when WHT is deducted
           'status', // Allow recipients/clients to update status (e.g., to 'paid' when marking payment)
-          'updatedAt' // Allow updating timestamp
+          'updatedAt', // Allow updating timestamp
+          'createdAt' // Allow createdAt (it's preserved to existing value anyway, just needed to pass validation)
         ]
-        const updateKeys = Object.keys(updateData)
+        // Exclude createdAt from validation since we're just preserving it (never changing it)
+        const updateKeys = Object.keys(updateData).filter(key => key !== 'createdAt')
         const disallowedFields = updateKeys.filter(key => !allowedFields.includes(key))
         if (disallowedFields.length > 0) {
           return {
             success: false,
-            error: `Recipients and clients can only update: ${allowedFields.join(', ')}`
+            error: `Recipients and clients can only update: ${allowedFields.filter(f => f !== 'createdAt').join(', ')}`
           }
         }
         
@@ -451,6 +453,7 @@ export class InvoiceService extends BaseService {
       }
 
       // Remove undefined values from updateData before sending to Firestore
+      // Always preserve createdAt (never allow it to be changed)
       const cleanedUpdateData: any = {}
       for (const key in updateData) {
         const value = updateData[key as keyof Invoice]
@@ -458,6 +461,9 @@ export class InvoiceService extends BaseService {
           cleanedUpdateData[key] = value
         }
       }
+      
+      // Always preserve createdAt from existing invoice (never allow it to be changed)
+      cleanedUpdateData.createdAt = existingInvoice.createdAt
 
       await this.update(invoiceId, {
         ...cleanedUpdateData,
