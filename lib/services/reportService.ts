@@ -16,7 +16,11 @@ export interface ReportPeriod {
 }
 
 export interface IncomeData {
-  totalIncome: number
+  totalIncome: number // Net income after VAT exclusion (taxable income)
+  grossIncome: number // Gross income before VAT/WHT deductions
+  vatCollected: number // Total VAT collected (amount that must be remitted to government)
+  whtDeducted: number // Total WHT deducted at source (tax credit)
+  platformFees: number // Total platform fees deducted
   incomeByCategory: { [category: string]: number }
   incomeBySource: { [source: string]: number }
   transactionCount: number
@@ -481,55 +485,104 @@ export class ReportService extends BaseService {
     // Include ALL income transactions, including invoice-related ones
     const incomeTransactions = transactions.filter(t => t.type === 'income')
 
-    let totalIncome = 0
+    let totalIncome = 0 // Net taxable income after VAT exclusion
+    let grossIncome = 0 // Gross income before VAT/WHT deductions
+    let vatCollected = 0 // Total VAT collected (must be remitted)
+    let whtDeducted = 0 // Total WHT deducted (tax credit)
+    let platformFees = 0 // Total platform fees
     const incomeByCategory: { [key: string]: number } = {}
     const incomeBySource: { [key: string]: number } = {}
 
     // Process all income transactions
     incomeTransactions.forEach(txn => {
-      // Determine the base amount to use
+      // Determine the base amount to use (after platform fees if applicable)
       let baseAmount = 0
+      let grossAmount = 0
+      let platformFee = 0
       
       // For foreign currency transactions, ngnEquivalent is already the converted amount
       // It represents the NGN equivalent of the net amount (after platform fees) if netAmount exists
       if (txn.currency && txn.currency !== 'NGN' && txn.ngnEquivalent) {
         // Use ngnEquivalent directly - it's already the NGN equivalent of the correct amount
         baseAmount = txn.ngnEquivalent
+        
+        // Calculate gross amount and platform fees in NGN
+        if (txn.grossAmount && txn.platformFees && txn.exchangeRate) {
+          // Convert gross amount and platform fees from original currency to NGN
+          grossAmount = txn.grossAmount * txn.exchangeRate
+          platformFee = txn.platformFees * txn.exchangeRate
+        } else {
+          grossAmount = baseAmount
+        }
       } else {
         // For NGN transactions, use netAmount if available (after platform fees), otherwise use amount
         baseAmount = txn.netAmount !== undefined ? txn.netAmount : (typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0)
+        
+        if (txn.grossAmount && txn.platformFees) {
+          grossAmount = txn.grossAmount
+          platformFee = txn.platformFees
+        } else {
+          grossAmount = baseAmount
+        }
       }
+      
+      platformFees += platformFee
       
       // Apply transaction nature percentage for mixed transactions (creators only)
       // Only apply if transactionNature is 'mixed' and businessPercentage is set
-      let taxableAmount = baseAmount
+      let businessGrossAmount = grossAmount
+      let businessBaseAmount = baseAmount
       if (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined) {
-        taxableAmount = baseAmount * (txn.businessPercentage / 100)
+        businessGrossAmount = grossAmount * (txn.businessPercentage / 100)
+        businessBaseAmount = baseAmount * (txn.businessPercentage / 100)
       } else if (txn.transactionNature === 'personal') {
-        // Personal transactions are not taxable income
-        taxableAmount = 0
+        // Personal transactions are not taxable income - skip them
+        return
       }
-      // If transactionNature is 'business' or undefined, use full amount
       
-      // For income transactions with VAT, exclude VAT amount from taxable income
-      // VAT must be remitted to government, so it shouldn't be taxed again
+      grossIncome += businessGrossAmount
+      
+      // Calculate VAT if applicable
+      let vatAmount = 0
+      let taxableAmount = businessGrossAmount // Start with gross amount before VAT
       if (txn.type === 'income' && txn.taxClassification?.vatApplicable && txn.taxClassification?.vatRate) {
         const vatRate = txn.taxClassification.vatRate / 100
-        // Taxable amount = amount - VAT portion = amount * (1 - vatRate)
-        taxableAmount = taxableAmount * (1 - vatRate)
+        // VAT is calculated on gross amount (before platform fees)
+        vatAmount = businessGrossAmount * vatRate
+        // Taxable amount = gross amount - VAT portion = gross amount * (1 - vatRate)
+        // VAT must be remitted to government, so it's not part of taxable income
+        taxableAmount = businessGrossAmount * (1 - vatRate)
+        vatCollected += vatAmount
       }
       
-      totalIncome += taxableAmount
+      // Calculate WHT if applicable (WHT is calculated on net amount after platform fees)
+      // WHT is a tax credit, not a deduction from taxable income
+      let whtAmount = 0
+      if (txn.taxClassification?.whtCreditable && txn.taxClassification?.whtRate) {
+        const whtRate = txn.taxClassification.whtRate / 100
+        // WHT is calculated on base amount (after platform fees, after VAT exclusion if VAT applies)
+        // Base for WHT calculation is the net amount after platform fees
+        whtAmount = businessBaseAmount * whtRate
+        whtDeducted += whtAmount
+        // WHT is a tax credit - it doesn't reduce taxable income, only reduces tax payable
+        // taxableAmount remains the same
+      }
+      
+      totalIncome += Math.max(0, taxableAmount)
       
       const category = txn.category || 'uncategorized'
-      incomeByCategory[category] = (incomeByCategory[category] || 0) + taxableAmount
+      incomeByCategory[category] = (incomeByCategory[category] || 0) + Math.max(0, taxableAmount)
       
       const source = txn.description || 'Other'
-      incomeBySource[source] = (incomeBySource[source] || 0) + taxableAmount
+      incomeBySource[source] = (incomeBySource[source] || 0) + Math.max(0, taxableAmount)
     })
 
     return {
       totalIncome,
+      grossIncome,
+      vatCollected,
+      whtDeducted,
+      platformFees,
       incomeByCategory,
       incomeBySource,
       transactionCount: incomeTransactions.length,
@@ -578,64 +631,120 @@ export class ReportService extends BaseService {
       return true
     })
 
-    let totalIncome = 0
+    let totalIncome = 0 // Net taxable income after VAT exclusion
+    let grossIncome = 0 // Gross income before VAT/WHT deductions
+    let vatCollected = 0 // Total VAT collected (must be remitted)
+    let whtDeducted = 0 // Total WHT deducted (tax credit)
+    let platformFees = 0 // Total platform fees
     const incomeByCategory: { [key: string]: number } = {}
     const incomeBySource: { [key: string]: number } = {}
 
     // Process income transactions (excluding invoice-related ones)
     incomeTransactions.forEach(txn => {
-      // Determine the base amount to use
+      // Determine the base amount to use (after platform fees if applicable)
       let baseAmount = 0
+      let grossAmount = 0
+      let platformFee = 0
       
       // For foreign currency transactions, ngnEquivalent is already the converted amount
-      // It represents the NGN equivalent of the net amount (after platform fees) if netAmount exists
       if (txn.currency && txn.currency !== 'NGN' && txn.ngnEquivalent) {
-        // Use ngnEquivalent directly - it's already the NGN equivalent of the correct amount
         baseAmount = txn.ngnEquivalent
+        
+        // Calculate gross amount and platform fees in NGN
+        if (txn.grossAmount && txn.platformFees && txn.exchangeRate) {
+          // Convert gross amount and platform fees from original currency to NGN
+          grossAmount = txn.grossAmount * txn.exchangeRate
+          platformFee = txn.platformFees * txn.exchangeRate
+        } else {
+          grossAmount = baseAmount
+        }
       } else {
         // For NGN transactions, use netAmount if available (after platform fees), otherwise use amount
         baseAmount = txn.netAmount !== undefined ? txn.netAmount : (typeof txn.amount === 'number' ? txn.amount : Number(String(txn.amount).replace(/[\u20A6,]/g, '').trim()) || 0)
+        
+        if (txn.grossAmount && txn.platformFees) {
+          grossAmount = txn.grossAmount
+          platformFee = txn.platformFees
+        } else {
+          grossAmount = baseAmount
+        }
       }
+      
+      platformFees += platformFee
       
       // Apply transaction nature percentage for mixed transactions (creators only)
-      // Only apply if transactionNature is 'mixed' and businessPercentage is set
-      let taxableAmount = baseAmount
+      let businessGrossAmount = grossAmount
+      let businessBaseAmount = baseAmount
       if (txn.transactionNature === 'mixed' && txn.businessPercentage !== undefined) {
-        taxableAmount = baseAmount * (txn.businessPercentage / 100)
+        businessGrossAmount = grossAmount * (txn.businessPercentage / 100)
+        businessBaseAmount = baseAmount * (txn.businessPercentage / 100)
       } else if (txn.transactionNature === 'personal') {
-        // Personal transactions are not taxable income
-        taxableAmount = 0
+        // Personal transactions are not taxable income - skip them
+        return
       }
-      // If transactionNature is 'business' or undefined, use full amount
       
-      // For income transactions with VAT, exclude VAT amount from taxable income
-      // VAT must be remitted to government, so it shouldn't be taxed again
+      grossIncome += businessGrossAmount
+      
+      // Calculate VAT if applicable
+      let vatAmount = 0
+      let taxableAmount = businessGrossAmount
       if (txn.type === 'income' && txn.taxClassification?.vatApplicable && txn.taxClassification?.vatRate) {
         const vatRate = txn.taxClassification.vatRate / 100
-        // Taxable amount = amount - VAT portion = amount * (1 - vatRate)
-        taxableAmount = taxableAmount * (1 - vatRate)
+        vatAmount = businessGrossAmount * vatRate
+        taxableAmount = businessGrossAmount * (1 - vatRate)
+        vatCollected += vatAmount
       }
       
-      totalIncome += taxableAmount
+      // Calculate WHT if applicable (WHT is a tax credit, not a deduction from taxable income)
+      let whtAmount = 0
+      if (txn.taxClassification?.whtCreditable && txn.taxClassification?.whtRate) {
+        const whtRate = txn.taxClassification.whtRate / 100
+        whtAmount = businessBaseAmount * whtRate
+        whtDeducted += whtAmount
+        // WHT doesn't affect taxable income - it's a tax credit
+      }
+      
+      totalIncome += Math.max(0, taxableAmount)
       
       const category = txn.category || 'uncategorized'
-      incomeByCategory[category] = (incomeByCategory[category] || 0) + taxableAmount
+      incomeByCategory[category] = (incomeByCategory[category] || 0) + Math.max(0, taxableAmount)
       
       const source = txn.description || 'Other'
-      incomeBySource[source] = (incomeBySource[source] || 0) + taxableAmount
+      incomeBySource[source] = (incomeBySource[source] || 0) + Math.max(0, taxableAmount)
     })
 
     // Process income from paid invoices only
     paidInvoices.forEach(inv => {
-      const amount = inv.total || inv.invoiceTotal || 0
-      totalIncome += amount
+      // For invoices, invoiceTotal is the gross amount before deductions
+      // total is the net amount after WHT deduction
+      const invoiceTotal = inv.invoiceTotal || inv.total || 0
+      const invoiceVat = inv.vatAmount || 0
+      const invoiceWht = inv.whtAmount || 0
       
-      incomeByCategory['Invoice Income'] = (incomeByCategory['Invoice Income'] || 0) + amount
-      incomeBySource[inv.invoiceNumber || 'Invoice'] = (incomeBySource[inv.invoiceNumber || 'Invoice'] || 0) + amount
+      // Gross income is the invoice total (before VAT/WHT)
+      const gross = invoiceTotal
+      const vat = invoiceVat
+      const wht = invoiceWht
+      
+      grossIncome += gross
+      vatCollected += vat
+      whtDeducted += wht
+      
+      // Taxable income = gross - VAT (VAT must be remitted, so it's not taxable)
+      // WHT is a tax credit, not a deduction from taxable income
+      const taxableAmount = Math.max(0, gross - vat)
+      totalIncome += taxableAmount
+      
+      incomeByCategory['Invoice Income'] = (incomeByCategory['Invoice Income'] || 0) + taxableAmount
+      incomeBySource[inv.invoiceNumber || 'Invoice'] = (incomeBySource[inv.invoiceNumber || 'Invoice'] || 0) + taxableAmount
     })
 
     return {
       totalIncome,
+      grossIncome,
+      vatCollected,
+      whtDeducted,
+      platformFees,
       incomeByCategory,
       incomeBySource,
       transactionCount: incomeTransactions.length,
@@ -901,9 +1010,12 @@ export class ReportService extends BaseService {
     
     // Calculate tax data using the same engine as self-assessment
     // Relief amounts are automatically included from transactions
+    // Note: Pass totalIncome (after VAT exclusion) to calculateTaxData
+    // VAT must be remitted to government, so it's not taxable income
+    // The tax calculator expects taxable income (after VAT exclusion) and will subtract expenses and apply reliefs
     const taxData = await this.calculateTaxData(
       userId,
-      incomeData.totalIncome,
+      incomeData.totalIncome, // Taxable income after VAT exclusion
       expenseData.totalExpenses,
       expenseData.taxDeductibleExpenses,
       profile,
@@ -911,8 +1023,11 @@ export class ReportService extends BaseService {
       reliefAmounts
     )
     
+    // Override grossIncome with actual gross income (before VAT exclusion) for display purposes
+    // The taxData.grossIncome is actually taxable income after VAT exclusion (for tax calculation purposes)
     return {
       ...taxData,
+      grossIncome: incomeData.grossIncome || incomeData.totalIncome, // Actual gross income before VAT exclusion
       taxClassification: taxClassificationSummary
     }
   }
@@ -1002,13 +1117,15 @@ export class ReportService extends BaseService {
 
   private async calculateTaxData(
     userId: string,
-    grossIncome: number,
+    grossIncome: number, // Actually taxable income after VAT exclusion (parameter name is misleading for backward compatibility)
     totalExpenses: number,
     businessExpenses: number,
     profile: any,
     taxClassification?: TaxClassificationSummary,
     reliefAmounts?: { [key: string]: number }
   ): Promise<TaxData> {
+    // Note: grossIncome parameter is actually taxable income after VAT exclusion
+    // This is for backward compatibility - the name is misleading
     const netIncome = grossIncome - totalExpenses
 
     // Extract relief amounts from transactions (if provided)
@@ -1021,13 +1138,14 @@ export class ReportService extends BaseService {
     const charitableDonations = reliefAmounts?.charitableDonations || 0
 
     // Prepare tax calculation data
-    // Note: calculateNigerianTax expects gross income, not net income
-    // It will subtract businessExpenses internally
+    // Note: calculateNigerianTax expects taxable income (after VAT exclusion, before expenses and reliefs)
+    // VAT must be remitted to government, so it's excluded from taxable income at the income calculation level
+    // The calculator will subtract businessExpenses and apply reliefs internally
     // Reliefs are automatically extracted from relief transactions with type='relief'
     const taxCalcData = {
       businessType: profile.businessType || 'freelancer',
       period: 'yearly' as const,
-      income: grossIncome, // Pass gross income, not net income
+      income: grossIncome, // Taxable income after VAT exclusion (grossIncome parameter name is misleading - it's actually taxable income)
       rentPaid: rentPaid, // Actual rent paid (calculator applies 20% relief, capped at ₦500k)
       pensionContribution: pensionContribution, // Auto-extracted from relief transactions
       healthInsurance: healthInsurance, // Auto-extracted from relief transactions

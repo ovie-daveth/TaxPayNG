@@ -193,12 +193,58 @@ export function IncomeStatementPreview({ reportData, formData, onBack }: IncomeS
           <p className="text-xs sm:text-sm text-muted-foreground">Period: {periodLabel}</p>
         </div>
 
-        {/* Total Income */}
-        <div className="bg-blue-50 dark:bg-blue-950/20 border-l-4 border-blue-500 dark:border-blue-400 p-3 sm:p-4 md:p-6 rounded">
-          <div className="flex justify-between items-center">
-            <span className="text-sm sm:text-base md:text-lg font-semibold">Total Income</span>
-            <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-blue-600 dark:text-blue-400">{formatCurrency(incomeData.totalIncome)}</span>
+        {/* Income Breakdown */}
+        <div className="space-y-3 sm:space-y-4">
+          {/* Gross Income */}
+          <div className="bg-muted/50 border-l-4 border-muted-foreground p-3 sm:p-4 rounded">
+            <div className="flex justify-between items-center">
+              <span className="text-sm sm:text-base font-semibold">Gross Income</span>
+              <span className="text-base sm:text-lg font-bold">{formatCurrency(incomeData.grossIncome || incomeData.totalIncome)}</span>
+            </div>
           </div>
+          
+          {/* Platform Fees (if applicable) */}
+          {(incomeData.platformFees || 0) > 0 && (
+            <div className="bg-muted/30 p-2 sm:p-3 rounded">
+              <div className="flex justify-between items-center text-xs sm:text-sm">
+                <span className="text-muted-foreground">Platform Fees:</span>
+                <span className="text-muted-foreground">-{formatCurrency(incomeData.platformFees || 0)}</span>
+              </div>
+            </div>
+          )}
+          
+          {/* VAT Collected (if applicable) */}
+          {(incomeData.vatCollected || 0) > 0 && (
+            <div className="bg-blue-50 dark:bg-blue-950/20 border-l-4 border-blue-500 dark:border-blue-400 p-3 sm:p-4 rounded">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-sm sm:text-base font-semibold text-blue-700 dark:text-blue-300">VAT Collected</span>
+                <span className="text-base sm:text-lg font-bold text-blue-600 dark:text-blue-400">{formatCurrency(incomeData.vatCollected || 0)}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Amount to be remitted to government</p>
+            </div>
+          )}
+          
+          {/* Net Income After VAT (Taxable Income) */}
+          <div className="bg-green-50 dark:bg-green-950/20 border-l-4 border-green-500 dark:border-green-400 p-3 sm:p-4 md:p-6 rounded">
+            <div className="flex justify-between items-center">
+              <span className="text-sm sm:text-base md:text-lg font-semibold">Net Income (Taxable Income)</span>
+              <span className="text-base sm:text-lg md:text-xl lg:text-2xl font-bold text-green-600 dark:text-green-400">{formatCurrency(incomeData.totalIncome)}</span>
+            </div>
+            <p className="text-xs sm:text-sm text-muted-foreground mt-1">
+              Gross Income - VAT Collected = {formatCurrency(incomeData.grossIncome || incomeData.totalIncome)} - {formatCurrency(incomeData.vatCollected || 0)} = {formatCurrency(incomeData.totalIncome)}
+            </p>
+          </div>
+          
+          {/* WHT Credits (if applicable) */}
+          {(incomeData.whtDeducted || 0) > 0 && (
+            <div className="bg-orange-50 dark:bg-orange-950/20 border-l-4 border-orange-500 dark:border-orange-400 p-3 sm:p-4 rounded">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-sm sm:text-base font-semibold text-orange-700 dark:text-orange-300">WHT Deducted (Tax Credit)</span>
+                <span className="text-base sm:text-lg font-bold text-orange-600 dark:text-orange-400">{formatCurrency(incomeData.whtDeducted || 0)}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Can be used as credit against tax payable</p>
+            </div>
+          )}
         </div>
 
         {/* Income Breakdown - Toggle between Category and Source */}

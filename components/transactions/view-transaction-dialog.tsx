@@ -243,19 +243,39 @@ export function ViewTransactionDialog({
                           
                           const finalNetIncome = Math.max(0, (originalNetAmount !== undefined ? originalNetAmount : originalAmount) - vatAmount - whtAmount)
                           
+                          // Calculate NGN equivalents if foreign currency
+                          const exchangeRate = transaction.exchangeRate || 1
+                          const showNgnEquivalent = isForeignCurrency && exchangeRate > 0
+                          
+                          const formatWithNgn = (amount: number, label: string, color?: string) => {
+                            const ngnEquivalent = showNgnEquivalent ? amount * exchangeRate : null
+                            return (
+                              <p className={color || "text-muted-foreground"}>
+                                <span className="font-medium">{label}:</span>{" "}
+                                {currencySymbol}{amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                {ngnEquivalent !== null && (
+                                  <span className="ml-2 text-muted-foreground/70">
+                                    (≈ {formatCurrency(ngnEquivalent)})
+                                  </span>
+                                )}
+                              </p>
+                            )
+                          }
+                          
                           return (
                             <div className="mt-2 p-2 bg-muted rounded text-xs space-y-1">
                               {/* Gross Amount (if available) */}
-                              {hasGrossAmount && (
-                                <p className="text-muted-foreground">
-                                  <span className="font-medium">Gross Amount:</span> {currencySymbol}{originalGrossAmount!.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                </p>
-                              )}
+                              {hasGrossAmount && formatWithNgn(originalGrossAmount!, "Gross Amount")}
                               
                               {/* Platform Fees */}
                               {hasPlatformFees && (
                                 <p className="text-muted-foreground">
                                   <span className="font-medium">Platform Fees:</span> -{currencySymbol}{originalPlatformFees!.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  {showNgnEquivalent && (
+                                    <span className="ml-2 text-muted-foreground/70">
+                                      (≈ -{formatCurrency(originalPlatformFees! * exchangeRate)})
+                                    </span>
+                                  )}
                                 </p>
                               )}
                               
@@ -263,6 +283,11 @@ export function ViewTransactionDialog({
                               {hasVAT && (
                                 <p className="text-blue-600 dark:text-blue-400">
                                   <span className="font-medium">VAT ({transaction.taxClassification!.vatRate}%):</span> -{currencySymbol}{vatAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  {showNgnEquivalent && (
+                                    <span className="ml-2 text-blue-600/70 dark:text-blue-400/70">
+                                      (≈ -{formatCurrency(vatAmount * exchangeRate)})
+                                    </span>
+                                  )}
                                 </p>
                               )}
                               
@@ -270,6 +295,11 @@ export function ViewTransactionDialog({
                               {hasWHT && (
                                 <p className="text-orange-600 dark:text-orange-400">
                                   <span className="font-medium">WHT ({transaction.taxClassification!.whtRate}%):</span> -{currencySymbol}{whtAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  {showNgnEquivalent && (
+                                    <span className="ml-2 text-orange-600/70 dark:text-orange-400/70">
+                                      (≈ -{formatCurrency(whtAmount * exchangeRate)})
+                                    </span>
+                                  )}
                                 </p>
                               )}
                               
@@ -277,6 +307,11 @@ export function ViewTransactionDialog({
                               {(hasPlatformFees || hasVAT || hasWHT) && (
                                 <p className="text-muted-foreground border-t pt-1 font-semibold">
                                   <span className="font-medium">Net Income:</span> {currencySymbol}{finalNetIncome.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  {showNgnEquivalent && (
+                                    <span className="ml-2 text-muted-foreground/70">
+                                      (≈ {formatCurrency(finalNetIncome * exchangeRate)})
+                                    </span>
+                                  )}
                                 </p>
                               )}
                             </div>
