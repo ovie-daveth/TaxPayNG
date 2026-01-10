@@ -54,7 +54,7 @@ export interface UserProfile {
   freeTrialEndDate?: string // ISO string - when free trial ends (3 days from start)
   freeTrialUsed?: boolean // Whether user has used their free trial
   /**
-   * Multi-Entity Business Management (PLATINUM):
+   * Multi-Entity Business Management (PLATINUM, Small Business, Big Business):
    * The currently active business entity context for this user.
    */
   activeEntityId?: string

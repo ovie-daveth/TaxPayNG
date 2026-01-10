@@ -75,7 +75,11 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     [entities, activeEntityId]
   )
 
-  const canUseMultiEntity = (p: UserProfile | null) => (p?.subscriptionType === "PLATINUM")
+  const canUseMultiEntity = (p: UserProfile | null) => {
+    const type = p?.subscriptionType
+    // Business entities are available for PLATINUM, Small Business, and Big Business
+    return type === "PLATINUM" || type === "Small Business" || type === "Big Business"
+  }
 
   const refetchEntities = useCallback(async () => {
     if (!user?.uid) return
@@ -94,13 +98,13 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   const ensureDefaultEntity = useCallback(async () => {
     if (!user?.uid || !profile) return
 
-    const isPlatinum = canUseMultiEntity(profile)
+    const canUseEntities = canUseMultiEntity(profile)
     const hasAnyEntityContext = Boolean(profile.activeEntityId || profile.defaultEntityId)
 
-    // Only auto-create business entities when user is PLATINUM.
-    // Before PLATINUM, users can operate without an entity; once upgraded we create a default business
+    // Auto-create business entities when user is PLATINUM, Small Business, or Big Business.
+    // Before these subscriptions, users can operate without an entity; once upgraded we create a default business
     // and migrate legacy records into it.
-    if (!isPlatinum && !hasAnyEntityContext) {
+    if (!canUseEntities && !hasAnyEntityContext) {
       setEntities([])
       return
     }
@@ -112,7 +116,16 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
 
     // Create default entity if none exist
     if (list.length === 0) {
-      const defaultName = profile.businessType === "creator" ? "Creator Business" : "Main Business"
+      // Determine default entity name based on business type
+      let defaultName = "Main Business"
+      if (profile.businessType === "creator") {
+        defaultName = "Creator Business"
+      } else if (profile.businessType === "sme") {
+        defaultName = "Small Business"
+      } else if (profile.businessType === "freelancer") {
+        defaultName = "Freelance Business"
+      }
+      
       const created = await businessEntityService.createBusinessEntity(user.uid, {
         name: defaultName,
         description: "Default business",
@@ -175,7 +188,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     if (!user?.uid) return
     if (profileLoading) return
     if (!profile) return
-    // Only ensure default entity once user is PLATINUM (or if they already have entity context).
+    // Ensure default entity when user has PLATINUM, Small Business, or Big Business subscription (or if they already have entity context).
     ensureDefaultEntity()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid, profileLoading, profile?.id, profile?.subscriptionType, profile?.activeEntityId, profile?.defaultEntityId])
@@ -205,7 +218,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     async (data: Pick<BusinessEntity, "name" | "description" | "currency">) => {
       if (!user?.uid || !profile) return null
       if (!canUseMultiEntity(profile)) {
-        setError("Multi-business is available on PLATINUM.")
+        setError("Multi-business is available on PLATINUM, Small Business, or Big Business plans.")
         return null
       }
 

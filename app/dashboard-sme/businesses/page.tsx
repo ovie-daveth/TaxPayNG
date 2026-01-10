@@ -69,7 +69,7 @@ export default function BusinessesPage() {
               )}
             </div>
             <p className="text-xs sm:text-sm text-muted-foreground max-w-2xl">
-              Create multiple businesses and switch between them. Transactions, invoices, and brand deals are scoped to the active business.
+              Create multiple businesses and switch between them. Transactions and invoices are scoped to the active business.
             </p>
           </div>
 
@@ -164,5 +164,4 @@ export default function BusinessesPage() {
     </div>
   )
 }
-
 
