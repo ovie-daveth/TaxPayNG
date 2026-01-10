@@ -379,14 +379,15 @@ export class InvoiceService extends BaseService {
       // Verify ownership
       const existingInvoice = await this.getById(invoiceId)
       
-      // Authorization: user must be sender OR recipient
+      // Authorization: user must be sender OR recipient OR client
       const isSender = existingInvoice.userId === userId
       const isRecipient = existingInvoice.recipientUserId === userId
+      const isClient = existingInvoice.client?.id === userId
       
-      if (!isSender && !isRecipient) {
+      if (!isSender && !isRecipient && !isClient) {
         return {
           success: false,
-          error: 'Unauthorized: You can only update invoices you sent or received'
+          error: 'Unauthorized: You can only update invoices you sent, received, or are the client of'
         }
       }
       
@@ -395,19 +396,21 @@ export class InvoiceService extends BaseService {
         updateData.createdAt = existingInvoice.createdAt
       }
       
-      // Recipients can update recipientEntityId and payment-related fields
-      if (isRecipient && !isSender) {
+      // Recipients and clients can update recipientEntityId and payment-related fields
+      // Note: isClient check ensures users who are clients (but may not have recipientUserId set) can still update
+      // This applies to all business types: creators, freelancers, and SMEs when they receive invoices
+      if ((isRecipient || isClient) && !isSender) {
         const allowedFields = [
           'recipientEntityId',
-          // Payment-related fields that recipients can update when marking payment
+          // Payment-related fields that recipients/clients can update when marking payment
           'clientPaymentStatus',
           'clientPaidAt',
           'clientPaymentMethod',
           'clientPaymentReference',
           'clientReceiptUrl',
-          'taxDeductible', // Allow recipients to mark if payment is tax deductible
+          'taxDeductible', // Allow recipients/clients to mark if payment is tax deductible
           'linkedTransactionId', // Allow linking transaction when payment is marked
-          // WHT-related fields that recipients can update when deducting WHT
+          // WHT-related fields that recipients/clients can update when deducting WHT
           'whtDeducted',
           'whtRate',
           'whtAmount',
@@ -416,6 +419,7 @@ export class InvoiceService extends BaseService {
           'whtCertificateNumber',
           'whtCreditNote',
           'total', // Allow updating total when WHT is deducted
+          'status', // Allow recipients/clients to update status (e.g., to 'paid' when marking payment)
           'updatedAt' // Allow updating timestamp
         ]
         const updateKeys = Object.keys(updateData)
@@ -423,13 +427,22 @@ export class InvoiceService extends BaseService {
         if (disallowedFields.length > 0) {
           return {
             success: false,
-            error: `Recipients can only update: ${allowedFields.join(', ')}`
+            error: `Recipients and clients can only update: ${allowedFields.join(', ')}`
           }
+        }
+        
+        // Additional validation: Recipients/clients can only set status to 'paid' or 'overdue', not other values
+        if (updateData.status && updateData.status !== 'paid' && updateData.status !== 'overdue') {
+          // If status is being set to something other than 'paid' or 'overdue', remove it
+          // The system will handle status updates automatically based on payment status
+          delete updateData.status
         }
       }
 
       // Check if invoice should be marked as overdue
-      if (updateData.status === 'sent' || (existingInvoice.status === 'sent' && !updateData.status)) {
+      // Only update status automatically if the user is the sender (not recipient or client)
+      // Recipients/clients can explicitly set status to 'paid' when marking payment
+      if (isSender && !isRecipient && !isClient && (updateData.status === 'sent' || (existingInvoice.status === 'sent' && !updateData.status))) {
         const dueDate = updateData.dueDate ? new Date(updateData.dueDate) : new Date(existingInvoice.dueDate)
         const today = new Date()
         if (dueDate < today && existingInvoice.status !== 'paid') {
@@ -692,7 +705,8 @@ export class InvoiceService extends BaseService {
       // Update invoice payment status (client marks as paid)
       const updateData: Partial<Invoice> = {
         clientPaymentStatus: 'paid',
-        clientPaidAt: new Date().toISOString()
+        clientPaidAt: new Date().toISOString(),
+        status: 'paid' // Also update the main status field
       }
       
       if (paymentMethod) {
