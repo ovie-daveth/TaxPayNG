@@ -224,20 +224,64 @@ export function ViewTransactionDialog({
                             ≈ {formatCurrency(transaction.ngnEquivalent)}
                           </p>
                         )}
-                        {/* Phase 2: Show platform fees breakdown if available */}
-                        {originalGrossAmount !== undefined && originalPlatformFees !== undefined && originalNetAmount !== undefined && (
-                          <div className="mt-2 p-2 bg-muted rounded text-xs space-y-1">
-                            <p className="text-muted-foreground">
-                              <span className="font-medium">Gross:</span> {currencySymbol}{originalGrossAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </p>
-                            <p className="text-muted-foreground">
-                              <span className="font-medium">Platform Fees:</span> -{currencySymbol}{originalPlatformFees.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </p>
-                            <p className="text-muted-foreground border-t pt-1">
-                              <span className="font-medium">Net:</span> {currencySymbol}{originalNetAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                            </p>
-                          </div>
-                        )}
+                        {/* Transaction Amount Breakdown - Gross, Platform Fees, VAT, WHT, Net Income */}
+                        {(() => {
+                          const hasGrossAmount = originalGrossAmount !== undefined && originalGrossAmount > 0
+                          const hasPlatformFees = originalPlatformFees !== undefined && originalPlatformFees > 0
+                          const hasVAT = transaction.type === 'income' && transaction.taxClassification?.vatApplicable && transaction.taxClassification?.vatRate
+                          const hasWHT = transaction.taxClassification?.whtCreditable && transaction.taxClassification?.whtRate
+                          const hasAnyBreakdown = hasGrossAmount || hasPlatformFees || hasVAT || hasWHT
+                          
+                          if (!hasAnyBreakdown) return null
+                          
+                          // Calculate breakdown amounts
+                          const baseForVat = originalGrossAmount !== undefined ? originalGrossAmount : originalAmount
+                          const vatAmount = hasVAT ? baseForVat * (transaction.taxClassification!.vatRate! / 100) : 0
+                          
+                          const baseForWht = originalNetAmount !== undefined ? originalNetAmount : (originalGrossAmount !== undefined ? (originalGrossAmount - (originalPlatformFees || 0)) : originalAmount)
+                          const whtAmount = hasWHT ? baseForWht * (transaction.taxClassification!.whtRate! / 100) : 0
+                          
+                          const finalNetIncome = Math.max(0, (originalNetAmount !== undefined ? originalNetAmount : originalAmount) - vatAmount - whtAmount)
+                          
+                          return (
+                            <div className="mt-2 p-2 bg-muted rounded text-xs space-y-1">
+                              {/* Gross Amount (if available) */}
+                              {hasGrossAmount && (
+                                <p className="text-muted-foreground">
+                                  <span className="font-medium">Gross Amount:</span> {currencySymbol}{originalGrossAmount!.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
+                              )}
+                              
+                              {/* Platform Fees */}
+                              {hasPlatformFees && (
+                                <p className="text-muted-foreground">
+                                  <span className="font-medium">Platform Fees:</span> -{currencySymbol}{originalPlatformFees!.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
+                              )}
+                              
+                              {/* VAT Deduction (if applicable) */}
+                              {hasVAT && (
+                                <p className="text-blue-600 dark:text-blue-400">
+                                  <span className="font-medium">VAT ({transaction.taxClassification!.vatRate}%):</span> -{currencySymbol}{vatAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
+                              )}
+                              
+                              {/* WHT Deduction (if applicable) */}
+                              {hasWHT && (
+                                <p className="text-orange-600 dark:text-orange-400">
+                                  <span className="font-medium">WHT ({transaction.taxClassification!.whtRate}%):</span> -{currencySymbol}{whtAmount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
+                              )}
+                              
+                              {/* Net Income After All Deductions */}
+                              {(hasPlatformFees || hasVAT || hasWHT) && (
+                                <p className="text-muted-foreground border-t pt-1 font-semibold">
+                                  <span className="font-medium">Net Income:</span> {currencySymbol}{finalNetIncome.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </p>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </>
                     )
                   })()}

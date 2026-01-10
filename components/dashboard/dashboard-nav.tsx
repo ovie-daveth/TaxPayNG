@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Calculator, LayoutDashboard, Receipt, FileText, Bell, Settings, LogOut, ChevronLeft, ChevronRight, IdCardIcon, FileCheck, BarChart3, MessageSquare, Plus, Menu } from "lucide-react"
+import { Calculator, LayoutDashboard, Receipt, FileText, Bell, Settings, LogOut, ChevronLeft, ChevronRight, IdCardIcon, FileCheck, BarChart3, MessageSquare, Plus, Menu, X } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { useAuth } from "@/lib/hooks/useAuth"
@@ -425,10 +425,20 @@ export function DashboardNav() {
 
       {/* Mobile Menu Sheet - Slides from left, full screen */}
       <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-        <SheetContent side="left" className="!w-full !max-w-full p-0 flex flex-col">
+        <SheetContent side="left" className="!w-full !max-w-full p-0 flex flex-col [&>button[class*='absolute'][class*='right-4'][class*='top-4']]:hidden">
           <SheetHeader>
             <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
           </SheetHeader>
+          {/* Custom Close Button - Larger and positioned lower */}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="absolute right-4 top-8 z-50 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 h-auto w-auto p-2"
+          >
+            <X className="h-12 w-12" />
+            <span className="sr-only">Close</span>
+          </Button>
           {/* User Profile Section */}
           <div className="p-4 border-b border-border">
             <div className="flex items-center gap-3">
