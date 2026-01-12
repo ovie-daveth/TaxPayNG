@@ -55,7 +55,7 @@ export default function SelectBusinessTypePage() {
   const [isSaving, setIsSaving] = useState(false)
   const [selectedBusinessType, setSelectedBusinessType] = useState<BusinessType | null>(null)
 
-  // Redirect if already has business type set and taxId
+  // Redirect if already has business type set and taxId, or if profile has been updated (existing user)
   useEffect(() => {
     if (authLoading || profileLoading) {
       return
@@ -66,8 +66,18 @@ export default function SelectBusinessTypePage() {
       return
     }
 
-    if (profile && ((profile.businessType && profile.businessType !== 'freelancer') || (profile?.businessType === 'freelancer' && profile?.taxId))) {
-      // User already has a business type set (and possibly TIN), redirect to appropriate dashboard
+    if (!profile) {
+      return
+    }
+
+    // Check if profile has been updated after creation (indicates existing user who has interacted with profile)
+    const createdAt = profile.createdAt ? new Date(profile.createdAt) : null
+    const updatedAt = profile.updatedAt ? new Date(profile.updatedAt) : null
+    const hasBeenUpdated = updatedAt && createdAt && (updatedAt.getTime() - createdAt.getTime()) > 5000 // Updated more than 5 seconds after creation
+    
+    // If user has a business type other than freelancer, or has taxId, or profile has been updated, redirect
+    if (profile.businessType && profile.businessType !== 'freelancer') {
+      // User has a non-freelancer business type, redirect to appropriate dashboard
       if (profile.businessType === 'agent') {
         if (profile.agentKycCompleted !== true) {
           router.push("/agent/kyc")
@@ -93,6 +103,25 @@ export default function SelectBusinessTypePage() {
       }
 
       router.push("/dashboard")
+      return
+    }
+
+    // If user has freelancer business type but has taxId, they've completed onboarding
+    if (profile.businessType === 'freelancer' && profile.taxId) {
+      router.push("/dashboard")
+      return
+    }
+
+    // If profile has been updated (existing user), don't allow changing business type
+    // Redirect them to verify-tin or dashboard based on their status
+    if (hasBeenUpdated) {
+      console.log("Profile has been updated, redirecting existing user - businessType:", profile.businessType, "taxId:", !!profile.taxId)
+      if (!profile.taxId) {
+        router.push("/verify-tin")
+        return
+      }
+      router.push("/dashboard")
+      return
     }
   }, [user, profile, authLoading, profileLoading, router])
 
