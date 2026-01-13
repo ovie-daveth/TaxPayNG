@@ -425,7 +425,7 @@ export default function PricingPage() {
                         </span>
                       </div>
                       <CardDescription className="text-xs sm:text-sm">
-                        For established creators, individuals with complex tax situations, multiple businesses, and team collaborations
+                        For established creators, individuals with complex tax situations, business owner (not Limited Liability Company), and team collaborations
                       </CardDescription>
                       <div className="mt-3 sm:mt-4">
                         <div className="mt-3 sm:mt-4 space-y-1">

@@ -235,17 +235,36 @@ export function ChangePlanModal({
                   </div>
                 )}
                 <CardHeader>
-                  <CardTitle className="text-xl">{plan.name}</CardTitle>
+                  <div className="flex items-center gap-2 mb-2">
+                    <CardTitle className="text-xl">
+                      {planType === 'PRO' ? 'PRO' : planType === 'GOLD' ? 'GOLD' : planType === 'PLATINUM' ? 'PLATINUM' : plan.name}
+                    </CardTitle>
+                    {planType === 'PRO' && (
+                      <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-medium">
+                        Basic
+                      </span>
+                    )}
+                    {planType === 'GOLD' && (
+                      <span className="text-xs bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 px-2 py-1 rounded-full font-medium">
+                        Advanced
+                      </span>
+                    )}
+                    {planType === 'PLATINUM' && (
+                      <span className="text-xs bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-medium">
+                        Individual Businesses
+                      </span>
+                    )}
+                  </div>
                   <CardDescription>
                     {businessType === 'sme' 
                       ? planType === 'Small Business' 
                         ? 'For businesses with annual turnover ≤ ₦50-100 million'
                         : 'For businesses with turnover above small business threshold'
                       : planType === 'PRO'
-                        ? 'Perfect for tech freelancers and independent professionals'
+                        ? 'Perfect for tech freelancers, VAs, copywriters, and independent professionals'
                         : planType === 'GOLD'
-                        ? 'Ideal for content creators and influencers'
-                        : 'For established creators with complex tax situations'}
+                        ? 'Ideal for content creators, influencers, and digital creators managing multiple income streams'
+                        : 'For established creators, individuals with complex tax situations, business owner (not Limited Liability Company), and team collaborations'}
                   </CardDescription>
                   <div className="mt-4">
                     {billingInterval === 'monthly' ? (
