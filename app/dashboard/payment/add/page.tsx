@@ -990,7 +990,7 @@ export default function PaymentPage() {
               <CardHeader className="p-3 sm:p-4 md:p-6">
                 <CardTitle className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">System Checks</CardTitle>
                 <CardDescription className="text-xs sm:text-sm mt-1">
-                  Please ensure all requirements are met before generating RRR
+                  Please ensure all requirements are met before making payment
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-3 sm:p-4 md:p-6">

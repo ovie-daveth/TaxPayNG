@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { ArrowRight, ArrowLeft, Calculator, Calendar, Loader2, AlertTriangle, CheckCircle2, TrendingUp } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
@@ -34,6 +35,48 @@ const normalizeQuarterlyTaxDuration = (duration: string): string => {
   }
   // If already in correct format or doesn't match, return as is
   return duration
+}
+
+// Check if a quarterly taxDuration represents a complete quarter
+const isQuarterComplete = (taxDuration: string): boolean => {
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth() + 1 // 1-12 (January = 1)
+  
+  // Extract quarter number and year from taxDuration
+  // Format: "Q1 2026 (Jan-Mar)" or "Q4 2025 (Oct-Dec)"
+  const qMatch = taxDuration.match(/Q(\d+)\s+(\d{4})/)
+  if (!qMatch) return true // If we can't parse it, allow it (might be a different format)
+  
+  const quarterNum = parseInt(qMatch[1])
+  const year = parseInt(qMatch[2])
+  
+  // If the year is in the future, it's not complete
+  if (year > currentYear) {
+    return false
+  }
+  
+  // If the year is in the past, it's complete
+  if (year < currentYear) {
+    return true
+  }
+  
+  // Same year - check if we're past the quarter's end month
+  // Q1 ends in March (month 3), so we can pay in April (month 4) or later
+  // Q2 ends in June (month 6), so we can pay in July (month 7) or later
+  // Q3 ends in September (month 9), so we can pay in October (month 10) or later
+  // Q4 ends in December (month 12), so we can pay in January (month 1) of next year or later
+  if (quarterNum === 4) {
+    return currentMonth >= 1 && currentYear > year
+  }
+  
+  const quarterEndMonths: Record<number, number> = {
+    1: 3,  // Q1 ends in March
+    2: 6,  // Q2 ends in June
+    3: 9   // Q3 ends in September
+  }
+  
+  return currentMonth > (quarterEndMonths[quarterNum] || 12)
 }
 
 interface OutstandingTax {
@@ -82,6 +125,7 @@ export function SimplifiedPaymentForm({ onContinue, outstandingTaxes = [], loadi
   const [loading, setLoading] = useState(false)
   const [selectedTaxDuration, setSelectedTaxDuration] = useState<string>("")
   const [isSelectedDurationPaid, setIsSelectedDurationPaid] = useState(false)
+  const [showQuarterIncompleteModal, setShowQuarterIncompleteModal] = useState(false)
 
   // Calculate tax amount when period is selected and we move to amount step
   useEffect(() => {
@@ -241,6 +285,12 @@ export function SimplifiedPaymentForm({ onContinue, outstandingTaxes = [], loadi
       }
       if (!taxDuration) {
         toast.error("Please select the period you want to pay for.")
+        return
+      }
+
+      // Validate that quarterly payments are only for completed quarters
+      if (selectedPeriod === 'quarterly' && !isQuarterComplete(taxDuration)) {
+        setShowQuarterIncompleteModal(true)
         return
       }
 
@@ -561,6 +611,50 @@ export function SimplifiedPaymentForm({ onContinue, outstandingTaxes = [], loadi
           </CardContent>
         </Card>
       )}
+
+      {/* Quarter Incomplete Modal */}
+      <Dialog open={showQuarterIncompleteModal} onOpenChange={setShowQuarterIncompleteModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="rounded-full bg-amber-100 dark:bg-amber-900/20 p-2">
+                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <DialogTitle>Quarter Not Complete</DialogTitle>
+            </div>
+            <DialogDescription className="pt-2">
+              You can only pay for quarters that have already ended.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Quarterly tax payments can only be made after the quarter has ended. For example:
+            </p>
+            <ul className="mt-3 space-y-2 text-sm text-muted-foreground list-disc list-inside">
+              <li>Q1 (Jan-Mar) can be paid from April onwards</li>
+              <li>Q2 (Apr-Jun) can be paid from July onwards</li>
+              <li>Q3 (Jul-Sep) can be paid from October onwards</li>
+              <li>Q4 (Oct-Dec) can be paid from January of the next year onwards</li>
+            </ul>
+            {selectedTaxDuration && (
+              <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                <p className="text-sm font-medium">Selected Period:</p>
+                <p className="text-sm text-muted-foreground mt-1">{selectedTaxDuration}</p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Please select a quarter that has already completed.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setShowQuarterIncompleteModal(false)}>
+              Understood
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

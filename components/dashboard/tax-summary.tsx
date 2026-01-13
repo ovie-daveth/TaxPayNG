@@ -119,11 +119,24 @@ export function TaxSummary({ businessType = "freelancer" }: TaxSummaryProps) {
         const totalExpenses = taxData.totalExpenses
         const manualReliefs = 0 // Manual reliefs are handled in self-assessment report
 
-        // Filter payments for the selected year
+        // Helper function to extract year from taxDuration
+        const extractYear = (taxDuration: string): number | null => {
+          const yearMatch = taxDuration.match(/\b(20\d{2})\b/)
+          return yearMatch ? parseInt(yearMatch[1]) : null
+        }
+
+        // Filter payments for the selected year based on taxDuration (the period the payment is for)
+        // NOT based on createdAt (when the payment was made)
+        // This ensures that a payment for December 2025 made in January 2026 is counted as 2025 payment
         const yearPayments = taxPayments.filter(payment => {
           if (payment.status !== 'completed') return false
-          const paymentDate = new Date(payment.createdAt || payment.paymentDate || '')
-          return paymentDate >= yearInfo.start && paymentDate <= yearInfo.end
+          if (!payment.taxDuration) return false
+          
+          // Extract year from taxDuration (e.g., "December 2025" -> 2025, "Q4 2025 (Oct-Dec)" -> 2025)
+          const paymentYear = extractYear(payment.taxDuration)
+          
+          // Match payments where the taxDuration year matches the selected year
+          return paymentYear === selectedYear
         })
         const totalPayments = yearPayments.reduce((sum, payment) => sum + (payment.amount || 0), 0)
 

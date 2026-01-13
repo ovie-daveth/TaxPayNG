@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter, usePathname } from "next/navigation"
 import {
   Dialog,
   DialogContent,
@@ -18,10 +19,14 @@ import {
   SelectItem,
   SelectValue,
 } from "@/components/ui/select"
-import { ExternalLink, Building2, MapPin, Info, ChevronDown, ChevronUp } from "lucide-react"
+import { ExternalLink, Building2, MapPin, Info, ChevronDown, ChevronUp, CheckCircle2, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { RadioGroup, RadioGroupItem } from "../ui/radio"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { taxPaymentService, documentService } from "@/lib/services"
+import { uploadToImageKit } from "@/lib/utils/imagekit"
+import { toast } from "sonner"
 
 interface PaymentPortalSelectorModalProps {
   open: boolean
@@ -93,6 +98,19 @@ export function PaymentPortalSelectorModal({
   const [selectedState, setSelectedState] = useState<string | undefined>(userState)
   const [showReceiptUpload, setShowReceiptUpload] = useState(false)
   const [showTaxDetails, setShowTaxDetails] = useState(false)
+  const [showConfirmation, setShowConfirmation] = useState(false)
+  const [uploadedReceiptUrl, setUploadedReceiptUrl] = useState<string | null>(null)
+  const [paymentRecord, setPaymentRecord] = useState<any>(null)
+  const { user } = useAuth()
+  const router = useRouter()
+  const pathname = usePathname()
+  
+  // Determine base path for redirect
+  const basePath = pathname?.startsWith("/dashboard-creator")
+    ? "/dashboard-creator"
+    : pathname?.startsWith("/dashboard-sme")
+      ? "/dashboard-sme"
+      : "/dashboard"
 
   const userStateIRSUrl = userState ? STATE_IRS_PORTALS[userState] : null
   const hasStateIRS = !!userStateIRSUrl
@@ -252,98 +270,80 @@ export function PaymentPortalSelectorModal({
       </DialogContent>
     </Dialog>
 
+    {/* Tax Details Popup Dialog - Centered Square */}
+    <Dialog open={showTaxDetails} onOpenChange={setShowTaxDetails}>
+      <DialogContent className="max-w-md w-[90vw] aspect-square flex flex-col items-center justify-center">
+        <DialogHeader>
+          <DialogTitle className="text-center mb-6">Payment Details</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-6 w-full flex-1 flex flex-col justify-center">
+          <div className="grid grid-cols-2 gap-4">
+            {taxAmount && (
+              <div className="space-y-1 text-center">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount to Pay</p>
+                <p className="text-xl font-bold text-primary">
+                  ₦{taxAmount.toLocaleString()}
+                </p>
+              </div>
+            )}
+            {taxDuration && (
+              <div className="space-y-1 text-center">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Period</p>
+                <p className="text-sm font-semibold">{taxDuration}</p>
+              </div>
+            )}
+            {period && (
+              <div className="space-y-1 text-center">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Type</p>
+                <p className="text-sm font-semibold capitalize">{period}</p>
+              </div>
+            )}
+            {selectedState && (
+              <div className="space-y-1 text-center">
+                <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">State</p>
+                <p className="text-sm font-semibold">{selectedState}</p>
+              </div>
+            )}
+          </div>
+
+          {taxDescription && (
+            <p className="text-xs text-muted-foreground italic text-center">{taxDescription}</p>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+
     {/* Embedded portal dialog (iframe) */}
     <Dialog open={!!embeddedUrl} onOpenChange={(open) => !open && setEmbeddedUrl(null)}>
       <DialogContent className="max-w-6xl w-screen h-[95vh] max-h-[95vh] overflow-hidden flex flex-col p-0">
-        {/* Scrollable content (header + portal) - footer remains fixed */}
-        <div className="flex-1 overflow-auto">
-          <div className="border-b bg-gradient-to-r from-primary/5 to-primary/10">
-            <div className="p-4 md:p-6">
-              <div className="flex items-center justify-between mb-4">
-                <DialogTitle className="text-lg md:text-2xl font-bold">Complete Payment</DialogTitle>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowTaxDetails(!showTaxDetails)}
-                  className="h-8 w-8 p-0"
-                  title="View payment details"
-                >
-                  <Info className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* Tax Details Display - Collapsible */}
-              {showTaxDetails && (
-                <div className="space-y-4 mb-4">
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                    {taxAmount && (
-                      <div className="space-y-1">
-                        <p className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount to Pay</p>
-                        <p className="text-lg md:text-2xl font-bold text-primary">
-                          ₦{taxAmount.toLocaleString()}
-                        </p>
-                      </div>
-                    )}
-                    {taxDuration && (
-                      <div className="space-y-1">
-                        <p className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wider">Period</p>
-                        <p className="text-xs md:text-sm font-semibold">{taxDuration}</p>
-                      </div>
-                    )}
-                    {period && (
-                      <div className="space-y-1">
-                        <p className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wider">Type</p>
-                        <p className="text-xs md:text-sm font-semibold capitalize">{period}</p>
-                      </div>
-                    )}
-                    {selectedState && (
-                      <div className="space-y-1">
-                        <p className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wider">State</p>
-                        <p className="text-xs md:text-sm font-semibold">{selectedState}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  {taxDescription && (
-                    <p className="text-xs md:text-sm text-muted-foreground italic">{taxDescription}</p>
-                  )}
-                </div>
-              )}
+        {/* Header - fixed */}
+        <div className="border-b bg-gradient-to-r from-primary/5 to-primary/10 shrink-0">
+          <div className="p-4 md:p-6">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-lg md:text-2xl font-bold">Complete Payment</DialogTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowTaxDetails(!showTaxDetails)}
+                className="h-10 w-10 p-0"
+                title="View payment details"
+              >
+                <Info className="h-5 w-5" />
+              </Button>
             </div>
           </div>
+        </div>
 
-          {/* Info Alert about portal performance */}
-          <div className="px-4 md:px-6 pb-4">
-            <Alert className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20">
-              <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-              <AlertDescription className="text-xs md:text-sm text-amber-800 dark:text-amber-200">
-                The portal in modal mode may fail or be slow. If you experience issues,{" "}
-                <a
-                  href={embeddedUrl || "#"}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold underline hover:no-underline"
-                >
-                  click here to open it in a new tab
-                </a>
-                {" "}to continue, then come back and click payment made.
-              </AlertDescription>
-            </Alert>
-          </div>
-
-          {/* Portal iframe - inside the same scroll container */}
-          <div className="w-full">
-            {embeddedUrl ? (
-              <div className="w-full">
-                <iframe
-                  src={embeddedUrl}
-                  title="Payment Portal"
-                  className="w-full min-h-[60vh] h-auto border-none"
-                  sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-top-navigation"
-                />
-              </div>
-            ) : null}
-          </div>
+        {/* Portal iframe - takes remaining space and scrollable */}
+        <div className="flex-1 overflow-auto min-h-0">
+          {embeddedUrl ? (
+            <iframe
+              src={embeddedUrl}
+              title="Payment Portal"
+              className="w-full h-full min-h-[calc(95vh-200px)] border-none"
+              sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-top-navigation"
+            />
+          ) : null}
         </div>
 
         <DialogFooter className="border-t pt-4 flex justify-between">
@@ -361,15 +361,152 @@ export function PaymentPortalSelectorModal({
     <ReceiptUploadModal
       open={showReceiptUpload}
       onOpenChange={setShowReceiptUpload}
-      onUpload={(file) => {
-        if (onPaymentMade) {
-          onPaymentMade(file)
+      onUpload={async (file) => {
+        if (!user?.uid || !taxAmount || !period || !taxDuration) {
+          toast.error("Missing payment information. Please try again.")
+          return
         }
-        setShowReceiptUpload(false)
-        setEmbeddedUrl(null)
-        onOpenChange(false)
+
+        try {
+          // Upload receipt to ImageKit
+          const uploadResult = await uploadToImageKit(file, "payment-receipts", user.uid)
+          
+          // Save as a Document
+          const docRes = await documentService.uploadDocument(user.uid, {
+            file: file,
+            name: `Payment Receipt - ${taxDuration}`,
+            type: "receipt",
+            imageKitUrl: uploadResult.url,
+            imageKitFileId: uploadResult.fileId,
+            fileSize: uploadResult.size,
+            notes: `Tax payment receipt for ${period} period: ${taxDuration}`
+          })
+
+          if (!docRes.success || !docRes.data) {
+            throw new Error(docRes.error || "Failed to save receipt document")
+          }
+
+          // Create tax payment record with status 'completed'
+          // Ensure we use the taxDuration from the form (the period the user selected to pay for)
+          // NOT the current date - this is critical for backdated payments
+          if (!taxDuration) {
+            throw new Error("Tax duration is required. Please go back and select the period you're paying for.")
+          }
+          
+          const transactionId = `PORTAL-${Date.now()}`
+          const saveResult = await taxPaymentService.createPayment(user.uid, {
+            transactionId: transactionId,
+            amount: taxAmount,
+            period: period,
+            taxDuration: taxDuration.trim(), // Use the selected taxDuration (e.g., "December 2025")
+            paymentMethod: selectedOption === 'nrc' ? 'firs' : 'firs', // Both use FIRS
+            status: 'completed',
+            receiptUrl: uploadResult.url,
+            notes: `Payment made via ${selectedOption === 'nrc' ? 'NRC' : 'State IRS'} portal for ${taxDuration.trim()}`
+          })
+          
+          // Log for debugging
+          console.log('Payment recorded with taxDuration:', taxDuration.trim(), 'Period:', period)
+
+          if (!saveResult.success || !saveResult.data) {
+            throw new Error(saveResult.error || "Failed to record payment")
+          }
+
+          // Store receipt URL and payment record for confirmation modal
+          setUploadedReceiptUrl(uploadResult.url)
+          setPaymentRecord(saveResult.data)
+
+          // Close receipt upload modal and show confirmation
+          setShowReceiptUpload(false)
+          setEmbeddedUrl(null)
+          setShowConfirmation(true)
+
+          // Call the callback if provided
+          if (onPaymentMade) {
+            onPaymentMade(file)
+          }
+
+          toast.success("Payment recorded successfully!")
+        } catch (error) {
+          console.error("Error processing payment:", error)
+          toast.error(error instanceof Error ? error.message : "Failed to process payment")
+        }
       }}
     />
+
+    {/* Payment Confirmation Modal */}
+    <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CheckCircle2 className="h-5 w-5 text-green-600" />
+            Payment Confirmed
+          </DialogTitle>
+          <DialogDescription>
+            Your tax payment has been successfully recorded for the specified period.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          {paymentRecord && (
+            <div className="rounded-lg border bg-muted/20 p-4 space-y-2">
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-muted-foreground">Amount</p>
+                  <p className="font-semibold">₦{paymentRecord.amount?.toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Period</p>
+                  <p className="font-semibold capitalize">{paymentRecord.period}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Tax Duration</p>
+                  <p className="font-semibold">{paymentRecord.taxDuration}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Status</p>
+                  <p className="font-semibold text-green-600 capitalize">{paymentRecord.status}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {uploadedReceiptUrl && (
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">Uploaded Receipt</Label>
+              <div className="rounded-lg border overflow-hidden">
+                {uploadedReceiptUrl.endsWith('.pdf') ? (
+                  <iframe
+                    src={uploadedReceiptUrl}
+                    className="w-full h-[400px]"
+                    title="Payment Receipt"
+                  />
+                ) : (
+                  <img
+                    src={uploadedReceiptUrl}
+                    alt="Payment Receipt"
+                    className="w-full h-auto max-h-[500px] object-contain"
+                  />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button
+            onClick={() => {
+              setShowConfirmation(false)
+              onOpenChange(false)
+              // Redirect to payment page
+              router.push(`${basePath}/payment`)
+            }}
+          >
+            Done
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     </>
   )
 }
