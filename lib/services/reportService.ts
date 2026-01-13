@@ -543,15 +543,22 @@ export class ReportService extends BaseService {
       grossIncome += businessGrossAmount
       
       // Calculate VAT if applicable
+      // For creators, taxable income should be net amount (after platform fees)
+      // VAT is calculated on gross amount (what customer pays), but taxable income is net (after platform fees)
       let vatAmount = 0
-      let taxableAmount = businessGrossAmount // Start with gross amount before VAT
+      // Start with net amount (after platform fees) for taxable income calculation
+      // Platform fees are a business expense and should be deducted from taxable income
+      let taxableAmount = businessBaseAmount // Use net amount (after platform fees) for taxable income
       if (txn.type === 'income' && txn.taxClassification?.vatApplicable && txn.taxClassification?.vatRate) {
         const vatRate = txn.taxClassification.vatRate / 100
-        // VAT is calculated on gross amount (before platform fees)
+        // VAT is calculated on gross amount (before platform fees) - what the customer pays
         vatAmount = businessGrossAmount * vatRate
-        // Taxable amount = gross amount - VAT portion = gross amount * (1 - vatRate)
-        // VAT must be remitted to government, so it's not part of taxable income
-        taxableAmount = businessGrossAmount * (1 - vatRate)
+        // Taxable amount = net amount (after platform fees) - VAT portion
+        // VAT is calculated on gross, but we need to exclude it from net taxable income
+        // The VAT portion of the gross is: gross * vatRate
+        // Since the creator receives net (gross - platform fees), taxable income = net - VAT portion
+        // This ensures VAT (which must be remitted) is excluded from taxable income
+        taxableAmount = businessBaseAmount - vatAmount
         vatCollected += vatAmount
       }
       
@@ -959,28 +966,38 @@ export class ReportService extends BaseService {
       { field: 'userId', operator: '==', value: userId }
     ])
     
-    // Filter transactions by period
-    // Include transactions if they were created in the period OR if their transaction date is in the period
-    // This ensures future-dated transactions (created now) are included in current period calculations
-    // For tax calculations, we include transactions created in the current period, even if their transaction date is future
+    // Filter transactions by period - use transaction date only for tax calculations
+    // Tax calculations must use the actual transaction date to maintain correct year attribution
+    // Priority: transactionDate > valueDate > date (createdAt only as absolute fallback for legacy transactions)
     const filteredTransactions = allTransactions.filter(txn => {
       if (entityId && txn.entityId !== entityId) return false
       
-      const txnDateStr = txn.date || txn.transactionDate || txn.valueDate
-      const txnDate = txnDateStr ? new Date(txnDateStr) : null
-      const createdDate = txn.createdAt ? new Date(txn.createdAt) : null
+      // Use transaction date (when transaction actually occurred) for tax period filtering
+      // This ensures transactions are attributed to the correct tax year
+      // Priority: transactionDate > valueDate > date > createdAt (only if no transaction date exists)
+      const txnDateStr = txn.transactionDate || txn.valueDate || txn.date
+      let dateToUse: Date | null = null
       
-      // Include if transaction date is in period (normal case)
-      if (txnDate && !isNaN(txnDate.getTime())) {
-        if (txnDate >= startDate && txnDate <= endDate) {
-          return true
-        }
+      if (txnDateStr) {
+        dateToUse = new Date(txnDateStr)
+      } else if (txn.createdAt) {
+        // Only use createdAt as fallback for legacy transactions without transaction date
+        dateToUse = new Date(txn.createdAt)
       }
       
-      // Include if created date is in period (for future-dated transactions created in current period)
-      // This ensures brand deals and future transactions created now are included in current period tax calculations
-      if (createdDate && !isNaN(createdDate.getTime())) {
-        if (createdDate >= startDate && createdDate <= endDate) {
+      // Only include if date is in period
+      // For tax purposes, we must use the actual transaction date to maintain year accuracy
+      if (dateToUse && !isNaN(dateToUse.getTime())) {
+        // Normalize dates to start of day for comparison
+        const dateToCheck = new Date(dateToUse)
+        dateToCheck.setHours(0, 0, 0, 0)
+        
+        const periodStart = new Date(startDate)
+        periodStart.setHours(0, 0, 0, 0)
+        const periodEnd = new Date(endDate)
+        periodEnd.setHours(23, 59, 59, 999)
+        
+        if (dateToCheck >= periodStart && dateToCheck <= periodEnd) {
           return true
         }
       }
@@ -1025,9 +1042,16 @@ export class ReportService extends BaseService {
     
     // Override grossIncome with actual gross income (before VAT exclusion) for display purposes
     // The taxData.grossIncome is actually taxable income after VAT exclusion (for tax calculation purposes)
+    // For creators, platform fees are deducted from gross income for tax purposes
+    let displayGrossIncome = incomeData.grossIncome || incomeData.totalIncome
+    if (profile?.businessType === 'creator' && incomeData.platformFees) {
+      // For creators, show net income (after platform fees) as gross income for tax summary
+      displayGrossIncome = incomeData.grossIncome - incomeData.platformFees
+    }
+    
     return {
       ...taxData,
-      grossIncome: incomeData.grossIncome || incomeData.totalIncome, // Actual gross income before VAT exclusion
+      grossIncome: displayGrossIncome, // Gross income (after platform fees for creators, before VAT exclusion)
       taxClassification: taxClassificationSummary
     }
   }

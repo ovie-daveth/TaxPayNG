@@ -588,7 +588,8 @@ export function AddTransactionDialog({
 
   useEffect(() => {
     if (transaction) {
-      // Editing existing transaction - show all fields immediately
+      // Editing existing transaction or retrying failed transaction - show all fields immediately
+      // If it's a failed transaction (_tempId), treat it as a new transaction for saving
       const transactionCurrency = (transaction as any).currency || 'NGN' as CurrencyCode
       
       // Calculate original amount based on locked exchange rate
@@ -939,193 +940,55 @@ export function AddTransactionDialog({
     }
 
     console.log("Before submission:", formData)
-    setIsSubmitting(true)
-    try {
-      let documentId: string | undefined = undefined
-      let imageUrl: string[] = []
-      let attachmentFileIds: string[] = []
+    
+    // Calculate values needed for transaction
+    let amountToStore: number
+    if (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && grossAmount && platformFees) {
+      const gross = parseFloat(grossAmount)
+      const fees = parseFloat(platformFees)
+      const net = gross - fees
+      amountToStore = formData.currency === 'NGN'
+        ? net
+        : (convertedAmountNGN ? (net * (convertedAmountNGN / gross)) : net)
+    } else {
+      amountToStore = formData.currency === 'NGN'
+        ? parseFloat(formData.amount)
+        : (convertedAmountNGN || parseFloat(formData.amount))
+    }
 
-      // Handle multiple file uploads
-      if (uploadedFiles.length > 0 && user?.uid) {
-        // New files to upload (either new transaction or replacing existing)
-        try {
-          setUploadingImages(true)
-          
-          // If editing and there are existing attachments, delete them first
-          if (transaction?.attachmentFileIds && transaction.attachmentFileIds.length > 0) {
-            try {
-              // Delete all existing attachment files from ImageKit
-              for (const fileId of transaction.attachmentFileIds) {
-                if (fileId) {
-                  try {
-                    const response = await fetch(`/api/delete-image?fileId=${encodeURIComponent(fileId)}`, {
-                      method: 'DELETE',
-                      headers: {
-                        'Content-Type': 'application/json',
-                      },
-                    })
-                    if (!response.ok) {
-                      console.warn(`Failed to delete ImageKit file ${fileId}`)
-                    }
-                  } catch (deleteError) {
-                    console.error(`Error deleting ImageKit file ${fileId}:`, deleteError)
-                  }
-                }
-              }
-              // Delete linked document if it exists
-              if (transaction.documentId) {
-                await documentService.deleteDocument(transaction.documentId, user.uid)
-                console.log(`Deleted old document ${transaction.documentId} before replacing`)
-              }
-            } catch (deleteError) {
-              console.error('Error deleting old documents:', deleteError)
-              // Continue even if deletion fails
-            }
-          }
+    const taxPeriod = calculateTaxPeriod(transactionDate || formData.date)
+    const lockedExchangeRate = formData.currency === 'NGN' 
+      ? 1 
+      : (exchangeRate || 1)
+    const lockedNgnEquivalent = formData.currency === 'NGN'
+      ? amountToStore
+      : (convertedAmountNGN || amountToStore * lockedExchangeRate)
+    const exchangeRateDate = new Date().toISOString().split('T')[0]
+    const primaryDate = transactionDate || formData.date
 
-          // Upload all files to ImageKit
-          const uploadResults: ImageUploadResult[] = []
-          for (const file of uploadedFiles) {
-            try {
-              const uploadResult = await uploadToImageKit(file, 'transactions', user.uid)
-              uploadResults.push(uploadResult)
-              imageUrl.push(uploadResult.url)
-              attachmentFileIds.push(uploadResult.fileId)
-            } catch (uploadError) {
-              console.error('Error uploading file:', uploadError)
-              // Continue silently - transaction will save without attachments
-            }
-          }
-
-          setUploadedImages(uploadResults)
-
-          // Create document record for the first file (for backward compatibility)
-          if (uploadResults.length > 0) {
-            const firstFile = uploadedFiles[0]
-            const firstResult = uploadResults[0]
-            const documentType = formData.type === 'income' ? 'invoice' : 'receipt'
-            const docResult = await documentService.uploadDocument(user.uid, {
-              file: firstFile,
-              name: `${formData.description} - Receipt`,
-              type: documentType,
-              imageKitUrl: firstResult.url,
-              imageKitFileId: firstResult.fileId,
-              fileSize: firstResult.size,
-              date: formData.date,
-              notes: `Auto-created from transaction: ${formData.description}`
-            })
-
-            if (docResult.success && docResult.data) {
-              documentId = docResult.data.id
-            }
-          }
-
-        } catch (error) {
-          console.error('Error uploading documents:', error)
-          // Continue silently - transaction will save without attachments
-        } finally {
-          setUploadingImages(false)
-        }
-      } else if (transaction?.attachments && transaction.attachments.length > 0 && uploadedFiles.length === 0) {
-        // Editing transaction but all files were removed - delete all attachments
-        try {
-          // Delete all attachment files from ImageKit
-          if (transaction.attachmentFileIds && transaction.attachmentFileIds.length > 0) {
-            for (const fileId of transaction.attachmentFileIds) {
-              if (fileId) {
-                try {
-                  const response = await fetch(`/api/delete-image?fileId=${encodeURIComponent(fileId)}`, {
-                    method: 'DELETE',
-                    headers: {
-                      'Content-Type': 'application/json',
-                    },
-                  })
-                  if (!response.ok) {
-                    console.warn(`Failed to delete ImageKit file ${fileId}`)
-                  }
-                } catch (deleteError) {
-                  console.error(`Error deleting ImageKit file ${fileId}:`, deleteError)
-                }
-              }
-            }
-          }
-          // Delete linked document if it exists
-          if (transaction.documentId) {
-            await documentService.deleteDocument(transaction.documentId, user?.uid || '')
-            console.log(`Deleted document ${transaction.documentId} as files were removed`)
-          }
-          documentId = undefined
-          imageUrl = []
-          attachmentFileIds = []
-        } catch (deleteError) {
-          console.error('Error deleting documents:', deleteError)
-          // Keep existing attachments if deletion fails
-          documentId = transaction.documentId
-          imageUrl = transaction.attachments || []
-          attachmentFileIds = transaction.attachmentFileIds || []
-        }
-      } else if (transaction?.attachments && transaction.attachments.length > 0) {
-        // Editing transaction, no file change - keep existing attachments
-        documentId = transaction.documentId
-        imageUrl = transaction.attachments || []
-        attachmentFileIds = transaction.attachmentFileIds || []
-      }
-
-      // Phase 2: For income transactions with platform fees breakdown enabled, use netAmount if available
-      // Otherwise use the regular amount
-      let amountToStore: number
-      if (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && grossAmount && platformFees) {
-        // Use net amount (gross - fees) for income with platform fees
-        const gross = parseFloat(grossAmount)
-        const fees = parseFloat(platformFees)
-        const net = gross - fees
-        amountToStore = formData.currency === 'NGN'
-          ? net
-          : (convertedAmountNGN ? (net * (convertedAmountNGN / gross)) : net)
-      } else {
-        // Use regular amount
-        amountToStore = formData.currency === 'NGN'
-          ? parseFloat(formData.amount)
-          : (convertedAmountNGN || parseFloat(formData.amount))
-      }
-
-      // Phase 1: Calculate tax period from transaction date
-      const taxPeriod = calculateTaxPeriod(transactionDate || formData.date)
-      
-      // Phase 1: Lock exchange rate at transaction date
-      const lockedExchangeRate = formData.currency === 'NGN' 
-        ? 1 
-        : (exchangeRate || 1)
-      const lockedNgnEquivalent = formData.currency === 'NGN'
-        ? amountToStore
-        : (convertedAmountNGN || amountToStore * lockedExchangeRate)
-      const exchangeRateDate = new Date().toISOString().split('T')[0] // Current date when rate is locked
-
-      // Use transactionDate as the primary date (for backward compatibility with legacy 'date' field)
-      const primaryDate = transactionDate || formData.date
-      
-      const result = await onSubmit({
+    // For ALL NEW transactions: Create optimistic transaction immediately and close modal
+    // This provides instant feedback while files upload and transaction saves in background
+    if (!transaction && user?.uid) {
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      const optimisticTransaction: Transaction & { _isSaving?: boolean; _tempId?: string; _saveError?: string; _formData?: any; _uploadedFiles?: File[] } = {
+        id: tempId,
+        userId: user.uid,
         type: formData.type,
         description: formData.description,
         amount: amountToStore,
-        date: primaryDate, // Keep for backward compatibility - uses transactionDate
-        // Phase 1: New date fields
+        date: primaryDate,
         transactionDate: primaryDate,
         valueDate: valueDate || primaryDate,
         taxPeriod: taxPeriod,
-        // Phase 1: Personal vs Business (not applicable for relief transactions)
         transactionNature: formData.type !== 'relief' ? transactionNature : undefined,
         businessPercentage: formData.type !== 'relief' && transactionNature === 'mixed' ? businessPercentage : undefined,
-        // Phase 1: Locked exchange rates
         currency: formData.currency,
         exchangeRate: formData.currency !== 'NGN' ? lockedExchangeRate : undefined,
         exchangeRateDate: formData.currency !== 'NGN' ? exchangeRateDate : undefined,
         ngnEquivalent: formData.currency !== 'NGN' ? lockedNgnEquivalent : undefined,
-        // Invoice linking - optional manual linking
         linkedInvoiceId: selectedInvoiceId || undefined,
         isFromInvoice: selectedInvoiceId ? true : undefined,
         invoiceStatus: selectedInvoiceId ? 'completed' : undefined,
-        // Phase 2: Platform fees tracking (for income transactions when breakdown is enabled)
         grossAmount: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && grossAmount) 
           ? (formData.currency === 'NGN' ? parseFloat(grossAmount) : (lockedExchangeRate ? parseFloat(grossAmount) * lockedExchangeRate : parseFloat(grossAmount)))
           : undefined,
@@ -1135,7 +998,378 @@ export function AddTransactionDialog({
         netAmount: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && netAmount !== null)
           ? (formData.currency === 'NGN' ? netAmount : (lockedExchangeRate ? netAmount * lockedExchangeRate : netAmount))
           : undefined,
-        // Phase 2: Platform info (when breakdown is enabled)
+        platform: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && platformName && (platformName !== 'Other' || platformAccountId))
+          ? {
+              name: platformName === 'Other' ? (platformAccountId || 'Other') : platformName,
+              platformType: platformType,
+              accountId: platformName !== 'Other' ? (platformAccountId || undefined) : undefined,
+              accountUrl: platformAccountUrl || undefined
+            }
+          : undefined,
+        category: formData.category,
+        paymentMethod: formData.paymentMethod,
+        notes: formData.notes,
+        taxDeductible: formData.taxDeductible,
+        tags: formData.tags,
+        attachments: [], // Will be updated after upload
+        attachmentFileIds: [],
+        documentId: undefined,
+        taxClassification: (hasTaxClassificationAccess && !skipTaxClassification && formData.type !== 'relief') ? taxClassification : undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        _isSaving: true,
+        _tempId: tempId,
+        _formData: { // Store form data for retry
+          formData,
+          transactionDate,
+          valueDate,
+          transactionNature,
+          businessPercentage,
+          taxClassification,
+          selectedInvoiceId,
+          grossAmount,
+          platformFees,
+          netAmount,
+          platformName,
+          platformType,
+          platformAccountId,
+          platformAccountUrl,
+          usePlatformFeesBreakdown,
+          exchangeRate,
+          convertedAmountNGN
+        },
+        _uploadedFiles: uploadedFiles // Store files for background upload
+      }
+      
+      // Add optimistic transaction to UI immediately
+      const optimisticEvent = new CustomEvent('transactionOptimistic', {
+        detail: { transaction: optimisticTransaction }
+      })
+      window.dispatchEvent(optimisticEvent)
+      
+      // Close modal immediately
+      onOpenChange(false)
+      setIsSubmitting(false)
+      toast.success('Transaction added! Saving in background...')
+      
+      // Save in background (upload files, create documents, save transaction)
+      // NOTE: This async operation will continue even if user navigates away from the page
+      // The file uploads and transaction save are independent of React component lifecycle
+      ;(async () => {
+        let documentId: string | undefined = undefined
+        let imageUrl: string[] = []
+        let attachmentFileIds: string[] = []
+        
+        try {
+          // Upload files in background
+          if (uploadedFiles.length > 0) {
+            // Only set state if component is still mounted (optional optimization)
+            try {
+              setUploadingImages(true)
+            } catch (e) {
+              // Component may have unmounted, but continue with save anyway
+            }
+            const uploadResults: ImageUploadResult[] = []
+            for (const file of uploadedFiles) {
+              try {
+                const uploadResult = await uploadToImageKit(file, 'transactions', user.uid)
+                uploadResults.push(uploadResult)
+                imageUrl.push(uploadResult.url)
+                attachmentFileIds.push(uploadResult.fileId)
+              } catch (uploadError) {
+                console.error('Error uploading file:', uploadError)
+              }
+            }
+            setUploadedImages(uploadResults)
+            
+            // Create document record for the first file
+            if (uploadResults.length > 0) {
+              const firstFile = uploadedFiles[0]
+              const firstResult = uploadResults[0]
+              const documentType = formData.type === 'income' ? 'invoice' : 'receipt'
+              const docResult = await documentService.uploadDocument(user.uid, {
+                file: firstFile,
+                name: `${formData.description} - Receipt`,
+                type: documentType,
+                imageKitUrl: firstResult.url,
+                imageKitFileId: firstResult.fileId,
+                fileSize: firstResult.size,
+                date: formData.date,
+                notes: `Auto-created from transaction: ${formData.description}`
+              })
+              if (docResult.success && docResult.data) {
+                documentId = docResult.data.id
+              }
+            }
+          }
+          
+          // Now save transaction with attachments
+          const result = await onSubmit({
+            type: formData.type,
+            description: formData.description,
+            amount: amountToStore,
+            date: primaryDate,
+            transactionDate: primaryDate,
+            valueDate: valueDate || primaryDate,
+            taxPeriod: taxPeriod,
+            transactionNature: formData.type !== 'relief' ? transactionNature : undefined,
+            businessPercentage: formData.type !== 'relief' && transactionNature === 'mixed' ? businessPercentage : undefined,
+            currency: formData.currency,
+            exchangeRate: formData.currency !== 'NGN' ? lockedExchangeRate : undefined,
+            exchangeRateDate: formData.currency !== 'NGN' ? exchangeRateDate : undefined,
+            ngnEquivalent: formData.currency !== 'NGN' ? lockedNgnEquivalent : undefined,
+            linkedInvoiceId: selectedInvoiceId || undefined,
+            isFromInvoice: selectedInvoiceId ? true : undefined,
+            invoiceStatus: selectedInvoiceId ? 'completed' : undefined,
+            grossAmount: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && grossAmount) 
+              ? (formData.currency === 'NGN' ? parseFloat(grossAmount) : (lockedExchangeRate ? parseFloat(grossAmount) * lockedExchangeRate : parseFloat(grossAmount)))
+              : undefined,
+            platformFees: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && platformFees)
+              ? (formData.currency === 'NGN' ? parseFloat(platformFees) : (lockedExchangeRate ? parseFloat(platformFees) * lockedExchangeRate : parseFloat(platformFees)))
+              : undefined,
+            netAmount: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && netAmount !== null)
+              ? (formData.currency === 'NGN' ? netAmount : (lockedExchangeRate ? netAmount * lockedExchangeRate : netAmount))
+              : undefined,
+            platform: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && platformName && (platformName !== 'Other' || platformAccountId))
+              ? {
+                  name: platformName === 'Other' ? (platformAccountId || 'Other') : platformName,
+                  platformType: platformType,
+                  accountId: platformName !== 'Other' ? (platformAccountId || undefined) : undefined,
+                  accountUrl: platformAccountUrl || undefined
+                }
+              : undefined,
+            category: formData.category,
+            paymentMethod: formData.paymentMethod,
+            notes: formData.notes,
+            taxDeductible: formData.taxDeductible,
+            tags: formData.tags,
+            attachments: imageUrl,
+            attachmentFileIds: attachmentFileIds,
+            documentId: documentId,
+            taxClassification: (hasTaxClassificationAccess && !skipTaxClassification && formData.type !== 'relief') ? taxClassification : undefined
+          })
+
+            console.log("Background save result:", result)
+
+            if (result.success && result.data) {
+              const hasAttachment = documentId !== undefined
+
+              // Link document to transaction if document was created
+              if (hasAttachment && result.data.id && documentId) {
+                try {
+                  await documentService.updateDocument(documentId, user.uid, {
+                    linkedTransaction: result.data.id
+                  })
+                  console.log(`Linked document ${documentId} to transaction ${result.data.id}`)
+                } catch (linkError) {
+                  console.error('Error linking document to transaction:', linkError)
+                }
+              }
+
+              // Update optimistic transaction with real data
+              const updateEvent = new CustomEvent('transactionSaved', {
+                detail: {
+                  tempId: tempId,
+                  transaction: result.data
+                }
+              })
+              window.dispatchEvent(updateEvent)
+
+              // Dispatch transaction changed event
+              const event = new CustomEvent('transactionChanged', {
+                detail: {
+                  action: 'created',
+                  transactionId: result.data.id
+                }
+              })
+              window.dispatchEvent(event)
+
+              // Dispatch document changed event if document was created
+              if (hasAttachment) {
+                const docEvent = new CustomEvent('documentChanged', {
+                  detail: { action: 'created' }
+                })
+                window.dispatchEvent(docEvent)
+              }
+
+              toast.success('Transaction saved successfully!')
+            } else {
+              // Update optimistic transaction with error - KEEP transaction in UI
+              const errorEvent = new CustomEvent('transactionSaveError', {
+                detail: {
+                  tempId: tempId,
+                  error: result.error || 'Failed to save transaction'
+                }
+              })
+              window.dispatchEvent(errorEvent)
+              toast.error(result.error || 'Failed to save transaction. Click transaction to retry.')
+            }
+          } catch (error) {
+            console.error('Error in background save:', error)
+            // Update optimistic transaction with error - KEEP transaction in UI
+            const errorEvent = new CustomEvent('transactionSaveError', {
+              detail: {
+                tempId: tempId,
+                error: error instanceof Error ? error.message : 'Failed to save transaction'
+              }
+            })
+            window.dispatchEvent(errorEvent)
+            toast.error('Failed to save transaction. Click transaction to retry.')
+          } finally {
+            // Only set state if component is still mounted
+            try {
+              setUploadingImages(false)
+            } catch (e) {
+              // Component may have unmounted, but save operation continues
+            }
+          }
+        })()
+        
+        return // Exit early - background save is handling everything
+      }
+      
+      // STANDARD PATH: Editing existing transaction - save immediately (no optimistic UI)
+      // Note: Failed transactions (_tempId) will be treated as new transactions when saved
+      setIsSubmitting(true)
+      try {
+        let documentId: string | undefined = undefined
+        let imageUrl: string[] = []
+        let attachmentFileIds: string[] = []
+
+        // Handle multiple file uploads for editing
+        if (uploadedFiles.length > 0 && user?.uid) {
+          try {
+            setUploadingImages(true)
+            
+            // If editing and there are existing attachments, delete them first
+            if (transaction?.attachmentFileIds && transaction.attachmentFileIds.length > 0) {
+              try {
+                for (const fileId of transaction.attachmentFileIds) {
+                  if (fileId) {
+                    try {
+                      const response = await fetch(`/api/delete-image?fileId=${encodeURIComponent(fileId)}`, {
+                        method: 'DELETE',
+                        headers: { 'Content-Type': 'application/json' },
+                      })
+                      if (!response.ok) {
+                        console.warn(`Failed to delete ImageKit file ${fileId}`)
+                      }
+                    } catch (deleteError) {
+                      console.error(`Error deleting ImageKit file ${fileId}:`, deleteError)
+                    }
+                  }
+                }
+                if (transaction.documentId) {
+                  await documentService.deleteDocument(transaction.documentId, user.uid)
+                }
+              } catch (deleteError) {
+                console.error('Error deleting old documents:', deleteError)
+              }
+            }
+
+            // Upload all files to ImageKit
+            const uploadResults: ImageUploadResult[] = []
+            for (const file of uploadedFiles) {
+              try {
+                const uploadResult = await uploadToImageKit(file, 'transactions', user.uid)
+                uploadResults.push(uploadResult)
+                imageUrl.push(uploadResult.url)
+                attachmentFileIds.push(uploadResult.fileId)
+              } catch (uploadError) {
+                console.error('Error uploading file:', uploadError)
+              }
+            }
+            setUploadedImages(uploadResults)
+
+            // Create document record for the first file
+            if (uploadResults.length > 0) {
+              const firstFile = uploadedFiles[0]
+              const firstResult = uploadResults[0]
+              const documentType = formData.type === 'income' ? 'invoice' : 'receipt'
+              const docResult = await documentService.uploadDocument(user.uid, {
+                file: firstFile,
+                name: `${formData.description} - Receipt`,
+                type: documentType,
+                imageKitUrl: firstResult.url,
+                imageKitFileId: firstResult.fileId,
+                fileSize: firstResult.size,
+                date: formData.date,
+                notes: `Auto-created from transaction: ${formData.description}`
+              })
+              if (docResult.success && docResult.data) {
+                documentId = docResult.data.id
+              }
+            }
+          } catch (error) {
+            console.error('Error uploading documents:', error)
+          } finally {
+            setUploadingImages(false)
+          }
+        } else if (transaction?.attachments && transaction.attachments.length > 0 && uploadedFiles.length === 0) {
+          // Editing transaction but all files were removed - delete all attachments
+          try {
+            if (transaction.attachmentFileIds && transaction.attachmentFileIds.length > 0) {
+              for (const fileId of transaction.attachmentFileIds) {
+                if (fileId) {
+                  try {
+                    const response = await fetch(`/api/delete-image?fileId=${encodeURIComponent(fileId)}`, {
+                      method: 'DELETE',
+                      headers: { 'Content-Type': 'application/json' },
+                    })
+                    if (!response.ok) {
+                      console.warn(`Failed to delete ImageKit file ${fileId}`)
+                    }
+                  } catch (deleteError) {
+                    console.error(`Error deleting ImageKit file ${fileId}:`, deleteError)
+                  }
+                }
+              }
+            }
+            if (transaction.documentId) {
+              await documentService.deleteDocument(transaction.documentId, user?.uid || '')
+            }
+            documentId = undefined
+            imageUrl = []
+            attachmentFileIds = []
+          } catch (deleteError) {
+            console.error('Error deleting documents:', deleteError)
+            documentId = transaction.documentId
+            imageUrl = transaction.attachments || []
+            attachmentFileIds = transaction.attachmentFileIds || []
+          }
+        } else if (transaction?.attachments && transaction.attachments.length > 0) {
+          // Editing transaction, no file change - keep existing attachments
+          documentId = transaction.documentId
+          imageUrl = transaction.attachments || []
+          attachmentFileIds = transaction.attachmentFileIds || []
+        }
+
+        const result = await onSubmit({
+        type: formData.type,
+        description: formData.description,
+        amount: amountToStore,
+        date: primaryDate,
+        transactionDate: primaryDate,
+        valueDate: valueDate || primaryDate,
+        taxPeriod: taxPeriod,
+        transactionNature: formData.type !== 'relief' ? transactionNature : undefined,
+        businessPercentage: formData.type !== 'relief' && transactionNature === 'mixed' ? businessPercentage : undefined,
+        currency: formData.currency,
+        exchangeRate: formData.currency !== 'NGN' ? lockedExchangeRate : undefined,
+        exchangeRateDate: formData.currency !== 'NGN' ? exchangeRateDate : undefined,
+        ngnEquivalent: formData.currency !== 'NGN' ? lockedNgnEquivalent : undefined,
+        linkedInvoiceId: selectedInvoiceId || undefined,
+        isFromInvoice: selectedInvoiceId ? true : undefined,
+        invoiceStatus: selectedInvoiceId ? 'completed' : undefined,
+        grossAmount: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && grossAmount) 
+          ? (formData.currency === 'NGN' ? parseFloat(grossAmount) : (lockedExchangeRate ? parseFloat(grossAmount) * lockedExchangeRate : parseFloat(grossAmount)))
+          : undefined,
+        platformFees: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && platformFees)
+          ? (formData.currency === 'NGN' ? parseFloat(platformFees) : (lockedExchangeRate ? parseFloat(platformFees) * lockedExchangeRate : parseFloat(platformFees)))
+          : undefined,
+        netAmount: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && netAmount !== null)
+          ? (formData.currency === 'NGN' ? netAmount : (lockedExchangeRate ? netAmount * lockedExchangeRate : netAmount))
+          : undefined,
         platform: (profile?.businessType === 'creator' && formData.type === 'income' && usePlatformFeesBreakdown && platformName && (platformName !== 'Other' || platformAccountId))
           ? {
               name: platformName === 'Other' ? (platformAccountId || 'Other') : platformName,
@@ -1152,7 +1386,6 @@ export function AddTransactionDialog({
         attachments: imageUrl,
         attachmentFileIds: attachmentFileIds,
         documentId: documentId,
-        // Tax Classification (Gold+ only) - not applicable for relief transactions
         taxClassification: (hasTaxClassificationAccess && !skipTaxClassification && formData.type !== 'relief') ? taxClassification : undefined
       })
 
@@ -1658,8 +1891,27 @@ export function AddTransactionDialog({
                         checked={usePlatformFeesBreakdown}
                         onCheckedChange={(checked) => {
                           setUsePlatformFeesBreakdown(checked)
-                          // If turning off, clear platform fees data
-                          if (!checked) {
+                          if (checked) {
+                            // When turning on, initialize gross amount with current amount value
+                            const currentAmount = formData.amount ? parseFloat(formData.amount) : 0
+                            if (currentAmount > 0) {
+                              // For foreign currency, use the converted NGN equivalent if available
+                              // Otherwise, use the current amount (will be converted when exchange rate is available)
+                              const amountToUse = formData.currency === 'NGN' 
+                                ? currentAmount 
+                                : (convertedAmountNGN || currentAmount)
+                              
+                              // Set gross amount (this is what will be displayed and can be edited)
+                              // This should be the value the user entered (or the gross amount if they were thinking of it as gross)
+                              setGrossAmount(amountToUse.toString())
+                              setGrossAmountDisplay(formatCurrencyInput(amountToUse.toString()))
+                              
+                              // Initialize net amount with the same value (no fees yet)
+                              // When fees are entered, net will be recalculated as gross - fees
+                              setNetAmount(amountToUse)
+                            }
+                          } else {
+                            // If turning off, clear platform fees data
                             setGrossAmount('')
                             setGrossAmountDisplay('')
                             setPlatformFees('')

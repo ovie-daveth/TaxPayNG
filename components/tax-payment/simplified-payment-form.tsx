@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { ArrowRight, ArrowLeft, Calculator, Calendar, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react"
+import { ArrowRight, ArrowLeft, Calculator, Calendar, Loader2, AlertTriangle, CheckCircle2, TrendingUp } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
@@ -22,8 +22,17 @@ const formatCurrencyAmount = (amount: number): string => {
   return formatCurrency(amount).replace("NGN", "₦").replace(".00", "")
 }
 
+interface OutstandingTax {
+  period: string
+  taxDuration: string
+  amount: number
+  periodType: 'monthly' | 'quarterly' | 'yearly'
+}
+
 interface SimplifiedPaymentFormProps {
   onContinue: (data: PaymentFormData) => void
+  outstandingTaxes?: OutstandingTax[]
+  loadingOutstanding?: boolean
 }
 
 interface PaymentFormData {
@@ -43,7 +52,7 @@ interface PendingPeriod {
 
 type Step = 'period' | 'amount'
 
-export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps) {
+export function SimplifiedPaymentForm({ onContinue, outstandingTaxes = [], loadingOutstanding = false }: SimplifiedPaymentFormProps) {
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { sidebarCollapsed } = useSidebar()
@@ -326,6 +335,82 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
             </div>
           </CardHeader>
           <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 md:space-y-6">
+            {/* Outstanding Taxes Alert - Only shown in amount step */}
+            {loadingOutstanding ? (
+              <Card>
+                <CardContent className="pt-3 sm:pt-4 md:pt-6 p-3 sm:p-4 md:p-6">
+                  <div className="flex items-center justify-center py-2.5 sm:py-3 md:py-4">
+                    <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 animate-spin text-muted-foreground mr-2" />
+                    <span className="text-[11px] sm:text-xs md:text-sm text-muted-foreground">Checking outstanding taxes...</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : outstandingTaxes && outstandingTaxes.length > 0 ? (
+              <Card className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20">
+                <CardHeader className="p-3 sm:p-4 md:p-6">
+                  <div className="flex items-center gap-2">
+                    <TrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <CardTitle className="text-sm sm:text-base md:text-lg text-amber-800 dark:text-amber-200 font-semibold">
+                      Outstanding Tax Payments
+                    </CardTitle>
+                  </div>
+                  <CardDescription className="text-[11px] sm:text-xs md:text-sm text-amber-700 dark:text-amber-300 mt-0.5 sm:mt-1">
+                    You have {outstandingTaxes.length} outstanding tax payment{outstandingTaxes.length !== 1 ? 's' : ''} to make
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="p-3 sm:p-4 md:p-6 pt-0">
+                  <div className="space-y-2 sm:space-y-2.5 md:space-y-3">
+                    {outstandingTaxes.map((outstanding, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-2 sm:p-2.5 md:p-3 bg-white dark:bg-gray-900 rounded-lg border border-amber-200 dark:border-amber-800"
+                      >
+                        <div className="flex-1 min-w-0 pr-2">
+                          <p className="font-medium text-[11px] sm:text-xs md:text-sm text-foreground truncate">
+                            {outstanding.taxDuration}
+                          </p>
+                          <p className="text-[10px] sm:text-[11px] md:text-xs text-muted-foreground capitalize mt-0.5">
+                            {outstanding.periodType} payment
+                          </p>
+                        </div>
+                        <div className="text-right shrink-0">
+                          <p className="font-semibold text-[11px] sm:text-xs md:text-sm text-amber-600 dark:text-amber-400">
+                            {formatCurrencyAmount(outstanding.amount)}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="pt-2 border-t border-amber-200 dark:border-amber-800">
+                      <div className="flex items-center justify-between">
+                        <p className="font-semibold text-[11px] sm:text-xs md:text-sm text-foreground">Total Outstanding</p>
+                        <p className="font-bold text-xs sm:text-sm md:text-base lg:text-lg text-amber-600 dark:text-amber-400">
+                          {formatCurrencyAmount(
+                            outstandingTaxes.reduce((sum, tax) => sum + tax.amount, 0)
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : outstandingTaxes && outstandingTaxes.length === 0 && !loadingOutstanding ? (
+              <Card className="border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/20">
+                <CardContent className="pt-3 sm:pt-4 md:pt-6 p-3 sm:p-4 md:p-6">
+                  <div className="flex items-center gap-2 sm:gap-2.5 md:gap-3">
+                    <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-green-600 dark:text-green-400 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="font-medium text-xs sm:text-sm md:text-base text-green-800 dark:text-green-200">
+                        No Outstanding Taxes
+                      </p>
+                      <p className="text-[11px] sm:text-xs md:text-sm text-green-700 dark:text-green-300 mt-0.5">
+                        All tax payments for the current year are up to date.
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
+
             {/* Choose which period to pay for */}
             {selectedPeriod && (
               <div className="space-y-2">
