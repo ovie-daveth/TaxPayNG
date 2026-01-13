@@ -51,7 +51,8 @@ export interface UserProfile {
   // Subscription fields
   isSubscribe?: boolean
   subscriptionType?: SubscriptionType
-  subscriptionExpiryDate?: string // ISO string - when subscription expires (31 days from payment)
+  subscriptionInterval?: 'monthly' | 'yearly' // Billing interval for the subscription
+  subscriptionExpiryDate?: string // ISO string - when subscription expires (31 days for monthly, 365 days for yearly)
   // Free Trial fields
   freeTrialStartDate?: string // ISO string - when free trial started
   freeTrialEndDate?: string // ISO string - when free trial ends (3 days from start)

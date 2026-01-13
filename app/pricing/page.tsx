@@ -12,6 +12,8 @@ import OtaxLogo from "@/components/OtaxLogo"
 import Footer from "@/components/footer"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
@@ -19,6 +21,7 @@ import { useRouter } from "next/navigation"
 import { auth } from "@/firebase/firebase"
 import { MigrateToCreatorModal } from "@/components/subscription/migrate-to-creator-modal"
 import { SubscriptionType } from "@/lib/types"
+import { subscriptionService, getPlanPrice, getPlanPriceDisplay } from "@/lib/services/subscriptionService"
 
 export default function PricingPage() {
   const { user, loading: authLoading } = useAuth()
@@ -27,6 +30,7 @@ export default function PricingPage() {
   const [processingSubscription, setProcessingSubscription] = useState<string | null>(null)
   const [showMigrationModal, setShowMigrationModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
 
   // Check if migration is needed (freelancer trying to subscribe to GOLD or PLATINUM)
   const needsMigration = (planType: string): boolean => {
@@ -125,7 +129,8 @@ export default function PricingPage() {
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
-          subscriptionType: planType
+          subscriptionType: planType,
+          interval: billingInterval
         })
       })
 
@@ -196,9 +201,29 @@ export default function PricingPage() {
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-8 sm:mb-12 md:mb-16">
             <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-2 sm:mb-3 md:mb-4">Simple, Transparent Pricing</h1>
-            <p className="text-sm sm:text-base md:text-lg text-muted-foreground max-w-2xl mx-auto px-4">
+            <p className="text-sm sm:text-base md:text-lg text-muted-foreground max-w-2xl mx-auto px-4 mb-4 sm:mb-6">
               Choose the plan that fits your business needs. All plans include a 3-day free trial.
             </p>
+            
+            {/* Billing Interval Toggle */}
+            <div className="flex items-center justify-center gap-3 sm:gap-4 mb-6 sm:mb-8">
+              <Label htmlFor="billing-toggle" className={`text-sm sm:text-base cursor-pointer ${billingInterval === 'monthly' ? 'font-semibold' : 'text-muted-foreground'}`}>
+                Monthly
+              </Label>
+              <Switch
+                id="billing-toggle"
+                checked={billingInterval === 'yearly'}
+                onCheckedChange={(checked) => setBillingInterval(checked ? 'yearly' : 'monthly')}
+              />
+              <Label htmlFor="billing-toggle" className={`text-sm sm:text-base cursor-pointer ${billingInterval === 'yearly' ? 'font-semibold' : 'text-muted-foreground'}`}>
+                Yearly
+              </Label>
+              {billingInterval === 'yearly' && (
+                <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 text-xs font-semibold ml-2">
+                  Save 25%
+                </Badge>
+              )}
+            </div>
           </div>
 
           {/* Toggle between Individuals and SMEs */}
@@ -218,21 +243,41 @@ export default function PricingPage() {
                       <div className="flex items-center gap-2 mb-2">
                         <CardTitle className="text-xl sm:text-2xl">PRO</CardTitle>
                         <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-medium">
-                          Freelancers
+                          Basic
                         </span>
                       </div>
                       <CardDescription className="text-xs sm:text-sm">
                         Perfect for tech freelancers, VAs, copywriters, and independent professionals
                       </CardDescription>
                 <div className="mt-3 sm:mt-4 space-y-1">
-                  <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">₦5,000</span>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">₦2,500</span>
-                    <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
-                      50% OFF
-                    </Badge>
-                  </div>
-                  <span className="text-xs sm:text-sm text-muted-foreground">per month (launch discount)</span>
+                  {billingInterval === 'monthly' ? (
+                    <>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">₦2,500</span>
+                      </div>
+                      <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">
+                        {(() => {
+                          const plan = subscriptionService.getPlan('PRO')
+                          if (!plan) return '₦30,000'
+                          const grossYearly = (plan.monthlyPrice * 12) / 100 // Convert kobo to naira
+                          return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                        })()}
+                      </span>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">
+                          {getPlanPriceDisplay(subscriptionService.getPlan('PRO')!, 'yearly')}
+                        </span>
+                        <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
+                          25% OFF
+                        </Badge>
+                      </div>
+                      <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
+                    </>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="flex-1 p-4 sm:p-6 pt-0">
@@ -288,7 +333,7 @@ export default function PricingPage() {
                       <div className="flex items-center gap-2 mb-2">
                         <CardTitle className="text-xl sm:text-2xl">GOLD</CardTitle>
                         <span className="text-xs bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 px-2 py-1 rounded-full font-medium">
-                          Creators
+                          Advanced
                         </span>
                       </div>
                       <CardDescription className="text-xs sm:text-sm">
@@ -296,14 +341,34 @@ export default function PricingPage() {
                       </CardDescription>
                       <div className="mt-3 sm:mt-4">
                         <div className="mt-3 sm:mt-4 space-y-1">
-                          <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">₦12,000</span>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦6,000</span>
-                            <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
-                              50% OFF
-                            </Badge>
-                          </div>
-                          <span className="text-xs sm:text-sm text-muted-foreground">per month (launch discount)</span>
+                          {billingInterval === 'monthly' ? (
+                            <>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦6,000</span>
+                              </div>
+                              <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">
+                                {(() => {
+                                  const plan = subscriptionService.getPlan('GOLD')
+                                  if (!plan) return '₦72,000'
+                                  const grossYearly = (plan.monthlyPrice * 12) / 100 // Convert kobo to naira
+                                  return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                                })()}
+                              </span>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
+                                  {getPlanPriceDisplay(subscriptionService.getPlan('GOLD')!, 'yearly')}
+                                </span>
+                                <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
+                                  25% OFF
+                                </Badge>
+                              </div>
+                              <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </CardHeader>
@@ -356,23 +421,43 @@ export default function PricingPage() {
                       <div className="flex items-center gap-2 mb-2">
                         <CardTitle className="text-xl sm:text-2xl">PLATINUM</CardTitle>
                         <span className="text-xs bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-medium">
-                          Advanced Creators
+                          Individual Businesses
                         </span>
                       </div>
                       <CardDescription className="text-xs sm:text-sm">
-                        For established creators with complex tax situations, multiple businesses, and team collaborations
+                        For established creators, individuals with complex tax situations, multiple businesses, and team collaborations
                       </CardDescription>
                       <div className="mt-3 sm:mt-4">
                         <div className="mt-3 sm:mt-4 space-y-1">
-                          <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">₦25,000</span>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦12,500</span>
-                            <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
-                              50% OFF
-                            </Badge>
-                          </div>
+                          {billingInterval === 'monthly' ? (
+                            <>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦12,500</span>
+                              </div>
+                              <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">
+                                {(() => {
+                                  const plan = subscriptionService.getPlan('PLATINUM')
+                                  if (!plan) return '₦150,000'
+                                  const grossYearly = (plan.monthlyPrice * 12) / 100 // Convert kobo to naira
+                                  return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                                })()}
+                              </span>
+                              <div className="flex items-baseline gap-2">
+                                <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
+                                  {getPlanPriceDisplay(subscriptionService.getPlan('PLATINUM')!, 'yearly')}
+                                </span>
+                                <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
+                                  25% OFF
+                                </Badge>
+                              </div>
+                              <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
+                            </>
+                          )}
                         </div>
-                        <span className="text-xs sm:text-sm text-muted-foreground">per month (launch discount)</span>
                       </div>
                     </CardHeader>
                     <CardContent className="flex-1 p-4 sm:p-6 pt-0">
@@ -467,14 +552,34 @@ export default function PricingPage() {
                         <p className="text-xs font-medium text-primary">May qualify for tax exemptions under NTA 2025</p>
                       </CardDescription>
                 <div className="mt-3 sm:mt-4 space-y-1">
-                  <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">₦25,000</span>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦12,500</span>
-                    <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
-                      50% OFF
-                    </Badge>
-                  </div>
-                  <span className="text-xs sm:text-sm text-muted-foreground">per month (launch discount)</span>
+                  {billingInterval === 'monthly' ? (
+                    <>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦12,500</span>
+                      </div>
+                      <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">
+                        {(() => {
+                          const plan = subscriptionService.getPlan('Small Business')
+                          if (!plan) return '₦150,000'
+                          const grossYearly = (plan.monthlyPrice * 12) / 100 // Convert kobo to naira
+                          return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                        })()}
+                      </span>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
+                          {getPlanPriceDisplay(subscriptionService.getPlan('Small Business')!, 'yearly')}
+                        </span>
+                        <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
+                          25% OFF
+                        </Badge>
+                      </div>
+                      <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
+                    </>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="flex-1 p-4 sm:p-6 pt-0">
@@ -532,14 +637,34 @@ export default function PricingPage() {
                         <p className="text-xs font-medium text-muted-foreground">Subject to full corporate tax regime</p>
                       </CardDescription>
                 <div className="mt-3 sm:mt-4 space-y-1">
-                        <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">₦75,000</span>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦37,500</span>
-                          <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
-                            50% OFF
-                          </Badge>
-                        </div>
-                  <span className="text-xs sm:text-sm text-muted-foreground">per month (launch discount)</span>
+                  {billingInterval === 'monthly' ? (
+                    <>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦37,500</span>
+                      </div>
+                      <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">
+                        {(() => {
+                          const plan = subscriptionService.getPlan('Big Business')
+                          if (!plan) return '₦450,000'
+                          const grossYearly = (plan.monthlyPrice * 12) / 100 // Convert kobo to naira
+                          return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                        })()}
+                      </span>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
+                          {getPlanPriceDisplay(subscriptionService.getPlan('Big Business')!, 'yearly')}
+                        </span>
+                        <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
+                          25% OFF
+                        </Badge>
+                      </div>
+                      <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
+                    </>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="flex-1 p-4 sm:p-6 pt-0">

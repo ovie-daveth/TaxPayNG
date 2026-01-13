@@ -6,21 +6,26 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Check, Loader2 } from "lucide-react"
-import { subscriptionService } from "@/lib/services/subscriptionService"
+import { subscriptionService, getPlanPriceDisplay } from "@/lib/services/subscriptionService"
 import { SubscriptionType, BusinessType } from "@/lib/types"
 import { MigrateToCreatorModal } from "./migrate-to-creator-modal"
 import { MigrateToFreelancerModal } from "./migrate-to-freelancer-modal"
 import { auth } from "@/firebase/firebase"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { Badge as UIBadge } from "@/components/ui/badge"
 
 interface ChangePlanModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   currentPlan: SubscriptionType | null
   businessType: BusinessType
-  onSelectPlan: (planType: SubscriptionType) => void | Promise<void>
+  onSelectPlan: (planType: SubscriptionType, interval?: 'monthly' | 'yearly') => void | Promise<void>
   processingPlan?: string | null
+  billingInterval?: 'monthly' | 'yearly'
+  onBillingIntervalChange?: (interval: 'monthly' | 'yearly') => void
 }
 
 export function ChangePlanModal({
@@ -29,12 +34,19 @@ export function ChangePlanModal({
   currentPlan,
   businessType,
   onSelectPlan,
-  processingPlan
+  processingPlan,
+  billingInterval: externalBillingInterval,
+  onBillingIntervalChange
 }: ChangePlanModalProps) {
   const router = useRouter()
   const [showMigrationModal, setShowMigrationModal] = useState(false)
   const [showFreelancerMigrationModal, setShowFreelancerMigrationModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
+  const [internalBillingInterval, setInternalBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
+  
+  // Use external billing interval if provided, otherwise use internal state
+  const billingInterval = externalBillingInterval ?? internalBillingInterval
+  const setBillingInterval = onBillingIntervalChange ?? setInternalBillingInterval
 
   // Get plans based on business type
   const getAvailablePlans = (): SubscriptionType[] => {
@@ -74,8 +86,8 @@ export function ChangePlanModal({
       return
     }
 
-    // No migration needed, proceed with plan selection
-    await onSelectPlan(planType)
+    // No migration needed, proceed with plan selection with billing interval
+    await onSelectPlan(planType, billingInterval)
   }
 
   const handleMigrateAndSubscribe = async () => {
@@ -127,7 +139,7 @@ export function ChangePlanModal({
       onOpenChange(false)
       // Small delay to ensure modals close, then proceed with plan selection
       setTimeout(() => {
-        onSelectPlan(selectedPlan)
+        onSelectPlan(selectedPlan, billingInterval)
       }, 300)
     } catch (error) {
       console.error("Migration error:", error)
@@ -169,6 +181,28 @@ export function ChangePlanModal({
           </DialogDescription>
         </DialogHeader>
 
+        {/* Billing Interval Toggle - Only show if user has existing subscription */}
+        {currentPlan && (
+          <div className="flex items-center justify-center gap-3 mt-4 mb-2">
+            <Label htmlFor="billing-toggle-modal" className={`text-sm cursor-pointer ${billingInterval === 'monthly' ? 'font-semibold' : 'text-muted-foreground'}`}>
+              Monthly
+            </Label>
+            <Switch
+              id="billing-toggle-modal"
+              checked={billingInterval === 'yearly'}
+              onCheckedChange={(checked) => setBillingInterval(checked ? 'yearly' : 'monthly')}
+            />
+            <Label htmlFor="billing-toggle-modal" className={`text-sm cursor-pointer ${billingInterval === 'yearly' ? 'font-semibold' : 'text-muted-foreground'}`}>
+              Yearly
+            </Label>
+            {billingInterval === 'yearly' && (
+              <UIBadge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 text-xs font-semibold ml-2">
+                Save 25%
+              </UIBadge>
+            )}
+          </div>
+        )}
+
         <div className="grid md:grid-cols-3 gap-6 mt-6">
           {availablePlans.map((planType) => {
             const plan = subscriptionService.getPlan(planType)
@@ -177,6 +211,7 @@ export function ChangePlanModal({
             const isCurrent = isCurrentPlan(planType)
             const upgrade = isUpgrade(planType)
             const isProcessing = processingPlan === planType
+            const isBigBusiness = planType === 'Big Business' && businessType === 'sme'
 
             return (
               <Card 
@@ -184,12 +219,19 @@ export function ChangePlanModal({
                 className={`relative flex flex-col ${
                   isCurrent 
                     ? 'border-primary shadow-lg scale-105' 
+                    : isBigBusiness
+                    ? 'opacity-75'
                     : 'hover:border-primary transition-all'
                 }`}
               >
                 {isCurrent && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-medium">
                     Current Plan
+                  </div>
+                )}
+                {isBigBusiness && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-muted border border-border px-3 py-1 rounded-full text-xs font-medium">
+                    Coming Soon
                   </div>
                 )}
                 <CardHeader>
@@ -206,10 +248,30 @@ export function ChangePlanModal({
                         : 'For established creators with complex tax situations'}
                   </CardDescription>
                   <div className="mt-4">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-bold">{plan.priceDisplay}</span>
-                      <span className="text-sm text-muted-foreground">/month</span>
-                    </div>
+                    {billingInterval === 'monthly' ? (
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-bold">{plan.monthlyPriceDisplay}</span>
+                        <span className="text-sm text-muted-foreground">/month</span>
+                      </div>
+                    ) : (
+                      <div className="space-y-1">
+                        <span className="text-xs font-medium text-muted-foreground line-through">
+                          {(() => {
+                            const grossYearly = (plan.monthlyPrice * 12) / 100
+                            return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                          })()}
+                        </span>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-3xl font-bold">
+                            {getPlanPriceDisplay(plan, 'yearly')}
+                          </span>
+                          <UIBadge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 py-0.5 text-xs font-semibold">
+                            25% OFF
+                          </UIBadge>
+                        </div>
+                        <span className="text-sm text-muted-foreground">/year</span>
+                      </div>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1">
@@ -231,7 +293,7 @@ export function ChangePlanModal({
                   <Button
                     className="w-full"
                     variant={isCurrent ? "outline" : "default"}
-                    disabled={isCurrent || isProcessing}
+                    disabled={isCurrent || isProcessing || isBigBusiness}
                     onClick={() => handlePlanSelect(planType)}
                   >
                     {isProcessing ? (
@@ -241,6 +303,8 @@ export function ChangePlanModal({
                       </>
                     ) : isCurrent ? (
                       "Current Plan"
+                    ) : isBigBusiness ? (
+                      "Coming Soon"
                     ) : upgrade ? (
                       "Upgrade"
                     ) : (
