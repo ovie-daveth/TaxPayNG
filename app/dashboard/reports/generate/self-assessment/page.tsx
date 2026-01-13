@@ -505,7 +505,7 @@ export default function GenerateSelfAssessmentPage() {
             </div>
           )}
       </main>
-      {profile && profile.businessType !== 'agent' && (
+      {profile && profile.businessType !== 'consultant' && (
         <SubscriptionRequiredModal
           open={showSubscriptionModal}
           onOpenChange={setShowSubscriptionModal}

@@ -111,7 +111,7 @@ export function getVATEligibility(profile: UserProfile | null | undefined): VATE
 
   // For SMEs and other business types: use similar logic
   // SMEs might have different rules - using same threshold for now
-  if (businessType === 'sme' || businessType === 'agent') {
+  if (businessType === 'sme' || businessType === 'consultant') {
     // If they have the VAT eligibility fields set, use them
     if (annualTurnover !== undefined && annualTurnover !== null) {
       if (annualTurnover < VAT_CHARGE_THRESHOLD) {

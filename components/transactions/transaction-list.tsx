@@ -215,7 +215,7 @@ export function TransactionList({
   }
 
   const handleAddTransaction = () => {
-    if (!hasAccess() && profile && profile.businessType !== 'agent') {
+    if (!hasAccess() && profile && profile.businessType !== 'consultant') {
       setShowSubscriptionModal(true)
       return
     }
@@ -301,7 +301,7 @@ export function TransactionList({
           />
         )}
         <SubscriptionRequiredModal
-          open={showSubscriptionModal && (profile?.businessType !== 'agent' || !profile)}
+          open={showSubscriptionModal && (profile?.businessType !== 'consultant' || !profile)}
           onOpenChange={setShowSubscriptionModal}
           businessType={profile?.businessType || 'freelancer'}
         />

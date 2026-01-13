@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Plus, FileText, Calculator, Bell, Settings, Receipt, Download, FileCheck, BarChart3, ArrowLeft } from "lucide-react"
+import { Plus, FileText, Calculator, Bell, Settings, Receipt, Download, FileCheck, BarChart3, ArrowLeft, Store } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { UploadDocumentDialog } from "../documents/upload-document-dialog"
 import { useState } from "react"
@@ -300,6 +300,24 @@ export function DashboardHeader() {
               <BusinessSwitcher className="mr-1 md:mr-2" />
             </div>
             <div className="flex items-center gap-1">
+              {/* Marketplace Link - Only for freelancers, creators, and SMEs */}
+              {(profile?.businessType !== 'consultant' || !profile) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => router.push('/marketplace')}
+                  className={cn(
+                    "h-8 text-xs whitespace-nowrap",
+                    sidebarCollapsed 
+                      ? "md:h-8 lg:h-10 md:px-1.5 lg:px-3 lg:text-sm" 
+                      : "md:h-8 lg:h-10 md:px-2 lg:px-3 lg:text-sm"
+                  )}
+                >
+                  <Store className="w-3.5 h-3.5 md:w-3.5 md:h-3.5 lg:w-4 lg:h-4 md:mr-0 lg:mr-2" />
+                  <span className="hidden lg:inline">Marketplace</span>
+                  <span className="lg:hidden">Market</span>
+                </Button>
+              )}
               <NotificationBell />
               <ThemeToggle />
             </div>
@@ -356,7 +374,7 @@ export function DashboardHeader() {
         onOpenChange={setIsAddReminderDialogOpen}
         onSubmit={createReminder}
       />
-      {(profile?.businessType !== 'agent' || !profile) && (
+      {(profile?.businessType !== 'consultant' || !profile) && (
         <SubscriptionRequiredModal
           open={showSubscriptionModal}
           onOpenChange={setShowSubscriptionModal}

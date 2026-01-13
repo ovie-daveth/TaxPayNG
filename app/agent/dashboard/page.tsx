@@ -51,24 +51,24 @@ export default function AgentDashboardPage() {
       return
     }
 
-    if (profile.businessType !== 'agent') {
+    if (profile.businessType !== 'consultant') {
       router.push('/dashboard')
       return
     }
 
-    // Only redirect if agentKycCompleted is explicitly false or undefined
+    // Only redirect if consultantKycCompleted is explicitly false or undefined
     // true means they can access the dashboard
     // Add a small delay to prevent rapid redirects
-    if (profile.agentKycCompleted !== true) {
+    if (profile.consultantKycCompleted !== true) {
       const timer = setTimeout(() => {
-        router.push('/agent/kyc')
+        router.push('/consultant/kyc')
       }, 100)
       return () => clearTimeout(timer)
     }
   }, [user, profile, authLoading, profileLoading, router])
 
   useEffect(() => {
-    if (user && profile?.businessType === 'agent' && profile?.agentKycCompleted) {
+    if (user && profile?.businessType === 'consultant' && profile?.consultantKycCompleted) {
       fetchMyRequests()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -140,7 +140,7 @@ export default function AgentDashboardPage() {
     )
   }
 
-  if (!user || profile?.businessType !== 'agent') {
+  if (!user || profile?.businessType !== 'consultant') {
     return null
   }
 
@@ -158,9 +158,9 @@ export default function AgentDashboardPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Welcome back, {profile?.firstName} {profile?.lastName}
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Tax Consultant Dashboard</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">
+          Welcome back, {profile?.firstName} {profile?.lastName}. Manage your clients and their tax filings.
         </p>
       </div>
         {/* Stats Cards */}
@@ -226,7 +226,9 @@ export default function AgentDashboardPage() {
               </div>
               <Button
                 variant="outline"
-                onClick={() => router.push('/agent/dashboard/requests')}
+                size="sm"
+                className="mt-2 sm:mt-0"
+                onClick={() => router.push('/consultant/dashboard/requests')}
               >
                 View All
               </Button>
@@ -244,39 +246,40 @@ export default function AgentDashboardPage() {
                 {filteredRequests.slice(0, 5).map((request) => (
                   <div
                     key={request.id}
-                    className="border rounded-lg p-4 hover:bg-muted/50 transition-colors cursor-pointer"
-                        onClick={() => router.push(`/agent/dashboard/requests/${request.id}`)}
+                    className="border rounded-lg p-3 sm:p-4 hover:bg-muted/50 transition-colors cursor-pointer"
+                        onClick={() => router.push(`/consultant/dashboard/requests/${request.id}`)}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-3 mb-2">
+                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
                           {getStatusBadge(request.status)}
-                          <code className="text-xs font-mono text-muted-foreground">
+                          <code className="text-xs font-mono text-muted-foreground truncate">
                             {request.id.substring(0, 12)}...
                           </code>
                         </div>
-                        <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
-                            <MapPin className="w-4 h-4" />
-                            {request.state}
+                            <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
+                            <span className="truncate">{request.state}</span>
                           </div>
                           <div className="flex items-center gap-1">
-                            <Calendar className="w-4 h-4" />
-                            {format(new Date(request.createdAt), 'MMM dd, yyyy')}
+                            <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
+                            <span className="whitespace-nowrap">{format(new Date(request.createdAt), 'MMM dd, yyyy')}</span>
                           </div>
-                          <span>{request.supportingDocuments?.length || 0} document(s)</span>
+                          <span className="whitespace-nowrap">{request.supportingDocuments?.length || 0} document(s)</span>
                         </div>
                       </div>
                       <Button
                         size="sm"
                         variant="ghost"
+                        className="w-full sm:w-auto"
                         onClick={(e) => {
                           e.stopPropagation()
-                          router.push(`/agent/dashboard/${request.id}`)
+                          router.push(`/consultant/dashboard/requests/${request.id}`)
                         }}
                       >
-                        <FileText className="w-4 h-4 mr-2" />
-                        View
+                        <FileText className="w-4 h-4 sm:mr-2" />
+                        <span className="hidden sm:inline">View</span>
                       </Button>
                     </div>
                   </div>
@@ -285,7 +288,8 @@ export default function AgentDashboardPage() {
                   <div className="text-center pt-4">
                     <Button
                       variant="outline"
-                      onClick={() => router.push('/agent/dashboard/requests')}
+                      size="sm"
+                      onClick={() => router.push('/consultant/dashboard/requests')}
                     >
                       View All {filteredRequests.length} Requests
                     </Button>

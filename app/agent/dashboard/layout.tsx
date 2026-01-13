@@ -26,12 +26,12 @@ function LayoutContent({
         router.push("/login")
         return
       }
-      if (profile?.businessType !== 'agent') {
+      if (profile?.businessType !== 'consultant') {
         router.push('/dashboard')
         return
       }
-      if (profile?.agentKycCompleted !== true) {
-        router.push('/agent/kyc')
+      if (profile?.consultantKycCompleted !== true) {
+        router.push('/consultant/kyc')
         return
       }
     }
@@ -45,7 +45,7 @@ function LayoutContent({
     )
   }
 
-  if (!user || profile?.businessType !== 'agent') {
+  if (!user || profile?.businessType !== 'consultant') {
     return null
   }
 
@@ -57,7 +57,7 @@ function LayoutContent({
         sidebarCollapsed ? "md:ml-16" : "md:ml-64"
       )}>
         <AgentHeader />
-        <main className="container mx-auto px-4 py-6 max-w-7xl">
+        <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
           {children}
         </main>
       </div>

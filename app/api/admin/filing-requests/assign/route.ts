@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
         title: 'New filing request assigned',
         message: `You have been assigned a new filing request for ${requestData?.state || 'a state'}. RRR: ${requestData?.rrr || 'N/A'}`,
         status: 'unread',
-        link: `/agent/dashboard/requests/${requestId}`,
+        link: `/consultant/dashboard/requests/${requestId}`,
         metadata: {
           requestId,
           state: requestData?.state,
@@ -64,8 +64,8 @@ export async function POST(request: NextRequest) {
         await db.collection('notifications').add({
           userId: requestData.userId,
           type: 'filing_status_update',
-          title: 'Agent assigned to your filing request',
-          message: `${agentName} has been assigned to handle your filing request.`,
+          title: 'Tax Consultant assigned to your filing request',
+          message: `${agentName} (Tax Consultant) has been assigned to handle your filing request.`,
           status: 'unread',
           link: `/dashboard/filing-requests/${requestId}`,
           metadata: {
@@ -83,12 +83,12 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: 'Agent assigned successfully'
+      message: 'Tax Consultant assigned successfully'
     })
   } catch (error) {
     console.error('Error assigning agent:', error)
     return NextResponse.json(
-      { error: 'Failed to assign agent' },
+      { error: 'Failed to assign tax consultant' },
       { status: 500 }
     )
   }

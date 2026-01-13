@@ -604,7 +604,7 @@ export default function PaymentPage() {
   if (!subscriptionLoading && !profileLoading && !isSubscribedOnly()) {
     return (
       <>
-        {profile && profile.businessType !== 'agent' && (
+        {profile && profile.businessType !== 'consultant' && (
           <SubscriptionRequiredModal
             open={showSubscriptionModal}
             onOpenChange={(open) => {

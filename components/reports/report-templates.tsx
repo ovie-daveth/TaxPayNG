@@ -107,7 +107,7 @@ export function ReportTemplates() {
           })}
         </div>
       </Card>
-      {profile && profile.businessType !== 'agent' && (
+      {profile && profile.businessType !== 'consultant' && (
         <SubscriptionRequiredModal
           open={showSubscriptionModal}
           onOpenChange={setShowSubscriptionModal}

@@ -70,18 +70,18 @@ function LayoutContent({
     const queryString = searchParams.toString()
     const querySuffix = queryString ? `?${queryString}` : ''
     
-    // Agent redirects - agents have their own pages, redirect them away from dashboard
-    if (profile.businessType === 'agent') {
-      // Only redirect if we're in the dashboard area (not already on agent pages)
-      if (!currentPath.startsWith('/agent')) {
+    // Tax Consultant redirects - consultants have their own pages, redirect them away from dashboard
+    if (profile.businessType === 'consultant') {
+      // Only redirect if we're in the dashboard area (not already on consultant pages)
+      if (!currentPath.startsWith('/consultant')) {
         // If KYC not completed, go to KYC page
-        console.log("Agent KYC completed:", profile.agentKycCompleted)
-        if (profile.agentKycCompleted !== true) {
-          router.push('/agent/kyc' + querySuffix)
+        console.log("Consultant KYC completed:", profile.consultantKycCompleted)
+        if (profile.consultantKycCompleted !== true) {
+          router.push('/consultant/kyc' + querySuffix)
           return
         }
-        // If KYC completed, go to agent dashboard
-        router.push('/agent/dashboard' + querySuffix)
+        // If KYC completed, go to consultant dashboard
+        router.push('/consultant/dashboard' + querySuffix)
         return
       }
       // Already on agent pages, don't interfere
