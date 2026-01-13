@@ -31,7 +31,7 @@ function getClientIP(request: NextRequest): string | undefined {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { email, password, firstName, lastName, businessType, phone, agentStates } = body;
+    const { email, password, firstName, lastName, businessType, phone, consultantStates, agentStates } = body;
 
     // Validate required fields
     if (!email || !password || !firstName || !lastName || !businessType) {
@@ -122,11 +122,20 @@ export async function POST(request: NextRequest) {
       }
     };
 
-    // Add agent-specific fields
+    // Add consultant-specific fields
+    if (businessType === 'consultant') {
+      profileData.phone = phone;
+      profileData.consultantStates = consultantStates || agentStates || []; // Support both for backward compatibility
+      profileData.consultantKycCompleted = false;
+      profileData.role = 'consultant';
+    }
+    // Backward compatibility: also handle 'agent' business type
     if (businessType === 'agent') {
       profileData.phone = phone;
-      profileData.agentStates = agentStates || [];
-      profileData.agentKycCompleted = false;
+      profileData.consultantStates = agentStates || [];
+      profileData.agentStates = agentStates || []; // Keep for backward compatibility
+      profileData.consultantKycCompleted = false;
+      profileData.agentKycCompleted = false; // Keep for backward compatibility
       profileData.role = 'agent';
     }
 

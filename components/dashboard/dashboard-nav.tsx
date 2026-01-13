@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Calculator, LayoutDashboard, Receipt, FileText, Bell, Settings, LogOut, ChevronLeft, ChevronRight, IdCardIcon, FileCheck, BarChart3, MessageSquare, Plus, Menu, X } from "lucide-react"
+import { Calculator, LayoutDashboard, Receipt, FileText, Bell, Settings, LogOut, ChevronLeft, ChevronRight, IdCardIcon, FileCheck, BarChart3, MessageSquare, Plus, Menu, X, Store } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { useAuth } from "@/lib/hooks/useAuth"
@@ -287,6 +287,15 @@ export function DashboardNav() {
             <Menu className="w-5 h-5 text-foreground" />
           </button>
           <div className="flex items-center gap-1.5 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push('/marketplace')}
+              className="h-8 w-8"
+              title="Marketplace"
+            >
+              <Store className="w-4 h-4" />
+            </Button>
             <NotificationBell />
             {mobileAddButton.show && (
               <Button 
@@ -523,7 +532,7 @@ export function DashboardNav() {
       />
       
       {/* Subscription Required Modal */}
-      {(profile?.businessType !== 'agent' || !profile) && (
+      {(profile?.businessType !== 'consultant' || !profile) && (
         <SubscriptionRequiredModal
           open={showSubscriptionModal}
           onOpenChange={setShowSubscriptionModal}

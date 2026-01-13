@@ -1,13 +1,13 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect } from "react"
 import { PaymentReceipt } from "@/components/tax-payment/payment-receipt"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { usePathname, useRouter } from "next/navigation"
 import { SimplifiedPaymentForm } from "@/components/tax-payment/simplified-payment-form"
-import { taxPaymentService, documentService, transactionService } from "@/lib/services"
+import { taxPaymentService, documentService, transactionService, userService } from "@/lib/services"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { useSubscription } from "@/lib/hooks/useSubscription"
@@ -15,13 +15,16 @@ import { toast } from "sonner"
 import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { CheckCircle2, XCircle, AlertCircle, Loader2, TrendingUp } from "lucide-react"
-import Link from "next/link"
+import { CheckCircle2, XCircle, AlertCircle, Loader2, TrendingUp, ExternalLink } from "lucide-react"
 import { calculatePeriodTaxes } from "@/lib/utils/tax-period-calculation"
 import { formatCurrencyAmount } from "@/lib/utils/currency"
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
 import { PaymentPortalSelectorModal } from "@/components/payment/payment-portal-selector-modal"
+import { isConsultant } from "@/lib/utils/businessTypeHelpers"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Upload } from "lucide-react"
 
 interface PaymentData {
   amount: number
@@ -55,6 +58,7 @@ interface SystemCheck {
   message: string
   actionUrl?: string
   actionLabel?: string
+  actionType?: 'profile' | 'tin' | 'kyc' // Type of action to determine which modal to open
 }
 
 export default function PaymentPage() {
@@ -66,8 +70,9 @@ export default function PaymentPage() {
       ? "/dashboard-sme"
       : "/dashboard"
   const { user } = useAuth()
-  const { profile, loading: profileLoading } = useUserProfile()
+  const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
   const { isSubscribedOnly, loading: subscriptionLoading } = useSubscription()
+  const [localProfile, setLocalProfile] = useState(profile) // Local profile state to avoid refresh
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [showReceipt, setShowReceipt] = useState(false)
   const [paymentData, setPaymentData] = useState<PaymentData | null>(null)
@@ -90,8 +95,19 @@ export default function PaymentPage() {
     periodType: 'monthly' | 'quarterly' | 'yearly'
   }>>([])
   const [loadingOutstanding, setLoadingOutstanding] = useState(false)
+  const [hasCheckedOutstanding, setHasCheckedOutstanding] = useState(false)
+  
+  // Modals for updating requirements
+  const [showProfileModal, setShowProfileModal] = useState(false)
+  const [showTINModal, setShowTINModal] = useState(false)
+  const [showKYCModal, setShowKYCModal] = useState(false)
+  const [showNrsTaxIdModal, setShowNrsTaxIdModal] = useState(false)
+  const [savingProfile, setSavingProfile] = useState(false)
+  const [savingTIN, setSavingTIN] = useState(false)
+  const [uploadingKYC, setUploadingKYC] = useState(false)
 
   const NRS_PORTAL_URL = "https://selfservice.nrs.gov.ng/"
+  const NRS_TAX_ID_URL = "https://taxid.nrs.gov.ng/"
 
   // Check subscription on mount
   useEffect(() => {
@@ -128,21 +144,32 @@ export default function PaymentPage() {
     }
   }
 
-  const performSystemChecks = async () => {
-    if (!profile || !user?.uid) return
+  // Update local profile when profile changes (but only on initial load)
+  // We don't want to sync after we've made local updates to prevent refresh
+  useEffect(() => {
+    // Only sync on initial load when localProfile is null
+    // After that, we manage localProfile ourselves to avoid refresh
+    if (profile && !localProfile) {
+      setLocalProfile(profile)
+    }
+  }, [profile]) // Only depend on profile, not localProfile to avoid loops
+
+  const performSystemChecks = async (profileToCheck?: any) => {
+    const profileToUse = profileToCheck || localProfile || profile
+    if (!profileToUse || !user?.uid) return
 
     setChecking(true)
     const checks: SystemCheck[] = []
 
     // 1. Check if profile is complete
     const isProfileComplete = !!(
-      profile.firstName &&
-      profile.lastName &&
-      profile.address &&
-      profile.address.street &&
-      profile.address.city &&
-      profile.address.state &&
-      profile.phone
+      profileToUse.firstName &&
+      profileToUse.lastName &&
+      profileToUse.address &&
+      profileToUse.address.street &&
+      profileToUse.address.city &&
+      profileToUse.address.state &&
+      profileToUse.phone
     )
     
     checks.push({
@@ -151,29 +178,29 @@ export default function PaymentPage() {
       message: isProfileComplete 
         ? "Your profile information is complete"
         : "Please complete your profile information (name, address, phone)",
-      actionUrl: !isProfileComplete ? `${basePath}/settings` : undefined,
-      actionLabel: !isProfileComplete ? "Complete Profile" : undefined
+      actionLabel: !isProfileComplete ? "Complete Profile" : undefined,
+      actionType: !isProfileComplete ? 'profile' : undefined
     })
 
     // 2. Check if TIN is verified
-    const taxId = profile.taxId
+    const taxId = profileToUse.taxId
     const isTINVerified = !!(taxId && typeof taxId === 'string' && taxId.trim().length > 0)
     checks.push({
-      name: "TIN Verified",
+      name: "Tax ID Verified",
       status: isTINVerified,
       message: isTINVerified
         ? "Your Tax Identification Number is verified"
-        : "Please verify your Tax Identification Number (TIN)",
-      actionUrl: !isTINVerified ? `${basePath}/settings` : undefined,
-      actionLabel: !isTINVerified ? "Add TIN" : undefined
+        : "Please verify your Tax Identification Number (Tax ID)",
+      actionLabel: !isTINVerified ? "Add Tax ID" : undefined,
+      actionType: !isTINVerified ? 'tin' : undefined
     })
 
     // 3. Check if KYC is uploaded (check for identity documents in profile)
     try {
       const hasKYCDocuments = !!(
-        profile.kycDocuments?.id || 
-        profile.kycDocuments?.passport || 
-        profile.kycDocuments?.driverLicense
+        profileToUse.kycDocuments?.id || 
+        profileToUse.kycDocuments?.passport || 
+        profileToUse.kycDocuments?.driverLicense
       )
       
       checks.push({
@@ -182,8 +209,8 @@ export default function PaymentPage() {
         message: hasKYCDocuments
           ? "KYC documents are uploaded"
           : "Please upload your identity documents (ID, Passport, or Driver's License)",
-        actionUrl: !hasKYCDocuments ? `${basePath}/settings?tab=profile&section=kyc` : undefined,
-        actionLabel: !hasKYCDocuments ? "Upload Documents" : undefined
+        actionLabel: !hasKYCDocuments ? "Upload Documents" : undefined,
+        actionType: !hasKYCDocuments ? 'kyc' : undefined
       })
     } catch (error) {
       console.error("Error checking KYC documents:", error)
@@ -191,8 +218,8 @@ export default function PaymentPage() {
         name: "KYC Documents",
         status: false,
         message: "Unable to verify KYC documents",
-        actionUrl: `${basePath}/settings?tab=profile&section=kyc`,
-        actionLabel: "Upload Documents"
+        actionLabel: "Upload Documents",
+        actionType: 'kyc'
       })
     }
 
@@ -216,12 +243,21 @@ export default function PaymentPage() {
       }
     }
     
-    // Load outstanding taxes for the selected period type AFTER period selection
-    await loadOutstandingTaxes(data.period)
+    // Reset outstanding taxes state when period changes
+    setOutstandingTaxes([])
+    setHasCheckedOutstanding(false)
     
-    // Perform system checks before navigating
-    await performSystemChecks()
+    // Immediately show validation phase (better UX)
     setShowValidation(true)
+    
+    // Load outstanding taxes and perform system checks in the background
+    // These will show loading states in the validation phase
+    Promise.all([
+      loadOutstandingTaxes(data.period),
+      performSystemChecks()
+    ]).catch(error => {
+      console.error('Error loading validation data:', error)
+    })
   }
 
   const handleProceedToPay = () => {
@@ -557,15 +593,171 @@ export default function PaymentPage() {
       })
 
       setOutstandingTaxes(outstanding)
+      setHasCheckedOutstanding(true)
     } catch (error) {
       console.error('Error loading outstanding taxes:', error)
       toast.error('Failed to load outstanding tax information')
+      setHasCheckedOutstanding(true) // Mark as checked even on error
     } finally {
       setLoadingOutstanding(false)
     }
   }
 
   // Outstanding taxes check is now done after period selection in handlePaymentFormContinue
+
+  // Handler to save profile updates
+  const handleSaveProfile = async (profileData: {
+    firstName: string
+    lastName: string
+    phone: string
+    address: {
+      street: string
+      city: string
+      state: string
+      country: string
+      postalCode: string
+    }
+  }) => {
+    if (!user?.uid) return
+    
+    setSavingProfile(true)
+    try {
+      const result = await userService.upsertProfile(user.uid, {
+        firstName: profileData.firstName,
+        lastName: profileData.lastName,
+        phone: profileData.phone,
+        address: profileData.address,
+        updatedAt: new Date().toISOString()
+      })
+      
+      if (result.success) {
+        // Update local profile state immediately
+        const updatedProfile = {
+          ...(localProfile || profile || {}),
+          firstName: profileData.firstName,
+          lastName: profileData.lastName,
+          phone: profileData.phone,
+          address: profileData.address,
+          updatedAt: new Date().toISOString()
+        }
+        setLocalProfile(updatedProfile as any)
+        
+        toast.success('Profile updated successfully')
+        setShowProfileModal(false)
+        
+        // Re-run checks with updated profile (no page refresh, no refetch)
+        performSystemChecks(updatedProfile).catch(console.error)
+      } else {
+        toast.error(result.error || 'Failed to update profile')
+      }
+    } catch (error) {
+      console.error('Error saving profile:', error)
+      toast.error('Failed to update profile')
+    } finally {
+      setSavingProfile(false)
+    }
+  }
+
+  // Handler to save TIN
+  const handleSaveTIN = async (taxId: string) => {
+    if (!user?.uid) return
+    
+    setSavingTIN(true)
+    try {
+      // Check if Tax ID is already taken by another user
+      const isTaken = await userService.isTaxIdTaken(taxId, user.uid)
+      if (isTaken) {
+        toast.error('This Tax ID has already been registered by another user.')
+        return
+      }
+
+      const result = await userService.upsertProfile(user.uid, {
+        taxId: taxId.trim(),
+        updatedAt: new Date().toISOString()
+      })
+      
+      if (result.success) {
+        // Update local profile state immediately
+        const updatedProfile = {
+          ...(localProfile || profile || {}),
+          taxId: taxId.trim(),
+          updatedAt: new Date().toISOString()
+        }
+        setLocalProfile(updatedProfile as any)
+        
+        toast.success('Tax ID saved successfully')
+        setShowTINModal(false)
+        
+        // Re-run checks with updated profile (no page refresh, no refetch)
+        performSystemChecks(updatedProfile).catch(console.error)
+      } else {
+        toast.error(result.error || 'Failed to save Tax ID')
+      }
+    } catch (error) {
+      console.error('Error saving TIN:', error)
+      toast.error('Failed to save Tax ID')
+    } finally {
+      setSavingTIN(false)
+    }
+  }
+
+  // Handler to upload KYC document
+  const handleUploadKYC = async (file: File) => {
+    if (!user?.uid) return
+    
+    setUploadingKYC(true)
+    try {
+      const result = await uploadToImageKit(file, 'kyc', user.uid)
+      
+      // Get current KYC documents
+      const currentKyc = (localProfile || profile)?.kycDocuments || (profile?.kycDocuments as any) || {}
+      
+      // Update profile with new document URL
+      const updateResult = await userService.upsertProfile(user.uid, {
+        kycDocuments: {
+          id: result.url,
+          idFileId: result.fileId,
+          idSize: result.size,
+          proofOfAddress: (currentKyc as any).proofOfAddress,
+          proofOfAddressFileId: (currentKyc as any).proofOfAddressFileId,
+          proofOfAddressSize: (currentKyc as any).proofOfAddressSize
+        } as any,
+        updatedAt: new Date().toISOString()
+      })
+      
+      if (updateResult.success) {
+        // Update local profile state immediately
+        const updatedProfile = {
+          ...(localProfile || profile || {}),
+          kycDocuments: {
+            id: result.url,
+            idFileId: result.fileId,
+            idSize: result.size,
+            proofOfAddress: (currentKyc as any).proofOfAddress,
+            proofOfAddressFileId: (currentKyc as any).proofOfAddressFileId,
+            proofOfAddressSize: (currentKyc as any).proofOfAddressSize
+          },
+          updatedAt: new Date().toISOString()
+        }
+        setLocalProfile(updatedProfile as any)
+        
+        // Re-run checks with updated profile (no page refresh)
+        await performSystemChecks(updatedProfile)
+        
+        toast.success('KYC document uploaded successfully')
+        setShowKYCModal(false)
+        
+        // No refetch - we're using localProfile to avoid page refresh
+      } else {
+        toast.error(updateResult.error || 'Failed to upload document')
+      }
+    } catch (error) {
+      console.error('Error uploading KYC:', error)
+      toast.error('Failed to upload document')
+    } finally {
+      setUploadingKYC(false)
+    }
+  }
 
   // Check for duplicate payment
   const checkDuplicatePayment = async (period: string, taxDuration: string): Promise<{ isDuplicate: boolean; payment?: any }> => {
@@ -601,7 +793,7 @@ export default function PaymentPage() {
   if (!subscriptionLoading && !profileLoading && !isSubscribedOnly()) {
     return (
       <>
-        {profile && profile.businessType !== 'agent' && (
+        {profile && !isConsultant(profile.businessType) && (
           <SubscriptionRequiredModal
             open={showSubscriptionModal}
             onOpenChange={(open) => {
@@ -798,7 +990,7 @@ export default function PaymentPage() {
               <CardHeader className="p-3 sm:p-4 md:p-6">
                 <CardTitle className="text-base sm:text-lg md:text-xl lg:text-2xl font-semibold">System Checks</CardTitle>
                 <CardDescription className="text-xs sm:text-sm mt-1">
-                  Please ensure all requirements are met before generating RRR
+                  Please ensure all requirements are met before making payment
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-3 sm:p-4 md:p-6">
@@ -828,7 +1020,7 @@ export default function PaymentPage() {
                               <AccordionItem key={index} value={`check-${index}`}>
                                 <AccordionTrigger className="hover:no-underline px-2 sm:px-3 md:px-4 py-2.5 sm:py-3">
                                   <div className="flex items-center gap-2 sm:gap-2.5 md:gap-3 w-full">
-                                    <XCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+                                    <XCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5 text-amber-600 dark:text-amber-400 shrink-0" />
                                     <span className="font-medium text-xs sm:text-sm text-amber-800 dark:text-amber-200">
                                       {check.name}
                                     </span>
@@ -837,12 +1029,23 @@ export default function PaymentPage() {
                                 <AccordionContent className="px-2 sm:px-3 md:px-4 pb-2.5 sm:pb-3">
                                   <div className="pl-5 sm:pl-6 md:pl-8 space-y-2 sm:space-y-2.5 md:space-y-3">
                                     <p className="text-[11px] sm:text-xs md:text-sm text-muted-foreground leading-relaxed">{check.message}</p>
-                                    {check.actionUrl && check.actionLabel && (
-                                      <Link href={check.actionUrl}>
-                                        <Button variant="outline" size="sm" className="h-8 sm:h-9 text-[11px] sm:text-xs md:text-sm">
-                                          {check.actionLabel}
-                                        </Button>
-                                      </Link>
+                                    {check.actionLabel && check.actionType && (
+                                      <Button 
+                                        variant="outline" 
+                                        size="sm" 
+                                        className="h-8 sm:h-9 text-[11px] sm:text-xs md:text-sm"
+                                        onClick={() => {
+                                          if (check.actionType === 'profile') {
+                                            setShowProfileModal(true)
+                                          } else if (check.actionType === 'tin') {
+                                            setShowTINModal(true)
+                                          } else if (check.actionType === 'kyc') {
+                                            setShowKYCModal(true)
+                                          }
+                                        }}
+                                      >
+                                        {check.actionLabel}
+                                      </Button>
                                     )}
                                   </div>
                                 </AccordionContent>
@@ -912,13 +1115,14 @@ export default function PaymentPage() {
               onContinue={handlePaymentFormContinue}
               outstandingTaxes={outstandingTaxes}
               loadingOutstanding={loadingOutstanding}
+              hasCheckedOutstanding={hasCheckedOutstanding}
             />
           </div>
         )}
       </div>
 
       {/* Subscription Required Modal */}
-      {profile && profile.businessType !== 'agent' && (
+      {profile && !isConsultant(profile.businessType) && (
         <SubscriptionRequiredModal
           open={showSubscriptionModal}
           onOpenChange={(open) => {
@@ -931,7 +1135,386 @@ export default function PaymentPage() {
           businessType={profile.businessType || 'freelancer'}
         />
       )}
+
+      {/* Profile Update Modal */}
+      <Dialog open={showProfileModal} onOpenChange={setShowProfileModal}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Complete Your Profile</DialogTitle>
+            <DialogDescription>
+              Please fill in all required information to proceed with payment
+            </DialogDescription>
+          </DialogHeader>
+          <ProfileUpdateForm
+            profile={profile}
+            onSave={handleSaveProfile}
+            onCancel={() => setShowProfileModal(false)}
+            saving={savingProfile}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Tax ID Update Modal */}
+      <Dialog open={showTINModal} onOpenChange={setShowTINModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Add Tax Identification Number</DialogTitle>
+            <DialogDescription>
+              Please enter your Tax Identification Number (Tax ID) to proceed
+            </DialogDescription>
+          </DialogHeader>
+          <TINUpdateForm
+            currentTIN={profile?.taxId || ''}
+            onSave={handleSaveTIN}
+            onCancel={() => setShowTINModal(false)}
+            saving={savingTIN}
+            onOpenNrsModal={() => setShowNrsTaxIdModal(true)}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* NRS Tax ID Portal Modal */}
+      <Dialog open={showNrsTaxIdModal} onOpenChange={setShowNrsTaxIdModal}>
+        <DialogContent className="max-w-full w-full h-[90vh] p-0 sm:max-w-4xl sm:h-[85vh] flex flex-col">
+          <DialogHeader className="px-4 sm:px-6 pt-4 sm:pt-6 pb-2 border-b">
+            <DialogTitle className="text-base sm:text-lg">NRS Tax ID Portal</DialogTitle>
+            <DialogDescription className="text-xs sm:text-sm">
+              Complete your Tax ID registration or verification in the portal below. You can close this window when done.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 relative min-h-0">
+            <iframe
+              src={NRS_TAX_ID_URL}
+              className="w-full h-full border-0"
+              title="NRS Tax ID Portal"
+              allow="fullscreen"
+            />
+          </div>
+          <div className="px-4 sm:px-6 py-3 border-t flex justify-end">
+            <Button type="button" onClick={() => setShowNrsTaxIdModal(false)} className="h-9 sm:h-10 text-xs sm:text-sm">
+              Close
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* KYC Upload Modal */}
+      <Dialog open={showKYCModal} onOpenChange={setShowKYCModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload KYC Document</DialogTitle>
+            <DialogDescription>
+              Please upload a valid identity document (ID, Passport, or Driver's License)
+            </DialogDescription>
+          </DialogHeader>
+          <KYCUploadForm
+            onUpload={handleUploadKYC}
+            onCancel={() => setShowKYCModal(false)}
+            uploading={uploadingKYC}
+          />
+        </DialogContent>
+      </Dialog>
     </>
+  )
+}
+
+// Profile Update Form Component
+function ProfileUpdateForm({ 
+  profile, 
+  onSave, 
+  onCancel, 
+  saving 
+}: { 
+  profile: any
+  onSave: (data: any) => void
+  onCancel: () => void
+  saving: boolean
+}) {
+  const [formData, setFormData] = useState({
+    firstName: profile?.firstName || '',
+    lastName: profile?.lastName || '',
+    phone: profile?.phone || '',
+    address: {
+      street: profile?.address?.street || '',
+      city: profile?.address?.city || '',
+      state: profile?.address?.state || '',
+      country: profile?.address?.country || 'Nigeria',
+      postalCode: profile?.address?.postalCode || ''
+    }
+  })
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!formData.firstName || !formData.lastName || !formData.phone || 
+        !formData.address.street || !formData.address.city || !formData.address.state) {
+      toast.error('Please fill in all required fields')
+      return
+    }
+    onSave(formData)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="firstName">First Name *</Label>
+          <Input
+            id="firstName"
+            value={formData.firstName}
+            onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="lastName">Last Name *</Label>
+          <Input
+            id="lastName"
+            value={formData.lastName}
+            onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
+            required
+          />
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="phone">Phone Number *</Label>
+        <Input
+          id="phone"
+          value={formData.phone}
+          onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+          required
+        />
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="street">Street Address *</Label>
+        <Input
+          id="street"
+          value={formData.address.street}
+          onChange={(e) => setFormData(prev => ({ 
+            ...prev, 
+            address: { ...prev.address, street: e.target.value }
+          }))}
+          required
+        />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="city">City *</Label>
+          <Input
+            id="city"
+            value={formData.address.city}
+            onChange={(e) => setFormData(prev => ({ 
+              ...prev, 
+              address: { ...prev.address, city: e.target.value }
+            }))}
+            required
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="state">State *</Label>
+          <Input
+            id="state"
+            value={formData.address.state}
+            onChange={(e) => setFormData(prev => ({ 
+              ...prev, 
+              address: { ...prev.address, state: e.target.value }
+            }))}
+            required
+          />
+        </div>
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={saving}>
+          {saving ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Save'
+          )}
+        </Button>
+      </DialogFooter>
+    </form>
+  )
+}
+
+// Tax ID Update Form Component
+function TINUpdateForm({ 
+  currentTIN, 
+  onSave, 
+  onCancel, 
+  saving,
+  onOpenNrsModal
+}: { 
+  currentTIN: string
+  onSave: (tin: string) => void
+  onCancel: () => void
+  saving: boolean
+  onOpenNrsModal: () => void
+}) {
+  const [taxId, setTaxId] = useState(currentTIN)
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!taxId.trim()) {
+      toast.error('Please enter a Tax ID')
+      return
+    }
+    onSave(taxId.trim())
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="taxId">Tax Identification Number (Tax ID) *</Label>
+        <Input
+          id="taxId"
+          value={taxId}
+          onChange={(e) => setTaxId(e.target.value)}
+          placeholder="Enter your Tax ID"
+          required
+        />
+        <p className="text-xs text-muted-foreground">
+          Your Tax Identification Number from the Nigerian tax authority
+        </p>
+      </div>
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={onOpenNrsModal}
+          className="flex items-center gap-2"
+        >
+          <ExternalLink className="w-4 h-4" />
+          Get Tax ID from NRS Portal
+        </Button>
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={saving}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={saving}>
+          {saving ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Save'
+          )}
+        </Button>
+      </DialogFooter>
+    </form>
+  )
+}
+
+// KYC Upload Form Component
+function KYCUploadForm({ 
+  onUpload, 
+  onCancel, 
+  uploading 
+}: { 
+  onUpload: (file: File) => void
+  onCancel: () => void
+  uploading: boolean
+}) {
+  const [file, setFile] = useState<File | null>(null)
+  const fileInputRef = React.useRef<HTMLInputElement>(null)
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0]
+    if (selectedFile) {
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf']
+      if (!validTypes.includes(selectedFile.type)) {
+        toast.error('Please upload a valid image (JPEG, PNG) or PDF file')
+        return
+      }
+      // Validate file size (max 10MB)
+      if (selectedFile.size > 10 * 1024 * 1024) {
+        toast.error('File size must be less than 10MB')
+        return
+      }
+      setFile(selectedFile)
+    }
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!file) {
+      toast.error('Please select a file to upload')
+      return
+    }
+    onUpload(file)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="kycFile">Identity Document *</Label>
+        <div className="border-2 border-dashed rounded-lg p-6 text-center">
+          <input
+            ref={fileInputRef}
+            type="file"
+            id="kycFile"
+            accept="image/*,.pdf"
+            onChange={handleFileChange}
+            className="hidden"
+            disabled={uploading}
+          />
+          {file ? (
+            <div className="space-y-2">
+              <p className="text-sm font-medium">{file.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {(file.size / 1024 / 1024).toFixed(2)} MB
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setFile(null)
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = ''
+                  }
+                }}
+                disabled={uploading}
+              >
+                Remove
+              </Button>
+            </div>
+          ) : (
+            <label htmlFor="kycFile" className="cursor-pointer">
+              <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground">
+                Click to upload or drag and drop
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                ID, Passport, or Driver's License (PDF, PNG, JPG - Max 10MB)
+              </p>
+            </label>
+          )}
+        </div>
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={uploading}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={uploading || !file}>
+          {uploading ? (
+            <>
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              Uploading...
+            </>
+          ) : (
+            'Upload'
+          )}
+        </Button>
+      </DialogFooter>
+    </form>
   )
 }
 

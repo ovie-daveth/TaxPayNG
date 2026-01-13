@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Calculator, LayoutDashboard, Settings, LogOut, ChevronLeft, ChevronRight, Receipt, FileText, Bell, IdCardIcon, FileCheck, BarChart3, MessageSquare, Plus, Menu, Handshake, X } from "lucide-react"
+import { Calculator, LayoutDashboard, Settings, LogOut, ChevronLeft, ChevronRight, Receipt, FileText, Bell, IdCardIcon, FileCheck, BarChart3, MessageSquare, Plus, Menu, Handshake, X, Store } from "lucide-react"
 import OtaxLogo from "../OtaxLogo"
 import { useState, useEffect } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
@@ -303,6 +303,15 @@ export function DashboardNavCreator() {
           </button>
           <div className="flex items-center gap-1.5 flex-shrink-0">
             {/* Business switcher lives in the header; removed from sidebar/menu for creators */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push('/marketplace')}
+              className="h-8 w-8"
+              title="Marketplace"
+            >
+              <Store className="w-4 h-4" />
+            </Button>
             <NotificationBell />
             {mobileAddButton.show && (
               <Button 
@@ -545,7 +554,7 @@ export function DashboardNavCreator() {
       />
 
       {/* Subscription Required Modal */}
-      {(profile?.businessType !== 'agent' || !profile) && (
+      {(profile?.businessType !== 'consultant' || !profile) && (
         <SubscriptionRequiredModal
           open={showSubscriptionModal}
           onOpenChange={setShowSubscriptionModal}

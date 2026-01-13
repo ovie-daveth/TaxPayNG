@@ -19,6 +19,15 @@ const nextConfig = {
   // Add empty turbopack config to silence warning
   // The webpack config above will still work when using --webpack flag
   turbopack: {},
+  // Rewrite /consultant/* routes to /agent/* for backward compatibility
+  async rewrites() {
+    return [
+      {
+        source: '/consultant/:path*',
+        destination: '/agent/:path*',
+      },
+    ]
+  },
 }
 
 export default nextConfig

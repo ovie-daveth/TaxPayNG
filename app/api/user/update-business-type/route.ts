@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
     const { businessType } = body
 
     // Validate business type
-    const validBusinessTypes: BusinessType[] = ['freelancer', 'creator', 'sme', 'agent']
+    const validBusinessTypes: BusinessType[] = ['freelancer', 'creator', 'sme', 'consultant']
     if (!businessType || !validBusinessTypes.includes(businessType)) {
       return NextResponse.json(
         { success: false, error: 'Invalid business type' },

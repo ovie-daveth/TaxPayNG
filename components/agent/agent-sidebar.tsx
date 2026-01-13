@@ -15,7 +15,8 @@ import {
   ChevronLeft, 
   ChevronRight,
   FileText,
-  User
+  User,
+  Briefcase
 } from "lucide-react"
 import { useState } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
@@ -25,10 +26,12 @@ import { toast } from "sonner"
 import OtaxLogo from "../OtaxLogo"
 
 const navItems = [
-  { href: "/agent/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/agent/dashboard/requests", label: "Filing Requests", icon: ClipboardList },
-  { href: "/agent/dashboard/payments", label: "Payments", icon: Wallet },
-  { href: "/agent/dashboard/settings", label: "Settings", icon: Settings },
+  { href: "/consultant/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/consultant/dashboard/clients", label: "Clients", icon: User },
+  { href: "/consultant/dashboard/requests", label: "Filing Requests", icon: ClipboardList },
+  { href: "/consultant/dashboard/payments", label: "Payments", icon: Wallet },
+  { href: "/consultant/dashboard/portfolio", label: "Portfolio", icon: Briefcase },
+  { href: "/consultant/dashboard/settings", label: "Settings", icon: Settings },
 ]
 
 export function AgentSidebar() {
@@ -57,7 +60,7 @@ export function AgentSidebar() {
         sidebarCollapsed ? "w-16" : "w-64"
       )}>
         <div className="p-6 border-b border-border flex items-center justify-between">
-          <Link href="/agent/dashboard" className={cn(
+          <Link href="/consultant/dashboard" className={cn(
             "flex items-center gap-2 transition-all duration-300",
             sidebarCollapsed && "justify-center"
           )}>
@@ -84,9 +87,14 @@ export function AgentSidebar() {
             const Icon = item.icon
             // For Dashboard, only match exact path (not sub-routes)
             // For other routes, match exact path or sub-routes
-            const isActive = item.href === "/agent/dashboard"
-              ? pathname === item.href || pathname === item.href + "/"
-              : pathname === item.href || pathname?.startsWith(item.href + "/")
+            let isActive = false
+            if (item.href === "/consultant/dashboard") {
+              // Dashboard: only match exact path, not sub-routes
+              isActive = pathname === item.href || pathname === item.href + "/"
+            } else {
+              // Other routes: match exact path or sub-routes
+              isActive = pathname === item.href || (pathname?.startsWith(item.href + "/") ?? false)
+            }
             return (
               <Link key={item.href} href={item.href}>
                 <div
@@ -178,9 +186,14 @@ export function AgentSidebar() {
                 const Icon = item.icon
                 // For Dashboard, only match exact path (not sub-routes)
                 // For other routes, match exact path or sub-routes
-                const isActive = item.href === "/agent/dashboard"
-                  ? pathname === item.href || pathname === item.href + "/"
-                  : pathname === item.href || pathname?.startsWith(item.href + "/")
+                let isActive = false
+                if (item.href === "/consultant/dashboard") {
+                  // Dashboard: only match exact path, not sub-routes
+                  isActive = pathname === item.href || pathname === item.href + "/"
+                } else {
+                  // Other routes: match exact path or sub-routes
+                  isActive = pathname === item.href || (pathname?.startsWith(item.href + "/") ?? false)
+                }
                 return (
                   <Link
                     key={item.href}

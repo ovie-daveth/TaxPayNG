@@ -290,7 +290,7 @@ export default function GenerateIncomeStatementPage() {
           />
         ) : null}
       </main>
-      {profile && profile.businessType !== 'agent' && (
+      {profile && profile.businessType !== 'consultant' && (
         <SubscriptionRequiredModal
           open={showSubscriptionModal}
           onOpenChange={setShowSubscriptionModal}

@@ -21,6 +21,7 @@ import { useSubscription } from "@/lib/hooks/useSubscription"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
+import { isConsultant } from "@/lib/utils/businessTypeHelpers"
 import { toast } from "sonner"
 
 
@@ -220,7 +221,7 @@ export function TransactionList({
   }
 
   const handleAddTransaction = () => {
-    if (!hasAccess() && profile && profile.businessType !== 'agent') {
+    if (!hasAccess() && profile && profile.businessType !== 'consultant') {
       setShowSubscriptionModal(true)
       return
     }
@@ -315,7 +316,7 @@ export function TransactionList({
           />
         )}
         <SubscriptionRequiredModal
-          open={showSubscriptionModal && (profile?.businessType !== 'agent' || !profile)}
+          open={showSubscriptionModal && (profile?.businessType !== 'consultant' || !profile)}
           onOpenChange={setShowSubscriptionModal}
           businessType={profile?.businessType || 'freelancer'}
         />
@@ -936,7 +937,7 @@ export function TransactionList({
         description="Are you sure you want to delete this transaction? This action cannot be undone."
       />
       <SubscriptionRequiredModal
-        open={showSubscriptionModal && (profile?.businessType !== 'agent' || !profile)}
+        open={showSubscriptionModal && (!isConsultant(profile?.businessType) || !profile)}
         onOpenChange={setShowSubscriptionModal}
         businessType={profile?.businessType || 'freelancer'}
       />

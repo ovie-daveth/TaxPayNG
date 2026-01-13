@@ -110,12 +110,12 @@ export function useAuth() {
         updatedAt: new Date().toISOString()
       }
 
-      // Add agent-specific fields if businessType is agent
-      if (data.businessType === 'agent') {
+      // Add consultant-specific fields if businessType is consultant
+      if (data.businessType === 'consultant') {
         profileData.phone = data.phone
-        profileData.agentStates = data.agentStates || []
-        profileData.agentKycCompleted = false
-        profileData.role = 'agent' // Set role to agent
+        profileData.consultantStates = data.consultantStates || []
+        profileData.consultantKycCompleted = false
+        profileData.role = 'consultant' // Set role to consultant
       }
 
       const profileResult = await userService.upsertProfile(user.uid, profileData)
@@ -346,11 +346,11 @@ export function useAuth() {
           updatedAt: new Date().toISOString()
         }
 
-        // Add agent-specific fields if businessType is agent
-        if (businessType === 'agent') {
-          profileData.agentKycCompleted = false
-          profileData.role = 'agent' // Set role to agent
-          // Note: phone and agentStates will need to be added later via profile completion
+        // Add consultant-specific fields if businessType is consultant
+        if (businessType === 'consultant') {
+          profileData.consultantKycCompleted = false
+          profileData.role = 'consultant' // Set role to consultant
+          // Note: phone and consultantStates will need to be added later via profile completion
         }
 
         const profileResult = await userService.upsertProfile(user.uid, profileData)
