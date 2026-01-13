@@ -57,11 +57,17 @@ export function useTransactions(userId: string | null) {
       const result = await transactionService.createTransaction(userId, payload)
       console.log('createTransaction (hook) service result:', result)
       if (result.success && result.data) {
-        // Add new transaction to the beginning of the list
+        // Add new transaction to the beginning of the list (it's already the newest)
+        // But also ensure the list is sorted by createdAt descending
         setTransactions(prev => {
-          console.log('Adding transaction to state:', result.data)
-          console.log('Previous transactions:', prev)
-          return [result.data!, ...prev]
+          const updated = [result.data!, ...prev]
+          // Re-sort to ensure newest is always first (in case of any timing issues)
+          updated.sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+            return dateB - dateA // Descending: newest first
+          })
+          return updated
         })
         // Update pagination total count
         setPagination(prev => prev ? {
@@ -93,9 +99,16 @@ export function useTransactions(userId: string | null) {
     try {
       const result = await transactionService.updateTransaction(transactionId, userId, updateData)
       if (result.success && result.data) {
-        setTransactions(prev => 
-          prev.map(t => t.id === transactionId ? result.data! : t)
-        )
+        setTransactions(prev => {
+          const updated = prev.map(t => t.id === transactionId ? result.data! : t)
+          // Re-sort to ensure order is maintained by createdAt (newest first)
+          updated.sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+            return dateB - dateA // Descending: newest first
+          })
+          return updated
+        })
       }
       return result
     } catch (err) {

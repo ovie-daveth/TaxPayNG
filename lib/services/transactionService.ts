@@ -105,7 +105,7 @@ export class TransactionService extends BaseService {
       const getCreatedAtTime = (createdAt: any): number => {
         if (!createdAt) return 0
         
-        // If it's already an ISO string, parse it
+        // If it's already an ISO string (like "2026-01-13T07:11:35.607Z"), parse it
         if (typeof createdAt === 'string') {
           const parsed = new Date(createdAt).getTime()
           return isNaN(parsed) ? 0 : parsed
@@ -136,12 +136,25 @@ export class TransactionService extends BaseService {
         }
       }
       
+      // Sort by createdAt in descending order (newest first)
+      // This ensures the most recently created transaction appears at the top
       filtered.sort((a, b) => {
         const dateA = getCreatedAtTime(a.createdAt)
         const dateB = getCreatedAtTime(b.createdAt)
         // Descending order: newest first (dateB - dateA)
+        // If dateB > dateA (b is newer), return positive (b comes before a)
+        // If dateB < dateA (b is older), return negative (a comes before b)
+        // If dates are equal, maintain original order (stable sort)
+        if (dateB === dateA) return 0
         return dateB - dateA
       })
+      
+      // Ensure the sort is correct - log for debugging if needed
+      // console.log('Sorted transactions by createdAt (newest first):', filtered.map(t => ({
+      //   id: t.id,
+      //   createdAt: t.createdAt,
+      //   description: t.description
+      // })))
       
       // Apply pagination
       const total = filtered.length
@@ -219,15 +232,19 @@ export class TransactionService extends BaseService {
 
       // If transaction has attachments but no documentId, create corresponding documents
       // (documentId means document was already created in the dialog with proper storage tracking)
+      // Only create documents for income, expense, or relief transactions (not transfer or adjustment)
       if (transactionData.attachments && transactionData.attachments.length > 0 && !transactionData.documentId) {
-        await this.createDocumentsFromAttachments(
-          userId,
-          transactionId,
-          transactionData.attachments,
-          transactionData.description,
-          transactionData.date,
-          transactionData.type
-        )
+        const transactionType = transactionData.type
+        if (transactionType === 'income' || transactionType === 'expense' || transactionType === 'relief') {
+          await this.createDocumentsFromAttachments(
+            userId,
+            transactionId,
+            transactionData.attachments,
+            transactionData.description,
+            transactionData.date,
+            transactionType
+          )
+        }
       }
 
       return {
@@ -335,14 +352,18 @@ export class TransactionService extends BaseService {
         )
         
         if (newAttachments.length > 0) {
-          await this.createDocumentsFromAttachments(
-            userId,
-            transactionId,
-            newAttachments,
-            updateData.description || existingTransaction.description,
-            updateData.date || existingTransaction.date,
-            updateData.type || existingTransaction.type
-          )
+          const transactionType = updateData.type || existingTransaction.type
+          // Only create documents for income, expense, or relief transactions (not transfer or adjustment)
+          if (transactionType === 'income' || transactionType === 'expense' || transactionType === 'relief') {
+            await this.createDocumentsFromAttachments(
+              userId,
+              transactionId,
+              newAttachments,
+              updateData.description || existingTransaction.description,
+              updateData.date || existingTransaction.date,
+              transactionType
+            )
+          }
         }
       }
 
@@ -458,10 +479,10 @@ export class TransactionService extends BaseService {
       const end = endDate ? new Date(endDate) : null
       const filteredTransactions = transactions
         .map((transaction) => {
-          // For income stats, filter by createdAt (when transaction was recorded)
-          // This ensures transactions are included in the period they were recorded,
-          // regardless of their transaction date (which may be in the future)
-          const recordDate = transaction.createdAt ? new Date(transaction.createdAt) : null
+          // Use transaction date (when transaction actually occurred) instead of createdAt
+          // Priority: transactionDate > valueDate > date > createdAt (fallback)
+          const transactionDate = transaction.transactionDate || transaction.valueDate || transaction.date || transaction.createdAt
+          const recordDate = transactionDate ? new Date(transactionDate) : null
 
           // Preserve original transaction data for calculation (netAmount, transactionNature, taxClassification, etc.)
           return {
@@ -493,7 +514,7 @@ export class TransactionService extends BaseService {
           if (end) {
             const endDateOnly = new Date(end)
             endDateOnly.setHours(23, 59, 59, 999)
-            if (transaction.recordDate > endDateOnly) return false
+            if (recordDateOnly > endDateOnly) return false
           }
           
           return true
@@ -648,10 +669,10 @@ export class TransactionService extends BaseService {
               ? baseAmount
               : Number(String(baseAmount).replace(/[\u20A6,]/g, '').trim()) || 0
           
-          // For period filtering, use createdAt (when transaction was recorded)
-          // This ensures transactions are included in the period they were recorded,
-          // regardless of their transaction date (which may be in the future)
-          const recordDate = transaction.createdAt ? new Date(transaction.createdAt) : null
+          // For period filtering, use transaction date (when transaction actually occurred)
+          // Priority: transactionDate > valueDate > date > createdAt (fallback)
+          const transactionDate = transaction.transactionDate || transaction.valueDate || transaction.date || transaction.createdAt
+          const recordDate = transactionDate ? new Date(transactionDate) : null
           
           return {
             ...transaction,

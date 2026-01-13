@@ -1658,8 +1658,27 @@ export function AddTransactionDialog({
                         checked={usePlatformFeesBreakdown}
                         onCheckedChange={(checked) => {
                           setUsePlatformFeesBreakdown(checked)
-                          // If turning off, clear platform fees data
-                          if (!checked) {
+                          if (checked) {
+                            // When turning on, initialize gross amount with current amount value
+                            const currentAmount = formData.amount ? parseFloat(formData.amount) : 0
+                            if (currentAmount > 0) {
+                              // For foreign currency, use the converted NGN equivalent if available
+                              // Otherwise, use the current amount (will be converted when exchange rate is available)
+                              const amountToUse = formData.currency === 'NGN' 
+                                ? currentAmount 
+                                : (convertedAmountNGN || currentAmount)
+                              
+                              // Set gross amount (this is what will be displayed and can be edited)
+                              // This should be the value the user entered (or the gross amount if they were thinking of it as gross)
+                              setGrossAmount(amountToUse.toString())
+                              setGrossAmountDisplay(formatCurrencyInput(amountToUse.toString()))
+                              
+                              // Initialize net amount with the same value (no fees yet)
+                              // When fees are entered, net will be recalculated as gross - fees
+                              setNetAmount(amountToUse)
+                            }
+                          } else {
+                            // If turning off, clear platform fees data
                             setGrossAmount('')
                             setGrossAmountDisplay('')
                             setPlatformFees('')
