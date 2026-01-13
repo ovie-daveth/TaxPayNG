@@ -175,6 +175,58 @@ export function useTransactions(userId: string | null) {
     }
   }, [userId, loadTransactions])
 
+  // Handle optimistic transactions
+  useEffect(() => {
+    const handleOptimistic = (event: CustomEvent) => {
+      const { transaction } = event.detail
+      if (transaction && transaction._isSaving) {
+        // Add optimistic transaction to the beginning of the list
+        setTransactions(prev => {
+          // Check if it already exists (avoid duplicates)
+          if (prev.some(t => t._tempId === transaction._tempId)) {
+            return prev
+          }
+          return [transaction, ...prev].sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+            return dateB - dateA // Descending: newest first
+          })
+        })
+      }
+    }
+
+    const handleSaved = (event: CustomEvent) => {
+      const { tempId, transaction } = event.detail
+      // Replace optimistic transaction with real one
+      setTransactions(prev => 
+        prev.map(t => t._tempId === tempId ? transaction : t)
+      )
+    }
+
+    const handleSaveError = (event: CustomEvent) => {
+      const { tempId, error } = event.detail
+      // Update optimistic transaction with error state
+      setTransactions(prev => 
+        prev.map(t => 
+          t._tempId === tempId 
+            ? { ...t, _isSaving: false, _saveError: error }
+            : t
+        )
+      )
+      toast.error(`Failed to save transaction: ${error}`)
+    }
+
+    window.addEventListener('transactionOptimistic', handleOptimistic as EventListener)
+    window.addEventListener('transactionSaved', handleSaved as EventListener)
+    window.addEventListener('transactionSaveError', handleSaveError as EventListener)
+
+    return () => {
+      window.removeEventListener('transactionOptimistic', handleOptimistic as EventListener)
+      window.removeEventListener('transactionSaved', handleSaved as EventListener)
+      window.removeEventListener('transactionSaveError', handleSaveError as EventListener)
+    }
+  }, [])
+
   return {
     transactions,
     loading,
