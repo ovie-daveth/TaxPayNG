@@ -63,11 +63,11 @@ export function GoogleBusinessTypeDialog({ open, onOpenChange, onSelect }: Googl
           <Button
             variant="outline"
             className="w-full justify-start h-auto py-4"
-            onClick={() => handleSelect('agent')}
+            onClick={() => handleSelect('consultant')}
           >
             <div className="text-left">
-              <div className="font-semibold">Tax Filing Agent</div>
-              <div className="text-sm text-muted-foreground">Help others file their taxes</div>
+              <div className="font-semibold">Tax Consultant</div>
+              <div className="text-sm text-muted-foreground">Professional tax consultant managing multiple businesses and individuals</div>
             </div>
           </Button>
         </div>

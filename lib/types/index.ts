@@ -1,4 +1,4 @@
-export type BusinessType = 'freelancer' | 'creator' | 'sme'  | 'agent'
+export type BusinessType = 'freelancer' | 'creator' | 'sme'  | 'consultant'
 
 // Subscription Types
 export type SubscriptionType = 'PRO' | 'GOLD' | 'PLATINUM' | 'Small Business' | 'Big Business' | null
@@ -26,13 +26,16 @@ export interface UserProfile {
   }
   kycDocuments?: {
     // Means of identification: NIN, International Passport, Voter's Card, Driver's License, etc.
-    // Single field - upload any valid government-issued ID
-    id?: string // URL to uploaded identification document (NIN, passport, voter's card, etc.)
-    // Proof of address: NEPA bill, utility bill, bank statement, etc.
-    proofOfAddress?: string // URL to uploaded proof of address document
+    // Single field - upload any valid government-issued ID (for consultants)
+    proofOfIdentity?: string // URL to uploaded identification document (NIN, passport, voter's card, driver's license, etc.)
+    // Selfie for KYC verification (for consultants)
+    selfie?: string // URL to uploaded selfie photo
     // Legacy fields - kept for backward compatibility when reading existing user data
+    id?: string // URL to uploaded identification document (NIN, passport, voter's card, etc.)
     passport?: string
     driverLicense?: string
+    // Proof of address: NEPA bill, utility bill, bank statement, etc.
+    proofOfAddress?: string // URL to uploaded proof of address document
   }
   role?: 'user' | 'admin' | 'editor' // User role - defaults to 'user'
   lastLogin?: string // Last login timestamp
@@ -73,10 +76,36 @@ export interface UserProfile {
   transactionCountResetDate?: string // Date when transaction count was last reset
   storageLimit?: number // Storage limit in bytes (e.g., 500MB = 500 * 1024 * 1024)
   storageUsed?: number // Current storage used in bytes
-  // Agent-specific fields
-  agentStates?: string[] // States the agent can handle
-  agentCertification?: string // URL to certification document
-  agentKycCompleted?: boolean // Whether agent has completed KYC
+  // Tax Consultant-specific fields
+  consultantStates?: string[] // States the consultant can handle
+  consultantCertification?: string // URL to certification document
+  consultantKycCompleted?: boolean // Whether consultant has completed KYC
+  consultantPortfolio?: {
+    bio?: string // Professional bio/description
+    experience?: string // Years of experience or experience description
+    specializations?: string[] // Areas of specialization (e.g., ["CIT", "VAT", "PAYE"])
+    location?: string // City/State location
+    languages?: string[] // Languages spoken
+    certifications?: Array<{
+      name: string
+      issuer: string
+      year?: number
+      certificateUrl?: string
+    }>
+    achievements?: Array<{
+      title: string
+      description?: string
+      year?: number
+    }>
+    clientCount?: number // Number of clients managed
+    successRate?: number // Success rate percentage
+    portfolioImages?: string[] // URLs to portfolio images/documents
+    rate?: {
+      amount: number // Rate amount
+      type: 'hourly' | 'per_consultancy' // Rate type
+      currency?: string // Currency code (default: NGN)
+    }
+  }
   // Creator-specific fields
   platformConnections?: PlatformConnection[] // Saved platform connections for creators
   // VAT Compliance fields (for freelancers and creators)
@@ -86,6 +115,10 @@ export interface UserProfile {
   vatRegistrationNumber?: string // VAT registration number (if registered)
   annualTurnover?: number // Annual turnover in NGN over 12 months - threshold is ₦100M to charge VAT
   vatEligibilityStatus?: 'eligible' | 'exempt' | 'below_threshold' // Auto-calculated: eligible if turnover ≥₦100M and VAT registered
+  // Consultant assignment (for clients)
+  assignedConsultantId?: string // User ID of the tax consultant assigned to this user (set when user selects consultant from marketplace)
+  assignedConsultantName?: string // Name of the assigned consultant (for display)
+  assignedAt?: string // Date when consultant was assigned
 }
 
 // Business Entity (Multi-Entity Business Management)

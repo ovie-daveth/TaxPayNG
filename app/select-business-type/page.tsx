@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { BusinessType } from "@/lib/types"
 import { Loader2 } from "lucide-react"
+import { isConsultant } from "@/lib/utils/businessTypeHelpers"
 import Image from "next/image"
 import { useTheme } from "next-themes"
 
@@ -78,12 +79,13 @@ export default function SelectBusinessTypePage() {
     // If user has a business type other than freelancer, or has taxId, or profile has been updated, redirect
     if (profile.businessType && profile.businessType !== 'freelancer') {
       // User has a non-freelancer business type, redirect to appropriate dashboard
-      if (profile.businessType === 'agent') {
-        if (profile.agentKycCompleted !== true) {
-          router.push("/agent/kyc")
+      // Check for both 'consultant' and legacy 'agent' for backward compatibility
+      if (isConsultant(profile.businessType)) {
+        if (profile.consultantKycCompleted !== true) {
+          router.push("/consultant/kyc")
           return
         }
-        router.push("/agent/dashboard")
+        router.push("/consultant/dashboard")
         return
       }
 
@@ -141,10 +143,10 @@ export default function SelectBusinessTypePage() {
         updatedAt: new Date().toISOString()
       }
 
-      // Add agent-specific fields if businessType is agent
-      if (businessType === 'agent') {
-        updateData.agentKycCompleted = false
-        updateData.role = 'agent'
+      // Add consultant-specific fields if businessType is consultant
+      if (businessType === 'consultant') {
+        updateData.consultantKycCompleted = false
+        updateData.role = 'consultant'
       }
 
       const result = await userService.upsertProfile(user.uid, updateData)
@@ -247,12 +249,12 @@ export default function SelectBusinessTypePage() {
               <Button
                 variant="outline"
                 className="w-full justify-start h-auto py-4"
-                onClick={() => handleSelectBusinessType('agent')}
+                onClick={() => handleSelectBusinessType('consultant')}
                 disabled={isSaving}
               >
                 <div className="text-left">
-                  <div className="font-semibold">Tax Filing Agent</div>
-                  <div className="text-sm text-muted-foreground">Professional tax agent assisting clients</div>
+                  <div className="font-semibold">Tax Consultant</div>
+                  <div className="text-sm text-muted-foreground">Professional tax consultant managing multiple businesses and individuals</div>
                 </div>
               </Button>
             </div>

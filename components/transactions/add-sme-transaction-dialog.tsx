@@ -2859,7 +2859,7 @@ export function AddSMETransactionDialog({
     <>
       {typeof window !== 'undefined' && createPortal(modalContent, document.body)}
       
-      {profile && profile.businessType !== 'agent' && (
+      {profile && profile.businessType !== 'consultant' && (
         <SubscriptionRequiredModal
           open={showSubscriptionModal}
           onOpenChange={setShowSubscriptionModal}

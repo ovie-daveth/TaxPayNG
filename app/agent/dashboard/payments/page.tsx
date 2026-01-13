@@ -46,7 +46,7 @@ export default function AgentPaymentsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
 
   useEffect(() => {
-    if (user && profile?.businessType === 'agent') {
+    if (user && profile?.businessType === 'consultant') {
       loadPayments()
     }
   }, [user, profile])
@@ -150,8 +150,8 @@ export default function AgentPaymentsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold mb-2">Payment History</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Payment History</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">
           View your earnings and payment history
         </p>
       </div>
@@ -265,65 +265,122 @@ export default function AgentPaymentsPage() {
               <p>No payments found</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-4 font-semibold">Request ID</th>
-                    <th className="text-left p-4 font-semibold">State</th>
-                    <th className="text-left p-4 font-semibold">Filing Fee</th>
-                    <th className="text-left p-4 font-semibold">Commission</th>
-                    <th className="text-left p-4 font-semibold">Status</th>
-                    <th className="text-left p-4 font-semibold">Payment Date</th>
-                    <th className="text-left p-4 font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredPayments.map((payment) => (
-                    <tr key={payment.id} className="border-b hover:bg-muted/50">
-                      <td className="p-4">
-                        <code className="text-xs font-mono">{payment.requestId.substring(0, 12)}...</code>
-                      </td>
-                      <td className="p-4">
-                        {payment.state || 'N/A'}
-                      </td>
-                      <td className="p-4 font-medium">
-                        {formatCurrency(payment.amount)}
-                      </td>
-                      <td className="p-4 font-bold text-green-600">
-                        {formatCurrency(payment.commission)}
-                      </td>
-                      <td className="p-4">
-                        {getStatusBadge(payment.status)}
-                      </td>
-                      <td className="p-4">
-                        {payment.paymentDate ? (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Calendar className="w-4 h-4" />
-                            {format(new Date(payment.paymentDate), 'MMM dd, yyyy')}
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-4 font-semibold text-sm">Request ID</th>
+                      <th className="text-left p-4 font-semibold text-sm">State</th>
+                      <th className="text-left p-4 font-semibold text-sm">Filing Fee</th>
+                      <th className="text-left p-4 font-semibold text-sm">Commission</th>
+                      <th className="text-left p-4 font-semibold text-sm">Status</th>
+                      <th className="text-left p-4 font-semibold text-sm">Payment Date</th>
+                      <th className="text-left p-4 font-semibold text-sm">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredPayments.map((payment) => (
+                      <tr key={payment.id} className="border-b hover:bg-muted/50">
+                        <td className="p-4">
+                          <code className="text-xs font-mono">{payment.requestId.substring(0, 12)}...</code>
+                        </td>
+                        <td className="p-4 text-sm">
+                          {payment.state || 'N/A'}
+                        </td>
+                        <td className="p-4 font-medium text-sm">
+                          {formatCurrency(payment.amount)}
+                        </td>
+                        <td className="p-4 font-bold text-green-600 text-sm">
+                          {formatCurrency(payment.commission)}
+                        </td>
+                        <td className="p-4">
+                          {getStatusBadge(payment.status)}
+                        </td>
+                        <td className="p-4">
+                          {payment.paymentDate ? (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Calendar className="w-4 h-4" />
+                              {format(new Date(payment.paymentDate), 'MMM dd, yyyy')}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-muted-foreground">Pending</span>
+                          )}
+                        </td>
+                        <td className="p-4">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              toast.info("Receipt download coming soon")
+                            }}
+                          >
+                            <Download className="w-4 h-4 mr-2" />
+                            Receipt
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile/Tablet Card View */}
+              <div className="md:hidden space-y-3">
+                {filteredPayments.map((payment) => (
+                  <Card key={payment.id} className="hover:bg-muted/50 transition-colors">
+                    <CardContent className="p-4">
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              {getStatusBadge(payment.status)}
+                              <code className="text-xs font-mono text-muted-foreground truncate">
+                                {payment.requestId.substring(0, 12)}...
+                              </code>
+                            </div>
+                            <p className="text-sm text-muted-foreground mb-1">
+                              State: {payment.state || 'N/A'}
+                            </p>
                           </div>
-                        ) : (
-                          <span className="text-sm text-muted-foreground">Pending</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 gap-3 pt-2 border-t">
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Filing Fee</p>
+                            <p className="font-medium text-sm">{formatCurrency(payment.amount)}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-muted-foreground mb-1">Commission</p>
+                            <p className="font-bold text-green-600 text-sm">{formatCurrency(payment.commission)}</p>
+                          </div>
+                        </div>
+
+                        {payment.paymentDate && (
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <Calendar className="w-3 h-3" />
+                            <span>Paid: {format(new Date(payment.paymentDate), 'MMM dd, yyyy')}</span>
+                          </div>
                         )}
-                      </td>
-                      <td className="p-4">
+
                         <Button
                           size="sm"
                           variant="outline"
+                          className="w-full"
                           onClick={() => {
-                            // TODO: Download receipt
                             toast.info("Receipt download coming soon")
                           }}
                         >
                           <Download className="w-4 h-4 mr-2" />
-                          Receipt
+                          Download Receipt
                         </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

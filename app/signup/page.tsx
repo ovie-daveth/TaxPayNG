@@ -67,15 +67,15 @@ const NIGERIAN_STATES = [
   "Sokoto", "Taraba", "Yobe", "Zamfara", "FCT"
 ]
 
-type SignupBusinessType = '' | 'freelancer' | 'creator' | 'sme' | 'large_corporation' | 'agent'
-type AllowedBusinessType = Extract<SignupBusinessType, 'freelancer' | 'creator' | 'sme' | 'agent'>
+type SignupBusinessType = '' | 'freelancer' | 'creator' | 'sme' | 'large_corporation' | 'consultant'
+type AllowedBusinessType = Extract<SignupBusinessType, 'freelancer' | 'creator' | 'sme' | 'consultant'>
 type SignupPayload = {
   email: string
   password: string
   firstName: string
   lastName: string
   businessType: AllowedBusinessType
-  agentStates?: string[]
+  consultantStates?: string[]
   phone?: string
 }
 
@@ -98,7 +98,7 @@ function SignupPageContent() {
     password: string
     confirmPassword: string
     phone: string
-    agentStates: string[]
+    consultantStates: string[]
   }>({
     fullName: '',
     email: '',
@@ -106,7 +106,7 @@ function SignupPageContent() {
     password: '',
     confirmPassword: '',
     phone: '',
-    agentStates: []
+    consultantStates: []
   })
   const [showVerificationDialog, setShowVerificationDialog] = useState(false)
   const [pendingEmail, setPendingEmail] = useState("")
@@ -128,13 +128,13 @@ function SignupPageContent() {
   }, [searchParams])
 
   // Redirect to login after successful signup (no auto-login) - for email/password signup
-  // For agents, redirect to agent KYC page after login
+  // For tax consultants, redirect to consultant KYC page after login
   useEffect(() => {
     if (signupSuccess && !loading && !user) {
       console.log("Signup successful, redirecting to /login")
-      // Store that this is an agent signup for redirect after login
-      if (formData.businessType === 'agent') {
-        sessionStorage.setItem('agentSignup', 'true')
+      // Store that this is a consultant signup for redirect after login
+      if (formData.businessType === 'consultant') {
+        sessionStorage.setItem('consultantSignup', 'true')
       }
       router.push("/login")
     }
@@ -170,13 +170,13 @@ function SignupPageContent() {
 
     console.log("Signup redirect - profile loaded, businessType:", profile.businessType, "taxId:", !!profile.taxId)
 
-    // Agent-specific redirects
-    if (profile.businessType === 'agent') {
-      if (profile.agentKycCompleted !== true) {
-        router.push("/agent/kyc")
+    // Tax Consultant-specific redirects
+    if (profile.businessType === 'consultant') {
+      if (profile.consultantKycCompleted !== true) {
+        router.push("/consultant/kyc")
         return
       }
-      router.push("/agent/dashboard")
+      router.push("/consultant/dashboard")
       return
     }
 
@@ -209,8 +209,8 @@ function SignupPageContent() {
 
   const isSME = formData.businessType === 'sme'
   const isCreator = formData.businessType === 'creator'
-  const isAgent = formData.businessType === 'agent'
-  const businessNameLabel = isSME ? 'Company Name' : isCreator ? 'Creator or Brand Name' : isAgent ? 'Full Name' : 'Full Name'
+  const isConsultant = formData.businessType === 'consultant'
+  const businessNameLabel = isSME ? 'Company Name' : isCreator ? 'Creator or Brand Name' : isConsultant ? 'Full Name' : 'Full Name'
   const businessNamePlaceholder = isSME
     ? 'Acme Corporation Ltd'
     : isCreator
@@ -226,9 +226,9 @@ function SignupPageContent() {
         firstName: payload.firstName,
         lastName: payload.lastName,
         businessType: payload.businessType,
-        ...(payload.businessType === 'agent' && {
+        ...(payload.businessType === 'consultant' && {
           phone: payload.phone,
-          agentStates: payload.agentStates
+          consultantStates: payload.consultantStates
         })
       })
 
@@ -290,18 +290,18 @@ function SignupPageContent() {
     }
 
     // Validate supported business type
-    if (!['freelancer', 'creator', 'sme', 'agent'].includes(formData.businessType)) {
+    if (!['freelancer', 'creator', 'sme', 'consultant'].includes(formData.businessType)) {
       toast.error('Please select a supported business type')
       return
     }
 
-    // Validate agent-specific fields
-    if (formData.businessType === 'agent') {
+    // Validate consultant-specific fields
+    if (formData.businessType === 'consultant') {
       if (!formData.phone || formData.phone.trim() === '') {
-        toast.error('Phone number is required for agents')
+        toast.error('Phone number is required for tax consultants')
         return
       }
-      if (formData.agentStates.length === 0) {
+      if (formData.consultantStates.length === 0) {
         toast.error('Please select at least one state you can handle')
         return
       }
@@ -326,9 +326,9 @@ function SignupPageContent() {
       firstName,
       lastName,
       businessType,
-      ...(formData.businessType === 'agent' && {
+      ...(formData.businessType === 'consultant' && {
         phone: formData.phone.trim(),
-        agentStates: formData.agentStates
+        consultantStates: formData.consultantStates
       })
     }
 
@@ -485,7 +485,7 @@ function SignupPageContent() {
                   <SelectItem value="freelancer">Freelancer</SelectItem>
                   <SelectItem value="creator">Creator / Influencer</SelectItem>
                   <SelectItem value="sme">Small Business</SelectItem>
-                  <SelectItem value="agent">Tax Filing Agent</SelectItem>
+                  <SelectItem value="consultant">Tax Consultant</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -518,8 +518,8 @@ function SignupPageContent() {
               />
             </div>
 
-            {/* Agent-specific fields */}
-            {isAgent && (
+            {/* Tax Consultant-specific fields */}
+            {isConsultant && (
               <>
                 <div className="space-y-2">
                   <Label htmlFor="phone" className="text-sm font-medium">Phone Number *</Label>
@@ -533,31 +533,31 @@ function SignupPageContent() {
                     className="h-11 sm:h-12 text-base border-2 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
                   />
                   <p className="text-xs text-muted-foreground">
-                    Required for agent registration
+                    Required for tax consultant registration
                   </p>
                 </div>
 
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">States You Can Handle *</Label>
                   <p className="text-xs sm:text-sm text-muted-foreground mb-3">
-                    Select all states where you can provide tax filing services
+                    Select all states where you can provide tax consultation services
                   </p>
                   <div className="border-2 rounded-xl p-4 max-h-48 sm:max-h-56 overflow-y-auto space-y-2.5 bg-muted/30">
                     {NIGERIAN_STATES.map((state) => (
                       <div key={state} className="flex items-center space-x-2.5">
                         <Checkbox
                           id={`state-${state}`}
-                          checked={formData.agentStates.includes(state)}
+                          checked={formData.consultantStates.includes(state)}
                           onCheckedChange={(checked) => {
                             if (checked) {
                               setFormData(prev => ({
                                 ...prev,
-                                agentStates: [...prev.agentStates, state]
+                                consultantStates: [...prev.consultantStates, state]
                               }))
                             } else {
                               setFormData(prev => ({
                                 ...prev,
-                                agentStates: prev.agentStates.filter(s => s !== state)
+                                consultantStates: prev.consultantStates.filter(s => s !== state)
                               }))
                             }
                           }}
@@ -572,9 +572,9 @@ function SignupPageContent() {
                       </div>
                     ))}
                   </div>
-                  {formData.agentStates.length > 0 && (
+                  {formData.consultantStates.length > 0 && (
                     <p className="text-xs sm:text-sm text-muted-foreground mt-2">
-                      {formData.agentStates.length} state{formData.agentStates.length !== 1 ? 's' : ''} selected
+                      {formData.consultantStates.length} state{formData.consultantStates.length !== 1 ? 's' : ''} selected
                     </p>
                   )}
                 </div>

@@ -21,6 +21,7 @@ import { useSubscription } from "@/lib/hooks/useSubscription"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
+import { isConsultant } from "@/lib/utils/businessTypeHelpers"
 import { toast } from "sonner"
 
 
@@ -134,6 +135,11 @@ export function TransactionList({
   }
 
   const handleView = (transaction: Transaction) => {
+    // If transaction failed to save, open edit modal instead
+    if (transaction._saveError) {
+      handleEdit(transaction)
+      return
+    }
     setViewingTransaction(transaction)
     setIsViewDialogOpen(true)
   }
@@ -215,7 +221,7 @@ export function TransactionList({
   }
 
   const handleAddTransaction = () => {
-    if (!hasAccess() && profile && profile.businessType !== 'agent') {
+    if (!hasAccess() && profile && profile.businessType !== 'consultant') {
       setShowSubscriptionModal(true)
       return
     }
@@ -228,12 +234,21 @@ export function TransactionList({
    console.log("Data from handleSubmit:", data)
     try {
       let result
-      if (editingTransaction) {
+      // If editing a failed transaction (has _tempId), treat it as a new transaction
+      // Otherwise, if it has a real ID, update it
+      if (editingTransaction && !editingTransaction._tempId && editingTransaction.id && !editingTransaction.id.startsWith('temp-')) {
         result = await onUpdateTransaction(editingTransaction.id, data)
         setEditingTransaction(null)
       } else {
+        // New transaction or retrying failed transaction
         result = await createTransaction(data)
         console.log("Result from handleSubmit:", result)
+        
+        // If this was a retry of a failed transaction, remove the old failed one
+        if (editingTransaction?._tempId && result.success) {
+          setTransactions(prev => prev.filter(t => t._tempId !== editingTransaction._tempId))
+        }
+        setEditingTransaction(null)
       }
 
       if (result && result.success) {
@@ -244,7 +259,7 @@ export function TransactionList({
 
         window.dispatchEvent(new CustomEvent('transactionChanged', {
           detail: {
-            action: editingTransaction ? 'updated' : 'created',
+            action: (editingTransaction && !editingTransaction._tempId) ? 'updated' : 'created',
             transactionId: result.data?.id
           }
         }))
@@ -301,7 +316,7 @@ export function TransactionList({
           />
         )}
         <SubscriptionRequiredModal
-          open={showSubscriptionModal && (profile?.businessType !== 'agent' || !profile)}
+          open={showSubscriptionModal && (profile?.businessType !== 'consultant' || !profile)}
           onOpenChange={setShowSubscriptionModal}
           businessType={profile?.businessType || 'freelancer'}
         />
@@ -320,7 +335,11 @@ export function TransactionList({
             <div
               key={`${transaction.id}-${transaction.updatedAt || transaction.createdAt}`}
               onClick={() => handleView(transaction)}
-              className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-muted/50 ${isHighlighted ? 'bg-primary/10 ring-2 ring-primary' : 'bg-card'}`}
+              className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-muted/50 ${
+                isHighlighted ? 'bg-primary/10 ring-2 ring-primary' : 
+                transaction._saveError ? 'bg-destructive/5 ring-1 ring-destructive/30' : 
+                'bg-card'
+              }`}
             >
               {/* Icon */}
               <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${isIncome ? 'bg-primary/10' : 'bg-destructive/10'}`}>
@@ -335,7 +354,19 @@ export function TransactionList({
               <div className="flex-1 min-w-0">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-foreground truncate">{transaction.description}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium text-foreground truncate">{transaction.description}</p>
+                      {transaction._isSaving && (
+                        <Badge variant="outline" className="text-xs animate-pulse">
+                          Saving...
+                        </Badge>
+                      )}
+                      {transaction._saveError && (
+                        <Badge variant="destructive" className="text-xs">
+                          Error
+                        </Badge>
+                      )}
+                    </div>
                     <div className="flex flex-col gap-0.5 mt-0.5">
                       <p className="text-xs text-muted-foreground">
                         Created: {transaction.createdAt ? formatDate(transaction.createdAt) : '-'}
@@ -455,6 +486,16 @@ export function TransactionList({
                   <td className="py-1.5 md:py-2 px-1 md:px-2 align-middle max-w-[100px] md:max-w-[150px] lg:max-w-[200px]">
                     <div className="flex items-center gap-1 md:gap-2 min-w-0 w-full">
                       <span className="text-[10px] md:text-xs font-medium truncate w-full">{transaction.description}</span>
+                      {transaction._isSaving && (
+                        <Badge variant="outline" className="text-[9px] md:text-[10px] px-1.5 md:px-2 py-0.5 animate-pulse flex-shrink-0">
+                          Saving...
+                        </Badge>
+                      )}
+                      {transaction._saveError && (
+                        <Badge variant="destructive" className="text-[9px] md:text-[10px] px-1.5 md:px-2 py-0.5 flex-shrink-0">
+                          Error
+                        </Badge>
+                      )}
                       {transaction.attachments && transaction.attachments.length > 0 && (
                         <button
                           onClick={() => handleViewImages(transaction)}
@@ -896,7 +937,7 @@ export function TransactionList({
         description="Are you sure you want to delete this transaction? This action cannot be undone."
       />
       <SubscriptionRequiredModal
-        open={showSubscriptionModal && (profile?.businessType !== 'agent' || !profile)}
+        open={showSubscriptionModal && (!isConsultant(profile?.businessType) || !profile)}
         onOpenChange={setShowSubscriptionModal}
         businessType={profile?.businessType || 'freelancer'}
       />

@@ -55,19 +55,19 @@ export default function AgentRequestDetailPage() {
         router.push('/login')
         return
       }
-      if (profile?.businessType !== 'agent') {
+      if (profile?.businessType !== 'consultant') {
         router.push('/dashboard')
         return
       }
-      if (!profile?.agentKycCompleted) {
-        router.push('/agent/kyc')
+      if (!profile?.consultantKycCompleted) {
+        router.push('/consultant/kyc')
         return
       }
     }
   }, [user, profile, authLoading, profileLoading, router])
 
   useEffect(() => {
-    if (requestId && user && profile && profile.businessType === 'agent') {
+    if (requestId && user && profile && profile.businessType === 'consultant') {
       loadRequestDetails()
     }
   }, [requestId, user, profile])
@@ -346,7 +346,7 @@ export default function AgentRequestDetailPage() {
     )
   }
 
-  if (profile.businessType !== 'agent') {
+  if (profile.businessType !== 'consultant') {
     return null
   }
 
@@ -375,29 +375,30 @@ export default function AgentRequestDetailPage() {
   return (
     <div className="space-y-6">
       {/* Header - Hidden when printing */}
-      <div className="flex items-center justify-between print:hidden">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 print:hidden">
+        <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => router.push('/agent/dashboard/requests')}
+            onClick={() => router.push('/consultant/dashboard/requests')}
           >
-            <ArrowLeft className="w-4 h-4 mr-2" />
+            <ArrowLeft className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Back</span>
           </Button>
-          <div>
-            <p className="text-sm text-muted-foreground">
+          <div className="min-w-0 flex-1 sm:flex-none">
+            <p className="text-xs sm:text-sm text-muted-foreground truncate">
               Request ID: {request.id.substring(0, 12)}...
             </p>
           </div>
         </div>
-        <Button onClick={handlePrint} className="print:hidden">
+        <Button onClick={handlePrint} size="sm" className="w-full sm:w-auto print:hidden">
           <Printer className="w-4 h-4 mr-2" />
           Print All
         </Button>
       </div>
 
       {/* Request Summary - Hidden when printing */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 print:hidden">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 print:hidden">
         <Card>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
@@ -498,30 +499,32 @@ export default function AgentRequestDetailPage() {
           <CardContent>
             {request.completedDocumentUrl ? (
               <div className="space-y-4">
-                <div className="border rounded-lg p-4 flex items-center justify-between bg-muted/30">
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                <div className="border rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 bg-muted/30">
+                  <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                    <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
                       <FileText className="w-5 h-5 text-primary" />
                     </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium">{request.completedDocumentName || 'Completed Document'}</h4>
-                      <p className="text-sm text-muted-foreground">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-sm sm:text-base truncate">{request.completedDocumentName || 'Completed Document'}</h4>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
                         Uploaded on {request.completedAt ? format(new Date(request.completedAt), 'MMM dd, yyyy hh:mm a') : 'N/A'}
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
                     <Button
                       variant="outline"
                       size="sm"
+                      className="flex-1 sm:flex-none"
                       onClick={() => window.open(request.completedDocumentUrl, '_blank')}
                     >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      View
+                      <ExternalLink className="w-4 h-4 sm:mr-2" />
+                      <span className="hidden sm:inline">View</span>
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
+                      className="flex-1 sm:flex-none"
                       onClick={async () => {
                         try {
                           // Fetch the file as a blob
@@ -605,15 +608,15 @@ export default function AgentRequestDetailPage() {
               {documents.map((doc) => (
                 <div
                   key={doc.id}
-                  className="border rounded-lg p-4 flex items-center justify-between hover:bg-muted/50 transition-colors"
+                  className="border rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 hover:bg-muted/50 transition-colors"
                 >
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                  <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 w-full sm:w-auto">
+                    <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
                       <FileText className="w-5 h-5 text-primary" />
                     </div>
-                    <div className="flex-1">
-                      <h4 className="font-medium">{doc.name || doc.originalName || 'Document'}</h4>
-                      <div className="flex items-center gap-4 text-sm text-muted-foreground mt-1">
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-sm sm:text-base truncate">{doc.name || doc.originalName || 'Document'}</h4>
+                      <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground mt-1">
                         <span>{doc.type}</span>
                         {doc.size && <span>{formatFileSize(doc.size)}</span>}
                         {doc.createdAt && (
@@ -622,18 +625,20 @@ export default function AgentRequestDetailPage() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
                     <Button
                       variant="outline"
                       size="sm"
+                      className="flex-1 sm:flex-none"
                       onClick={() => window.open(doc.url, '_blank')}
                     >
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      View
+                      <ExternalLink className="w-4 h-4 sm:mr-2" />
+                      <span className="hidden sm:inline">View</span>
                     </Button>
                     <Button
                       variant="outline"
                       size="sm"
+                      className="flex-1 sm:flex-none"
                       onClick={async () => {
                         try {
                           // Fetch the file as a blob

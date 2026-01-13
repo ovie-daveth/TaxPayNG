@@ -131,16 +131,16 @@ export default function LoginPage() {
       }
     }
 
-    // Agent-specific redirects
-    if (profile.businessType === 'agent') {
-      // Only redirect if agentKycCompleted is explicitly true
+    // Tax Consultant-specific redirects
+    if (profile.businessType === 'consultant') {
+      // Only redirect if consultantKycCompleted is explicitly true
       // undefined or false means they need to complete KYC
-      console.log("Agent KYC completed:", profile.agentKycCompleted)
-      if (profile.agentKycCompleted !== true) {
-        router.push("/agent/kyc")
+      console.log("Consultant KYC completed:", profile.consultantKycCompleted)
+      if (profile.consultantKycCompleted !== true) {
+        router.push("/consultant/kyc")
         return
       }
-      router.push("/agent/dashboard")
+      router.push("/consultant/dashboard")
       return
     }
 

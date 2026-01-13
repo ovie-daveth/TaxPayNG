@@ -57,11 +57,17 @@ export function useTransactions(userId: string | null) {
       const result = await transactionService.createTransaction(userId, payload)
       console.log('createTransaction (hook) service result:', result)
       if (result.success && result.data) {
-        // Add new transaction to the beginning of the list
+        // Add new transaction to the beginning of the list (it's already the newest)
+        // But also ensure the list is sorted by createdAt descending
         setTransactions(prev => {
-          console.log('Adding transaction to state:', result.data)
-          console.log('Previous transactions:', prev)
-          return [result.data!, ...prev]
+          const updated = [result.data!, ...prev]
+          // Re-sort to ensure newest is always first (in case of any timing issues)
+          updated.sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+            return dateB - dateA // Descending: newest first
+          })
+          return updated
         })
         // Update pagination total count
         setPagination(prev => prev ? {
@@ -93,9 +99,16 @@ export function useTransactions(userId: string | null) {
     try {
       const result = await transactionService.updateTransaction(transactionId, userId, updateData)
       if (result.success && result.data) {
-        setTransactions(prev => 
-          prev.map(t => t.id === transactionId ? result.data! : t)
-        )
+        setTransactions(prev => {
+          const updated = prev.map(t => t.id === transactionId ? result.data! : t)
+          // Re-sort to ensure order is maintained by createdAt (newest first)
+          updated.sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+            return dateB - dateA // Descending: newest first
+          })
+          return updated
+        })
       }
       return result
     } catch (err) {
@@ -161,6 +174,58 @@ export function useTransactions(userId: string | null) {
       loadTransactions()
     }
   }, [userId, loadTransactions])
+
+  // Handle optimistic transactions
+  useEffect(() => {
+    const handleOptimistic = (event: CustomEvent) => {
+      const { transaction } = event.detail
+      if (transaction && transaction._isSaving) {
+        // Add optimistic transaction to the beginning of the list
+        setTransactions(prev => {
+          // Check if it already exists (avoid duplicates)
+          if (prev.some(t => t._tempId === transaction._tempId)) {
+            return prev
+          }
+          return [transaction, ...prev].sort((a, b) => {
+            const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0
+            const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0
+            return dateB - dateA // Descending: newest first
+          })
+        })
+      }
+    }
+
+    const handleSaved = (event: CustomEvent) => {
+      const { tempId, transaction } = event.detail
+      // Replace optimistic transaction with real one
+      setTransactions(prev => 
+        prev.map(t => t._tempId === tempId ? transaction : t)
+      )
+    }
+
+    const handleSaveError = (event: CustomEvent) => {
+      const { tempId, error } = event.detail
+      // Update optimistic transaction with error state
+      setTransactions(prev => 
+        prev.map(t => 
+          t._tempId === tempId 
+            ? { ...t, _isSaving: false, _saveError: error }
+            : t
+        )
+      )
+      toast.error(`Failed to save transaction: ${error}`)
+    }
+
+    window.addEventListener('transactionOptimistic', handleOptimistic as EventListener)
+    window.addEventListener('transactionSaved', handleSaved as EventListener)
+    window.addEventListener('transactionSaveError', handleSaveError as EventListener)
+
+    return () => {
+      window.removeEventListener('transactionOptimistic', handleOptimistic as EventListener)
+      window.removeEventListener('transactionSaved', handleSaved as EventListener)
+      window.removeEventListener('transactionSaveError', handleSaveError as EventListener)
+    }
+  }, [])
 
   return {
     transactions,

@@ -7,7 +7,8 @@ import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { ArrowRight, ArrowLeft, Calculator, Calendar, Loader2, AlertTriangle, CheckCircle2 } from "lucide-react"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { ArrowRight, ArrowLeft, Calculator, Calendar, Loader2, AlertTriangle, CheckCircle2, TrendingUp } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
@@ -22,8 +23,74 @@ const formatCurrencyAmount = (amount: number): string => {
   return formatCurrency(amount).replace("NGN", "₦").replace(".00", "")
 }
 
+// Normalize quarterly taxDuration format to match calculatePeriodTaxes output
+// Converts "Jan-Mar 2026" to "Q1 2026 (Jan-Mar)"
+const normalizeQuarterlyTaxDuration = (duration: string): string => {
+  const months = ['Jan-Mar', 'Apr-Jun', 'Jul-Sep', 'Oct-Dec']
+  const match = duration.match(/^(Jan-Mar|Apr-Jun|Jul-Sep|Oct-Dec)\s+(\d{4})$/)
+  if (match) {
+    const [, monthRange, year] = match
+    const quarterNum = months.indexOf(monthRange) + 1
+    return `Q${quarterNum} ${year} (${monthRange})`
+  }
+  // If already in correct format or doesn't match, return as is
+  return duration
+}
+
+// Check if a quarterly taxDuration represents a complete quarter
+const isQuarterComplete = (taxDuration: string): boolean => {
+  const now = new Date()
+  const currentYear = now.getFullYear()
+  const currentMonth = now.getMonth() + 1 // 1-12 (January = 1)
+  
+  // Extract quarter number and year from taxDuration
+  // Format: "Q1 2026 (Jan-Mar)" or "Q4 2025 (Oct-Dec)"
+  const qMatch = taxDuration.match(/Q(\d+)\s+(\d{4})/)
+  if (!qMatch) return true // If we can't parse it, allow it (might be a different format)
+  
+  const quarterNum = parseInt(qMatch[1])
+  const year = parseInt(qMatch[2])
+  
+  // If the year is in the future, it's not complete
+  if (year > currentYear) {
+    return false
+  }
+  
+  // If the year is in the past, it's complete
+  if (year < currentYear) {
+    return true
+  }
+  
+  // Same year - check if we're past the quarter's end month
+  // Q1 ends in March (month 3), so we can pay in April (month 4) or later
+  // Q2 ends in June (month 6), so we can pay in July (month 7) or later
+  // Q3 ends in September (month 9), so we can pay in October (month 10) or later
+  // Q4 ends in December (month 12), so we can pay in January (month 1) of next year or later
+  if (quarterNum === 4) {
+    return currentMonth >= 1 && currentYear > year
+  }
+  
+  const quarterEndMonths: Record<number, number> = {
+    1: 3,  // Q1 ends in March
+    2: 6,  // Q2 ends in June
+    3: 9   // Q3 ends in September
+  }
+  
+  return currentMonth > (quarterEndMonths[quarterNum] || 12)
+}
+
+interface OutstandingTax {
+  period: string
+  taxDuration: string
+  amount: number
+  periodType: 'monthly' | 'quarterly' | 'yearly'
+}
+
 interface SimplifiedPaymentFormProps {
   onContinue: (data: PaymentFormData) => void
+  outstandingTaxes?: OutstandingTax[]
+  loadingOutstanding?: boolean
+  hasCheckedOutstanding?: boolean
 }
 
 interface PaymentFormData {
@@ -43,7 +110,7 @@ interface PendingPeriod {
 
 type Step = 'period' | 'amount'
 
-export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps) {
+export function SimplifiedPaymentForm({ onContinue, outstandingTaxes = [], loadingOutstanding = false, hasCheckedOutstanding = false }: SimplifiedPaymentFormProps) {
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { sidebarCollapsed } = useSidebar()
@@ -58,6 +125,7 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
   const [loading, setLoading] = useState(false)
   const [selectedTaxDuration, setSelectedTaxDuration] = useState<string>("")
   const [isSelectedDurationPaid, setIsSelectedDurationPaid] = useState(false)
+  const [showQuarterIncompleteModal, setShowQuarterIncompleteModal] = useState(false)
 
   // Calculate tax amount when period is selected and we move to amount step
   useEffect(() => {
@@ -102,6 +170,7 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
       ).flat()
 
       // Initialize default selected duration if not set yet
+      let normalizedSelectedTaxDuration = selectedTaxDuration
       if (!selectedTaxDuration) {
         const now = new Date()
         let defaultDuration = ""
@@ -110,20 +179,30 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
         } else if (selectedPeriod === 'quarterly') {
           const currentQuarter = Math.floor(now.getMonth() / 3) + 1
           const months = ['Jan-Mar', 'Apr-Jun', 'Jul-Sep', 'Oct-Dec']
-          defaultDuration = `${months[currentQuarter - 1]} ${now.getFullYear()}`
+          // Match the format from calculatePeriodTaxes: "Q1 2026 (Jan-Mar)"
+          defaultDuration = `Q${currentQuarter} ${now.getFullYear()} (${months[currentQuarter - 1]})`
         } else {
           defaultDuration = now.getFullYear().toString()
         }
+        normalizedSelectedTaxDuration = defaultDuration
         setSelectedTaxDuration(defaultDuration)
+      } else if (selectedPeriod === 'quarterly') {
+        // Normalize quarterly format to ensure it matches calculatePeriodTaxes output
+        normalizedSelectedTaxDuration = normalizeQuarterlyTaxDuration(selectedTaxDuration)
+        if (normalizedSelectedTaxDuration !== selectedTaxDuration) {
+          setSelectedTaxDuration(normalizedSelectedTaxDuration)
+        }
       }
+
+      const normalizedDuration = normalizedSelectedTaxDuration.trim()
 
       const hasSelectedPayment = completedPayments.some(
         p =>
           p.period === selectedPeriod &&
-          p.taxDuration.trim() === (selectedTaxDuration || "").trim()
+          p.taxDuration.trim() === normalizedDuration
       )
 
-      const selectedPeriodTax = allPeriodsWithIncome.find(p => p.taxDuration.trim() === (selectedTaxDuration || "").trim())
+      const selectedPeriodTax = allPeriodsWithIncome.find(p => p.taxDuration.trim() === normalizedDuration)
       const selectedAmount = selectedPeriodTax?.amount ?? 0
 
       setIsSelectedDurationPaid(hasSelectedPayment)
@@ -133,7 +212,7 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
       const pending = allPeriodsWithIncome
         .filter(period => {
           // Exclude the selected target period to avoid double-counting
-          if (period.taxDuration.trim() === (selectedTaxDuration || "").trim()) {
+          if (period.taxDuration.trim() === normalizedDuration) {
             return false
           }
           
@@ -163,6 +242,12 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
 
   const handlePeriodSelect = (period: 'monthly' | 'quarterly' | 'yearly') => {
     setSelectedPeriod(period)
+  }
+
+  const handleBack = () => {
+    if (currentStep === 'amount') {
+      setCurrentStep('period')
+    }
   }
 
   const handleContinue = () => {
@@ -200,6 +285,12 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
       }
       if (!taxDuration) {
         toast.error("Please select the period you want to pay for.")
+        return
+      }
+
+      // Validate that quarterly payments are only for completed quarters
+      if (selectedPeriod === 'quarterly' && !isQuarterComplete(taxDuration)) {
+        setShowQuarterIncompleteModal(true)
         return
       }
 
@@ -326,6 +417,8 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
             </div>
           </CardHeader>
           <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 md:space-y-6">
+           
+
             {/* Choose which period to pay for */}
             {selectedPeriod && (
               <div className="space-y-2">
@@ -493,6 +586,14 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
 
             <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-2.5 md:gap-3 pt-2.5 sm:pt-3 md:pt-4">
               <Button 
+                onClick={handleBack}
+                variant="outline"
+                className="w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm"
+              >
+                <ArrowLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 sm:mr-2" />
+                Back
+              </Button>
+              <Button 
                 onClick={() => {
                   if (!isManual && totalWithPending() <= 0) {
                     toast.message("No tax due for the selected period (already paid).")
@@ -510,6 +611,50 @@ export function SimplifiedPaymentForm({ onContinue }: SimplifiedPaymentFormProps
           </CardContent>
         </Card>
       )}
+
+      {/* Quarter Incomplete Modal */}
+      <Dialog open={showQuarterIncompleteModal} onOpenChange={setShowQuarterIncompleteModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3">
+              <div className="rounded-full bg-amber-100 dark:bg-amber-900/20 p-2">
+                <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <DialogTitle>Quarter Not Complete</DialogTitle>
+            </div>
+            <DialogDescription className="pt-2">
+              You can only pay for quarters that have already ended.
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="py-4">
+            <p className="text-sm text-muted-foreground">
+              Quarterly tax payments can only be made after the quarter has ended. For example:
+            </p>
+            <ul className="mt-3 space-y-2 text-sm text-muted-foreground list-disc list-inside">
+              <li>Q1 (Jan-Mar) can be paid from April onwards</li>
+              <li>Q2 (Apr-Jun) can be paid from July onwards</li>
+              <li>Q3 (Jul-Sep) can be paid from October onwards</li>
+              <li>Q4 (Oct-Dec) can be paid from January of the next year onwards</li>
+            </ul>
+            {selectedTaxDuration && (
+              <div className="mt-4 p-3 bg-muted/50 rounded-lg">
+                <p className="text-sm font-medium">Selected Period:</p>
+                <p className="text-sm text-muted-foreground mt-1">{selectedTaxDuration}</p>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Please select a quarter that has already completed.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button onClick={() => setShowQuarterIncompleteModal(false)}>
+              Understood
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

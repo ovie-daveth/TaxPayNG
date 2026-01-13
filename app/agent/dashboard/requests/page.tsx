@@ -34,7 +34,7 @@ export default function AgentRequestsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all")
 
   useEffect(() => {
-    if (user && profile?.businessType === 'agent' && profile?.agentKycCompleted) {
+    if (user && profile?.businessType === 'consultant' && profile?.consultantKycCompleted) {
       fetchMyRequests()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -109,8 +109,8 @@ export default function AgentRequestsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold mb-2">Filing Requests</h1>
-        <p className="text-muted-foreground">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Filing Requests</h1>
+        <p className="text-sm sm:text-base text-muted-foreground">
           Manage all your assigned filing requests
         </p>
       </div>
@@ -161,63 +161,118 @@ export default function AgentRequestsPage() {
               <p>No filing requests assigned to you yet</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-4 font-semibold">Request ID</th>
-                    <th className="text-left p-4 font-semibold">State</th>
-                    <th className="text-left p-4 font-semibold">RRR</th>
-                    <th className="text-left p-4 font-semibold">Status</th>
-                    <th className="text-left p-4 font-semibold">Documents</th>
-                    <th className="text-left p-4 font-semibold">Created</th>
-                    <th className="text-left p-4 font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRequests.map((request) => (
-                    <tr key={request.id} className="border-b hover:bg-muted/50">
-                      <td className="p-4">
-                        <code className="text-xs font-mono">{request.id.substring(0, 12)}...</code>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <MapPin className="w-4 h-4 text-muted-foreground" />
-                          {request.state}
+            <>
+              {/* Desktop Table View */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left p-4 font-semibold text-sm">Request ID</th>
+                      <th className="text-left p-4 font-semibold text-sm">State</th>
+                      <th className="text-left p-4 font-semibold text-sm">RRR</th>
+                      <th className="text-left p-4 font-semibold text-sm">Status</th>
+                      <th className="text-left p-4 font-semibold text-sm">Documents</th>
+                      <th className="text-left p-4 font-semibold text-sm">Created</th>
+                      <th className="text-left p-4 font-semibold text-sm">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredRequests.map((request) => (
+                      <tr key={request.id} className="border-b hover:bg-muted/50">
+                        <td className="p-4">
+                          <code className="text-xs font-mono">{request.id.substring(0, 12)}...</code>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="w-4 h-4 text-muted-foreground" />
+                            <span className="text-sm">{request.state}</span>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <code className="text-xs font-mono">{request.rrr}</code>
+                        </td>
+                        <td className="p-4">
+                          {getStatusBadge(request.status)}
+                        </td>
+                        <td className="p-4">
+                          <span className="text-sm">{request.supportingDocuments?.length || 0} doc(s)</span>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                            <Calendar className="w-4 h-4" />
+                            {format(new Date(request.createdAt), 'MMM dd, yyyy')}
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              router.push(`/consultant/dashboard/requests/${request.id}`)
+                            }}
+                          >
+                            <FileText className="w-4 h-4 mr-2" />
+                            View
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile/Tablet Card View */}
+              <div className="md:hidden space-y-3">
+                {filteredRequests.map((request) => (
+                  <Card key={request.id} className="hover:bg-muted/50 transition-colors">
+                    <CardContent className="p-4">
+                      <div className="space-y-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-2">
+                              {getStatusBadge(request.status)}
+                              <code className="text-xs font-mono text-muted-foreground truncate">
+                                {request.id.substring(0, 12)}...
+                              </code>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
+                              <MapPin className="w-4 h-4" />
+                              <span>{request.state}</span>
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                              <code>RRR: {request.rrr}</code>
+                            </div>
+                          </div>
                         </div>
-                      </td>
-                      <td className="p-4">
-                        <code className="text-xs font-mono">{request.rrr}</code>
-                      </td>
-                      <td className="p-4">
-                        {getStatusBadge(request.status)}
-                      </td>
-                      <td className="p-4">
-                        <span className="text-sm">{request.supportingDocuments?.length || 0} document(s)</span>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                          <Calendar className="w-4 h-4" />
-                          {format(new Date(request.createdAt), 'MMM dd, yyyy')}
+                        
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <div className="flex items-center gap-1">
+                            <FileText className="w-3 h-3" />
+                            <span>{request.supportingDocuments?.length || 0} document(s)</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3" />
+                            <span>{format(new Date(request.createdAt), 'MMM dd, yyyy')}</span>
+                          </div>
                         </div>
-                      </td>
-                      <td className="p-4">
+
                         <Button
                           size="sm"
                           variant="outline"
+                          className="w-full"
                           onClick={() => {
-                            router.push(`/agent/dashboard/requests/${request.id}`)
+                            router.push(`/consultant/dashboard/requests/${request.id}`)
                           }}
                         >
                           <FileText className="w-4 h-4 mr-2" />
                           View Details
                         </Button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

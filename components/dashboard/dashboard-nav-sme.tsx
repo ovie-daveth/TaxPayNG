@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Calculator, LayoutDashboard, Users, DollarSign, FileText, Settings, LogOut, ChevronLeft, ChevronRight, TrendingUp, Menu, Bell, User, Receipt, FileCheck, IdCardIcon, MessageSquare, Plus, X } from "lucide-react"
+import { Calculator, LayoutDashboard, Users, DollarSign, FileText, Settings, LogOut, ChevronLeft, ChevronRight, TrendingUp, Menu, Bell, User, Receipt, FileCheck, IdCardIcon, MessageSquare, Plus, X, Store } from "lucide-react"
 import OtaxLogo from "../OtaxLogo"
 import { useState, useEffect } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
@@ -248,6 +248,15 @@ export function DashboardNavSME() {
             <Menu className="w-5 h-5 text-foreground" />
           </button>
           <div className="flex items-center gap-1.5 flex-shrink-0">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => router.push('/marketplace')}
+              className="h-8 w-8"
+              title="Marketplace"
+            >
+              <Store className="w-4 h-4" />
+            </Button>
             <NotificationBell />
             {mobileAddButton.show && (
               <Button 

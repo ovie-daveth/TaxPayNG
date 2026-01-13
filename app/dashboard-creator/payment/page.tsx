@@ -76,7 +76,7 @@ export default function PaymentPage() {
   // Check subscription on mount
   useEffect(() => {
     if (subscriptionLoading) return
-    if (!isSubscribed && profile && profile.businessType !== 'agent') {
+    if (!isSubscribed && profile && profile.businessType !== 'consultant') {
       setShowSubscriptionModal(true)
     }
   }, [isSubscribed, subscriptionLoading, profile])
@@ -651,7 +651,7 @@ export default function PaymentPage() {
         </>
       )}
     </div>
-    {profile && profile.businessType !== 'agent' && (
+    {profile && profile.businessType !== 'consultant' && (
       <SubscriptionRequiredModal
         open={showSubscriptionModal}
         onOpenChange={setShowSubscriptionModal}
