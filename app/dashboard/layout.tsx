@@ -14,6 +14,7 @@ import { FreeTrialBlockedModal } from "@/components/subscription/free-trial-bloc
 import { FreeTrialBanner } from "@/components/subscription/free-trial-banner"
 import { cn } from "@/lib/utils"
 import { FloatingSupportButton } from "@/components/support/floating-support-button"
+import { isConsultant } from "@/lib/utils/businessTypeHelpers"
 
 function LayoutContent({
   children,
@@ -71,7 +72,8 @@ function LayoutContent({
     const querySuffix = queryString ? `?${queryString}` : ''
     
     // Tax Consultant redirects - consultants have their own pages, redirect them away from dashboard
-    if (profile.businessType === 'consultant') {
+    // Check for both 'consultant' and legacy 'agent' for backward compatibility
+    if (isConsultant(profile.businessType)) {
       // Only redirect if we're in the dashboard area (not already on consultant pages)
       if (!currentPath.startsWith('/consultant')) {
         // If KYC not completed, go to KYC page

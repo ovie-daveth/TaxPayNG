@@ -16,10 +16,10 @@ export function TaxDurationSelector({ period, onDurationChange }: TaxDurationSel
   ]
   
   const quarters = [
-    { label: "Q1 (Jan-Mar)", value: "Jan-Mar" },
-    { label: "Q2 (Apr-Jun)", value: "Apr-Jun" },
-    { label: "Q3 (Jul-Sep)", value: "Jul-Sep" },
-    { label: "Q4 (Oct-Dec)", value: "Oct-Dec" }
+    { label: "Q1 (Jan-Mar)", value: "Jan-Mar", quarterNum: 1 },
+    { label: "Q2 (Apr-Jun)", value: "Apr-Jun", quarterNum: 2 },
+    { label: "Q3 (Jul-Sep)", value: "Jul-Sep", quarterNum: 3 },
+    { label: "Q4 (Oct-Dec)", value: "Oct-Dec", quarterNum: 4 }
   ]
   
   const years = [2024, 2025, 2026, 2027, 2028]
@@ -33,7 +33,11 @@ export function TaxDurationSelector({ period, onDurationChange }: TaxDurationSel
     if (period === "monthly" && selectedMonth) {
       onDurationChange(`${selectedMonth} ${year}`)
     } else if (period === "quarterly" && selectedQuarter) {
-      onDurationChange(`${selectedQuarter} ${year}`)
+      const quarter = quarters.find(q => q.value === selectedQuarter)
+      if (quarter) {
+        // Match the format from calculatePeriodTaxes: "Q1 2026 (Jan-Mar)"
+        onDurationChange(`Q${quarter.quarterNum} ${year} (${quarter.value})`)
+      }
     } else if (period === "yearly") {
       onDurationChange(year)
     }
@@ -44,9 +48,13 @@ export function TaxDurationSelector({ period, onDurationChange }: TaxDurationSel
     onDurationChange(`${month} ${selectedYear}`)
   }
   
-  const handleQuarterChange = (quarter: string) => {
-    setSelectedQuarter(quarter)
-    onDurationChange(`${quarter} ${selectedYear}`)
+  const handleQuarterChange = (quarterValue: string) => {
+    setSelectedQuarter(quarterValue)
+    const quarter = quarters.find(q => q.value === quarterValue)
+    if (quarter) {
+      // Match the format from calculatePeriodTaxes: "Q1 2026 (Jan-Mar)"
+      onDurationChange(`Q${quarter.quarterNum} ${selectedYear} (${quarter.value})`)
+    }
   }
   
   // Auto-set current period on mount or when period changes
@@ -61,7 +69,8 @@ export function TaxDurationSelector({ period, onDurationChange }: TaxDurationSel
     } else if (period === "quarterly") {
       const currentQuarter = quarters[Math.floor(new Date().getMonth() / 3)]
       setSelectedQuarter(currentQuarter.value)
-      onDurationChange(`${currentQuarter.value} ${currentYear}`)
+      // Match the format from calculatePeriodTaxes: "Q1 2026 (Jan-Mar)"
+      onDurationChange(`Q${currentQuarter.quarterNum} ${currentYear} (${currentQuarter.value})`)
     } else if (period === "yearly") {
       onDurationChange(currentYear)
     }

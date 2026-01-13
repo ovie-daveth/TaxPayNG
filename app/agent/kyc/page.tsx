@@ -56,7 +56,8 @@ export default function ConsultantKYCPage() {
     console.log("Consultant KYC page - businessType:", profile.businessType)
     console.log("Consultant KYC page - consultantKycCompleted:", profile.consultantKycCompleted)
     
-    if (profile.businessType !== 'consultant') {
+    // Check for both 'consultant' and legacy 'agent' for backward compatibility
+    if (!isConsultant(profile.businessType)) {
       router.push('/dashboard')
       return
     }

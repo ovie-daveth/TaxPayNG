@@ -18,9 +18,10 @@ import {
   SelectItem,
   SelectValue,
 } from "@/components/ui/select"
-import { ExternalLink, Building2, MapPin } from "lucide-react"
+import { ExternalLink, Building2, MapPin, Info, ChevronDown, ChevronUp } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { RadioGroup, RadioGroupItem } from "../ui/radio"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 interface PaymentPortalSelectorModalProps {
   open: boolean
@@ -91,6 +92,7 @@ export function PaymentPortalSelectorModal({
   const [embeddedUrl, setEmbeddedUrl] = useState<string | null>(null)
   const [selectedState, setSelectedState] = useState<string | undefined>(userState)
   const [showReceiptUpload, setShowReceiptUpload] = useState(false)
+  const [showTaxDetails, setShowTaxDetails] = useState(false)
 
   const userStateIRSUrl = userState ? STATE_IRS_PORTALS[userState] : null
   const hasStateIRS = !!userStateIRSUrl
@@ -124,11 +126,17 @@ export function PaymentPortalSelectorModal({
         <DialogHeader>
           <DialogTitle>Choose Payment Portal</DialogTitle>
           <DialogDescription>
-            Select where you'd like to make your tax payment. You can pay through the National Revenue Center (NRC) or your state's tax authority.
+            Select where you'd like to make your tax payment. NRC is for federal payers (VAT, Development Fee, CIT), while State IRS is for those paying Personal Income Taxes.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4 flex-1 overflow-y-auto">
+          <Alert className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20">
+            <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
+              We're working to make payment more seamless in-app. <span className="font-semibold">Coming soon!</span>
+            </AlertDescription>
+          </Alert>
           <RadioGroup value={selectedOption} onValueChange={(v) => setSelectedOption(v as "nrc" | "state") }>
             {/* NRC Option */}
             <div
@@ -150,7 +158,7 @@ export function PaymentPortalSelectorModal({
                   National Revenue Center (NRC)
                 </Label>
                 <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-                  Pay through the centralized National Revenue Center portal. Supports all states and territories.
+                  Pay through the centralized National Revenue Center portal. For federal taxes: VAT, Development Fee, and CIT (Company Income Tax).
                 </p>
                 <div className="mt-3 flex items-center gap-1 text-xs text-primary font-medium">
                   <ExternalLink className="w-3 h-3" />
@@ -186,7 +194,7 @@ export function PaymentPortalSelectorModal({
                     {selectedState || userState || "State"} IRS
                   </Label>
                   <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-                    Pay directly through your state's Internal Revenue Service portal.
+                    Pay directly through your state's Internal Revenue Service portal. For Personal Income Taxes (PIT).
                   </p>
                   <div className="mt-3">
                     <Label className="text-xs">Choose state</Label>
@@ -251,42 +259,76 @@ export function PaymentPortalSelectorModal({
         <div className="flex-1 overflow-auto">
           <div className="border-b bg-gradient-to-r from-primary/5 to-primary/10">
             <div className="p-4 md:p-6">
-              <DialogTitle className="text-lg md:text-2xl font-bold mb-4">Complete Payment</DialogTitle>
-
-              {/* Tax Details Display */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-                {taxAmount && (
-                  <div className="space-y-1">
-                    <p className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount to Pay</p>
-                    <p className="text-lg md:text-2xl font-bold text-primary">
-                      ₦{taxAmount.toLocaleString()}
-                    </p>
-                  </div>
-                )}
-                {taxDuration && (
-                  <div className="space-y-1">
-                    <p className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wider">Period</p>
-                    <p className="text-xs md:text-sm font-semibold">{taxDuration}</p>
-                  </div>
-                )}
-                {period && (
-                  <div className="space-y-1">
-                    <p className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wider">Type</p>
-                    <p className="text-xs md:text-sm font-semibold capitalize">{period}</p>
-                  </div>
-                )}
-                {selectedState && (
-                  <div className="space-y-1">
-                    <p className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wider">State</p>
-                    <p className="text-xs md:text-sm font-semibold">{selectedState}</p>
-                  </div>
-                )}
+              <div className="flex items-center justify-between mb-4">
+                <DialogTitle className="text-lg md:text-2xl font-bold">Complete Payment</DialogTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowTaxDetails(!showTaxDetails)}
+                  className="h-8 w-8 p-0"
+                  title="View payment details"
+                >
+                  <Info className="h-4 w-4" />
+                </Button>
               </div>
 
-              {taxDescription && (
-                <p className="text-xs md:text-sm text-muted-foreground mt-3 italic">{taxDescription}</p>
+              {/* Tax Details Display - Collapsible */}
+              {showTaxDetails && (
+                <div className="space-y-4 mb-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
+                    {taxAmount && (
+                      <div className="space-y-1">
+                        <p className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount to Pay</p>
+                        <p className="text-lg md:text-2xl font-bold text-primary">
+                          ₦{taxAmount.toLocaleString()}
+                        </p>
+                      </div>
+                    )}
+                    {taxDuration && (
+                      <div className="space-y-1">
+                        <p className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wider">Period</p>
+                        <p className="text-xs md:text-sm font-semibold">{taxDuration}</p>
+                      </div>
+                    )}
+                    {period && (
+                      <div className="space-y-1">
+                        <p className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wider">Type</p>
+                        <p className="text-xs md:text-sm font-semibold capitalize">{period}</p>
+                      </div>
+                    )}
+                    {selectedState && (
+                      <div className="space-y-1">
+                        <p className="text-[10px] md:text-xs font-semibold text-muted-foreground uppercase tracking-wider">State</p>
+                        <p className="text-xs md:text-sm font-semibold">{selectedState}</p>
+                      </div>
+                    )}
+                  </div>
+
+                  {taxDescription && (
+                    <p className="text-xs md:text-sm text-muted-foreground italic">{taxDescription}</p>
+                  )}
+                </div>
               )}
             </div>
+          </div>
+
+          {/* Info Alert about portal performance */}
+          <div className="px-4 md:px-6 pb-4">
+            <Alert className="border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20">
+              <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+              <AlertDescription className="text-xs md:text-sm text-amber-800 dark:text-amber-200">
+                The portal in modal mode may fail or be slow. If you experience issues,{" "}
+                <a
+                  href={embeddedUrl || "#"}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold underline hover:no-underline"
+                >
+                  click here to open it in a new tab
+                </a>
+                {" "}to continue, then come back and click payment made.
+              </AlertDescription>
+            </Alert>
           </div>
 
           {/* Portal iframe - inside the same scroll container */}

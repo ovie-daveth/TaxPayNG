@@ -51,15 +51,17 @@ export default function AgentDashboardPage() {
       return
     }
 
-    if (profile.businessType !== 'consultant') {
+    // Check for both 'consultant' and legacy 'agent' for backward compatibility
+    if (!isConsultant(profile.businessType)) {
       router.push('/dashboard')
       return
     }
 
     // Only redirect if consultantKycCompleted is explicitly false or undefined
     // true means they can access the dashboard
-    // Add a small delay to prevent rapid redirects
-    if (profile.consultantKycCompleted !== true) {
+    // Also check for legacy agentKycCompleted field
+    const kycCompleted = profile.consultantKycCompleted === true || (profile as any).agentKycCompleted === true
+    if (!kycCompleted) {
       const timer = setTimeout(() => {
         router.push('/consultant/kyc')
       }, 100)
@@ -68,7 +70,8 @@ export default function AgentDashboardPage() {
   }, [user, profile, authLoading, profileLoading, router])
 
   useEffect(() => {
-    if (user && profile?.businessType === 'consultant' && profile?.consultantKycCompleted) {
+    const kycCompleted = profile?.consultantKycCompleted === true || (profile as any)?.agentKycCompleted === true
+    if (user && isConsultant(profile?.businessType) && kycCompleted) {
       fetchMyRequests()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

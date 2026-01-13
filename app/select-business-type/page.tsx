@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { BusinessType } from "@/lib/types"
 import { Loader2 } from "lucide-react"
+import { isConsultant } from "@/lib/utils/businessTypeHelpers"
 import Image from "next/image"
 import { useTheme } from "next-themes"
 
@@ -78,7 +79,8 @@ export default function SelectBusinessTypePage() {
     // If user has a business type other than freelancer, or has taxId, or profile has been updated, redirect
     if (profile.businessType && profile.businessType !== 'freelancer') {
       // User has a non-freelancer business type, redirect to appropriate dashboard
-      if (profile.businessType === 'consultant') {
+      // Check for both 'consultant' and legacy 'agent' for backward compatibility
+      if (isConsultant(profile.businessType)) {
         if (profile.consultantKycCompleted !== true) {
           router.push("/consultant/kyc")
           return
