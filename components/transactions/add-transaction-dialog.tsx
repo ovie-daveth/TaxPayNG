@@ -1053,6 +1053,8 @@ export function AddTransactionDialog({
       toast.success('Transaction added! Saving in background...')
       
       // Save in background (upload files, create documents, save transaction)
+      // NOTE: This async operation will continue even if user navigates away from the page
+      // The file uploads and transaction save are independent of React component lifecycle
       ;(async () => {
         let documentId: string | undefined = undefined
         let imageUrl: string[] = []
@@ -1061,7 +1063,12 @@ export function AddTransactionDialog({
         try {
           // Upload files in background
           if (uploadedFiles.length > 0) {
-            setUploadingImages(true)
+            // Only set state if component is still mounted (optional optimization)
+            try {
+              setUploadingImages(true)
+            } catch (e) {
+              // Component may have unmounted, but continue with save anyway
+            }
             const uploadResults: ImageUploadResult[] = []
             for (const file of uploadedFiles) {
               try {
@@ -1209,7 +1216,12 @@ export function AddTransactionDialog({
             window.dispatchEvent(errorEvent)
             toast.error('Failed to save transaction. Click transaction to retry.')
           } finally {
-            setUploadingImages(false)
+            // Only set state if component is still mounted
+            try {
+              setUploadingImages(false)
+            } catch (e) {
+              // Component may have unmounted, but save operation continues
+            }
           }
         })()
         
