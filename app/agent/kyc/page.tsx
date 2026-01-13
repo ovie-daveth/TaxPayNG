@@ -14,6 +14,7 @@ import { uploadToImageKit } from "@/lib/utils/imagekit"
 import { toast } from "sonner"
 import { Loader2, Upload, CheckCircle2, X, FileText, Shield, AlertCircle, Camera, User, RotateCcw } from "lucide-react"
 import OtaxLogo from "@/components/OtaxLogo"
+import { isConsultant } from "@/lib/utils/businessTypeHelpers"
 
 export default function ConsultantKYCPage() {
   const router = useRouter()

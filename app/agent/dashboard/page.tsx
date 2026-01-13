@@ -24,6 +24,7 @@ import {
 } from "lucide-react"
 import { FilingRequest } from "@/lib/types"
 import { formatCurrency } from "@/lib/utils"
+import { isConsultant } from "@/lib/utils/businessTypeHelpers"
 
 export default function AgentDashboardPage() {
   const router = useRouter()
