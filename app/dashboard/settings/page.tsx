@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge"
 import { User, Building2, CreditCard, Bell, Shield, Upload, X, CheckCircle2, Loader2, ExternalLink, HelpCircle, MessageSquare, Mail, Send } from "lucide-react"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
 import { useSubscription } from "@/lib/hooks/useSubscription"
-import { subscriptionService } from "@/lib/services/subscriptionService"
+import { subscriptionService, getPlanPriceDisplay } from "@/lib/services/subscriptionService"
 import { getAuth } from "firebase/auth"
 import { auth } from "@/firebase/firebase"
 import { reauthenticateWithCredential, updatePassword, EmailAuthProvider } from "firebase/auth"
@@ -46,6 +46,7 @@ export default function SettingsPage() {
   const [showChangePlanModal, setShowChangePlanModal] = useState(false)
   const [showMigrationModal, setShowMigrationModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
   const kycSectionRef = useRef<HTMLDivElement>(null)
   // KYC: Means of identification (NIN, International Passport, Voter's Card, Driver's License, etc.)
   const [kycDocument, setKycDocument] = useState('')
@@ -255,7 +256,8 @@ export default function SettingsPage() {
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
-          subscriptionType: planType
+          subscriptionType: planType,
+          interval: billingInterval
         })
       })
 
@@ -280,7 +282,12 @@ export default function SettingsPage() {
     }
   }
 
-  const handleSubscribe = async (planType: SubscriptionType) => {
+  const handleSubscribe = async (planType: SubscriptionType, interval?: 'monthly' | 'yearly') => {
+    // Update billing interval if provided
+    if (interval) {
+      setBillingInterval(interval)
+    }
+    
     // Check if migration is needed
     if (needsMigration(planType)) {
       setSelectedPlan(planType)
@@ -1522,7 +1529,7 @@ export default function SettingsPage() {
                                   <Card key={planType} className="p-3 sm:p-4">
                                     <div className="space-y-2">
                                       <h4 className="text-sm sm:text-base font-semibold">{plan.name}</h4>
-                                      <p className="text-xl sm:text-2xl font-bold">{plan.priceDisplay}</p>
+                                      <p className="text-xl sm:text-2xl font-bold">{plan.monthlyPriceDisplay}</p>
                                       <p className="text-xs text-muted-foreground">per month</p>
                                       <Button
                                         className="w-full mt-3 sm:mt-4 text-xs sm:text-sm h-9 sm:h-10"
@@ -1553,8 +1560,24 @@ export default function SettingsPage() {
                             <div>
                               <h3 className="text-base sm:text-lg font-semibold">Current Plan</h3>
                               <p className="text-xs sm:text-sm text-muted-foreground">
-                                {subscriptionType} - {subscriptionService.getPlan(subscriptionType)?.priceDisplay}/month
+                                {subscriptionType} - {(() => {
+                                  const plan = subscriptionService.getPlan(subscriptionType)
+                                  if (!plan) return 'N/A'
+                                  const interval = (profile?.subscriptionInterval as 'monthly' | 'yearly' | undefined) || 'monthly'
+                                  const priceDisplay = getPlanPriceDisplay(plan, interval)
+                                  const period = interval === 'yearly' ? '/year' : '/month'
+                                  return `${priceDisplay}${period}`
+                                })()}
                               </p>
+                              {subscriptionExpiryDate && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Expires: {new Date(subscriptionExpiryDate).toLocaleDateString('en-NG', { 
+                                    year: 'numeric', 
+                                    month: 'long', 
+                                    day: 'numeric' 
+                                  })}
+                                </p>
+                              )}
                             </div>
                             <Badge variant="default" className="w-fit">Active</Badge>
                           </div>
@@ -2177,6 +2200,8 @@ export default function SettingsPage() {
         businessType={profile?.businessType || 'freelancer'}
         onSelectPlan={handleSubscribe}
         processingPlan={processingSubscription}
+        billingInterval={billingInterval}
+        onBillingIntervalChange={setBillingInterval}
       />
 
       {/* Migration modal */}

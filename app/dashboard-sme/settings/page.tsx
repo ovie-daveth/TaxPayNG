@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge"
 import { User, Building2, CreditCard, Bell, Shield, Upload, X, CheckCircle2, Loader2, ExternalLink, HelpCircle, MessageSquare, Mail, Send } from "lucide-react"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
 import { useSubscription } from "@/lib/hooks/useSubscription"
-import { subscriptionService } from "@/lib/services/subscriptionService"
+import { subscriptionService, getPlanPriceDisplay } from "@/lib/services/subscriptionService"
 import { getAuth } from "firebase/auth"
 import { auth } from "@/firebase/firebase"
 import { reauthenticateWithCredential, updatePassword, EmailAuthProvider } from "firebase/auth"
@@ -45,6 +45,7 @@ export default function SettingsPage() {
   const [showChangePlanModal, setShowChangePlanModal] = useState(false)
   const [showMigrationModal, setShowMigrationModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
   const kycSectionRef = useRef<HTMLDivElement>(null)
   // KYC: Means of identification (NIN, International Passport, Voter's Card, Driver's License, etc.)
   const [kycDocument, setKycDocument] = useState('')
@@ -258,7 +259,8 @@ export default function SettingsPage() {
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
-          subscriptionType: planType
+          subscriptionType: planType,
+          interval: billingInterval
         })
       })
 
@@ -283,7 +285,12 @@ export default function SettingsPage() {
     }
   }
 
-  const handleSubscribe = async (planType: SubscriptionType) => {
+  const handleSubscribe = async (planType: SubscriptionType, interval?: 'monthly' | 'yearly') => {
+    // Update billing interval if provided
+    if (interval) {
+      setBillingInterval(interval)
+    }
+    
     // Check if migration is needed
     if (needsMigration(planType)) {
       setSelectedPlan(planType)
@@ -1296,11 +1303,34 @@ export default function SettingsPage() {
                     {(!isSubscribed || isExpired) ? (
                       <div className="space-y-3 sm:space-y-4">
                         <div className="p-4 sm:p-5 md:p-6 border rounded-lg bg-muted/50">
-                          <h3 className="text-base sm:text-lg font-semibold mb-2">Choose a Subscription Plan</h3>
-                          <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
-                            Select a plan to unlock all features and start managing your taxes efficiently.
-                          </p>
-                          <div className={`grid gap-3 sm:gap-4 ${!sidebarCollapsed ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
+                          <div className="mb-4 sm:mb-6">
+                            <h3 className="text-base sm:text-lg font-semibold mb-2">Choose a Subscription Plan</h3>
+                            <p className="text-xs sm:text-sm text-muted-foreground mb-4">
+                              Select a plan to unlock all features and start managing your taxes efficiently.
+                            </p>
+                            
+                            {/* Billing Interval Toggle */}
+                            <div className="flex items-center justify-center gap-3 mb-4 sm:mb-6 p-3 sm:p-4 bg-background rounded-lg border">
+                              <Label htmlFor="billing-toggle-sme" className={`text-sm cursor-pointer ${billingInterval === 'monthly' ? 'font-semibold' : 'text-muted-foreground'}`}>
+                                Monthly
+                              </Label>
+                              <Switch
+                                id="billing-toggle-sme"
+                                checked={billingInterval === 'yearly'}
+                                onCheckedChange={(checked) => setBillingInterval(checked ? 'yearly' : 'monthly')}
+                              />
+                              <Label htmlFor="billing-toggle-sme" className={`text-sm cursor-pointer ${billingInterval === 'yearly' ? 'font-semibold' : 'text-muted-foreground'}`}>
+                                Yearly
+                              </Label>
+                              {billingInterval === 'yearly' && (
+                                <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 text-xs font-semibold ml-2">
+                                  Save 25%
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                          
+                          <div className={`grid gap-3 sm:gap-4 ${!sidebarCollapsed ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2'}`}>
                             {(() => {
                               // Get plans based on business type
                               const availablePlans = profile?.businessType === 'sme' 
@@ -1310,22 +1340,82 @@ export default function SettingsPage() {
                               return availablePlans.map((planType) => {
                                 const plan = subscriptionService.getPlan(planType)
                                 if (!plan) return null
+                                
+                                const isProcessing = processingSubscription === planType
+                                const isBigBusiness = planType === 'Big Business'
+                                
                                 return (
-                                  <Card key={planType} className="p-3 sm:p-4">
-                                    <div className="space-y-2">
-                                      <h4 className="text-sm sm:text-base font-semibold">{plan.name}</h4>
-                                      <p className="text-xl sm:text-2xl font-bold">{plan.priceDisplay}</p>
-                                      <p className="text-xs text-muted-foreground">per month</p>
+                                  <Card key={planType} className={`p-4 sm:p-6 transition-all ${isBigBusiness ? 'opacity-75' : 'hover:border-primary'}`}>
+                                    <div className="space-y-3 sm:space-y-4">
+                                      {isBigBusiness && (
+                                        <Badge variant="outline" className="w-fit mb-2">
+                                          Coming Soon
+                                        </Badge>
+                                      )}
+                                      <div>
+                                        <h4 className="text-base sm:text-lg font-semibold mb-1">{plan.name}</h4>
+                                        <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
+                                          {planType === 'Small Business' 
+                                            ? 'For businesses with annual turnover ≤ ₦50-100 million'
+                                            : 'For businesses with turnover above small business threshold'}
+                                        </p>
+                                      </div>
+                                      
+                                      <div className="space-y-2">
+                                        {billingInterval === 'monthly' ? (
+                                          <>
+                                            <div className="flex items-baseline gap-2">
+                                              <span className="text-2xl sm:text-3xl font-bold">{plan.monthlyPriceDisplay}</span>
+                                            </div>
+                                            <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <span className="text-xs font-medium text-muted-foreground line-through">
+                                              {(() => {
+                                                const grossYearly = (plan.monthlyPrice * 12) / 100
+                                                return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                                              })()}
+                                            </span>
+                                            <div className="flex items-baseline gap-2">
+                                              <span className="text-2xl sm:text-3xl font-bold">
+                                                {getPlanPriceDisplay(plan, 'yearly')}
+                                              </span>
+                                              <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 py-0.5 text-xs font-semibold">
+                                                25% OFF
+                                              </Badge>
+                                            </div>
+                                            <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
+                                          </>
+                                        )}
+                                      </div>
+                                      
+                                      <ul className="space-y-2 text-xs sm:text-sm">
+                                        {plan.features.slice(0, 4).map((feature, idx) => (
+                                          <li key={idx} className="flex items-start gap-2">
+                                            <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                                            <span className="text-muted-foreground">{feature}</span>
+                                          </li>
+                                        ))}
+                                        {plan.features.length > 4 && (
+                                          <li className="text-xs text-muted-foreground">
+                                            +{plan.features.length - 4} more features
+                                          </li>
+                                        )}
+                                      </ul>
+                                      
                                       <Button
-                                        className="w-full mt-3 sm:mt-4 text-xs sm:text-sm h-9 sm:h-10"
-                                        onClick={() => handleSubscribe(planType)}
-                                        disabled={processingSubscription === planType}
+                                        className="w-full mt-4 sm:mt-6 text-xs sm:text-sm h-9 sm:h-10"
+                                        onClick={() => handleSubscribe(planType, billingInterval)}
+                                        disabled={isProcessing || planType === 'Big Business'}
                                       >
-                                        {processingSubscription === planType ? (
+                                        {isProcessing ? (
                                           <>
                                             <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-2 animate-spin" />
                                             Processing...
                                           </>
+                                        ) : planType === 'Big Business' ? (
+                                          "Coming Soon"
                                         ) : (
                                           "Subscribe"
                                         )}
@@ -1345,8 +1435,24 @@ export default function SettingsPage() {
                             <div>
                               <h3 className="text-base sm:text-lg font-semibold">Current Plan</h3>
                               <p className="text-xs sm:text-sm text-muted-foreground">
-                                {subscriptionType} - {subscriptionService.getPlan(subscriptionType)?.priceDisplay}/month
+                                {subscriptionType} - {(() => {
+                                  const plan = subscriptionService.getPlan(subscriptionType)
+                                  if (!plan) return 'N/A'
+                                  const interval = (profile?.subscriptionInterval as 'monthly' | 'yearly' | undefined) || 'monthly'
+                                  const priceDisplay = getPlanPriceDisplay(plan, interval)
+                                  const period = interval === 'yearly' ? '/year' : '/month'
+                                  return `${priceDisplay}${period}`
+                                })()}
                               </p>
+                              {subscriptionExpiryDate && (
+                                <p className="text-xs text-muted-foreground mt-1">
+                                  Expires: {new Date(subscriptionExpiryDate).toLocaleDateString('en-NG', { 
+                                    year: 'numeric', 
+                                    month: 'long', 
+                                    day: 'numeric' 
+                                  })}
+                                </p>
+                              )}
                             </div>
                             <Badge variant="default" className="w-fit">Active</Badge>
                           </div>
@@ -1969,6 +2075,8 @@ export default function SettingsPage() {
         businessType={profile?.businessType || 'freelancer'}
         onSelectPlan={handleSubscribe}
         processingPlan={processingSubscription}
+        billingInterval={billingInterval}
+        onBillingIntervalChange={setBillingInterval}
       />
 
       {/* Migration modal */}

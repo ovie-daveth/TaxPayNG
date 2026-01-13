@@ -7,7 +7,9 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Check, Lock } from "lucide-react"
-import { subscriptionService } from "@/lib/services/subscriptionService"
+import { subscriptionService, getPlanPriceDisplay } from "@/lib/services/subscriptionService"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 import { SubscriptionType, BusinessType } from "@/lib/types"
 import { auth } from "@/firebase/firebase"
 import { toast } from "sonner"
@@ -30,6 +32,7 @@ export function SubscriptionRequiredModal({
   const [showMigrationModal, setShowMigrationModal] = useState(false)
   const [showFreelancerMigrationModal, setShowFreelancerMigrationModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
+  const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
 
   const getAvailablePlans = (): SubscriptionType[] => {
     if (businessType === 'sme') {
@@ -168,7 +171,8 @@ export function SubscriptionRequiredModal({
           "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
-          subscriptionType: planType
+          subscriptionType: planType,
+          interval: billingInterval
         })
       })
 
@@ -222,6 +226,26 @@ export function SubscriptionRequiredModal({
         </DialogHeader>
 
         <div className="mt-4 sm:mt-6">
+          {/* Billing Interval Toggle */}
+          <div className="flex items-center justify-center gap-3 mb-4 sm:mb-6 p-3 sm:p-4 bg-background rounded-lg border">
+            <Label htmlFor="billing-toggle-modal-sub" className={`text-sm cursor-pointer ${billingInterval === 'monthly' ? 'font-semibold' : 'text-muted-foreground'}`}>
+              Monthly
+            </Label>
+            <Switch
+              id="billing-toggle-modal-sub"
+              checked={billingInterval === 'yearly'}
+              onCheckedChange={(checked) => setBillingInterval(checked ? 'yearly' : 'monthly')}
+            />
+            <Label htmlFor="billing-toggle-modal-sub" className={`text-sm cursor-pointer ${billingInterval === 'yearly' ? 'font-semibold' : 'text-muted-foreground'}`}>
+              Yearly
+            </Label>
+            {billingInterval === 'yearly' && (
+              <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 text-xs font-semibold ml-2">
+                Save 25%
+              </Badge>
+            )}
+          </div>
+
           <div className="bg-muted/50 border border-border rounded-lg p-3 sm:p-4 mb-4 sm:mb-6">
             <p className="text-xs sm:text-sm text-muted-foreground">
               <strong className="text-foreground">Why subscribe?</strong> Our subscription plans give you access to:
@@ -241,30 +265,75 @@ export function SubscriptionRequiredModal({
               if (!plan) return null
 
               const isProcessing = processingSubscription === planType
+              const isBigBusiness = planType === 'Big Business' && businessType === 'sme'
 
               return (
                 <Card 
                   key={planType} 
-                  className="relative flex flex-col hover:border-primary transition-all"
+                  className={`relative flex flex-col ${isBigBusiness ? 'opacity-75' : 'hover:border-primary transition-all'}`}
                 >
+                  {isBigBusiness && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-muted border border-border px-3 py-1 rounded-full text-xs font-medium">
+                      Coming Soon
+                    </div>
+                  )}
                   <CardHeader className="p-3 sm:p-6">
-                    <CardTitle className="text-base sm:text-lg md:text-xl">{plan.name}</CardTitle>
+                    <div className="flex items-center gap-2 mb-2">
+                      <CardTitle className="text-base sm:text-lg md:text-xl">
+                        {planType === 'PRO' ? 'PRO' : planType === 'GOLD' ? 'GOLD' : planType === 'PLATINUM' ? 'PLATINUM' : plan.name}
+                      </CardTitle>
+                      {planType === 'PRO' && (
+                        <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-medium">
+                          Basic
+                        </span>
+                      )}
+                      {planType === 'GOLD' && (
+                        <span className="text-xs bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 px-2 py-1 rounded-full font-medium">
+                          Advanced
+                        </span>
+                      )}
+                      {planType === 'PLATINUM' && (
+                        <span className="text-xs bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-medium">
+                          Individual Businesses
+                        </span>
+                      )}
+                    </div>
                     <CardDescription className="text-xs sm:text-sm mt-1 sm:mt-2">
                       {businessType === 'sme' 
                         ? planType === 'Small Business' 
                           ? 'For businesses with annual turnover ≤ ₦50-100 million'
                           : 'For businesses with turnover above small business threshold'
                         : planType === 'PRO'
-                          ? 'Perfect for tech freelancers and independent professionals'
+                          ? 'Perfect for tech freelancers, VAs, copywriters, and independent professionals'
                           : planType === 'GOLD'
-                          ? 'Ideal for content creators and influencers'
-                          : 'For established creators with complex tax situations'}
+                          ? 'Ideal for content creators, influencers, and digital creators managing multiple income streams'
+                          : 'For established creators, individuals with complex tax situations, business owner (not Limited Liability Company), and team collaborations'}
                     </CardDescription>
                     <div className="mt-3 sm:mt-4">
-                      <div className="flex items-baseline gap-1.5 sm:gap-2">
-                        <span className="text-xl sm:text-2xl md:text-3xl font-bold">{plan.priceDisplay}</span>
-                        <span className="text-xs sm:text-sm text-muted-foreground">/month</span>
-                      </div>
+                      {billingInterval === 'monthly' ? (
+                        <div className="flex items-baseline gap-1.5 sm:gap-2">
+                          <span className="text-xl sm:text-2xl md:text-3xl font-bold">{plan.monthlyPriceDisplay}</span>
+                          <span className="text-xs sm:text-sm text-muted-foreground">/month</span>
+                        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">
+                            {(() => {
+                              const grossYearly = (plan.monthlyPrice * 12) / 100
+                              return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                            })()}
+                          </span>
+                          <div className="flex items-baseline gap-1.5 sm:gap-2">
+                            <span className="text-xl sm:text-2xl md:text-3xl font-bold">
+                              {getPlanPriceDisplay(plan, 'yearly')}
+                            </span>
+                            <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 py-0.5 text-xs font-semibold">
+                              25% OFF
+                            </Badge>
+                          </div>
+                          <span className="text-xs sm:text-sm text-muted-foreground">/year</span>
+                        </div>
+                      )}
                     </div>
                   </CardHeader>
                   <CardContent className="flex-1 p-3 sm:p-6 pt-0">
@@ -293,9 +362,9 @@ export function SubscriptionRequiredModal({
                           console.error('Error in handleSubscribe:', err)
                         })
                       }}
-                      disabled={isProcessing || (businessType === 'sme' && planType === 'Big Business')}
+                      disabled={isProcessing || isBigBusiness}
                     >
-                      {businessType === 'sme' && planType === 'Big Business' ? (
+                      {isBigBusiness ? (
                         "Coming Soon"
                       ) : isProcessing ? (
                         <>

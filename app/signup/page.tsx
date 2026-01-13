@@ -482,10 +482,10 @@ function SignupPageContent() {
                   <SelectValue placeholder="Select business type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="freelancer">Freelancer</SelectItem>
+                  <SelectItem value="freelancer">Freelancer/Self-Employed</SelectItem>
                   <SelectItem value="creator">Creator / Influencer</SelectItem>
                   <SelectItem value="sme">Small Business</SelectItem>
-                  <SelectItem value="consultant">Tax Consultant</SelectItem>
+                  {/* <SelectItem value="consultant">Tax Consultant</SelectItem> */}
                 </SelectContent>
               </Select>
             </div>

@@ -80,11 +80,14 @@ export function SubscriptionSuccessModal() {
               </div>
             </DialogTitle>
             <DialogDescription className="text-xs sm:text-sm mt-1 sm:mt-2">
-              {isFirstTime 
-                ? `Welcome to ${plan.name}! Your subscription is now active.`
-                : profile?.renewalCount 
-                  ? `Thank you for being a loyal customer! You've renewed ${profile.renewalCount} time${profile.renewalCount !== 1 ? 's' : ''}. Your ${plan.name} subscription is now active.`
-                  : `Your ${plan.name} subscription has been renewed and is now active.`}
+              {(() => {
+                const planDisplayName = plan.id === 'PRO' ? 'PRO' : plan.id === 'GOLD' ? 'GOLD' : plan.id === 'PLATINUM' ? 'PLATINUM' : plan.name
+                return isFirstTime 
+                  ? `Welcome to ${planDisplayName}! Your subscription is now active.`
+                  : profile?.renewalCount 
+                    ? `Thank you for being a loyal customer! You've renewed ${profile.renewalCount} time${profile.renewalCount !== 1 ? 's' : ''}. Your ${planDisplayName} subscription is now active.`
+                    : `Your ${planDisplayName} subscription has been renewed and is now active.`
+              })()}
             </DialogDescription>
           </div>
         </DialogHeader>
