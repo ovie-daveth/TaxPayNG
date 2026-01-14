@@ -77,7 +77,11 @@ export function SubscriptionExpiryModal({
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs sm:text-sm text-muted-foreground">Current Plan:</span>
-                <span className="text-xs sm:text-sm font-semibold">{plan?.name || subscriptionType}</span>
+                <span className="text-xs sm:text-sm font-semibold">
+                  {plan 
+                    ? (plan.id === 'PRO' ? 'PRO' : plan.id === 'GOLD' ? 'GOLD' : plan.id === 'PLATINUM' ? 'PLATINUM' : plan.name)
+                    : subscriptionType}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-xs sm:text-sm text-muted-foreground">

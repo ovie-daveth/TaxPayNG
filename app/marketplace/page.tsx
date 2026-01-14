@@ -58,6 +58,11 @@ interface Consultant {
     clientCount?: number
     successRate?: number
     portfolioImages?: string[]
+    rate?: {
+      amount: number
+      currency?: string
+      type?: 'hourly' | 'consultancy'
+    }
   }
   consultantCertification?: string
   consultantKycCompleted?: boolean
@@ -101,20 +106,26 @@ export default function MarketplacePage() {
   const [locationFilter, setLocationFilter] = useState<string>("")
 
   useEffect(() => {
+    // Wait for auth and profile to finish loading
     if (authLoading || profileLoading) {
       return
     }
 
+    // If not logged in, redirect to login
     if (!user) {
       router.push('/login')
       return
     }
 
-    // Only allow freelancers, creators, and SMEs
-    if (profile && (profile.businessType === 'consultant' || profile.role === 'admin')) {
-      router.push('/dashboard')
-      return
+    // Only redirect consultants and admins - allow freelancers, creators, and SMEs
+    // Make sure profile exists before checking businessType
+    if (profile) {
+      if (profile.businessType === 'consultant' || profile.role === 'admin') {
+        router.push('/dashboard')
+        return
+      }
     }
+    // If profile is null but user is logged in, allow access (profile might still be loading or being created)
   }, [user, profile, authLoading, profileLoading, router])
 
   useEffect(() => {
@@ -196,7 +207,14 @@ export default function MarketplacePage() {
     )
   }
 
-  if (!user || (profile && (profile.businessType === 'consultant' || profile.role === 'admin'))) {
+  // Only block if user is not logged in, or if profile exists and user is consultant/admin
+  if (!user) {
+    return null
+  }
+  
+  // If profile exists and user is consultant or admin, they should have been redirected
+  // But if they're still here, show nothing (redirect is in progress)
+  if (profile && (profile.businessType === 'consultant' || profile.role === 'admin')) {
     return null
   }
 
@@ -515,7 +533,7 @@ export default function MarketplacePage() {
                         isAssigned && "bg-green-600 hover:bg-green-700"
                       )}
                       variant={isAssigned ? "default" : "default"}
-                      disabled={isAssigned || isAssigning}
+                      disabled={isAssigned}
                       onClick={(e) => {
                         e.stopPropagation()
                         router.push(`/marketplace/${consultant.id}`)

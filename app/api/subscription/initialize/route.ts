@@ -9,6 +9,7 @@ const PAYSTACK_PUBLIC_KEY = process.env.NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY
 
 interface InitializeSubscriptionRequest {
   subscriptionType: SubscriptionType
+  interval?: 'monthly' | 'yearly' // Default to 'monthly' if not provided
 }
 
 export async function POST(request: NextRequest) {
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
 
     const userId = decodedToken.uid
     const body: InitializeSubscriptionRequest = await request.json()
-    const { subscriptionType } = body
+    const { subscriptionType, interval = 'monthly' } = body
 
     if (!subscriptionType || !subscriptionService.getPlan(subscriptionType)) {
       return NextResponse.json(
@@ -56,8 +57,22 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    if (interval !== 'monthly' && interval !== 'yearly') {
+      return NextResponse.json(
+        { success: false, error: 'Invalid interval. Must be "monthly" or "yearly"' },
+        { status: 400 }
+      )
+    }
+
     const plan = subscriptionService.getPlan(subscriptionType)!
-    const amount = plan.price // Amount in kobo
+    const amount = subscriptionService.getPlanPrice(subscriptionType, interval) // Amount in kobo based on interval
+    
+    if (!amount) {
+      return NextResponse.json(
+        { success: false, error: 'Failed to get plan price' },
+        { status: 500 }
+      )
+    }
 
     // Get user email for Paystack
     const userRecord = await adminAuth.getUser(userId)
@@ -86,7 +101,8 @@ export async function POST(request: NextRequest) {
         metadata: {
           userId,
           subscriptionType,
-          planName: plan.name
+          planName: plan.name,
+          interval: interval
         }
       })
     })
@@ -111,12 +127,18 @@ export async function POST(request: NextRequest) {
 
     // Create subscription payment record using Admin SDK (bypasses security rules)
     const db = getAdminDb()
+    // Calculate expiry date based on interval (will be recalculated in verify route, but set initial value)
     const expiresAt = new Date()
-    expiresAt.setMonth(expiresAt.getMonth() + 1)
+    if (interval === 'yearly') {
+      expiresAt.setFullYear(expiresAt.getFullYear() + 1)
+    } else {
+      expiresAt.setMonth(expiresAt.getMonth() + 1)
+    }
     
     const subscriptionData = {
       userId,
       subscriptionType,
+      interval: interval,
       amount,
       paystackReference: paystackData.data.reference,
       status: 'pending',

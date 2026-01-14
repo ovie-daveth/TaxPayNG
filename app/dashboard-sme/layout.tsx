@@ -12,6 +12,7 @@ import { SubscriptionExpiryChecker } from "@/components/subscription/subscriptio
 import { FreeTrialWarningModal } from "@/components/subscription/free-trial-warning-modal"
 import { FreeTrialBlockedModal } from "@/components/subscription/free-trial-blocked-modal"
 import { FreeTrialBanner } from "@/components/subscription/free-trial-banner"
+import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { FloatingSupportButton } from "@/components/support/floating-support-button"
 import { cn } from "@/lib/utils"
 
@@ -27,6 +28,7 @@ function LayoutContent({
   const router = useRouter()
   const [showWarningModal, setShowWarningModal] = useState(false)
   const [hasShownWarning, setHasShownWarning] = useState(false)
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
 
   useEffect(() => {
     if (!loading && !user) {
@@ -117,6 +119,16 @@ function LayoutContent({
         <FreeTrialBlockedModal
           open={true}
           onOpenChange={() => {}} // Prevent closing
+          businessType={profile?.businessType || 'sme'}
+          onOpenSubscription={() => setShowSubscriptionModal(true)}
+        />
+      )}
+      
+      {profile && (
+        <SubscriptionRequiredModal
+          open={showSubscriptionModal}
+          onOpenChange={setShowSubscriptionModal}
+          businessType={profile.businessType || 'sme'}
         />
       )}
     </div>

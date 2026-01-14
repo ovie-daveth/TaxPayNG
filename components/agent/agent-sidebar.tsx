@@ -30,7 +30,7 @@ const navItems = [
   { href: "/consultant/dashboard/clients", label: "Clients", icon: User },
   { href: "/consultant/dashboard/requests", label: "Filing Requests", icon: ClipboardList },
   { href: "/consultant/dashboard/payments", label: "Payments", icon: Wallet },
-  { href: "/consultant/dashboard/portfolio", label: "Portfolio", icon: Briefcase },
+  { href: "/agent/dashboard/portfolio", label: "Portfolio", icon: Briefcase },
   { href: "/consultant/dashboard/settings", label: "Settings", icon: Settings },
 ]
 

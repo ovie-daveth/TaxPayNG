@@ -51,7 +51,8 @@ export interface UserProfile {
   // Subscription fields
   isSubscribe?: boolean
   subscriptionType?: SubscriptionType
-  subscriptionExpiryDate?: string // ISO string - when subscription expires (31 days from payment)
+  subscriptionInterval?: 'monthly' | 'yearly' // Billing interval for the subscription
+  subscriptionExpiryDate?: string // ISO string - when subscription expires (31 days for monthly, 365 days for yearly)
   // Free Trial fields
   freeTrialStartDate?: string // ISO string - when free trial started
   freeTrialEndDate?: string // ISO string - when free trial ends (3 days from start)
@@ -909,4 +910,75 @@ export interface FilingRequest {
   notes?: string
   createdAt: string
   updatedAt: string
+}
+
+// Employee Types for SME Payroll
+export interface Employee {
+  id: string
+  userId: string // The SME user who owns this employee
+  employeeNumber?: string // Unique employee number/ID within the company
+  firstName: string
+  lastName: string
+  middleName?: string
+  email?: string
+  phone?: string
+  dateOfBirth?: string // ISO date string
+  gender?: 'male' | 'female' | 'other'
+  address?: {
+    street?: string
+    city?: string
+    state?: string
+    country?: string
+    postalCode?: string
+  }
+  
+  // Employment details
+  employmentType: 'full-time' | 'part-time' | 'contract' | 'intern'
+  department?: string
+  position?: string
+  jobTitle?: string
+  employmentDate?: string // ISO date string - when employee started
+  employmentEndDate?: string // ISO date string - when employee left (if applicable)
+  status: 'active' | 'inactive' | 'terminated' | 'on-leave'
+  
+  // Payroll details
+  basicSalary?: number // Monthly basic salary in NGN
+  allowances?: Array<{
+    name: string
+    amount: number
+    type: 'fixed' | 'percentage' // Percentage of basic salary
+    taxable: boolean // Whether allowance is taxable
+  }>
+  deductions?: Array<{
+    name: string
+    amount: number
+    type: 'fixed' | 'percentage' // Percentage of basic salary
+    category?: 'pension' | 'nhf' | 'nhis' | 'tax' | 'loan' | 'other'
+  }>
+  
+  // Tax information
+  taxIdentificationNumber?: string // Employee's TIN
+  taxState?: string // State for tax purposes
+  taxExempt?: boolean // Whether employee is tax-exempt
+  
+  // Bank details for salary payment
+  bankAccount?: {
+    bankName?: string
+    accountNumber?: string
+    accountName?: string
+  }
+  
+  // Additional information
+  emergencyContact?: {
+    name: string
+    relationship?: string
+    phone: string
+    email?: string
+  }
+  notes?: string
+  
+  // Tracking
+  createdAt: string
+  updatedAt: string
+  createdBy?: string // User ID who created this employee record
 }

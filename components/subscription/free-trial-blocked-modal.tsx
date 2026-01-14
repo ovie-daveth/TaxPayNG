@@ -3,18 +3,36 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Lock, AlertCircle } from "lucide-react"
-import Link from "next/link"
+import { BusinessType } from "@/lib/types"
 
 interface FreeTrialBlockedModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  businessType?: BusinessType
+  onOpenSubscription?: () => void
 }
 
-export function FreeTrialBlockedModal({ open, onOpenChange }: FreeTrialBlockedModalProps) {
+export function FreeTrialBlockedModal({ open, onOpenChange, businessType = 'freelancer', onOpenSubscription }: FreeTrialBlockedModalProps) {
   // Prevent closing the modal - user must subscribe
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
-      // Don't allow closing - redirect to pricing instead
+      // If onOpenSubscription is provided, open subscription modal instead of redirecting
+      if (onOpenSubscription) {
+        onOpenSubscription()
+      } else {
+        // Fallback: redirect to pricing
+        window.location.href = '/pricing'
+      }
+    }
+  }
+
+  const handleSubscribe = () => {
+    if (onOpenSubscription) {
+      onOpenSubscription()
+      // Close the blocked modal when opening subscription modal
+      onOpenChange(false)
+    } else {
+      // Fallback: redirect to pricing
       window.location.href = '/pricing'
     }
   }
@@ -50,11 +68,9 @@ export function FreeTrialBlockedModal({ open, onOpenChange }: FreeTrialBlockedMo
           </div>
           
           <div className="flex flex-col gap-3">
-            <Link href="/pricing" className="w-full">
-              <Button className="w-full" size="lg" onClick={() => onOpenChange(false)}>
-                Subscribe Now
-              </Button>
-            </Link>
+            <Button className="w-full" size="lg" onClick={handleSubscribe}>
+              Subscribe Now
+            </Button>
             <Button 
               variant="outline" 
               className="w-full"

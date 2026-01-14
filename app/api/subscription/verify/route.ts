@@ -82,6 +82,7 @@ export async function GET(request: NextRequest) {
     const subscriptionId = subscriptionDoc.id
     const userId = subscription.userId
     const subscriptionType = subscription.subscriptionType
+    const interval = subscription.interval || 'monthly' // Default to monthly for backward compatibility
 
     // Update subscription status to success using Admin SDK
     await db.collection('subscriptions').doc(subscriptionId).update({
@@ -123,7 +124,7 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Calculate subscription expiry
+      // Calculate subscription expiry based on interval
       const now = new Date()
       let expiryDate = new Date(now)
       
@@ -137,8 +138,14 @@ export async function GET(request: NextRequest) {
         }
       }
       
-      // Add 31 days to the start date
-      expiryDate.setDate(expiryDate.getDate() + 31)
+      // Add subscription period based on interval
+      if (interval === 'yearly') {
+        // Add 12 months (365 days) for yearly subscription
+        expiryDate.setFullYear(expiryDate.getFullYear() + 1)
+      } else {
+        // Add 31 days for monthly subscription
+        expiryDate.setDate(expiryDate.getDate() + 31)
+      }
       
       // Check if this is a first-time subscription or renewal
       const isFirstSubscription = !profileData?.subscriptionStartDate
@@ -148,6 +155,7 @@ export async function GET(request: NextRequest) {
       const updateData: any = {
         isSubscribe: true,
         subscriptionType: subscriptionType,
+        subscriptionInterval: interval, // Store billing interval for reference
         subscriptionExpiryDate: expiryDate.toISOString(),
         lastSubscriptionDate: now.toISOString(),
         renewalCount: renewalCount,
@@ -223,6 +231,7 @@ export async function POST(request: NextRequest) {
         const subscriptionId = subscriptionDoc.id
         const userId = subscription.userId
         const subscriptionType = subscription.subscriptionType
+        const interval = subscription.interval || 'monthly' // Default to monthly for backward compatibility
 
         // Update subscription status using Admin SDK
         await db.collection('subscriptions').doc(subscriptionId).update({
@@ -250,7 +259,7 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // Calculate subscription expiry
+          // Calculate subscription expiry based on interval
           const now = new Date()
           let expiryDate = new Date(now)
           
@@ -264,8 +273,14 @@ export async function POST(request: NextRequest) {
             }
           }
           
-          // Add 31 days to the start date
-          expiryDate.setDate(expiryDate.getDate() + 31)
+          // Add subscription period based on interval
+          if (interval === 'yearly') {
+            // Add 12 months (365 days) for yearly subscription
+            expiryDate.setFullYear(expiryDate.getFullYear() + 1)
+          } else {
+            // Add 31 days for monthly subscription
+            expiryDate.setDate(expiryDate.getDate() + 31)
+          }
           
           // Check if this is a first-time subscription or renewal
           const isFirstSubscription = !profileData?.subscriptionStartDate
@@ -274,6 +289,7 @@ export async function POST(request: NextRequest) {
           const updateData: any = {
             isSubscribe: true,
             subscriptionType: subscriptionType,
+            subscriptionInterval: interval, // Store billing interval for reference
             subscriptionExpiryDate: expiryDate.toISOString(),
             lastSubscriptionDate: now.toISOString(),
             renewalCount: renewalCount,
