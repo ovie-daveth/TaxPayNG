@@ -42,7 +42,7 @@ export function AddInvoiceDialog({
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { hasAccess } = useSubscription()
-  const { activeEntityId } = useBusiness()
+  const { activeEntityId, activeEntity } = useBusiness()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [isSearchingUser, setIsSearchingUser] = useState(false)
@@ -1435,9 +1435,57 @@ export function AddInvoiceDialog({
                         onChange={(e) => updateItem(item.id, { description: e.target.value })}
                         onKeyDown={handleInputKeyDown}
                         onClick={(e) => e.stopPropagation()}
-                        placeholder="Item description"
+                        placeholder={(() => {
+                          const businessType = activeEntity?.businessType || 'both'
+                          if (businessType === 'service') {
+                            return "e.g., Consulting Services, Professional Services, Project Fees..."
+                          } else if (businessType === 'sales') {
+                            return "e.g., Product Name, Item Description, Quantity..."
+                          } else {
+                            return "e.g., Service or Product Description..."
+                          }
+                        })()}
+                        list={`item-descriptions-${item.id}`}
                         className="h-9 sm:h-10 text-xs sm:text-sm"
                       />
+                      <datalist id={`item-descriptions-${item.id}`}>
+                        {(() => {
+                          const businessType = activeEntity?.businessType || 'both'
+                          const suggestions: string[] = []
+                          
+                          if (businessType === 'service' || businessType === 'both') {
+                            suggestions.push(
+                              'Consulting Services',
+                              'Professional Services',
+                              'Project Fees',
+                              'Contract Services',
+                              'Retainer Fees',
+                              'Hourly Services',
+                              'Advisory Services',
+                              'Training Services',
+                              'Support Services',
+                              'Maintenance Services'
+                            )
+                          }
+                          
+                          if (businessType === 'sales' || businessType === 'both') {
+                            suggestions.push(
+                              'Product Sales',
+                              'Merchandise',
+                              'Inventory Item',
+                              'Goods',
+                              'Retail Product',
+                              'Wholesale Item',
+                              'Raw Materials',
+                              'Finished Goods'
+                            )
+                          }
+                          
+                          return suggestions.map((suggestion, idx) => (
+                            <option key={idx} value={suggestion} />
+                          ))
+                        })()}
+                      </datalist>
                     </div>
                     <div className="space-y-2 w-full sm:w-20 flex-shrink-0">
                       <Label className="text-xs sm:text-sm">Quantity</Label>
