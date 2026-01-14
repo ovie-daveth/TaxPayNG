@@ -332,7 +332,11 @@ export default function SMEEmployeesPage() {
                               <MoreVertical className="w-4 h-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-40">
+                          <DropdownMenuContent 
+                            align="end" 
+                            className="w-40"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <DropdownMenuItem
                               onClick={(e) => {
                                 e.stopPropagation()
