@@ -1304,10 +1304,10 @@ export default function SettingsPage() {
                       <div className="space-y-3 sm:space-y-4">
                         <div className="p-4 sm:p-5 md:p-6 border rounded-lg bg-muted/50">
                           <div className="mb-4 sm:mb-6">
-                            <h3 className="text-base sm:text-lg font-semibold mb-2">Choose a Subscription Plan</h3>
+                          <h3 className="text-base sm:text-lg font-semibold mb-2">Choose a Subscription Plan</h3>
                             <p className="text-xs sm:text-sm text-muted-foreground mb-4">
-                              Select a plan to unlock all features and start managing your taxes efficiently.
-                            </p>
+                            Select a plan to unlock all features and start managing your taxes efficiently.
+                          </p>
                             
                             {/* Billing Interval Toggle */}
                             <div className="flex items-center justify-center gap-3 mb-4 sm:mb-6 p-3 sm:p-4 bg-background rounded-lg border">
@@ -1361,7 +1361,7 @@ export default function SettingsPage() {
                                         </p>
                                       </div>
                                       
-                                      <div className="space-y-2">
+                                    <div className="space-y-2">
                                         {billingInterval === 'monthly' ? (
                                           <>
                                             <div className="flex items-baseline gap-2">

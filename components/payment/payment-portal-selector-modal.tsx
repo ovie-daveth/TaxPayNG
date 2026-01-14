@@ -278,35 +278,35 @@ export function PaymentPortalSelectorModal({
         </DialogHeader>
         <div className="space-y-6 w-full flex-1 flex flex-col justify-center">
           <div className="grid grid-cols-2 gap-4">
-            {taxAmount && (
+                {taxAmount && (
               <div className="space-y-1 text-center">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Amount to Pay</p>
                 <p className="text-xl font-bold text-primary">
-                  ₦{taxAmount.toLocaleString()}
-                </p>
-              </div>
-            )}
-            {taxDuration && (
+                      ₦{taxAmount.toLocaleString()}
+                    </p>
+                  </div>
+                )}
+                {taxDuration && (
               <div className="space-y-1 text-center">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Period</p>
                 <p className="text-sm font-semibold">{taxDuration}</p>
-              </div>
-            )}
-            {period && (
+                  </div>
+                )}
+                {period && (
               <div className="space-y-1 text-center">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Type</p>
                 <p className="text-sm font-semibold capitalize">{period}</p>
-              </div>
-            )}
-            {selectedState && (
+                  </div>
+                )}
+                {selectedState && (
               <div className="space-y-1 text-center">
                 <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">State</p>
                 <p className="text-sm font-semibold">{selectedState}</p>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
 
-          {taxDescription && (
+              {taxDescription && (
             <p className="text-xs text-muted-foreground italic text-center">{taxDescription}</p>
           )}
         </div>
@@ -331,19 +331,19 @@ export function PaymentPortalSelectorModal({
                 <Info className="h-5 w-5" />
               </Button>
             </div>
+            </div>
           </div>
-        </div>
 
         {/* Portal iframe - takes remaining space and scrollable */}
         <div className="flex-1 overflow-auto min-h-0">
-          {embeddedUrl ? (
-            <iframe
-              src={embeddedUrl}
-              title="Payment Portal"
+            {embeddedUrl ? (
+                <iframe
+                  src={embeddedUrl}
+                  title="Payment Portal"
               className="w-full h-full min-h-[calc(95vh-200px)] border-none"
-              sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-top-navigation"
-            />
-          ) : null}
+                  sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-top-navigation"
+                />
+            ) : null}
         </div>
 
         <DialogFooter className="border-t pt-4 flex justify-between">
@@ -422,9 +422,9 @@ export function PaymentPortalSelectorModal({
           setShowConfirmation(true)
 
           // Call the callback if provided
-          if (onPaymentMade) {
-            onPaymentMade(file)
-          }
+        if (onPaymentMade) {
+          onPaymentMade(file)
+        }
 
           toast.success("Payment recorded successfully!")
         } catch (error) {
