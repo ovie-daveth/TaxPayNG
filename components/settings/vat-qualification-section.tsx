@@ -125,6 +125,7 @@ export function VATQualificationSection({
           Under Nigeria&apos;s VAT Act, only businesses with ₦100M+ annual turnover that are VAT-registered can charge VAT on invoices. 
           {profile?.businessType === 'creator' && " As a creator, you can qualify if you meet these requirements."}
           {profile?.businessType === 'freelancer' && " As a freelancer, you can qualify if you meet these requirements."}
+          {profile?.businessType === 'sme' && " As an SME, you can qualify if you meet these requirements."}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">

@@ -667,7 +667,18 @@ export function StatsCards({
             whtCredits: periodTaxData.whtCredits,
             vatOutput: periodTaxData.taxClassification?.vatOutput || 0,
             reliefs: periodTaxData.reliefs,
-            effectiveRate: periodTaxData.taxableIncome > 0 ? ((periodTaxData.taxPayable / periodTaxData.taxableIncome) * 100).toFixed(2) : '0'
+            effectiveRate: periodTaxData.taxableIncome > 0 ? ((periodTaxData.taxPayable / periodTaxData.taxableIncome) * 100).toFixed(2) : '0',
+            // CIT-specific fields
+            citRate: (periodTaxData as any).citRate,
+            isSmallCompany: (periodTaxData as any).isSmallCompany,
+            isLargeMultinational: (periodTaxData as any).isLargeMultinational,
+            effectiveTaxRate: (periodTaxData as any).effectiveTaxRate,
+            originalETR: (periodTaxData as any).originalETR,
+            topUpTax: (periodTaxData as any).topUpTax,
+            profitBeforeTax: (periodTaxData as any).profitBeforeTax,
+            totalDeductions: (periodTaxData as any).totalDeductions,
+            capitalAllowancesTotal: (periodTaxData as any).capitalAllowancesTotal,
+            isCIT: calculatedBusinessType === 'sme' || businessType === 'small-business'
           } : null
           
           yearTaxCalculationRaw = yearTaxData ? {
@@ -683,7 +694,18 @@ export function StatsCards({
             whtCredits: yearTaxData.whtCredits,
             vatOutput: yearTaxData.taxClassification?.vatOutput || 0,
             reliefs: yearTaxData.reliefs,
-            effectiveRate: yearTaxData.taxableIncome > 0 ? ((yearTaxData.taxPayable / yearTaxData.taxableIncome) * 100).toFixed(2) : '0'
+            effectiveRate: yearTaxData.taxableIncome > 0 ? ((yearTaxData.taxPayable / yearTaxData.taxableIncome) * 100).toFixed(2) : '0',
+            // CIT-specific fields
+            citRate: (yearTaxData as any).citRate,
+            isSmallCompany: (yearTaxData as any).isSmallCompany,
+            isLargeMultinational: (yearTaxData as any).isLargeMultinational,
+            effectiveTaxRate: (yearTaxData as any).effectiveTaxRate,
+            originalETR: (yearTaxData as any).originalETR,
+            topUpTax: (yearTaxData as any).topUpTax,
+            profitBeforeTax: (yearTaxData as any).profitBeforeTax,
+            totalDeductions: (yearTaxData as any).totalDeductions,
+            capitalAllowancesTotal: (yearTaxData as any).capitalAllowancesTotal,
+            isCIT: calculatedBusinessType === 'sme' || businessType === 'small-business'
           } : null
           
           setStats(buildStatsFromSummary(

@@ -5,6 +5,7 @@ import { taxCalculationService } from './taxCalculationService'
 import { userService } from './userService'
 import { Transaction, Invoice, TaxCalculation, SavedReport, TaxPeriod } from '@/lib/types'
 import { calculateNigerianTax } from '@/lib/tax-calculator'
+import { calculateCIT } from '@/lib/tax/cit-calculator'
 import { calculateTaxClassificationBenefitsFromTransactions, TaxClassificationSummary } from '@/lib/utils/tax-classification-calculator'
 
 export interface ReportPeriod {
@@ -63,6 +64,16 @@ export interface TaxData {
   adjustedGrossIncome: number
   capitalAllowances?: number // Gold+ feature: capital allowances from tax classification
   whtCredits?: number // Gold+ feature: WHT credits from tax classification
+  // CIT-specific fields
+  citRate?: number
+  isSmallCompany?: boolean
+  isLargeMultinational?: boolean
+  effectiveTaxRate?: number
+  originalETR?: number
+  topUpTax?: number
+  profitBeforeTax?: number
+  totalDeductions?: number
+  capitalAllowancesTotal?: number
 }
 
 export interface ReportData {
@@ -1161,7 +1172,77 @@ export class ReportService extends BaseService {
     const lifeInsurance = reliefAmounts?.lifeInsurance || 0
     const charitableDonations = reliefAmounts?.charitableDonations || 0
 
-    // Prepare tax calculation data
+    // Check if this is an SME - use CIT instead of PIT
+    const isSME = profile.businessType === 'sme' || profile.businessType === 'small-business'
+    
+    if (isSME) {
+      // Use CIT (Corporate Income Tax) for SMEs
+      // CIT is 30% for businesses above ₦100M turnover, 0% for small companies (≤₦100M turnover AND ≤₦250M assets)
+      const annualTurnover = profile.annualTurnover || grossIncome // Use annual turnover from profile, or grossIncome as fallback
+      const totalFixedAssets = profile.totalFixedAssets || 0 // Default to 0 if not provided
+      const profitBeforeTax = grossIncome - totalExpenses // Net profit after expenses
+      
+      // Map capital allowance details to CIT format
+      const capitalAllowancesForCIT = taxClassification?.capitalAllowanceDetails?.map(ca => {
+        // Map asset category from transaction type to CIT category
+        // Note: We don't have the asset category in capitalAllowanceDetails, so default to equipment
+        // This could be enhanced in the future to track asset category from transaction taxClassification
+        let assetCategory: "building" | "furniture" | "equipment" | "vehicle" | "computer" | "other" = "equipment"
+        
+        return {
+          id: ca.transactionId || '',
+          assetDescription: ca.description || '',
+          assetCost: ca.originalCost || 0,
+          assetCategory: assetCategory,
+          allowanceRate: ca.allowanceRate || 25,
+          allowanceAmount: ca.allowanceAmount || 0
+        }
+      }) || undefined
+      
+      // Calculate CIT using minimal mode (profitBeforeTax)
+      const citResult = calculateCIT({
+        annualTurnover: annualTurnover,
+        totalFixedAssets: totalFixedAssets,
+        profitBeforeTax: profitBeforeTax,
+        period: 'yearly',
+        capitalAllowances: capitalAllowancesForCIT
+      })
+      
+      // Map CIT result to TaxData format
+      return {
+        grossIncome,
+        totalExpenses,
+        netIncome,
+        reliefs: {
+          consolidatedRelief: 0, // Not applicable for CIT
+          pensionContribution: 0, // Not applicable for CIT
+          nhfContribution: 0, // Not applicable for CIT
+          healthInsurance: 0, // Not applicable for CIT
+          lifeInsurance: 0, // Not applicable for CIT
+          charitableDonations: 0, // Not applicable for CIT
+          dependents: 0 // Not applicable for CIT
+        },
+        taxableIncome: citResult.taxableProfit || 0,
+        taxPayable: citResult.totalCITPayable || 0,
+        taxBrackets: [], // CIT doesn't use brackets
+        totalReliefs: citResult.totalDeductions || 0,
+        adjustedGrossIncome: citResult.profitBeforeTax || 0,
+        capitalAllowances: citResult.capitalAllowancesTotal || 0,
+        whtCredits: taxClassification?.whtCredits || 0,
+        // CIT-specific fields for breakdown display
+        citRate: citResult.citRate,
+        isSmallCompany: citResult.isSmallCompany,
+        isLargeMultinational: citResult.isLargeMultinational,
+        effectiveTaxRate: citResult.effectiveTaxRate,
+        originalETR: citResult.originalETR,
+        topUpTax: citResult.topUpTax,
+        profitBeforeTax: citResult.profitBeforeTax,
+        totalDeductions: citResult.totalDeductions,
+        capitalAllowancesTotal: citResult.capitalAllowancesTotal
+      }
+    }
+    
+    // Prepare tax calculation data for PIT (Personal Income Tax) - for freelancers and creators
     // Note: calculateNigerianTax expects taxable income (after VAT exclusion, before expenses and reliefs)
     // VAT must be remitted to government, so it's excluded from taxable income at the income calculation level
     // The calculator will subtract businessExpenses and apply reliefs internally
@@ -1183,7 +1264,7 @@ export class ReportService extends BaseService {
       whtCredits: taxClassification?.whtCredits || undefined
     }
 
-    // Calculate tax
+    // Calculate tax using PIT (Personal Income Tax)
     const taxResult = calculateNigerianTax(taxCalcData)
 
     return {

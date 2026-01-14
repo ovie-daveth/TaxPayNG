@@ -158,7 +158,7 @@ export function getVATEligibility(profile: UserProfile | null | undefined): VATE
   return {
     canChargeVAT: false,
     status: 'below_threshold',
-    reason: 'VAT eligibility cannot be determined. Update your profile with annual turnover and VAT registration status.',
+    reason: "You're not eligible for VAT. Update your profile with annual turnover and VAT registration status.",
     annualTurnover: profile.annualTurnover,
     isVATRegistered: profile.vatRegistered
   }
