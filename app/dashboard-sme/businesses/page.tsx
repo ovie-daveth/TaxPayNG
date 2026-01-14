@@ -11,6 +11,7 @@ import { useBusiness } from "@/lib/contexts/business-context"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { toast } from "sonner"
 import { Building2, Plus, CheckCircle2, Trash2, Edit } from "lucide-react"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export default function BusinessesPage() {
   const { profile } = useUserProfile()
@@ -23,9 +24,10 @@ export default function BusinessesPage() {
 
   const [open, setOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
-  const [editingEntity, setEditingEntity] = useState<{ id: string; name: string; description?: string } | null>(null)
+  const [editingEntity, setEditingEntity] = useState<{ id: string; name: string; description?: string; businessType?: 'service' | 'sales' | 'both' } | null>(null)
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
+  const [businessType, setBusinessType] = useState<'service' | 'sales' | 'both'>('both')
 
   const canCreateMore = useMemo(() => {
     // PLATINUM users can create unlimited entities
@@ -42,20 +44,27 @@ export default function BusinessesPage() {
       toast.error("Business name is required")
       return
     }
-    const created = await createEntity({ name: name.trim(), description: description.trim() || undefined, currency: "NGN" })
+    const created = await createEntity({ 
+      name: name.trim(), 
+      description: description.trim() || undefined, 
+      currency: "NGN",
+      businessType: businessType
+    })
     if (created) {
       toast.success("Business created")
       setOpen(false)
       setName("")
       setDescription("")
+      setBusinessType('both')
       await setActiveEntityId(created.id)
     }
   }
 
-  const handleEdit = (entity: { id: string; name: string; description?: string }) => {
+  const handleEdit = (entity: { id: string; name: string; description?: string; businessType?: 'service' | 'sales' | 'both' }) => {
     setEditingEntity(entity)
     setName(entity.name)
     setDescription(entity.description || "")
+    setBusinessType(entity.businessType || 'both')
     setEditOpen(true)
   }
 
@@ -64,13 +73,18 @@ export default function BusinessesPage() {
       toast.error("Business name is required")
       return
     }
-    const updated = await updateEntity(editingEntity.id, { name: name.trim(), description: description.trim() || undefined })
+    const updated = await updateEntity(editingEntity.id, { 
+      name: name.trim(), 
+      description: description.trim() || undefined,
+      businessType: businessType
+    })
     if (updated) {
       toast.success("Business updated")
       setEditOpen(false)
       setEditingEntity(null)
       setName("")
       setDescription("")
+      setBusinessType('both')
     }
   }
 
@@ -126,6 +140,20 @@ export default function BusinessesPage() {
                 <div className="space-y-2">
                   <Label className="text-xs sm:text-sm">Description (optional)</Label>
                   <Input value={description} onChange={(e) => setDescription(e.target.value)} className="text-xs sm:text-sm" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs sm:text-sm">Business Type</Label>
+                  <Select value={businessType} onValueChange={(value: 'service' | 'sales' | 'both') => setBusinessType(value)}>
+                    <SelectTrigger className="text-xs sm:text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="service">Service-Based (Consulting, Professional Services)</SelectItem>
+                      <SelectItem value="sales">Sales-Based (Selling Products/Items)</SelectItem>
+                      <SelectItem value="both">Both (Services & Sales)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground">This helps customize transaction categories and invoice structure</p>
                 </div>
                 <Button onClick={handleCreate} disabled={loading} className="w-full">
                   Create

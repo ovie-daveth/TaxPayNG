@@ -42,7 +42,7 @@ export function AddInvoiceDialog({
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { hasAccess } = useSubscription()
-  const { activeEntityId } = useBusiness()
+  const { activeEntityId, activeEntity } = useBusiness()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [isSearchingUser, setIsSearchingUser] = useState(false)
@@ -656,8 +656,10 @@ export function AddInvoiceDialog({
     const vatableSubtotalAfterDiscount = vatableSubtotal - vatableDiscountAmount
     
     // Calculate VAT (7.5% default in Nigeria) only on vatable items after discount
-    const vatRate = formData.vatRate || 7.5
-    const vatAmount = vatableSubtotalAfterDiscount * (vatRate / 100)
+    // Only calculate VAT if user can charge VAT (VAT-eligible)
+    const userCanChargeVAT = canChargeVAT(profile)
+    const vatRate = userCanChargeVAT ? (formData.vatRate || 7.5) : 0
+    const vatAmount = userCanChargeVAT ? (vatableSubtotalAfterDiscount * (vatRate / 100)) : 0
     
     // Invoice Total = Subtotal (after discount) + VAT (on vatable items only)
     const invoiceTotal = subtotalAfterDiscount + vatAmount
@@ -777,7 +779,7 @@ export function AddInvoiceDialog({
         paymentInstructions: formData.paymentInstructions || undefined,
         status: 'draft' as const,
         subtotal: totals.subtotal,
-        vatRate: formData.vatRate || 7.5,
+        vatRate: canChargeVAT(profile) ? (formData.vatRate || 7.5) : undefined,
         vatAmount: totals.vatAmount,
         taxAmount: totals.taxAmount, // Legacy field
         invoiceTotal: totals.invoiceTotal,
@@ -1401,7 +1403,7 @@ export function AddInvoiceDialog({
                   <strong>Note:</strong> Mark items as "Vatable" if they are subject to VAT. VAT (7.5%) will be calculated at invoice level and added to the subtotal. VAT is collected on behalf of government—remember to remit to FIRS.
                 </AlertDescription>
               </Alert>
-            ) : (profile?.businessType === 'freelancer' || profile?.businessType === 'creator') && (
+            ) : (
               <Alert className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
                 <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-amber-600 dark:text-amber-400" />
                 <AlertDescription className="text-xs sm:text-sm text-amber-900 dark:text-amber-100">
@@ -1435,9 +1437,57 @@ export function AddInvoiceDialog({
                         onChange={(e) => updateItem(item.id, { description: e.target.value })}
                         onKeyDown={handleInputKeyDown}
                         onClick={(e) => e.stopPropagation()}
-                        placeholder="Item description"
+                        placeholder={(() => {
+                          const businessType = activeEntity?.businessType || 'both'
+                          if (businessType === 'service') {
+                            return "e.g., Consulting Services, Professional Services, Project Fees..."
+                          } else if (businessType === 'sales') {
+                            return "e.g., Product Name, Item Description, Quantity..."
+                          } else {
+                            return "e.g., Service or Product Description..."
+                          }
+                        })()}
+                        list={`item-descriptions-${item.id}`}
                         className="h-9 sm:h-10 text-xs sm:text-sm"
                       />
+                      <datalist id={`item-descriptions-${item.id}`}>
+                        {(() => {
+                          const businessType = activeEntity?.businessType || 'both'
+                          const suggestions: string[] = []
+                          
+                          if (businessType === 'service' || businessType === 'both') {
+                            suggestions.push(
+                              'Consulting Services',
+                              'Professional Services',
+                              'Project Fees',
+                              'Contract Services',
+                              'Retainer Fees',
+                              'Hourly Services',
+                              'Advisory Services',
+                              'Training Services',
+                              'Support Services',
+                              'Maintenance Services'
+                            )
+                          }
+                          
+                          if (businessType === 'sales' || businessType === 'both') {
+                            suggestions.push(
+                              'Product Sales',
+                              'Merchandise',
+                              'Inventory Item',
+                              'Goods',
+                              'Retail Product',
+                              'Wholesale Item',
+                              'Raw Materials',
+                              'Finished Goods'
+                            )
+                          }
+                          
+                          return suggestions.map((suggestion, idx) => (
+                            <option key={idx} value={suggestion} />
+                          ))
+                        })()}
+                      </datalist>
                     </div>
                     <div className="space-y-2 w-full sm:w-20 flex-shrink-0">
                       <Label className="text-xs sm:text-sm">Quantity</Label>

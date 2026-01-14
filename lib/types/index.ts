@@ -136,6 +136,11 @@ export interface BusinessEntity {
    */
   currency?: string
   /**
+   * Business type: service-based, sales-based (selling items), or both
+   * Used to determine transaction categories and invoice structure
+   */
+  businessType?: 'service' | 'sales' | 'both'
+  /**
    * Helps with UX; does not change access rules.
    */
   isDefault?: boolean

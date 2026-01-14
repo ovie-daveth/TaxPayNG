@@ -13,8 +13,8 @@ type BusinessContextType = {
   loading: boolean
   error: string | null
   setActiveEntityId: (entityId: string) => Promise<void>
-  createEntity: (data: Pick<BusinessEntity, "name" | "description" | "currency">) => Promise<BusinessEntity | null>
-  updateEntity: (entityId: string, updates: Partial<Pick<BusinessEntity, "name" | "description" | "currency">>) => Promise<BusinessEntity | null>
+  createEntity: (data: Pick<BusinessEntity, "name" | "description" | "currency" | "businessType">) => Promise<BusinessEntity | null>
+  updateEntity: (entityId: string, updates: Partial<Pick<BusinessEntity, "name" | "description" | "currency" | "businessType">>) => Promise<BusinessEntity | null>
   deleteEntity: (entityId: string) => Promise<boolean>
   refetchEntities: () => Promise<void>
 }
@@ -130,6 +130,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
         name: defaultName,
         description: "Default business",
         currency: profile.preferences?.currency || "NGN",
+        businessType: 'both', // Default to both for new businesses
         isDefault: true,
       })
       if (created.success && created.data) {
@@ -215,7 +216,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   )
 
   const createEntity = useCallback(
-    async (data: Pick<BusinessEntity, "name" | "description" | "currency">) => {
+    async (data: Pick<BusinessEntity, "name" | "description" | "currency" | "businessType">) => {
       if (!user?.uid || !profile) return null
       if (!canUseMultiEntity(profile)) {
         setError("Multi-business is available on PLATINUM, Small Business, or Big Business plans.")
@@ -229,6 +230,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
           name: data.name,
           description: data.description,
           currency: data.currency || profile.preferences?.currency || "NGN",
+          businessType: data.businessType,
         })
         if (res.success && res.data) {
           setEntities((prev) => [res.data!, ...prev])
@@ -244,7 +246,7 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   )
 
   const updateEntity = useCallback(
-    async (entityId: string, updates: Partial<Pick<BusinessEntity, "name" | "description" | "currency">>) => {
+    async (entityId: string, updates: Partial<Pick<BusinessEntity, "name" | "description" | "currency" | "businessType">>) => {
       if (!user?.uid) return null
       setLoading(true)
       setError(null)

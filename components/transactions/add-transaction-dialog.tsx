@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { Upload, Scan, Loader2, AlertCircle, HelpCircle } from "lucide-react"
+import { Upload, Scan, Loader2, AlertCircle, HelpCircle, Info } from "lucide-react"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { Transaction, TransactionNature, TaxPeriod, TaxClassification } from "@/lib/types"
 import { toast } from "sonner"
@@ -28,6 +28,7 @@ import { SubscriptionRequiredModal } from "@/components/subscription/subscriptio
 import { useAuth } from "@/lib/hooks/useAuth"
 import { documentService, invoiceService } from "@/lib/services"
 import { Invoice } from "@/lib/types"
+import { canChargeVAT, getVATEligibility } from "@/lib/utils/vatEligibility"
 
 function getCapitalAllowanceRatesByAssetType(
   assetType: TaxClassification['capitalAssetType']
@@ -812,6 +813,12 @@ export function AddTransactionDialog({
       autoClassification.vatRate = undefined
     }
     
+    // Ensure VAT is only set if user can charge VAT (VAT-eligible)
+    if (!canChargeVAT(profile)) {
+      autoClassification.vatApplicable = false
+      autoClassification.vatRate = undefined
+    }
+    
     setTaxClassification(autoClassification)
   }, [formData.type, formData.category, formData.description, formData.notes, transactionNature, hasTaxClassificationAccess, skipTaxClassification, taxClassificationManuallyEdited])
 
@@ -1014,7 +1021,12 @@ export function AddTransactionDialog({
         attachments: [], // Will be updated after upload
         attachmentFileIds: [],
         documentId: undefined,
-        taxClassification: (hasTaxClassificationAccess && !skipTaxClassification && formData.type !== 'relief') ? taxClassification : undefined,
+        taxClassification: (hasTaxClassificationAccess && !skipTaxClassification && formData.type !== 'relief') ? {
+          ...taxClassification,
+          // Remove VAT fields if user cannot charge VAT
+          vatApplicable: canChargeVAT(profile) ? taxClassification?.vatApplicable : false,
+          vatRate: canChargeVAT(profile) ? taxClassification?.vatRate : undefined
+        } : undefined,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         _isSaving: true,
@@ -1146,7 +1158,12 @@ export function AddTransactionDialog({
             attachments: imageUrl,
             attachmentFileIds: attachmentFileIds,
             documentId: documentId,
-            taxClassification: (hasTaxClassificationAccess && !skipTaxClassification && formData.type !== 'relief') ? taxClassification : undefined
+            taxClassification: (hasTaxClassificationAccess && !skipTaxClassification && formData.type !== 'relief') ? {
+              ...taxClassification,
+              // Remove VAT fields if user cannot charge VAT
+              vatApplicable: canChargeVAT(profile) ? taxClassification?.vatApplicable : false,
+              vatRate: canChargeVAT(profile) ? taxClassification?.vatRate : undefined
+            } : undefined
           })
 
             console.log("Background save result:", result)
@@ -1386,7 +1403,12 @@ export function AddTransactionDialog({
         attachments: imageUrl,
         attachmentFileIds: attachmentFileIds,
         documentId: documentId,
-        taxClassification: (hasTaxClassificationAccess && !skipTaxClassification && formData.type !== 'relief') ? taxClassification : undefined
+        taxClassification: (hasTaxClassificationAccess && !skipTaxClassification && formData.type !== 'relief') ? {
+          ...taxClassification,
+          // Remove VAT fields if user cannot charge VAT
+          vatApplicable: canChargeVAT(profile) ? taxClassification?.vatApplicable : false,
+          vatRate: canChargeVAT(profile) ? taxClassification?.vatRate : undefined
+        } : undefined
       })
 
       console.log("Result:", result)
@@ -2914,8 +2936,18 @@ export function AddTransactionDialog({
                         </>
                       )}
                       
-                      {/* VAT Applicable - only show for income transactions, not expenses */}
-                      {formData.type === 'income' && (
+                      {/* VAT Eligibility Explanation - show when user cannot charge VAT */}
+                      {formData.type === 'income' && !canChargeVAT(profile) && (
+                        <Alert className="bg-amber-50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800">
+                          <Info className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                          <AlertDescription className="text-xs sm:text-sm text-amber-900 dark:text-amber-100">
+                            <strong>VAT Qualification:</strong> {getVATEligibility(profile).reason} Go to Settings → VAT &amp; Turnover to update your annual turnover and VAT registration if you qualify (₦100M+ turnover + FIRS VAT registration).
+                          </AlertDescription>
+                        </Alert>
+                      )}
+                      
+                      {/* VAT Applicable - only show for income transactions and if user can charge VAT */}
+                      {formData.type === 'income' && canChargeVAT(profile) && (
                         <>
                           <div className="flex items-center space-x-2">
                             <Switch
