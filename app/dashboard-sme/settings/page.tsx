@@ -32,6 +32,7 @@ import { MigrateToCreatorModal } from "@/components/subscription/migrate-to-crea
 import { OneTouchResubscribeButton } from "@/components/subscription/one-touch-resubscribe-button"
 import { SubscriptionType } from "@/lib/types"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
+import { VATQualificationSection } from "@/components/settings/vat-qualification-section"
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -778,11 +779,10 @@ export default function SettingsPage() {
                         </p>
                       </div>
                       {/* Means of Identification */}
-                      <div className="max-w-md">
+                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
+                     <div className="max-w-md">
                         <h4 className="text-sm font-medium mb-2">Means of Identification</h4>
                         <p className="text-xs text-muted-foreground mb-2">NIN, International Passport, Voter&apos;s Card, Driver&apos;s License, etc.</p>
-                        <div className="space-y-1.5 sm:space-y-2">
-                          <Label className="text-xs sm:text-sm">Identification Document</Label>
                           <div className="border-2 border-dashed rounded-lg p-3 sm:p-4 flex flex-col items-center justify-center min-h-[100px] sm:min-h-[120px]">
                             {kycDocument ? (
                               <div className="flex flex-col items-center gap-1.5 sm:gap-2 w-full">
@@ -1014,7 +1014,6 @@ export default function SettingsPage() {
                               </label>
                             )}
                           </div>
-                        </div>
 
                       </div>
 
@@ -1022,8 +1021,8 @@ export default function SettingsPage() {
                       <div className="max-w-md">
                         <h4 className="text-sm font-medium mb-2">Proof of Address</h4>
                         <p className="text-xs text-muted-foreground mb-2">NEPA bill, utility bill, bank statement, etc.</p>
-                        <div className="space-y-1.5 sm:space-y-2">
-                          <Label className="text-xs sm:text-sm">Address Document</Label>
+
+  
                           <div className="border-2 border-dashed rounded-lg p-3 sm:p-4 flex flex-col items-center justify-center min-h-[100px] sm:min-h-[120px]">
                             {proofOfAddress ? (
                               <div className="flex flex-col items-center gap-1.5 sm:gap-2 w-full">
@@ -1070,8 +1069,9 @@ export default function SettingsPage() {
                               </label>
                             )}
                           </div>
-                        </div>
+                  
                       </div>
+                     </div>
                     </div>
                     <div className="flex justify-end">
                       <Button 
@@ -1120,6 +1120,13 @@ export default function SettingsPage() {
                     </div>
               </div>
             </Card>
+
+            {/* VAT Qualification - for SMEs (can charge VAT if ₦100M+ turnover and VAT registered) */}
+            <VATQualificationSection 
+              profile={profile} 
+              onProfileUpdate={refetchProfile}
+              businessTypes={['sme']}
+            />
               </TabsContent>
 
 
