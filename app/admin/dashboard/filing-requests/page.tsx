@@ -294,6 +294,7 @@ export default function AdminFilingRequestsPage() {
                           <Button
                             size="sm"
                             onClick={() => setAssignDialog({ open: true, request })}
+                            disabled={assigning}
                           >
                             <UserCheck className="w-4 h-4 mr-2" />
                             Assign Agent

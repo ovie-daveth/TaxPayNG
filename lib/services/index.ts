@@ -17,6 +17,8 @@ export { invoiceService } from './invoiceService'
 export { capitalAssetService } from './capitalAssetService'
 export { brandDealService } from './brandDealService'
 export { businessEntityService } from './businessEntityService'
+// Note: employeeService is not exported here because it uses firebase-admin (server-only)
+// Import it directly in API routes: import { employeeService } from '@/lib/services/employeeService'
 export type { ExchangeRate } from './exchangeRateService'
 export type { Conversation, ConversationMessage } from './conversationService'
 export type { ReceiptData } from './ocrService'
