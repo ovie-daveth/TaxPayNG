@@ -26,6 +26,7 @@ import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { SubscriptionAlert } from "@/components/subscription/subscription-restriction"
 import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { useAuth } from "@/lib/hooks/useAuth"
+import { useBusiness } from "@/lib/contexts/business-context"
 import { documentService, invoiceService } from "@/lib/services"
 import { Invoice } from "@/lib/types"
 
@@ -69,48 +70,66 @@ export function AddSMETransactionDialog({
 }: AddSMETransactionDialogProps) {
   const { user } = useAuth()
   const { profile } = useUserProfile()
+  const { activeEntity } = useBusiness()
   
   // Define base categories for SME business type and transaction type
   const getBaseCategories = () => {
     const isIncome = formData.type === 'income'
-    const isRelief = formData.type === 'relief'
-    
-    if (isRelief) {
-      // Tax Relief Categories (from FAQ and Nigerian Tax Act)
-      return [
-        { value: "Pension Contribution", label: "Pension Contribution (Up to 8% of gross income)" },
-        { value: "National Housing Fund (NHF)", label: "National Housing Fund (NHF)" },
-        { value: "National Health Insurance Scheme (NHIS)", label: "National Health Insurance Scheme (NHIS)" },
-        { value: "Rent Relief", label: "Rent Relief (20% of rent paid, capped at ₦500,000)" },
-        { value: "Life Insurance Premium", label: "Life Insurance Premium" },
-        { value: "Interest on Housing Loan", label: "Interest on Housing Loan (for own residence)" },
-        { value: "Charitable Donation", label: "Charitable Donation (Up to 10% of gross income)" },
-        { value: "Other Relief", label: "Other Relief" },
-      ]
-    } else if (isIncome) {
-      // SME Income Categories
-      return [
-        { value: "Sales Revenue", label: "Sales Revenue" },
-        { value: "Service Revenue", label: "Service Revenue" },
-        { value: "Product Sales", label: "Product Sales" },
-        { value: "Rent Income", label: "Rent Income" },
-        { value: "Interest Income", label: "Interest Income" },
-        { value: "Commission Income", label: "Commission Income" },
-        { value: "Consulting Fees", label: "Consulting Fees" },
-        { value: "Contract Revenue", label: "Contract Revenue" },
-        { value: "Retainer Fees", label: "Retainer Fees" },
-        { value: "Licensing Revenue", label: "Licensing Revenue" },
-        { value: "Other Income", label: "Other Income" },
-      ]
+    const businessType = activeEntity?.businessType || 'both'
+     if (isIncome) {
+      // SME Income Categories - based on business type
+      if (businessType === 'service') {
+        // Service-based business income categories
+        return [
+          { value: "Service Revenue", label: "Service Revenue" },
+          { value: "Consulting Fees", label: "Consulting Fees" },
+          { value: "Professional Services", label: "Professional Services" },
+          { value: "Contract Revenue", label: "Contract Revenue" },
+          { value: "Retainer Fees", label: "Retainer Fees" },
+          { value: "Project Fees", label: "Project Fees" },
+          { value: "Hourly Services", label: "Hourly Services" },
+          { value: "Commission Income", label: "Commission Income" },
+          { value: "Licensing Revenue", label: "Licensing Revenue" },
+          { value: "Rent Income", label: "Rent Income" },
+          { value: "Interest Income", label: "Interest Income" },
+          { value: "Other Income", label: "Other Income" },
+        ]
+      } else if (businessType === 'sales') {
+        // Sales-based business income categories
+        return [
+          { value: "Sales Revenue", label: "Sales Revenue" },
+          { value: "Product Sales", label: "Product Sales" },
+          { value: "Retail Sales", label: "Retail Sales" },
+          { value: "Wholesale Sales", label: "Wholesale Sales" },
+          { value: "Online Sales", label: "Online Sales" },
+          { value: "Merchandise Sales", label: "Merchandise Sales" },
+          { value: "Commission Income", label: "Commission Income" },
+          { value: "Rent Income", label: "Rent Income" },
+          { value: "Interest Income", label: "Interest Income" },
+          { value: "Other Income", label: "Other Income" },
+        ]
+      } else {
+        // Both service and sales - combined categories
+        return [
+          { value: "Sales Revenue", label: "Sales Revenue" },
+          { value: "Service Revenue", label: "Service Revenue" },
+          { value: "Product Sales", label: "Product Sales" },
+          { value: "Consulting Fees", label: "Consulting Fees" },
+          { value: "Professional Services", label: "Professional Services" },
+          { value: "Contract Revenue", label: "Contract Revenue" },
+          { value: "Retainer Fees", label: "Retainer Fees" },
+          { value: "Project Fees", label: "Project Fees" },
+          { value: "Commission Income", label: "Commission Income" },
+          { value: "Licensing Revenue", label: "Licensing Revenue" },
+          { value: "Rent Income", label: "Rent Income" },
+          { value: "Interest Income", label: "Interest Income" },
+          { value: "Other Income", label: "Other Income" },
+        ]
+      }
     } else {
-      // SME Expense Categories
-      return [
-        // Cost of Goods Sold
-        { value: "Cost of Goods Sold", label: "Cost of Goods Sold (COGS)" },
-        { value: "Raw Materials", label: "Raw Materials" },
-        { value: "Inventory", label: "Inventory" },
-        { value: "Direct Labor", label: "Direct Labor" },
-        // Operating Expenses
+      // SME Expense Categories - based on business type
+      const baseExpenses = [
+        // Operating Expenses (common to all)
         { value: "Salaries & Wages", label: "Salaries & Wages" },
         { value: "Office Rent", label: "Office Rent / Workspace" },
         { value: "Utilities", label: "Utilities (Electricity, Water, etc.)" },
@@ -132,6 +151,23 @@ export function AddSMETransactionDialog({
         { value: "Taxes & Licenses", label: "Taxes & Licenses" },
         { value: "Other", label: "Other Expenses" },
       ]
+      
+      if (businessType === 'sales' || businessType === 'both') {
+        // Add COGS categories for sales-based businesses
+        return [
+          // Cost of Goods Sold
+          { value: "Cost of Goods Sold", label: "Cost of Goods Sold (COGS)" },
+          { value: "Raw Materials", label: "Raw Materials" },
+          { value: "Inventory", label: "Inventory" },
+          { value: "Direct Labor", label: "Direct Labor" },
+          { value: "Packaging", label: "Packaging" },
+          { value: "Shipping & Delivery", label: "Shipping & Delivery Costs" },
+          ...baseExpenses
+        ]
+      } else {
+        // Service-based businesses don't have COGS
+        return baseExpenses
+      }
     }
   }
 
@@ -219,13 +255,6 @@ export function AddSMETransactionDialog({
   const [platformType, setPlatformType] = useState<'social' | 'subscription' | 'marketplace' | 'streaming' | 'other'>('social')
   const [platformAccountId, setPlatformAccountId] = useState('')
   const [platformAccountUrl, setPlatformAccountUrl] = useState('')
-  const [savedPlatforms, setSavedPlatforms] = useState<Array<{
-    id: string
-    name: string
-    platformType: 'social' | 'subscription' | 'marketplace' | 'streaming' | 'other'
-    accountId?: string
-    accountUrl?: string
-  }>>([])
   
   // Check if user has access to OCR (GOLD and above plans only)
   // OCR is enabled for the first upload box, but disabled when manual entry is selected
@@ -1604,7 +1633,7 @@ export function AddSMETransactionDialog({
                     <SelectContent>
                       <SelectItem value="income">Income</SelectItem>
                       <SelectItem value="expense">Expense</SelectItem>
-                      <SelectItem value="relief">Tax Relief</SelectItem>
+                      {/* <SelectItem value="relief">Tax Relief</SelectItem> */}
                     </SelectContent>
                   </Select>
                 </div>

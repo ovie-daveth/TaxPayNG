@@ -1044,8 +1044,8 @@ export default function PaymentPage() {
                                           }
                                         }}
                                       >
-                                        {check.actionLabel}
-                                      </Button>
+                                          {check.actionLabel}
+                                        </Button>
                                     )}
                                   </div>
                                 </AccordionContent>
@@ -1117,9 +1117,9 @@ export default function PaymentPage() {
               loadingOutstanding={loadingOutstanding}
               hasCheckedOutstanding={hasCheckedOutstanding}
             />
-          </div>
+                  </div>
         )}
-      </div>
+                  </div>
 
       {/* Subscription Required Modal */}
       {profile && !isConsultant(profile.businessType) && (
@@ -1189,12 +1189,12 @@ export default function PaymentPage() {
               title="NRS Tax ID Portal"
               allow="fullscreen"
             />
-          </div>
+                        </div>
           <div className="px-4 sm:px-6 py-3 border-t flex justify-end">
             <Button type="button" onClick={() => setShowNrsTaxIdModal(false)} className="h-9 sm:h-10 text-xs sm:text-sm">
               Close
             </Button>
-          </div>
+                        </div>
         </DialogContent>
       </Dialog>
 
@@ -1264,7 +1264,7 @@ function ProfileUpdateForm({
             onChange={(e) => setFormData(prev => ({ ...prev, firstName: e.target.value }))}
             required
           />
-        </div>
+                      </div>
         <div className="space-y-2">
           <Label htmlFor="lastName">Last Name *</Label>
           <Input
@@ -1273,8 +1273,8 @@ function ProfileUpdateForm({
             onChange={(e) => setFormData(prev => ({ ...prev, lastName: e.target.value }))}
             required
           />
-        </div>
-      </div>
+                      </div>
+                    </div>
       <div className="space-y-2">
         <Label htmlFor="phone">Phone Number *</Label>
         <Input
@@ -1283,7 +1283,7 @@ function ProfileUpdateForm({
           onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
           required
         />
-      </div>
+                  </div>
       <div className="space-y-2">
         <Label htmlFor="street">Street Address *</Label>
         <Input
@@ -1295,7 +1295,7 @@ function ProfileUpdateForm({
           }))}
           required
         />
-      </div>
+                    </div>
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label htmlFor="city">City *</Label>
@@ -1308,7 +1308,7 @@ function ProfileUpdateForm({
             }))}
             required
           />
-        </div>
+                  </div>
         <div className="space-y-2">
           <Label htmlFor="state">State *</Label>
           <Input
@@ -1380,7 +1380,7 @@ function TINUpdateForm({
         <p className="text-xs text-muted-foreground">
           Your Tax Identification Number from the Nigerian tax authority
         </p>
-      </div>
+          </div>
       <div className="flex items-center gap-2">
         <Button
           type="button"

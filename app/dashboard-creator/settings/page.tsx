@@ -414,17 +414,11 @@ export default function SettingsPage() {
         <main className="flex-1 overflow-hidden">
           <div className="px-3 sm:px-4 md:px-6 py-4 sm:py-6 md:py-8 h-full overflow-y-auto hide-scrollbar">
           <Tabs defaultValue={searchParams.get('tab') || 'profile'} className="w-full">
-            <TabsList className={`grid w-full mb-4 sm:mb-6 ${profile?.businessType === 'sme' ? 'grid-cols-5 md:grid-cols-6' : 'grid-cols-4 md:grid-cols-5'} gap-1 sm:gap-2`}>
+            <TabsList className={`grid w-full mb-4 sm:mb-6 grid-cols-4 md:grid-cols-5 gap-1 sm:gap-2`}>
               <TabsTrigger value="profile" className="flex items-center gap-1 sm:gap-2 cursor-pointer text-xs sm:text-sm">
                 <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Profile</span>
               </TabsTrigger>
-              {profile?.businessType === 'sme' && (
-                <TabsTrigger value="business" className="flex items-center gap-1 sm:gap-2 cursor-pointer text-xs sm:text-sm">
-                  <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span className="hidden sm:inline">Business</span>
-                </TabsTrigger>
-              )}
               <TabsTrigger value="subscription" className="flex items-center gap-1 sm:gap-2 cursor-pointer text-xs sm:text-sm">
                 <CreditCard className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Subscription</span>
@@ -1601,46 +1595,6 @@ export default function SettingsPage() {
                 </div>
               </TabsContent>
 
-              {/* Business Tab - Only show for SMEs */}
-              {profile?.businessType === 'sme' && (
-                <TabsContent value="business" className="mt-0">
-                  <Card className="p-4 sm:p-6 md:p-8">
-                    <div className="mb-4 sm:mb-6">
-                      <h2 className="text-lg sm:text-xl md:text-2xl font-semibold">Business Information</h2>
-                      <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-                        Manage your business details and type
-                      </p>
-                    </div>
-                    <div className="space-y-4 sm:space-y-5 md:space-y-6">
-                <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="business-name" className="text-xs sm:text-sm">Business Name</Label>
-                        <Input id="business-name" placeholder="Enter your business name" className="h-9 sm:h-10 text-xs sm:text-sm" />
-                </div>
-                <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="business-type" className="text-xs sm:text-sm">Business Type</Label>
-                        <Select defaultValue={profile?.businessType || "freelancer"}>
-                    <SelectTrigger id="business-type" className="h-9 sm:h-10 text-xs sm:text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="freelancer">Freelancer / Self-Employed</SelectItem>
-                  <SelectItem value="creator">Creator / Influencer</SelectItem>
-                      <SelectItem value="sme">Small & Medium Enterprise</SelectItem>
-                      <SelectItem value="individual">Individual</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5 sm:space-y-2">
-                  <Label htmlFor="business-address" className="text-xs sm:text-sm">Business Address</Label>
-                        <Input id="business-address" placeholder="Enter your business address" className="h-9 sm:h-10 text-xs sm:text-sm" />
-                      </div>
-                      <div className="flex justify-end">
-                        <Button size="lg" className="h-9 sm:h-10 md:h-11 text-xs sm:text-sm md:text-base w-full sm:w-auto">Save Changes</Button>
-                </div>
-              </div>
-            </Card>
-                </TabsContent>
-              )}
 
               {/* Subscription Tab */}
               <TabsContent value="subscription" className="mt-0">
