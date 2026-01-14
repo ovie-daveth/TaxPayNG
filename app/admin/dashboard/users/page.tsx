@@ -33,7 +33,7 @@ import { db } from "@/firebase/firebase"
 import { collection, getDocs, query, orderBy, deleteDoc, doc, updateDoc } from "firebase/firestore"
 import { format } from "date-fns"
 import { Timestamp } from "firebase/firestore"
-import { AlertTriangle, ArrowLeft, Ban, CheckCircle, Loader2, Mail, MoreVertical, Search, Send, Copy, Trash2, UserCog, Calendar, Clock, Crown, Gift } from "lucide-react"
+import { AlertTriangle, ArrowLeft, Ban, CheckCircle, Loader2, Mail, MoreVertical, Search, Send, Copy, Trash2, UserCog, Calendar, Clock, Crown, Gift, Users, UserCheck, UserX, TrendingUp, Plus } from "lucide-react"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { buildUserEmail, USER_EMAIL_TEMPLATES, USER_SITE_LINK, type UserTemplateKey } from "@/lib/emails/user-templates"
@@ -72,6 +72,13 @@ export default function AdminUsersPage() {
   const [bulkBusinessTypeFilter, setBulkBusinessTypeFilter] = useState<"all" | string>("all")
   const [subscriptionFilter, setSubscriptionFilter] = useState<"all" | "active" | "expired" | "none">("all")
   const [trialFilter, setTrialFilter] = useState<"all" | "active" | "expired" | "not_used">("all")
+  const [extendTrialDialogOpen, setExtendTrialDialogOpen] = useState(false)
+  const [extendTrialUser, setExtendTrialUser] = useState<any | null>(null)
+  const [extendTrialDays, setExtendTrialDays] = useState<string>("7")
+  const [extendingTrial, setExtendingTrial] = useState(false)
+  const [bulkExtendTrialDialogOpen, setBulkExtendTrialDialogOpen] = useState(false)
+  const [bulkExtendTrialDays, setBulkExtendTrialDays] = useState<string>("7")
+  const [bulkExtendingTrial, setBulkExtendingTrial] = useState(false)
 
   useEffect(() => {
     if (!authLoading && !adminLoading) {
@@ -255,6 +262,35 @@ export default function AdminUsersPage() {
 
   // Get unique business types for filter
   const businessTypes = Array.from(new Set(users.map((u: any) => u.businessType).filter(Boolean)))
+
+  // Calculate user statistics
+  const stats = {
+    total: users.length,
+    onFreeTrial: users.filter((u: any) => {
+      const trialStatus = getFreeTrialStatus(u)
+      return trialStatus.status === 'active'
+    }).length,
+    subscribed: users.filter((u: any) => {
+      const subStatus = getSubscriptionStatus(u)
+      return subStatus.status === 'active'
+    }).length,
+    expiredTrial: users.filter((u: any) => {
+      const trialStatus = getFreeTrialStatus(u)
+      return trialStatus.status === 'expired'
+    }).length,
+    notUsedTrial: users.filter((u: any) => {
+      const trialStatus = getFreeTrialStatus(u)
+      return trialStatus.status === 'not_used'
+    }).length,
+    expiredSubscription: users.filter((u: any) => {
+      const subStatus = getSubscriptionStatus(u)
+      return subStatus.status === 'expired'
+    }).length,
+    noSubscription: users.filter((u: any) => {
+      const subStatus = getSubscriptionStatus(u)
+      return subStatus.status === 'none'
+    }).length
+  }
 
   useEffect(() => {
     if (selectedRecipient && selectedTemplate !== "custom") {
@@ -645,6 +681,126 @@ export default function AdminUsersPage() {
     handleCloseDialog()
   }
 
+  const handleExtendTrial = async () => {
+    if (!extendTrialUser || !extendTrialDays) return
+
+    const days = parseInt(extendTrialDays)
+    if (isNaN(days) || days <= 0) {
+      toast.error("Please enter a valid number of days")
+      return
+    }
+
+    setExtendingTrial(true)
+    try {
+      const currentUser = auth.currentUser
+      const token = currentUser ? await currentUser.getIdToken() : undefined
+
+      const response = await fetch("/api/admin/extend-free-trial", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          userIds: [extendTrialUser.userId],
+          daysToAdd: days
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to extend free trial")
+      }
+
+      toast.success(`Free trial extended by ${days} day(s)`)
+      setExtendTrialDialogOpen(false)
+      setExtendTrialUser(null)
+      setExtendTrialDays("7")
+
+      // Refresh users list
+      const usersSnapshot = await getDocs(query(
+        collection(db, "userProfiles"),
+        orderBy("createdAt", "desc")
+      ))
+      const usersData = usersSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      setUsers(usersData)
+    } catch (error: any) {
+      console.error("Extend trial error:", error)
+      toast.error(error.message || "Failed to extend free trial")
+    } finally {
+      setExtendingTrial(false)
+    }
+  }
+
+  const handleBulkExtendTrial = async () => {
+    if (!bulkExtendTrialDays) return
+
+    const days = parseInt(bulkExtendTrialDays)
+    if (isNaN(days) || days <= 0) {
+      toast.error("Please enter a valid number of days")
+      return
+    }
+
+    setBulkExtendingTrial(true)
+    try {
+      const currentUser = auth.currentUser
+      const token = currentUser ? await currentUser.getIdToken() : undefined
+
+      // Get all user IDs (or filtered users)
+      const userIds = filteredUsers
+        .filter((u: any) => u.userId)
+        .map((u: any) => u.userId)
+
+      if (userIds.length === 0) {
+        toast.error("No users found to extend trial for")
+        setBulkExtendingTrial(false)
+        return
+      }
+
+      const response = await fetch("/api/admin/extend-free-trial", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          userIds,
+          daysToAdd: days
+        })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to extend free trial")
+      }
+
+      toast.success(`Free trial extended by ${days} day(s) for ${data.summary?.successful || 0} user(s)`)
+      setBulkExtendTrialDialogOpen(false)
+      setBulkExtendTrialDays("7")
+
+      // Refresh users list
+      const usersSnapshot = await getDocs(query(
+        collection(db, "userProfiles"),
+        orderBy("createdAt", "desc")
+      ))
+      const usersData = usersSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      setUsers(usersData)
+    } catch (error: any) {
+      console.error("Bulk extend trial error:", error)
+      toast.error(error.message || "Failed to extend free trial")
+    } finally {
+      setBulkExtendingTrial(false)
+    }
+  }
+
   const handleAssignRole = async () => {
     if (!actionDialog.user) return
     
@@ -781,6 +937,13 @@ export default function AdminUsersPage() {
           <div className="flex items-center gap-3">
             <Button 
               variant="outline" 
+              onClick={() => setBulkExtendTrialDialogOpen(true)}
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Extend Free Trial (Bulk)
+            </Button>
+            <Button 
+              variant="outline" 
               onClick={() => {
                 setBulkTemplate("welcome")
                 setBulkBusinessTypeFilter("all")
@@ -799,6 +962,88 @@ export default function AdminUsersPage() {
             </Button>
             <Badge variant="outline">{users.length} users</Badge>
           </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.total}</div>
+              <p className="text-xs text-muted-foreground">All registered users</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">On Free Trial</CardTitle>
+              <Gift className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.onFreeTrial}</div>
+              <p className="text-xs text-muted-foreground">Active free trials</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Subscribed</CardTitle>
+              <Crown className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.subscribed}</div>
+              <p className="text-xs text-muted-foreground">Active subscriptions</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Trial Not Used</CardTitle>
+              <Clock className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.notUsedTrial}</div>
+              <p className="text-xs text-muted-foreground">Haven't started trial</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Expired Trial</CardTitle>
+              <UserX className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.expiredTrial}</div>
+              <p className="text-xs text-muted-foreground">Trial expired</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Expired Subscription</CardTitle>
+              <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.expiredSubscription}</div>
+              <p className="text-xs text-muted-foreground">Subscription expired</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">No Subscription</CardTitle>
+              <UserCheck className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.noSubscription}</div>
+              <p className="text-xs text-muted-foreground">Never subscribed</p>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="mb-6 space-y-4">
@@ -976,6 +1221,10 @@ export default function AdminUsersPage() {
                               <DropdownMenuItem onClick={() => handleOpenDialog('assignRole', u)}>
                                 <UserCog className="mr-2 h-4 w-4" />
                                 Assign Role
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleOpenDialog('extendTrial', u)}>
+                                <Gift className="mr-2 h-4 w-4" />
+                                Extend Free Trial
                               </DropdownMenuItem>
                               <DropdownMenuItem 
                                 onClick={() => handleOpenDialog('delete', u)}
@@ -1332,6 +1581,115 @@ export default function AdminUsersPage() {
                 <>
                   <Send className="w-4 h-4" />
                   Send Bulk Email
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Extend Free Trial Dialog (Individual) */}
+      <Dialog open={extendTrialDialogOpen} onOpenChange={setExtendTrialDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Extend Free Trial</DialogTitle>
+            <DialogDescription>
+              Extend the free trial for {extendTrialUser ? `${extendTrialUser.firstName || ''} ${extendTrialUser.lastName || ''}`.trim() || extendTrialUser.email : 'this user'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div>
+              <Label htmlFor="trialDays">Days to Add</Label>
+              <Input
+                id="trialDays"
+                type="number"
+                min="1"
+                value={extendTrialDays}
+                onChange={(e) => setExtendTrialDays(e.target.value)}
+                placeholder="7"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Enter the number of days to add to the free trial period
+              </p>
+            </div>
+            {extendTrialUser?.freeTrialEndDate && (
+              <div className="p-3 bg-muted rounded-md">
+                <p className="text-sm font-medium">Current Trial End Date:</p>
+                <p className="text-sm text-muted-foreground">{formatDate(extendTrialUser.freeTrialEndDate)}</p>
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setExtendTrialDialogOpen(false)
+              setExtendTrialUser(null)
+              setExtendTrialDays("7")
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleExtendTrial} disabled={extendingTrial}>
+              {extendingTrial ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Extending...
+                </>
+              ) : (
+                <>
+                  <Gift className="mr-2 h-4 w-4" />
+                  Extend Trial
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Extend Free Trial Dialog (Bulk) */}
+      <Dialog open={bulkExtendTrialDialogOpen} onOpenChange={setBulkExtendTrialDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Extend Free Trial (Bulk)</DialogTitle>
+            <DialogDescription>
+              Extend the free trial for all {filteredUsers.length} filtered user(s)
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-4">
+            <div>
+              <Label htmlFor="bulkTrialDays">Days to Add</Label>
+              <Input
+                id="bulkTrialDays"
+                type="number"
+                min="1"
+                value={bulkExtendTrialDays}
+                onChange={(e) => setBulkExtendTrialDays(e.target.value)}
+                placeholder="7"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Enter the number of days to add to the free trial period for all selected users
+              </p>
+            </div>
+            <div className="p-3 bg-muted rounded-md">
+              <p className="text-sm font-medium">Users Affected:</p>
+              <p className="text-sm text-muted-foreground">{filteredUsers.length} user(s) will have their trial extended</p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => {
+              setBulkExtendTrialDialogOpen(false)
+              setBulkExtendTrialDays("7")
+            }}>
+              Cancel
+            </Button>
+            <Button onClick={handleBulkExtendTrial} disabled={bulkExtendingTrial || filteredUsers.length === 0}>
+              {bulkExtendingTrial ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Extending...
+                </>
+              ) : (
+                <>
+                  <Gift className="mr-2 h-4 w-4" />
+                  Extend Trial for All
                 </>
               )}
             </Button>
