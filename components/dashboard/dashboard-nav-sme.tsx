@@ -275,6 +275,30 @@ export function DashboardNavSME() {
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border safe-area-inset-bottom">
         <div className="flex items-center justify-around px-2 py-2">
+          {/* Dashboard - First Item */}
+          <Link href="/dashboard-sme" className={cn(
+            "flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] transition-colors",
+            (pathname === "/dashboard-sme" || pathname === "/dashboard-sme/") 
+              ? "min-w-[70px] -mt-4" 
+              : "rounded-lg"
+          )}>
+            {(pathname === "/dashboard-sme" || pathname === "/dashboard-sme/") ? (
+              <div className="w-12 h-12 rounded-full flex items-center justify-center bg-primary text-primary-foreground shadow-lg">
+                <LayoutDashboard className="w-6 h-6" />
+              </div>
+            ) : (
+              <LayoutDashboard className="w-5 h-5 text-muted-foreground" />
+            )}
+            <span className={cn(
+              "text-[10px] font-medium",
+              (pathname === "/dashboard-sme" || pathname === "/dashboard-sme/") 
+                ? "text-primary" 
+                : "text-muted-foreground"
+            )}>
+              Dashboard
+            </span>
+          </Link>
+
           <Link href="/dashboard-sme/invoices" className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] rounded-lg transition-colors">
             <FileCheck className={cn(
               "w-5 h-5",
@@ -343,23 +367,6 @@ export function DashboardNavSME() {
                 : "text-muted-foreground"
             )}>
               Reports
-            </span>
-          </Link>
-
-          <Link href="/dashboard-sme/payment" className="flex flex-col items-center justify-center gap-1 px-3 py-2 min-w-[60px] rounded-lg transition-colors">
-            <IdCardIcon className={cn(
-              "w-5 h-5",
-              (pathname === "/dashboard-sme/payment" || pathname?.startsWith("/dashboard-sme/payment/")) 
-                ? "text-primary" 
-                : "text-muted-foreground"
-            )} />
-            <span className={cn(
-              "text-[10px] font-medium",
-              (pathname === "/dashboard-sme/payment" || pathname?.startsWith("/dashboard-sme/payment/")) 
-                ? "text-primary" 
-                : "text-muted-foreground"
-            )}>
-              Payment
             </span>
           </Link>
         </div>
