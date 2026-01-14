@@ -252,8 +252,8 @@ export default function PricingPage() {
                 <div className="mt-3 sm:mt-4 space-y-1">
                   {billingInterval === 'monthly' ? (
                     <>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">₦2,500</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">₦2,500</span>
                       </div>
                       <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
                     </>
@@ -271,10 +271,10 @@ export default function PricingPage() {
                         <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">
                           {getPlanPriceDisplay(subscriptionService.getPlan('PRO')!, 'yearly')}
                         </span>
-                        <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
+                    <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
                           25% OFF
-                        </Badge>
-                      </div>
+                    </Badge>
+                  </div>
                       <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
                     </>
                   )}
@@ -343,8 +343,8 @@ export default function PricingPage() {
                         <div className="mt-3 sm:mt-4 space-y-1">
                           {billingInterval === 'monthly' ? (
                             <>
-                              <div className="flex items-baseline gap-2">
-                                <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦6,000</span>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦6,000</span>
                               </div>
                               <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
                             </>
@@ -362,10 +362,10 @@ export default function PricingPage() {
                                 <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
                                   {getPlanPriceDisplay(subscriptionService.getPlan('GOLD')!, 'yearly')}
                                 </span>
-                                <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
+                            <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
                                   25% OFF
-                                </Badge>
-                              </div>
+                            </Badge>
+                          </div>
                               <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
                             </>
                           )}
@@ -431,8 +431,8 @@ export default function PricingPage() {
                         <div className="mt-3 sm:mt-4 space-y-1">
                           {billingInterval === 'monthly' ? (
                             <>
-                              <div className="flex items-baseline gap-2">
-                                <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦12,500</span>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦12,500</span>
                               </div>
                               <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
                             </>
@@ -450,10 +450,10 @@ export default function PricingPage() {
                                 <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
                                   {getPlanPriceDisplay(subscriptionService.getPlan('PLATINUM')!, 'yearly')}
                                 </span>
-                                <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
+                            <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
                                   25% OFF
-                                </Badge>
-                              </div>
+                            </Badge>
+                          </div>
                               <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
                             </>
                           )}
@@ -554,8 +554,8 @@ export default function PricingPage() {
                 <div className="mt-3 sm:mt-4 space-y-1">
                   {billingInterval === 'monthly' ? (
                     <>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦12,500</span>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦12,500</span>
                       </div>
                       <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
                     </>
@@ -573,10 +573,10 @@ export default function PricingPage() {
                         <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
                           {getPlanPriceDisplay(subscriptionService.getPlan('Small Business')!, 'yearly')}
                         </span>
-                        <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
+                    <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
                           25% OFF
-                        </Badge>
-                      </div>
+                    </Badge>
+                  </div>
                       <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
                     </>
                   )}
@@ -639,8 +639,8 @@ export default function PricingPage() {
                 <div className="mt-3 sm:mt-4 space-y-1">
                   {billingInterval === 'monthly' ? (
                     <>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦37,500</span>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦37,500</span>
                       </div>
                       <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
                     </>
@@ -658,10 +658,10 @@ export default function PricingPage() {
                         <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
                           {getPlanPriceDisplay(subscriptionService.getPlan('Big Business')!, 'yearly')}
                         </span>
-                        <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
+                          <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
                           25% OFF
-                        </Badge>
-                      </div>
+                          </Badge>
+                        </div>
                       <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
                     </>
                   )}

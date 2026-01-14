@@ -960,6 +960,7 @@ export interface Employee {
   taxIdentificationNumber?: string // Employee's TIN
   taxState?: string // State for tax purposes
   taxExempt?: boolean // Whether employee is tax-exempt
+  rentPaid?: number // Monthly rent paid (for rent relief calculation - 20% capped at ₦500,000/year)
   
   // Bank details for salary payment
   bankAccount?: {
@@ -981,4 +982,178 @@ export interface Employee {
   createdAt: string
   updatedAt: string
   createdBy?: string // User ID who created this employee record
+}
+
+// Payroll Types
+export interface PayrollTemplate {
+  id: string
+  userId: string
+  name: string
+  isDefault: boolean // System default template
+  description?: string
+  
+  // Allowance structure
+  allowances: Array<{
+    name: string
+    type: 'fixed' | 'percentage' // Percentage of basic salary
+    amount?: number // For fixed type
+    percentage?: number // For percentage type (0-100)
+    taxable: boolean // Whether allowance is taxable
+    category?: 'transport' | 'housing' | 'meal' | 'medical' | 'other'
+  }>
+  
+  // Deduction structure
+  deductions: Array<{
+    name: string
+    type: 'fixed' | 'percentage'
+    amount?: number
+    percentage?: number
+    category: 'pension' | 'nhf' | 'nhis' | 'tax' | 'loan' | 'other'
+    applicable?: boolean // Whether this deduction applies (e.g., NHF, NHIS)
+  }>
+  
+  // Company settings
+  companySettings?: {
+    pensionEnabled: boolean
+    nhfEnabled: boolean
+    nhisEnabled: boolean
+    pensionRate?: number // Default 8%
+    nhfRate?: number // Default 2.5%
+    nhisAmount?: number // Fixed amount or percentage
+  }
+  
+  createdAt: string
+  updatedAt: string
+}
+
+export interface PayrollItem {
+  employeeId: string
+  employeeNumber?: string
+  employeeName: string
+  employeeEmail?: string
+  
+  // Earnings
+  basicSalary: number
+  allowances: Array<{
+    name: string
+    amount: number
+    taxable: boolean
+  }>
+  grossSalary: number // Basic + all allowances
+  
+  // Deductions
+  pension: {
+    employee: number // 8% of (basic + transport + housing)
+    employer: number // 8% of (basic + transport + housing)
+    total: number
+  }
+  nhf?: {
+    amount: number // 2.5% of basic salary
+  }
+  nhis?: {
+    amount: number
+  }
+  paye: {
+    amount: number // Calculated using PAYE calculator
+    monthly: number
+    // Detailed tax breakdown
+    taxBreakdown?: {
+      grossIncome: number // Annual gross income
+      adjustedGrossIncome: number // After business expenses
+      reliefs: {
+        rentRelief: number // 20% of rent paid, capped at ₦500,000/year
+        pension: number // Pension contribution relief
+        healthInsurance: number // NHIS relief
+        housingFund: number // NHF relief
+        transportAllowance: number // Transport allowance exemption (up to ₦360,000/year)
+        lifeInsurance?: number
+        charitable?: number
+      }
+      totalReliefs: number
+      taxableIncome: number // After all reliefs
+      taxBrackets: Array<{
+        amount: number // Amount in this bracket
+        rate: number // Tax rate (0%, 15%, 18%, 21%, 23%, 25%)
+        tax: number // Tax for this bracket
+      }>
+      totalTax: number // Annual total tax
+      effectiveRate: string // Effective tax rate percentage
+    }
+  }
+  otherDeductions: Array<{
+    name: string
+    amount: number
+    category: string
+  }>
+  totalDeductions: number
+  
+  // Net
+  netSalary: number // Gross - Total Deductions
+  
+  // Tax information
+  taxState?: string
+  taxId?: string
+  
+  // Remittance information
+  remittanceInfo?: {
+    paye: {
+      amount: number // Amount to remit
+      deadline: string // ISO date - 10th of next month
+      authority: 'state-irs' | 'nrs' // Based on employee state/category
+      authorityName?: string // Name of tax authority
+    }
+    pension: {
+      employeeAmount: number
+      employerAmount: number
+      totalAmount: number
+      deadline: string // ISO date - 7 days after payment
+      authority: 'pfa' // Pension Fund Administrator
+    }
+    nhf?: {
+      amount: number
+      deadline: string // ISO date
+      authority: 'fmb' // Federal Mortgage Bank
+    }
+    nhis?: {
+      amount: number
+      deadline: string // ISO date
+      authority: 'hmo' // Health Maintenance Organization
+    }
+  }
+}
+
+export interface Payroll {
+  id: string
+  userId: string
+  templateId: string
+  templateName: string
+  
+  // Period
+  period: string // e.g., "January 2024", "Q1 2024"
+  periodType: 'monthly' | 'quarterly' | 'yearly'
+  periodStart: string // ISO date
+  periodEnd: string // ISO date
+  generatedAt: string // ISO date
+  
+  // Payroll items
+  items: PayrollItem[]
+  
+  // Totals
+  totalGrossSalary: number
+  totalDeductions: number
+  totalNetSalary: number
+  totalPAYE: number
+  totalPension: number
+  totalNHF?: number
+  totalNHIS?: number
+  
+  // Status
+  status: 'draft' | 'generated' | 'approved' | 'paid' | 'sent'
+  
+  // Email tracking
+  emailsSent?: number
+  emailsFailed?: number
+  
+  createdAt: string
+  updatedAt: string
 }
