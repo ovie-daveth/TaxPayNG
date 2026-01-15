@@ -1,8 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { DashboardNav } from "@/components/dashboard/dashboard-nav"
-import { DashboardHeader } from "@/components/dashboard/dashboard-header"
 import { Card } from "@/components/ui/card"
 import { ReportTemplates } from "@/components/reports/report-templates"
 import { RecentReports } from "@/components/reports/recent-reports"
@@ -49,7 +47,7 @@ function MobileReportDropdown() {
   const router = useRouter()
   const pathname = usePathname()
   const { profile } = useUserProfile()
-  const { isSubscribedOnly, loading: subscriptionLoading } = useSubscription()
+  const { hasAccess, loading: subscriptionLoading } = useSubscription()
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
 
   const basePath = pathname?.startsWith("/dashboard-creator")
@@ -67,7 +65,8 @@ function MobileReportDropdown() {
     if (subscriptionLoading) {
       return
     }
-    if (!isSubscribedOnly()) {
+    // Allow access for active free trial users too
+    if (!hasAccess()) {
       setShowSubscriptionModal(true)
       return
     }
@@ -216,7 +215,7 @@ export default function ReportsPage() {
                       </>
                     )}
                   </div>
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0 ml-1">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-primary/10 rounded-lg flex items-center justify-center shrink-0 ml-1">
                     <FileText className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-primary" />
                   </div>
                 </div>
@@ -239,7 +238,7 @@ export default function ReportsPage() {
                       </>
                     )}
                   </div>
-                  <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0 ml-1">
+                  <div className="w-8 h-8 sm:w-10 sm:h-10 md:w-12 md:h-12 bg-blue-100 rounded-lg flex items-center justify-center shrink-0 ml-1">
                     <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 md:w-6 md:h-6 text-blue-600" />
                   </div>
                 </div>

@@ -18,7 +18,7 @@ export function GoogleBusinessTypeDialog({ open, onOpenChange, onSelect }: Googl
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-md overflow-x-hidden max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Select Your Business Type</DialogTitle>
           <DialogDescription>
@@ -29,45 +29,53 @@ export function GoogleBusinessTypeDialog({ open, onOpenChange, onSelect }: Googl
         <div className="space-y-3 pt-4">
           <Button
             variant="outline"
-            className="w-full justify-start h-auto py-4"
+            className="w-full justify-start items-start h-auto py-4 whitespace-normal text-left"
             onClick={() => handleSelect('freelancer')}
           >
-            <div className="text-left">
+            <div className="text-left min-w-0 w-full">
               <div className="font-semibold">Freelancer</div>
-              <div className="text-sm text-muted-foreground">Individual contractor or consultant</div>
+              <div className="text-sm text-muted-foreground wrap-break-word">
+                Individual contractor or consultant
+              </div>
             </div>
           </Button>
           
           <Button
             variant="outline"
-            className="w-full justify-start h-auto py-4"
+            className="w-full justify-start items-start h-auto py-4 whitespace-normal text-left"
             onClick={() => handleSelect('creator')}
           >
-            <div className="text-left">
+            <div className="text-left min-w-0 w-full">
               <div className="font-semibold">Content Creator</div>
-              <div className="text-sm text-muted-foreground">YouTuber, influencer, or content creator</div>
+              <div className="text-sm text-muted-foreground wrap-break-word">
+                YouTuber, influencer, or content creator
+              </div>
             </div>
           </Button>
           
           <Button
             variant="outline"
-            className="w-full justify-start h-auto py-4"
+            className="w-full justify-start items-start h-auto py-4 whitespace-normal text-left"
             onClick={() => handleSelect('sme')}
           >
-            <div className="text-left">
+            <div className="text-left min-w-0 w-full">
               <div className="font-semibold">Small/Medium Business</div>
-              <div className="text-sm text-muted-foreground">Small or medium-sized enterprise</div>
+              <div className="text-sm text-muted-foreground wrap-break-word">
+                Small or medium-sized enterprise
+              </div>
             </div>
           </Button>
           
           <Button
             variant="outline"
-            className="w-full justify-start h-auto py-4"
+            className="w-full justify-start items-start h-auto py-4 whitespace-normal text-left"
             onClick={() => handleSelect('consultant')}
           >
-            <div className="text-left">
+            <div className="text-left min-w-0 w-full">
               <div className="font-semibold">Tax Consultant</div>
-              <div className="text-sm text-muted-foreground">Professional tax consultant managing multiple businesses and individuals</div>
+              <div className="text-sm text-muted-foreground wrap-break-word">
+                Professional tax consultant managing multiple businesses and individuals
+              </div>
             </div>
           </Button>
         </div>

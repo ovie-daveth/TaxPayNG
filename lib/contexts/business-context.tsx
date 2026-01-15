@@ -5,6 +5,7 @@ import type { BusinessEntity, UserProfile } from "@/lib/types"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { businessEntityService, userService, invoiceService, transactionService, brandDealService } from "@/lib/services"
+import { getFreeTrialStatus } from "@/lib/utils/freeTrial"
 
 type BusinessContextType = {
   entities: BusinessEntity[]
@@ -98,11 +99,13 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   const ensureDefaultEntity = useCallback(async () => {
     if (!user?.uid || !profile) return
 
-    const canUseEntities = canUseMultiEntity(profile)
+    const trialStatus = getFreeTrialStatus(profile)
+    // During free trial, give access to entity creation too (at least a default entity)
+    const canUseEntities = canUseMultiEntity(profile) || trialStatus.isInFreeTrial
     const hasAnyEntityContext = Boolean(profile.activeEntityId || profile.defaultEntityId)
 
-    // Auto-create business entities when user is PLATINUM, Small Business, or Big Business.
-    // Before these subscriptions, users can operate without an entity; once upgraded we create a default business
+    // Auto-create business entities when user is in free trial OR is PLATINUM/Small Business/Big Business.
+    // Before these, users can operate without an entity; once eligible we create a default business
     // and migrate legacy records into it.
     if (!canUseEntities && !hasAnyEntityContext) {
       setEntities([])
@@ -218,8 +221,9 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
   const createEntity = useCallback(
     async (data: Pick<BusinessEntity, "name" | "description" | "currency" | "businessType">) => {
       if (!user?.uid || !profile) return null
-      if (!canUseMultiEntity(profile)) {
-        setError("Multi-business is available on PLATINUM, Small Business, or Big Business plans.")
+      const trialStatus = getFreeTrialStatus(profile)
+      if (!canUseMultiEntity(profile) && !trialStatus.isInFreeTrial) {
+        setError("Multi-business is available on PLATINUM, Small Business, Big Business plans, or during free trial.")
         return null
       }
 

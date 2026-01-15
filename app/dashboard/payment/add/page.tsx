@@ -71,7 +71,7 @@ export default function PaymentPage() {
       : "/dashboard"
   const { user } = useAuth()
   const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
-  const { isSubscribedOnly, loading: subscriptionLoading } = useSubscription()
+  const { hasAccess, loading: subscriptionLoading } = useSubscription()
   const [localProfile, setLocalProfile] = useState(profile) // Local profile state to avoid refresh
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [showReceipt, setShowReceipt] = useState(false)
@@ -113,10 +113,11 @@ export default function PaymentPage() {
   useEffect(() => {
     if (subscriptionLoading || profileLoading) return
     
-    if (!isSubscribedOnly()) {
+    // Allow access for active free trial users too
+    if (!hasAccess()) {
       setShowSubscriptionModal(true)
     }
-  }, [isSubscribedOnly, subscriptionLoading, profileLoading])
+  }, [hasAccess, subscriptionLoading, profileLoading])
 
   // Mock payment processing
   const processPayment = async (amount: number, method: string): Promise<PaymentData> => {
@@ -790,7 +791,7 @@ export default function PaymentPage() {
   }
 
   // Don't render content if user is not subscribed (show modal instead)
-  if (!subscriptionLoading && !profileLoading && !isSubscribedOnly()) {
+  if (!subscriptionLoading && !profileLoading && !hasAccess()) {
     return (
       <>
         {profile && !isConsultant(profile.businessType) && (
@@ -1127,7 +1128,7 @@ export default function PaymentPage() {
           open={showSubscriptionModal}
           onOpenChange={(open) => {
             setShowSubscriptionModal(open)
-            if (!open && !isSubscribedOnly()) {
+            if (!open && !hasAccess()) {
               // Redirect back if modal is closed and user is not subscribed
               router.push(`${basePath}/payment`)
             }

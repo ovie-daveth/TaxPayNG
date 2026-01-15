@@ -351,9 +351,47 @@ export class PayrollService {
     } as Employee))
 
     // Generate payroll items for each employee
-    const items: PayrollItem[] = employees.map(employee => 
-      this.generatePayrollItem(employee, template, period)
-    )
+    let items: PayrollItem[] = []
+    
+    if (period.type === 'yearly') {
+      // For yearly payroll, generate 12 monthly items for each employee
+      const year = new Date(period.start).getFullYear()
+      const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+      
+      employees.forEach(employee => {
+        for (let month = 0; month < 12; month++) {
+          // Calculate period for this specific month
+          const monthStart = new Date(year, month, 1)
+          const monthEnd = new Date(year, month + 1, 0) // Last day of the month
+          
+          const monthlyPeriod = {
+            start: monthStart.toISOString(),
+            end: monthEnd.toISOString(),
+            type: 'monthly' as const
+          }
+          
+          // Generate payroll item for this month
+          const monthlyItem = this.generatePayrollItem(employee, template, monthlyPeriod)
+          
+          // Add month-specific metadata to the item
+          const itemWithMonth = {
+            ...monthlyItem,
+            month: month + 1,
+            monthName: monthNames[month],
+            monthlyPeriod: `${monthNames[month]} ${year}`,
+            monthlyPeriodStart: monthStart.toISOString(),
+            monthlyPeriodEnd: monthEnd.toISOString()
+          }
+          
+          items.push(itemWithMonth)
+        }
+      })
+    } else {
+      // For monthly or quarterly, generate one item per employee
+      items = employees.map(employee => 
+        this.generatePayrollItem(employee, template, period)
+      )
+    }
 
     // Calculate totals
     const totalGrossSalary = items.reduce((sum, item) => sum + item.grossSalary, 0)

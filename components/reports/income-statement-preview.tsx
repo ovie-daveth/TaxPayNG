@@ -49,12 +49,13 @@ export function IncomeStatementPreview({ reportData, formData, onBack }: IncomeS
       return
     }
 
+    const logoUrl = `${window.location.origin}/logootax_bg.png`
     const printContent = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
-  <title>Income Statement - ${periodLabel}</title>
+  <title>-</title>
   <style>
     @media print {
       @page { size: A4; margin: 20mm; }
@@ -66,13 +67,27 @@ export function IncomeStatementPreview({ reportData, formData, onBack }: IncomeS
       max-width: 800px;
       margin: 0 auto;
     }
+    .topbar {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 11px;
+      color: #666;
+      margin-bottom: 14px;
+    }
+    .topbar-left { width: 170px; }
+    .topbar-center { flex: 1; text-align: center; }
+    .topbar-right { width: 170px; display: flex; justify-content: flex-end; }
+    .logo { height: 22px; width: auto; }
     .header {
-      text-align: center;
       border-bottom: 2px solid #000;
       padding-bottom: 20px;
       margin-bottom: 30px;
     }
+    .header { text-align: center; }
     .header h1 { margin: 0; font-size: 24px; font-weight: bold; }
+    img { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     .total-income {
       font-size: 18px;
       font-weight: bold;
@@ -102,9 +117,14 @@ export function IncomeStatementPreview({ reportData, formData, onBack }: IncomeS
   </style>
 </head>
 <body>
+  <div class="topbar">
+    <div class="topbar-left"></div>
+    <div class="topbar-center">Income Statement - ${periodLabel}</div>
+    <div class="topbar-right"><img class="logo" src="${logoUrl}" alt="OTax" /></div>
+  </div>
   <div class="header">
     <h1>INCOME STATEMENT</h1>
-    <p style="font-size: 12px; color: #666;">Period: ${periodLabel}</p>
+    <p style="font-size: 12px; color: #666; margin: 6px 0 0;">Period: ${periodLabel}</p>
   </div>
 
   <div class="total-income">
@@ -156,7 +176,7 @@ export function IncomeStatementPreview({ reportData, formData, onBack }: IncomeS
     printWindow.onload = () => {
       setTimeout(() => {
         printWindow.print()
-      }, 250)
+      }, 500)
     }
   }
 
