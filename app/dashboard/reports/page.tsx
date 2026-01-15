@@ -27,6 +27,11 @@ const reportTemplates = [
     href: "/dashboard/reports/generate/self-assessment",
   },
   {
+    id: "tax-assessment",
+    title: "Tax Assessment (CIT)",
+    href: "/dashboard/reports/generate/tax-assessment",
+  },
+  {
     id: "income-statement",
     title: "Income Statement",
     href: "/dashboard/reports/generate/income-statement",
@@ -56,7 +61,13 @@ function MobileReportDropdown() {
       ? "/dashboard-sme"
       : "/dashboard"
 
-  const resolvedTemplates = reportTemplates.map(t => ({
+  const isSME = profile?.businessType === "sme"
+  const filteredTemplates = reportTemplates.filter((t) => {
+    if (isSME) return t.id !== "self-assessment"
+    return t.id !== "tax-assessment"
+  })
+
+  const resolvedTemplates = filteredTemplates.map(t => ({
     ...t,
     href: t.href.replace(/^\/dashboard/, basePath),
   }))

@@ -93,7 +93,7 @@ export interface ReportData {
 }
 
 export class ReportService extends BaseService {
-  private getCollectionName(type: 'Self-Assessment' | 'Income Statement' | 'Expense Report' | 'Tax Summary'): string {
+  private getCollectionName(type: 'Self-Assessment' | 'Income Statement' | 'Expense Report' | 'Tax Summary' | 'Tax Assessment'): string {
     switch (type) {
       case 'Self-Assessment':
         return 'selfAssessments'
@@ -103,6 +103,8 @@ export class ReportService extends BaseService {
         return 'expenseReports'
       case 'Tax Summary':
         return 'taxSummaries'
+      case 'Tax Assessment':
+        return 'taxAssessments'
       default:
         return 'reports' // fallback
     }
@@ -218,11 +220,17 @@ export class ReportService extends BaseService {
     const reliefTransactions = filteredTransactions.filter(txn => txn.type === 'relief')
     const reliefAmounts = this.calculateReliefAmounts(reliefTransactions, incomeData.totalIncome)
 
+    // For SMEs (CIT), use revenue (gross income) as turnover base for threshold checks.
+    // For PIT (freelancer/creator), use taxable income after VAT exclusion (totalIncome).
+    const bt = profile.businessType as unknown as string | undefined
+    const isSMEProfile = bt === 'sme' || bt === 'small-business'
+    const taxBaseIncome = isSMEProfile ? (incomeData.grossIncome || incomeData.totalIncome) : incomeData.totalIncome
+
     // Calculate tax data
     // Relief amounts are automatically included from transactions
     const taxData = await this.calculateTaxData(
       userId,
-      incomeData.totalIncome,
+      taxBaseIncome,
       expenseData.totalExpenses,
       expenseData.taxDeductibleExpenses,
       profile,
@@ -428,11 +436,17 @@ export class ReportService extends BaseService {
       const reliefTransactions = filteredTransactions.filter(txn => txn.type === 'relief')
       const reliefAmounts = this.calculateReliefAmounts(reliefTransactions, incomeData.totalIncome)
 
+      // For SMEs (CIT), use revenue (gross income) as turnover base for threshold checks.
+      // For PIT (freelancer/creator), use taxable income after VAT exclusion (totalIncome).
+      const bt = profile.businessType as unknown as string | undefined
+      const isSMEProfile = bt === 'sme' || bt === 'small-business'
+      const taxBaseIncome = isSMEProfile ? (incomeData.grossIncome || incomeData.totalIncome) : incomeData.totalIncome
+
       // Calculate tax data (now includes capital allowances and WHT credits if available)
       // Relief amounts are automatically included from transactions
       const taxData = await this.calculateTaxData(
         userId,
-        incomeData.totalIncome,
+        taxBaseIncome,
         expenseData.totalExpenses,
         expenseData.taxDeductibleExpenses,
         profile,
@@ -1038,12 +1052,16 @@ export class ReportService extends BaseService {
     
     // Calculate tax data using the same engine as self-assessment
     // Relief amounts are automatically included from transactions
-    // Note: Pass totalIncome (after VAT exclusion) to calculateTaxData
-    // VAT must be remitted to government, so it's not taxable income
-    // The tax calculator expects taxable income (after VAT exclusion) and will subtract expenses and apply reliefs
+    // Note:
+    // - For SMEs (CIT), we pass revenue (grossIncome) as turnover base for threshold checks
+    // - For PIT (freelancer/creator), we pass totalIncome (after VAT exclusion) as the taxable income base
+    const bt = (profile?.businessType as unknown as string | undefined) || undefined
+    const isSMEProfile = bt === 'sme' || bt === 'small-business'
+    const taxBaseIncome = isSMEProfile ? (incomeData.grossIncome || incomeData.totalIncome) : incomeData.totalIncome
+
     const taxData = await this.calculateTaxData(
       userId,
-      incomeData.totalIncome, // Taxable income after VAT exclusion
+      taxBaseIncome,
       expenseData.totalExpenses,
       expenseData.taxDeductibleExpenses,
       profile,
@@ -1295,7 +1313,7 @@ export class ReportService extends BaseService {
   async saveReport(
     userId: string,
     title: string,
-    type: 'Self-Assessment' | 'Income Statement' | 'Expense Report' | 'Tax Summary',
+    type: 'Self-Assessment' | 'Income Statement' | 'Expense Report' | 'Tax Summary' | 'Tax Assessment',
     reportData: ReportData,
     status: 'draft' | 'completed' | 'submitted' = 'completed',
     entityId?: string
@@ -1331,7 +1349,7 @@ export class ReportService extends BaseService {
       const allReports: SavedReport[] = []
       
       // Fetch from all report type collections
-      const collections = ['selfAssessments', 'incomeStatements', 'expenseReports', 'taxSummaries']
+      const collections = ['selfAssessments', 'incomeStatements', 'expenseReports', 'taxSummaries', 'taxAssessments']
       
       for (const collectionName of collections) {
         try {
@@ -1362,7 +1380,7 @@ export class ReportService extends BaseService {
   }
 
   // Get a single report by ID (searches all collections)
-  async getReportById(reportId: string, type?: 'Self-Assessment' | 'Income Statement' | 'Expense Report' | 'Tax Summary'): Promise<SavedReport | null> {
+  async getReportById(reportId: string, type?: 'Self-Assessment' | 'Income Statement' | 'Expense Report' | 'Tax Summary' | 'Tax Assessment'): Promise<SavedReport | null> {
     try {
       if (type) {
         // If type is provided, search in specific collection
@@ -1371,7 +1389,7 @@ export class ReportService extends BaseService {
         return await baseService.getById(reportId)
       } else {
         // Search in all collections
-        const collections = ['selfAssessments', 'incomeStatements', 'expenseReports', 'taxSummaries']
+        const collections = ['selfAssessments', 'incomeStatements', 'expenseReports', 'taxSummaries', 'taxAssessments']
         for (const collectionName of collections) {
           try {
             const baseService = new BaseService(collectionName)
@@ -1392,7 +1410,7 @@ export class ReportService extends BaseService {
   // Update a report
   async updateReport(
     reportId: string,
-    type: 'Self-Assessment' | 'Income Statement' | 'Expense Report' | 'Tax Summary',
+    type: 'Self-Assessment' | 'Income Statement' | 'Expense Report' | 'Tax Summary' | 'Tax Assessment',
     updates: Partial<SavedReport>
   ): Promise<void> {
     try {
@@ -1409,7 +1427,7 @@ export class ReportService extends BaseService {
   }
 
   // Delete a report (searches all collections)
-  async deleteReport(reportId: string, type?: 'Self-Assessment' | 'Income Statement' | 'Expense Report' | 'Tax Summary'): Promise<void> {
+  async deleteReport(reportId: string, type?: 'Self-Assessment' | 'Income Statement' | 'Expense Report' | 'Tax Summary' | 'Tax Assessment'): Promise<void> {
     try {
       if (type) {
         // If type is provided, delete from specific collection
@@ -1418,7 +1436,7 @@ export class ReportService extends BaseService {
         await baseService.delete(reportId)
       } else {
         // Search and delete from all collections
-        const collections = ['selfAssessments', 'incomeStatements', 'expenseReports', 'taxSummaries']
+        const collections = ['selfAssessments', 'incomeStatements', 'expenseReports', 'taxSummaries', 'taxAssessments']
         for (const collectionName of collections) {
           try {
             const baseService = new BaseService(collectionName)

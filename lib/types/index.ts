@@ -730,7 +730,7 @@ export interface SavedClient {
 }
 
 // Report Types
-export type ReportType = 'Self-Assessment' | 'Income Statement' | 'Expense Report' | 'Tax Summary'
+export type ReportType = 'Self-Assessment' | 'Income Statement' | 'Expense Report' | 'Tax Summary' | 'Tax Assessment'
 export type ReportStatus = 'draft' | 'completed' | 'submitted'
 export type FilingStatus = 'not_filed' | 'filed' | 'submitted' | 'acknowledged'
 export type FilingMethod = 'direct' | 'agent' | 'email' | null
@@ -992,11 +992,6 @@ export interface Employee {
     notes?: string
     createdAt: string // ISO date
   }>
-  bankAccount?: {
-    bankName?: string
-    accountNumber?: string
-    accountName?: string
-  }
   
   // Additional information
   emergencyContact?: {

@@ -19,6 +19,14 @@ const templates = [
     href: "/dashboard/reports/generate/self-assessment",
   },
   {
+    id: "tax-assessment",
+    title: "Tax Assessment (CIT)",
+    description: "Generate company tax assessment for FIRS Company Income Tax (CIT) filing",
+    icon: FileCheck,
+    color: "bg-green-100 text-green-600",
+    href: "/dashboard/reports/generate/tax-assessment",
+  },
+  {
     id: "income-statement",
     title: "Income Statement",
     description: "Detailed breakdown of all income sources and categories",
@@ -57,7 +65,14 @@ export function ReportTemplates() {
       ? "/dashboard-sme"
       : "/dashboard"
 
-  const resolvedTemplates = templates.map(t => ({
+  // Treat dashboard-sme routes as SME even if legacy profiles still have businessType like "small-business"
+  const isSME = basePath === "/dashboard-sme" || profile?.businessType === "sme" || (profile?.businessType as unknown as string) === "small-business"
+  const filteredTemplates = templates.filter((t) => {
+    if (isSME) return t.id !== "self-assessment"
+    return t.id !== "tax-assessment"
+  })
+
+  const resolvedTemplates = filteredTemplates.map(t => ({
     ...t,
     href: t.href.replace(/^\/dashboard/, basePath),
   }))
