@@ -20,7 +20,7 @@ import { useBusiness } from "@/lib/contexts/business-context"
 export default function GenerateTaxSummaryPage() {
   const { user } = useAuth()
   const { profile } = useUserProfile()
-  const { isSubscribed } = useSubscription()
+  const { hasAccess } = useSubscription()
   const { activeEntityId } = useBusiness()
   const [showPreview, setShowPreview] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -78,7 +78,8 @@ export default function GenerateTaxSummaryPage() {
     }
 
     // Check subscription
-    if (!isSubscribed) {
+    // Allow access for active free trial users too
+    if (!hasAccess()) {
       setShowSubscriptionModal(true)
       return
     }
@@ -144,7 +145,7 @@ export default function GenerateTaxSummaryPage() {
             {/* Header Section */}
             <Card className="p-3 sm:p-4 md:p-6">
               <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4 mb-3 sm:mb-4">
-                <div className="p-2 sm:p-3 bg-primary/10 rounded-lg flex-shrink-0">
+                <div className="p-2 sm:p-3 bg-primary/10 rounded-lg shrink-0">
                   <Calculator className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                 </div>
                 <div className="flex-1 min-w-0">

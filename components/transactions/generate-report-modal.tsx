@@ -31,7 +31,7 @@ export function GenerateReportModal({
 }: GenerateReportModalProps) {
   const { user } = useAuth()
   const { profile } = useUserProfile()
-  const { isSubscribed } = useSubscription()
+  const { hasAccess } = useSubscription()
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
@@ -87,7 +87,7 @@ export function GenerateReportModal({
       return
     }
 
-    if (!isSubscribed) {
+    if (!hasAccess()) {
       setShowSubscriptionModal(true)
       return
     }

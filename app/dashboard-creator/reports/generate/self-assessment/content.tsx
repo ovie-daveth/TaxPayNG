@@ -26,7 +26,7 @@ export default function GenerateSelfAssessmentPageContent() {
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { activeEntityId } = useBusiness()
-  const { isSubscribed } = useSubscription()
+  const { hasAccess } = useSubscription()
   const [showPreview, setShowPreview] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [reportData, setReportData] = useState<ReportData | null>(null)
@@ -138,7 +138,8 @@ export default function GenerateSelfAssessmentPageContent() {
       return
     }
 
-    if (!isSubscribed) {
+    // Allow access for active free trial users too
+    if (!hasAccess()) {
       setShowSubscriptionModal(true)
       return
     }

@@ -48,7 +48,7 @@ export function ReportTemplates() {
   const router = useRouter()
   const pathname = usePathname()
   const { profile } = useUserProfile()
-  const { isSubscribed, loading: subscriptionLoading } = useSubscription()
+  const { hasAccess, loading: subscriptionLoading } = useSubscription()
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
 
   const basePath = pathname?.startsWith("/dashboard-creator")
@@ -68,7 +68,7 @@ export function ReportTemplates() {
       return
     }
     // Check if user is subscribed - if not, show modal
-    if (!isSubscribed) {
+    if (!hasAccess()) {
       setShowSubscriptionModal(true)
       return
     }

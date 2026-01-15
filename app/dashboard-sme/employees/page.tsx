@@ -9,7 +9,8 @@ import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Search, Plus, Upload, Edit, Trash2, Download, FileSpreadsheet, UserPlus, X, Loader2, MoreVertical, Mail, Phone, Briefcase, Building2, DollarSign, User } from "lucide-react"
+import { Search, Plus, Upload, Edit, Trash2, Download, FileSpreadsheet, UserPlus, X, Loader2, MoreVertical, Mail, Phone, Briefcase, Building2, DollarSign, User, Eye } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { toast } from "sonner"
 import { Employee } from "@/lib/types"
@@ -18,6 +19,7 @@ import { auth } from "@/firebase/firebase"
 
 export default function SMEEmployeesPage() {
   const { user } = useAuth()
+  const router = useRouter()
   const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
@@ -505,6 +507,15 @@ export default function SMEEmployeesPage() {
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex items-center justify-end gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => router.push(`/dashboard-sme/employees/${employee.id}`)}
+                              className="h-7 w-7 p-0"
+                              title="View Salary Breakdown"
+                            >
+                              <Eye className="w-3 h-3 sm:w-4 sm:h-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="sm"
