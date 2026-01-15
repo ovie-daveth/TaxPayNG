@@ -18,6 +18,7 @@ import { SelfAssessmentPreview, type SelfAssessmentPreviewHandle } from "./self-
 import { IncomeStatementPreview } from "./income-statement-preview"
 import { ExpenseReportPreview } from "./expense-report-preview"
 import { TaxSummaryPreview } from "./tax-summary-preview"
+import { TaxAssessmentPreview } from "./tax-assessment-preview"
 import { useBusiness } from "@/lib/contexts/business-context"
 
 export function RecentReports() {
@@ -303,7 +304,14 @@ export function RecentReports() {
                   onBack={() => setShowViewDialog(false)}
                 />
               )}
-              {selectedReport.type !== 'Self-Assessment' && selectedReport.type !== 'Income Statement' && selectedReport.type !== 'Expense Report' && selectedReport.type !== 'Tax Summary' && (
+              {selectedReport.type === 'Tax Assessment' && (
+                <TaxAssessmentPreview
+                  reportData={selectedReport.reportData}
+                  returningCurrency="NGN"
+                  onBack={() => setShowViewDialog(false)}
+                />
+              )}
+              {selectedReport.type !== 'Self-Assessment' && selectedReport.type !== 'Income Statement' && selectedReport.type !== 'Expense Report' && selectedReport.type !== 'Tax Summary' && selectedReport.type !== 'Tax Assessment' && (
                 <div className="p-8 text-center text-muted-foreground">
                   Preview not yet implemented for {selectedReport.type}
                 </div>
@@ -354,7 +362,12 @@ export function RecentReports() {
                   Editing not yet implemented for Tax Summary
                 </div>
               )}
-              {editingReport.type !== 'Self-Assessment' && editingReport.type !== 'Income Statement' && editingReport.type !== 'Expense Report' && editingReport.type !== 'Tax Summary' && (
+              {editingReport.type === 'Tax Assessment' && (
+                <div className="p-8 text-center text-muted-foreground">
+                  Editing not yet implemented for Tax Assessment
+                </div>
+              )}
+              {editingReport.type !== 'Self-Assessment' && editingReport.type !== 'Income Statement' && editingReport.type !== 'Expense Report' && editingReport.type !== 'Tax Summary' && editingReport.type !== 'Tax Assessment' && (
                 <div className="p-8 text-center text-muted-foreground">
                   Editing not yet implemented for {editingReport.type}
                 </div>
