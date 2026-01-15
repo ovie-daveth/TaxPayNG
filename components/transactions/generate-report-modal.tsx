@@ -15,11 +15,13 @@ import { SubscriptionRequiredModal } from "@/components/subscription/subscriptio
 import { IncomeStatementPreview } from "@/components/reports/income-statement-preview"
 import { SelfAssessmentPreview, type SelfAssessmentPreviewHandle } from "@/components/reports/self-assessment-preview"
 import { ExpenseReportPreview } from "@/components/reports/expense-report-preview"
+import { TaxAssessmentPreview } from "@/components/reports/tax-assessment-preview"
+import { useBusiness } from "@/lib/contexts/business-context"
 
 interface GenerateReportModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  reportType: 'income' | 'expense' | 'self-assessment'
+  reportType: 'income' | 'expense' | 'self-assessment' | 'tax-assessment'
   transactions?: any[]
 }
 
@@ -32,6 +34,7 @@ export function GenerateReportModal({
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { hasAccess } = useSubscription()
+  const { activeEntityId } = useBusiness()
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
@@ -43,7 +46,8 @@ export function GenerateReportModal({
   const [formData, setFormData] = useState({
     taxYear: new Date().getFullYear().toString(),
     period: 'annual' as 'annual' | 'q1' | 'q2' | 'q3' | 'q4',
-    includeInvoices: reportType === 'income'
+    includeInvoices: reportType === 'income',
+    returningCurrency: 'NGN' as 'NGN' | 'USD' | 'GBP' | 'EUR' | 'CFA'
   })
 
   const getPeriodDates = (year: number, period: string) => {
@@ -92,10 +96,20 @@ export function GenerateReportModal({
       return
     }
 
+    if (reportType === 'tax-assessment') {
+      const bt = profile.businessType as unknown as string | undefined
+      const isSME = bt === 'sme' || bt === 'small-business'
+      if (!isSME) {
+        toast.error("Tax Assessment (CIT) is only available for SME accounts")
+        return
+      }
+    }
+
     setIsGenerating(true)
     try {
       const year = parseInt(formData.taxYear)
-      const periodInfo = getPeriodDates(year, formData.period)
+      // Tax assessment (CIT) is annual only
+      const periodInfo = getPeriodDates(year, reportType === 'tax-assessment' ? 'annual' : formData.period)
       
       const period = {
         startDate: periodInfo.startDate,
@@ -108,7 +122,9 @@ export function GenerateReportModal({
       const data = await reportService.generateReportData(
         profile.userId,
         period,
-        reportType === 'income' ? formData.includeInvoices : false
+        reportType === 'income' ? formData.includeInvoices : false,
+        activeEntityId || undefined,
+        profile.defaultEntityId
       )
 
       const periodLabel = period.periodType === 'annual' 
@@ -121,6 +137,8 @@ export function GenerateReportModal({
         ? `Income Statement - ${periodLabel}`
         : reportType === 'expense'
         ? `Expense Report - ${periodLabel}`
+        : reportType === 'tax-assessment'
+        ? `Tax Assessment (CIT) - ${periodLabel}`
         : `Self-Assessment Filing - ${periodLabel}`
 
       let reportId: string | null = null
@@ -130,7 +148,8 @@ export function GenerateReportModal({
           title,
           'Income Statement',
           data,
-          'draft'
+          'draft',
+          activeEntityId || undefined
         )
         toast.success("Income statement generated and saved successfully")
       } else if (reportType === 'expense') {
@@ -139,9 +158,20 @@ export function GenerateReportModal({
           title,
           'Expense Report',
           data,
-          'draft'
+          'draft',
+          activeEntityId || undefined
         )
         toast.success("Expense report generated and saved")
+      } else if (reportType === 'tax-assessment') {
+        reportId = await reportService.saveReport(
+          profile.userId,
+          title,
+          'Tax Assessment',
+          data,
+          'draft',
+          activeEntityId || undefined
+        )
+        toast.success("Tax assessment generated and saved")
       } else {
         // For self-assessment, don't auto-save, let user review and save manually
         toast.success("Self-assessment report generated. Please review and save when ready.")
@@ -170,6 +200,8 @@ export function GenerateReportModal({
         return 'Generate Expense Report'
       case 'self-assessment':
         return 'Generate Self Assessment Report'
+      case 'tax-assessment':
+        return 'Generate Tax Assessment (CIT)'
       default:
         return 'Generate Report'
     }
@@ -183,6 +215,8 @@ export function GenerateReportModal({
         return 'Generate an expense report for the selected period showing all your expenses. Review and download as CSV for external analysis or record keeping.'
       case 'self-assessment':
         return 'Generate a self-assessment tax filing report for the selected period. Review and submit when ready.'
+      case 'tax-assessment':
+        return 'Generate a company tax assessment for Company Income Tax (CIT). This is annual and tailored for SMEs.'
       default:
         return ''
     }
@@ -270,14 +304,14 @@ export function GenerateReportModal({
       <Dialog open={open} onOpenChange={handleClose}>
         <DialogContent
           className={[
-            "left-0 top-0 translate-x-0 translate-y-0 w-screen h-[100dvh] rounded-none",
+            "left-0 top-0 translate-x-0 translate-y-0 w-screen h-dvh rounded-none",
             "sm:left-[50%] sm:top-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:w-full sm:h-auto sm:rounded-lg",
             showPreview ? "sm:max-w-5xl" : "sm:max-w-2xl",
             "overflow-hidden p-0 gap-0",
           ].join(" ")}
         >
           {showPreview && reportData ? (
-            <div className="flex flex-col h-[100dvh] sm:max-h-[90vh]">
+            <div className="flex flex-col h-dvh sm:max-h-[90vh]">
               <div className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur px-3 py-2.5 sm:px-6 sm:py-4 pr-10 sm:pr-12">
                 <div className="flex items-center justify-between gap-2 sm:gap-3">
                   <div className="min-w-0 flex-1">
@@ -288,7 +322,7 @@ export function GenerateReportModal({
                       Review your report. You can edit fields and file when ready.
                     </DialogDescription>
                   </div>
-                  <FileText className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-muted-foreground" />
+                  <FileText className="w-4 h-4 sm:w-5 sm:h-5 shrink-0 text-muted-foreground" />
                 </div>
               </div>
 
@@ -308,6 +342,15 @@ export function GenerateReportModal({
                 ) : reportType === 'expense' ? (
                   <ExpenseReportPreview
                     reportData={reportData}
+                    onBack={() => {
+                      setShowPreview(false)
+                      setReportData(null)
+                    }}
+                  />
+                ) : reportType === 'tax-assessment' ? (
+                  <TaxAssessmentPreview
+                    reportData={reportData}
+                    returningCurrency={formData.returningCurrency}
                     onBack={() => {
                       setShowPreview(false)
                       setReportData(null)
@@ -380,13 +423,13 @@ export function GenerateReportModal({
                       {getReportDescription()}
                     </DialogDescription>
                   </div>
-                  <FileText className="w-4 h-4 sm:w-5 sm:h-5 flex-shrink-0 text-muted-foreground" />
+                  <FileText className="w-4 h-4 sm:w-5 sm:h-5 shrink-0 text-muted-foreground" />
                 </div>
               </div>
 
               <div className="flex flex-col h-[calc(100dvh-56px)] sm:h-auto">
                 <div className="flex-1 overflow-auto px-3 py-3 sm:px-6 sm:py-6 space-y-3 sm:space-y-4">
-                  <div className="rounded-lg border bg-muted/20 p-3 sm:p-4">
+                      <div className="rounded-lg border bg-muted/20 p-3 sm:p-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                       <div className="space-y-1.5 sm:space-y-2">
                         <Label htmlFor="tax-year" className="text-xs sm:text-sm">Tax Year</Label>
@@ -405,24 +448,48 @@ export function GenerateReportModal({
                         </Select>
                       </div>
 
-                      <div className="space-y-1.5 sm:space-y-2">
-                        <Label htmlFor="period" className="text-xs sm:text-sm">Period</Label>
-                        <Select 
-                          value={formData.period}
-                          onValueChange={(value) => setFormData(prev => ({ ...prev, period: value as any }))}
-                        >
-                          <SelectTrigger id="period" className="h-10 sm:h-11 text-xs sm:text-sm">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="annual">Annual</SelectItem>
-                            <SelectItem value="q1">Q1 (Jan - Mar)</SelectItem>
-                            <SelectItem value="q2">Q2 (Apr - Jun)</SelectItem>
-                            <SelectItem value="q3">Q3 (Jul - Sep)</SelectItem>
-                            <SelectItem value="q4">Q4 (Oct - Dec)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
+                          {reportType !== 'tax-assessment' ? (
+                            <div className="space-y-1.5 sm:space-y-2">
+                              <Label htmlFor="period" className="text-xs sm:text-sm">Period</Label>
+                              <Select 
+                                value={formData.period}
+                                onValueChange={(value) => setFormData(prev => ({ ...prev, period: value as any }))}
+                              >
+                                <SelectTrigger id="period" className="h-10 sm:h-11 text-xs sm:text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="annual">Annual</SelectItem>
+                                  <SelectItem value="q1">Q1 (Jan - Mar)</SelectItem>
+                                  <SelectItem value="q2">Q2 (Apr - Jun)</SelectItem>
+                                  <SelectItem value="q3">Q3 (Jul - Sep)</SelectItem>
+                                  <SelectItem value="q4">Q4 (Oct - Dec)</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          ) : (
+                            <div className="space-y-1.5 sm:space-y-2">
+                              <Label htmlFor="returning-currency" className="text-xs sm:text-sm">Returning Currency</Label>
+                              <Select
+                                value={formData.returningCurrency}
+                                onValueChange={(value) => setFormData(prev => ({ ...prev, returningCurrency: value as any }))}
+                              >
+                                <SelectTrigger id="returning-currency" className="h-10 sm:h-11 text-xs sm:text-sm">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="NGN">NGN</SelectItem>
+                                  <SelectItem value="USD">USD</SelectItem>
+                                  <SelectItem value="GBP">GBP</SelectItem>
+                                  <SelectItem value="EUR">EUR</SelectItem>
+                                  <SelectItem value="CFA">CFA</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              <div className="text-[10px] sm:text-xs text-muted-foreground">
+                                Tax assessment is generated annually for CIT.
+                              </div>
+                            </div>
+                          )}
                     </div>
                   </div>
 

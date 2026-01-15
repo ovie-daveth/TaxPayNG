@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useTransactions } from "@/lib/hooks/useTransactions"
 import { Button } from "@/components/ui/button"
@@ -19,7 +18,6 @@ import { Transaction } from "@/lib/types"
 import { toast } from "sonner"
 
 export default function SMETransactionsPage() {
-  const router = useRouter()
   const { user } = useAuth()
   const { activeEntityId } = useBusiness()
   const [isFilterOpen, setIsFilterOpen] = useState(false)
@@ -27,7 +25,7 @@ export default function SMETransactionsPage() {
   const [filters, setFilters] = useState<TransactionFiltersType>({})
   const [currentPage, setCurrentPage] = useState(1)
   const [reportModalOpen, setReportModalOpen] = useState(false)
-  const [reportType, setReportType] = useState<'income' | 'expense'>('income')
+  const [reportType, setReportType] = useState<'income' | 'expense' | 'tax-assessment'>('income')
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   
@@ -220,7 +218,8 @@ export default function SMETransactionsPage() {
                   <DropdownMenuItem 
                     className="group cursor-pointer"
                     onClick={() => {
-                      router.push("/dashboard-sme/reports/generate/tax-assessment")
+                      setReportType('tax-assessment')
+                      setReportModalOpen(true)
                     }}
                   >
                     <FileCheck2 className="w-4 h-4 mr-2 text-foreground group-hover:text-foreground dark:group-hover:text-gray-100" />
