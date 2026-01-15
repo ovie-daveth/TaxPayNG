@@ -107,14 +107,9 @@ export function useSubscription() {
       return false
     }
 
-    // If in free trial, allow access (unless blocked)
+    // If in free trial, allow access to ALL features (unless blocked)
     if (freeTrialStatus.isInFreeTrial && !isBlocked) {
-      // For free trial users, only allow basic features (no plan requirement)
-      if (!requiredPlan) {
-        return true
-      }
-      // Free trial users don't have access to premium features
-      return false
+      return true
     }
 
     if (!isSubscribed || !subscriptionType) {

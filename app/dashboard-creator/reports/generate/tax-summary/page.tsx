@@ -20,7 +20,7 @@ import { useBusiness } from "@/lib/contexts/business-context"
 export default function GenerateTaxSummaryPage() {
   const { user } = useAuth()
   const { profile } = useUserProfile()
-  const { isSubscribed } = useSubscription()
+  const { hasAccess } = useSubscription()
   const { activeEntityId } = useBusiness()
   const [showPreview, setShowPreview] = useState(false)
   const [isGenerating, setIsGenerating] = useState(false)
@@ -78,7 +78,8 @@ export default function GenerateTaxSummaryPage() {
     }
 
     // Check subscription
-    if (!isSubscribed) {
+    // Allow access for active free trial users too
+    if (!hasAccess()) {
       setShowSubscriptionModal(true)
       return
     }

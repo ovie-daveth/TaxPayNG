@@ -30,7 +30,7 @@ export default function GenerateRRRPage() {
   const router = useRouter()
   const { user } = useAuth()
   const { profile, loading: profileLoading } = useUserProfile()
-  const { isSubscribed, loading: subscriptionLoading } = useSubscription()
+  const { hasAccess, loading: subscriptionLoading } = useSubscription()
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [rrrData, setRrrData] = useState<RRRResponse | null>(null)
@@ -93,7 +93,8 @@ export default function GenerateRRRPage() {
 
   const handleGenerateRRR = async () => {
     // Check subscription first
-    if (!subscriptionLoading && !isSubscribed) {
+    // Allow access for active free trial users too
+    if (!subscriptionLoading && !hasAccess()) {
       setShowSubscriptionModal(true)
       return
     }
@@ -501,6 +502,7 @@ export default function GenerateRRRPage() {
       <SubscriptionRequiredModal
         open={showSubscriptionModal}
         onOpenChange={setShowSubscriptionModal}
+        businessType={profile?.businessType || "freelancer"}
       />
     </div>
   )

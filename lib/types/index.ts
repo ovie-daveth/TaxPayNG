@@ -969,6 +969,30 @@ export interface Employee {
   
   // Bank details for salary payment
   bankAccount?: {
+    accountNumber?: string
+    accountName?: string
+    bankName?: string
+    bankCode?: string
+  }
+  
+  // Payment tracking
+  paymentRecords?: Array<{
+    id: string
+    payrollId: string
+    period: string // e.g., "January 2024"
+    periodType: 'monthly' | 'quarterly' | 'yearly'
+    periodStart: string // ISO date
+    periodEnd: string // ISO date
+    netSalary: number
+    status: 'pending' | 'paid' | 'failed'
+    paidAt?: string // ISO date
+    paidBy?: string // userId who marked as paid
+    paymentMethod?: 'bank_transfer' | 'cash' | 'cheque' | 'other'
+    paymentReference?: string
+    notes?: string
+    createdAt: string // ISO date
+  }>
+  bankAccount?: {
     bankName?: string
     accountNumber?: string
     accountName?: string

@@ -65,7 +65,7 @@ export default function PaymentHistoryPage() {
       : "/dashboard"
   const { user } = useAuth()
   const { profile } = useUserProfile()
-  const { isSubscribed, loading: subscriptionLoading } = useSubscription()
+  const { hasAccess, loading: subscriptionLoading } = useSubscription()
   const { sidebarCollapsed } = useSidebar()
   const [payments, setPayments] = useState<TaxPayment[]>([])
   const [filteredPayments, setFilteredPayments] = useState<TaxPayment[]>([])
@@ -87,10 +87,11 @@ export default function PaymentHistoryPage() {
   // Check subscription on mount
   useEffect(() => {
     if (subscriptionLoading) return
-    if (!isSubscribed && profile && profile.businessType !== 'consultant') {
+    // Allow access for active free trial users too
+    if (!hasAccess() && profile && profile.businessType !== 'consultant') {
       setShowSubscriptionModal(true)
     }
-  }, [isSubscribed, subscriptionLoading, profile])
+  }, [hasAccess, subscriptionLoading, profile])
 
   useEffect(() => {
     if (user?.uid) {
@@ -177,7 +178,7 @@ export default function PaymentHistoryPage() {
   }
 
   const handleMakePayment = () => {
-    if (!isSubscribed && profile && profile.businessType !== 'consultant') {
+    if (!hasAccess() && profile && profile.businessType !== 'consultant') {
       setShowSubscriptionModal(true)
       return
     }
@@ -470,7 +471,7 @@ export default function PaymentHistoryPage() {
                   className="flex items-center gap-2.5 p-2.5 rounded-lg cursor-pointer transition-all duration-200 hover:bg-muted/50 bg-card"
                 >
                   {/* Icon */}
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${statusColor}`}>
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${statusColor}`}>
                     <Wallet className="w-4 h-4" />
                   </div>
 
@@ -483,7 +484,7 @@ export default function PaymentHistoryPage() {
                   </div>
 
                   {/* Right */}
-                  <div className="text-right flex-shrink-0">
+                  <div className="text-right shrink-0">
                     <p className="text-sm font-bold whitespace-nowrap">{formatCurrency(payment.amount)}</p>
                     <div className="mt-0.5 flex justify-end">
                       <span className="text-[10px] px-2 py-0.5 rounded-full border bg-muted/30">

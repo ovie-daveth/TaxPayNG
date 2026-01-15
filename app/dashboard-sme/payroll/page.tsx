@@ -29,14 +29,17 @@ import {
   X,
   Printer,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  User
 } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { Payroll, PayrollTemplate, PayrollItem } from "@/lib/types"
 import { format } from "date-fns"
 
 export default function SMEPayrollPage() {
   const { user } = useAuth()
+  const router = useRouter()
   const [templates, setTemplates] = useState<PayrollTemplate[]>([])
   const [payrolls, setPayrolls] = useState<Payroll[]>([])
   const [loading, setLoading] = useState(true)
@@ -48,10 +51,8 @@ export default function SMEPayrollPage() {
   const [showTemplateDialog, setShowTemplateDialog] = useState(false)
   const [newTemplateName, setNewTemplateName] = useState("")
 
-  // Period selection
-  const [selectedMonth, setSelectedMonth] = useState("")
+  // Period selection (always yearly)
   const [selectedYear, setSelectedYear] = useState("")
-  const [selectedPeriodType, setSelectedPeriodType] = useState<"monthly" | "quarterly" | "yearly">("monthly")
 
   // View payroll
   const [selectedPayroll, setSelectedPayroll] = useState<Payroll | null>(null)
@@ -83,10 +84,9 @@ export default function SMEPayrollPage() {
     }
   }, [user])
 
-  // Initialize current month/year
+  // Initialize current year
   useEffect(() => {
     const now = new Date()
-    setSelectedMonth(String(now.getMonth() + 1).padStart(2, '0'))
     setSelectedYear(String(now.getFullYear()))
   }, [])
 
@@ -182,35 +182,18 @@ export default function SMEPayrollPage() {
   }
 
   const generatePayroll = async () => {
-    if (!user || !selectedTemplateId || !selectedMonth || !selectedYear) {
-      toast.error('Please select a template and period')
+    if (!user || !selectedTemplateId || !selectedYear) {
+      toast.error('Please select a template and year')
       return
     }
 
     setGenerating(true)
     try {
-      // Calculate period dates
-      const month = parseInt(selectedMonth)
+      // Always generate yearly payroll
       const year = parseInt(selectedYear)
-      let periodStart: string
-      let periodEnd: string
-      let periodLabel: string
-
-      if (selectedPeriodType === 'monthly') {
-        periodStart = new Date(year, month - 1, 1).toISOString()
-        periodEnd = new Date(year, month, 0).toISOString()
-        periodLabel = format(new Date(year, month - 1, 1), 'MMMM yyyy')
-      } else if (selectedPeriodType === 'quarterly') {
-        const quarterStartMonth = Math.floor((month - 1) / 3) * 3 + 1
-        periodStart = new Date(year, quarterStartMonth - 1, 1).toISOString()
-        periodEnd = new Date(year, quarterStartMonth + 2, 0).toISOString()
-        const quarter = Math.ceil(month / 3)
-        periodLabel = `Q${quarter} ${year}`
-      } else {
-        periodStart = new Date(year, 0, 1).toISOString()
-        periodEnd = new Date(year, 11, 31).toISOString()
-        periodLabel = String(year)
-      }
+      const periodStart = new Date(year, 0, 1).toISOString()
+      const periodEnd = new Date(year, 11, 31).toISOString()
+      const periodLabel = String(year)
 
       const token = await user.getIdToken()
       const response = await fetch('/api/payroll/generate', {
@@ -223,14 +206,16 @@ export default function SMEPayrollPage() {
           templateId: selectedTemplateId,
           periodStart,
           periodEnd,
-          periodType: selectedPeriodType,
+          periodType: 'yearly',
           periodLabel
         })
       })
 
       const data = await response.json()
       if (data.success) {
-        toast.success(`Payroll generated successfully for ${data.data.items.length} employees`)
+        // Count unique employees (each employee has 12 monthly items)
+        const uniqueEmployees = new Set(data.data.items.map((item: any) => item.employeeId))
+        toast.success(`Payroll generated successfully for ${uniqueEmployees.size} employees (12 months each)`)
         fetchPayrolls()
         setSelectedPayroll(data.data)
         setShowPayrollDialog(true)
@@ -1122,58 +1107,29 @@ export default function SMEPayrollPage() {
                 )}
               </div>
 
-              {/* Period Type */}
+              {/* Year */}
               <div className="space-y-2">
-                <Label>Period Type</Label>
-                <Select value={selectedPeriodType} onValueChange={(value: any) => setSelectedPeriodType(value)}>
+                <Label>Year</Label>
+                <Select value={selectedYear} onValueChange={setSelectedYear}>
                   <SelectTrigger>
-                    <SelectValue />
+                    <SelectValue placeholder="Select year" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="monthly">Monthly</SelectItem>
-                    <SelectItem value="quarterly">Quarterly</SelectItem>
-                    <SelectItem value="yearly">Yearly</SelectItem>
+                    {years.map(year => (
+                      <SelectItem key={String(year)} value={String(year)}>
+                        {year}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
-              </div>
-
-              {/* Month and Year */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Month</Label>
-                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {months.map(month => (
-                        <SelectItem key={month.value} value={month.value}>
-                          {month.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Year</Label>
-                  <Select value={selectedYear} onValueChange={setSelectedYear}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {years.map(year => (
-                        <SelectItem key={String(year)} value={String(year)}>
-                          {year}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <p className="text-xs text-muted-foreground">
+                  Payroll will be generated for all 12 months of the selected year
+                </p>
               </div>
 
               <Button 
                 onClick={generatePayroll} 
-                disabled={!selectedTemplateId || !selectedMonth || !selectedYear || generating}
+                disabled={!selectedTemplateId || !selectedYear || generating}
                 className="w-full"
               >
                 {generating ? (
@@ -1567,6 +1523,17 @@ export default function SMEPayrollPage() {
                                   <p className="text-xs text-muted-foreground">Net</p>
                                   <p className="font-semibold text-primary text-lg">{formatCurrency(item.netSalary)}</p>
                                 </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    router.push(`/dashboard-sme/employees/${item.employeeId}`)
+                                  }}
+                                  title="View Employee Details & Payment History"
+                                >
+                                  <User className="w-4 h-4" />
+                                </Button>
                                 <Button
                                   variant="ghost"
                                   size="sm"

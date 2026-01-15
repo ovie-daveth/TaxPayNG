@@ -19,6 +19,7 @@ const navItems = [
   { href: "/dashboard-sme", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard-sme/transactions", label: "Transactions", icon: Receipt },
   { href: "/dashboard-sme/invoices", label: "Invoices", icon: FileCheck },
+  { href: "/dashboard-sme/tax-calculator", label: "Tax Calculator", icon: Calculator },
   { href: "/dashboard-sme/reports", label: "Reports", icon: TrendingUp },
   { href: "/dashboard-sme/filing-requests", label: "Filing Requests", icon: MessageSquare },
   { href: "/dashboard-sme/payment", label: "Payment", icon: IdCardIcon },
@@ -112,8 +113,12 @@ export function DashboardNavSME() {
     "/dashboard-sme/reports"
   ]
 
-  // Items to show in the sidebar menu (all items except those in bottom nav)
+  // Items to show in the sidebar menu (all items except those in bottom nav, but include tax calculator in both)
   const menuNavItems = filteredNavItems.filter(item => {
+    // Include tax calculator in sidebar even though it's in bottom nav
+    if (item.href === "/dashboard-sme/tax-calculator") {
+      return true
+    }
     return !bottomNavItems.includes(item.href)
   })
 
