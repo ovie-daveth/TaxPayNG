@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Check, Loader2 } from "lucide-react"
-import { subscriptionService, getPlanPriceDisplay } from "@/lib/services/subscriptionService"
+import { subscriptionService } from "@/lib/services/subscriptionService"
 import { SubscriptionType, BusinessType } from "@/lib/types"
 import { MigrateToCreatorModal } from "./migrate-to-creator-modal"
 import { MigrateToFreelancerModal } from "./migrate-to-freelancer-modal"
@@ -15,6 +15,8 @@ import { useRouter } from "next/navigation"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Badge as UIBadge } from "@/components/ui/badge"
+import { usePricingConfig } from "@/lib/hooks/usePricingConfig"
+import { DEFAULT_YEARLY_DISCOUNT_PERCENT } from "@/lib/constants/pricing"
 
 interface ChangePlanModalProps {
   open: boolean
@@ -38,6 +40,7 @@ export function ChangePlanModal({
   onBillingIntervalChange
 }: ChangePlanModalProps) {
   const router = useRouter()
+  const { pricingConfig } = usePricingConfig()
   const [showMigrationModal, setShowMigrationModal] = useState(false)
   const [showFreelancerMigrationModal, setShowFreelancerMigrationModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
@@ -58,6 +61,25 @@ export function ChangePlanModal({
   }
 
   const availablePlans = getAvailablePlans()
+  const yearlyDiscountPercent = pricingConfig?.yearlyDiscountPercent ?? DEFAULT_YEARLY_DISCOUNT_PERCENT
+  const format = (priceInKobo: number) => {
+    const priceInNaira = priceInKobo / 100
+    return `₦${priceInNaira.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+  }
+  const getPlanWithOverrides = (planType: SubscriptionType) => {
+    const base = subscriptionService.getPlan(planType)
+    if (!base) return null
+    const overrideMonthly = pricingConfig?.plans?.[planType as any]?.monthlyPrice
+    const monthlyPrice = typeof overrideMonthly === "number" && overrideMonthly > 0 ? overrideMonthly : base.monthlyPrice
+    const yearlyPrice = Math.round(12 * monthlyPrice * (1 - yearlyDiscountPercent / 100))
+    return {
+      ...base,
+      monthlyPrice,
+      yearlyPrice,
+      monthlyPriceDisplay: format(monthlyPrice),
+      yearlyPriceDisplay: format(yearlyPrice)
+    }
+  }
 
   // Check if migration is needed
   // - Freelancer trying to subscribe to GOLD or PLATINUM (needs to migrate to creator)
@@ -151,7 +173,7 @@ export function ChangePlanModal({
             </Label>
             {billingInterval === 'yearly' && (
               <UIBadge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 text-xs font-semibold ml-2">
-                Save 25%
+                Save {yearlyDiscountPercent}%
               </UIBadge>
             )}
           </div>
@@ -159,7 +181,7 @@ export function ChangePlanModal({
 
         <div className="grid md:grid-cols-3 gap-6 mt-6">
           {availablePlans.map((planType) => {
-            const plan = subscriptionService.getPlan(planType)
+            const plan = getPlanWithOverrides(planType)
             if (!plan) return null
 
             const isCurrent = isCurrentPlan(planType)
@@ -236,10 +258,10 @@ export function ChangePlanModal({
                         </span>
                         <div className="flex items-baseline gap-2">
                           <span className="text-3xl font-bold">
-                            {getPlanPriceDisplay(plan, 'yearly')}
+                            {plan.yearlyPriceDisplay}
                           </span>
                           <UIBadge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 py-0.5 text-xs font-semibold">
-                            25% OFF
+                            {yearlyDiscountPercent}% OFF
                           </UIBadge>
                         </div>
                         <span className="text-sm text-muted-foreground">/year</span>

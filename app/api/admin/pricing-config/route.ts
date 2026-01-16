@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminAuth, getAdminDb } from '@/lib/firebase-admin'
 import { getPricingConfigAdmin, setPricingConfigAdmin } from '@/lib/services/pricingConfigService'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
@@ -24,7 +26,10 @@ export async function GET(request: NextRequest) {
     }
 
     const config = await getPricingConfigAdmin()
-    return NextResponse.json({ success: true, data: config })
+    return NextResponse.json(
+      { success: true, data: config },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    )
   } catch (error: any) {
     return NextResponse.json(
       { success: false, error: error?.message || 'Failed to fetch pricing config' },
@@ -87,7 +92,10 @@ export async function POST(request: NextRequest) {
     }
 
     const updated = await setPricingConfigAdmin(updates, decoded.email || decoded.uid)
-    return NextResponse.json({ success: true, data: updated })
+    return NextResponse.json(
+      { success: true, data: updated },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    )
   } catch (error: any) {
     return NextResponse.json(
       { success: false, error: error?.message || 'Failed to update pricing config' },

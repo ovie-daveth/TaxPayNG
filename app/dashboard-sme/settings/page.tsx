@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge"
 import { User, Building2, CreditCard, Bell, Shield, Upload, X, CheckCircle2, Loader2, ExternalLink, HelpCircle, MessageSquare, Mail, Send } from "lucide-react"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
 import { useSubscription } from "@/lib/hooks/useSubscription"
-import { subscriptionService, getPlanPriceDisplay } from "@/lib/services/subscriptionService"
+import { subscriptionService } from "@/lib/services/subscriptionService"
 import { getAuth } from "firebase/auth"
 import { auth } from "@/firebase/firebase"
 import { reauthenticateWithCredential, updatePassword, EmailAuthProvider } from "firebase/auth"
@@ -33,6 +33,8 @@ import { OneTouchResubscribeButton } from "@/components/subscription/one-touch-r
 import { SubscriptionType } from "@/lib/types"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { VATQualificationSection } from "@/components/settings/vat-qualification-section"
+import { usePricingConfig } from "@/lib/hooks/usePricingConfig"
+import { DEFAULT_YEARLY_DISCOUNT_PERCENT } from "@/lib/constants/pricing"
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -40,6 +42,7 @@ export default function SettingsPage() {
   const { user, loading: authLoading, setPasswordForGoogleUser } = useAuth()
   const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
   const { isSubscribed, subscriptionType, isExpired, isExpiringSoon, subscriptionExpiryDate, freeTrialStatus } = useSubscription()
+  const { pricingConfig } = usePricingConfig()
   const { sidebarCollapsed } = useSidebar()
   const [isSaving, setIsSaving] = useState(false)
   const [processingSubscription, setProcessingSubscription] = useState<string | null>(null)
@@ -119,6 +122,27 @@ export default function SettingsPage() {
 
   // Loading state: show skeleton while auth or profile is loading
   const isLoading = authLoading || profileLoading
+
+  const yearlyDiscountPercent = pricingConfig?.yearlyDiscountPercent ?? DEFAULT_YEARLY_DISCOUNT_PERCENT
+  const formatKobo = (priceInKobo: number) => {
+    const priceInNaira = priceInKobo / 100
+    return `₦${priceInNaira.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+  }
+  const getPlanWithOverrides = (planType: SubscriptionType) => {
+    const base = subscriptionService.getPlan(planType)
+    if (!base) return null
+    const overrideMonthly = pricingConfig?.plans?.[planType as any]?.monthlyPrice
+    const monthlyPrice = typeof overrideMonthly === "number" && overrideMonthly > 0 ? overrideMonthly : base.monthlyPrice
+    const yearlyPrice = Math.round(12 * monthlyPrice * (1 - yearlyDiscountPercent / 100))
+    return {
+      ...base,
+      monthlyPrice,
+      yearlyPrice,
+      monthlyPriceDisplay: formatKobo(monthlyPrice),
+      yearlyPriceDisplay: formatKobo(yearlyPrice),
+      priceDisplay: formatKobo(monthlyPrice),
+    }
+  }
 
   useEffect(() => {
     if (profileLoading || !profile) {
@@ -1285,7 +1309,7 @@ export default function SettingsPage() {
                               </Label>
                               {billingInterval === 'yearly' && (
                                 <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 text-xs font-semibold ml-2">
-                                  Save 25%
+                                  Save {yearlyDiscountPercent}%
                                 </Badge>
                               )}
                             </div>
@@ -1299,7 +1323,7 @@ export default function SettingsPage() {
                                 : (['PRO', 'GOLD', 'PLATINUM'] as const)
                               
                               return availablePlans.map((planType) => {
-                                const plan = subscriptionService.getPlan(planType)
+                                const plan = getPlanWithOverrides(planType)
                                 if (!plan) return null
                                 
                                 const isProcessing = processingSubscription === planType
@@ -1340,10 +1364,10 @@ export default function SettingsPage() {
                                             </span>
                                             <div className="flex items-baseline gap-2">
                                               <span className="text-2xl sm:text-3xl font-bold">
-                                                {getPlanPriceDisplay(plan, 'yearly')}
+                                                {plan.yearlyPriceDisplay}
                                               </span>
                                               <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 py-0.5 text-xs font-semibold">
-                                                25% OFF
+                                                {yearlyDiscountPercent}% OFF
                                               </Badge>
                                             </div>
                                             <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
@@ -1397,10 +1421,10 @@ export default function SettingsPage() {
                               <h3 className="text-base sm:text-lg font-semibold">Current Plan</h3>
                               <p className="text-xs sm:text-sm text-muted-foreground">
                                 {subscriptionType} - {(() => {
-                                  const plan = subscriptionService.getPlan(subscriptionType)
+                                  const plan = getPlanWithOverrides(subscriptionType)
                                   if (!plan) return 'N/A'
                                   const interval = (profile?.subscriptionInterval as 'monthly' | 'yearly' | undefined) || 'monthly'
-                                  const priceDisplay = getPlanPriceDisplay(plan, interval)
+                                  const priceDisplay = interval === 'yearly' ? plan.yearlyPriceDisplay : plan.monthlyPriceDisplay
                                   const period = interval === 'yearly' ? '/year' : '/month'
                                   return `${priceDisplay}${period}`
                                 })()}
@@ -1556,7 +1580,7 @@ export default function SettingsPage() {
                             setNotificationPreferences(prev => ({ ...prev, emailNotifications: !checked }))
                           }
                         }}
-                        className="flex-shrink-0" 
+                        className="shrink-0" 
                       />
                     </div>
                     <Separator />
@@ -1570,7 +1594,7 @@ export default function SettingsPage() {
                       <Switch 
                         checked={false}
                         disabled
-                        className="flex-shrink-0" 
+                        className="shrink-0"
                       />
                     </div>
                   </div>

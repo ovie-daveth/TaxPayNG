@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Check, Lock } from "lucide-react"
-import { subscriptionService, getPlanPriceDisplay } from "@/lib/services/subscriptionService"
+import { subscriptionService } from "@/lib/services/subscriptionService"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { SubscriptionType, BusinessType } from "@/lib/types"
@@ -15,6 +15,8 @@ import { auth } from "@/firebase/firebase"
 import { toast } from "sonner"
 import { MigrateToCreatorModal } from "./migrate-to-creator-modal"
 import { MigrateToFreelancerModal } from "./migrate-to-freelancer-modal"
+import { usePricingConfig } from "@/lib/hooks/usePricingConfig"
+import { DEFAULT_YEARLY_DISCOUNT_PERCENT } from "@/lib/constants/pricing"
 
 interface SubscriptionRequiredModalProps {
   open: boolean
@@ -28,11 +30,32 @@ export function SubscriptionRequiredModal({
   businessType
 }: SubscriptionRequiredModalProps) {
   const router = useRouter()
+  const { pricingConfig } = usePricingConfig()
   const [processingSubscription, setProcessingSubscription] = useState<string | null>(null)
   const [showMigrationModal, setShowMigrationModal] = useState(false)
   const [showFreelancerMigrationModal, setShowFreelancerMigrationModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
+
+  const yearlyDiscountPercent = pricingConfig?.yearlyDiscountPercent ?? DEFAULT_YEARLY_DISCOUNT_PERCENT
+  const format = (priceInKobo: number) => {
+    const priceInNaira = priceInKobo / 100
+    return `₦${priceInNaira.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+  }
+  const getPlanWithOverrides = (planType: SubscriptionType) => {
+    const base = subscriptionService.getPlan(planType)
+    if (!base) return null
+    const overrideMonthly = pricingConfig?.plans?.[planType as any]?.monthlyPrice
+    const monthlyPrice = typeof overrideMonthly === "number" && overrideMonthly > 0 ? overrideMonthly : base.monthlyPrice
+    const yearlyPrice = Math.round(12 * monthlyPrice * (1 - yearlyDiscountPercent / 100))
+    return {
+      ...base,
+      monthlyPrice,
+      yearlyPrice,
+      monthlyPriceDisplay: format(monthlyPrice),
+      yearlyPriceDisplay: format(yearlyPrice)
+    }
+  }
 
   const getAvailablePlans = (): SubscriptionType[] => {
     if (businessType === 'sme') {
@@ -194,7 +217,7 @@ export function SubscriptionRequiredModal({
             </Label>
             {billingInterval === 'yearly' && (
               <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 text-xs font-semibold ml-2">
-                Save 25%
+                Save {yearlyDiscountPercent}%
               </Badge>
             )}
           </div>
@@ -214,7 +237,7 @@ export function SubscriptionRequiredModal({
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4 md:gap-6">
             {availablePlans.map((planType) => {
-              const plan = subscriptionService.getPlan(planType)
+              const plan = getPlanWithOverrides(planType)
               if (!plan) return null
 
               const isProcessing = processingSubscription === planType
@@ -278,10 +301,10 @@ export function SubscriptionRequiredModal({
                           </span>
                           <div className="flex items-baseline gap-1.5 sm:gap-2">
                             <span className="text-xl sm:text-2xl md:text-3xl font-bold">
-                              {getPlanPriceDisplay(plan, 'yearly')}
+                              {plan.yearlyPriceDisplay}
                             </span>
                             <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 py-0.5 text-xs font-semibold">
-                              25% OFF
+                              {yearlyDiscountPercent}% OFF
                             </Badge>
                           </div>
                           <span className="text-xs sm:text-sm text-muted-foreground">/year</span>
