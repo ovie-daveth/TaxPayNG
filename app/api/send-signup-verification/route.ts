@@ -26,13 +26,34 @@ export async function POST(request: NextRequest) {
     const adminDb = getAdminDb()
     const adminAuth = getAdminAuth()
 
-    // Check if user already exists in Firebase Auth
+    // If user exists in Firebase Auth, only block signup if a userProfile already exists.
+    // If Auth exists but profile is missing (partial/aborted signup), allow verification so we can recover by creating the profile.
     try {
-      await adminAuth.getUserByEmail(emailLower)
-      return NextResponse.json(
-        { error: 'An account with this email already exists. Please log in instead.' },
-        { status: 400 }
-      )
+      const authUser = await adminAuth.getUserByEmail(emailLower)
+
+      const profilesCol = adminDb.collection('userProfiles')
+      const directDoc = await profilesCol.doc(authUser.uid).get()
+
+      let hasProfile = directDoc.exists
+
+      if (!hasProfile) {
+        // Backward compatibility: some profiles may have random doc IDs but contain userId/email fields.
+        const byUserId = await profilesCol.where('userId', '==', authUser.uid).limit(1).get()
+        hasProfile = !byUserId.empty
+      }
+
+      if (!hasProfile) {
+        const byEmail = await profilesCol.where('email', '==', emailLower).limit(1).get()
+        hasProfile = !byEmail.empty
+      }
+
+      if (hasProfile) {
+        return NextResponse.json(
+          { error: 'An account with this email already exists. Please log in instead.' },
+          { status: 400 }
+        )
+      }
+      // else: Auth user exists but no profile -> allow verification & continue signup recovery flow
     } catch (error: any) {
       if (error.code !== 'auth/user-not-found') {
         console.error('Firebase auth lookup error:', error)
