@@ -322,7 +322,12 @@ export class PayrollService {
     userId: string,
     templateId: string,
     period: { start: string; end: string; type: 'monthly' | 'quarterly' | 'yearly' },
-    periodLabel: string
+    periodLabel: string,
+    options?: {
+      employeeIds?: string[]
+      department?: string
+      role?: string
+    }
   ): Promise<Payroll> {
     // Get template
     const templateDoc = await this.db.collection('payrollTemplates').doc(templateId).get()
@@ -345,10 +350,48 @@ export class PayrollService {
       throw new Error('No active employees found')
     }
 
-    const employees = employeesSnapshot.docs.map(doc => ({
+    const employeesAll = employeesSnapshot.docs.map(doc => ({
       id: doc.id,
       ...doc.data()
     } as Employee))
+
+    const employeeIds = Array.isArray(options?.employeeIds) ? options?.employeeIds?.filter(Boolean) : []
+    const department = typeof options?.department === 'string' ? options.department.trim() : ''
+    const role = typeof options?.role === 'string' ? options.role.trim() : ''
+
+    let employees: Employee[] = []
+
+    if (employeeIds.length > 0) {
+      // Explicit employee selection overrides template assignment.
+      employees = employeesAll.filter((e) => employeeIds.includes(e.id))
+    } else {
+      // If employees are assigned to specific payroll templates, include only those assigned to this template.
+      // Backward compatible: employees with no assignment are still included.
+      employees = employeesAll.filter((e) => !e.payrollTemplateId || e.payrollTemplateId === templateId)
+    }
+
+    if (department) {
+      const depLower = department.toLowerCase()
+      employees = employees.filter((e) => (e.department || '').toLowerCase() === depLower)
+    }
+
+    if (role) {
+      const roleLower = role.toLowerCase()
+      employees = employees.filter((e) => ((e.jobTitle || e.position || '') as string).toLowerCase() === roleLower)
+    }
+
+    if (employees.length === 0) {
+      if (employeeIds.length > 0) {
+        throw new Error('No active employees found for the selected employees')
+      }
+      if (department) {
+        throw new Error('No active employees found for the selected department')
+      }
+      if (role) {
+        throw new Error('No active employees found for the selected role')
+      }
+      throw new Error('No active employees assigned to this payroll template')
+    }
 
     // Generate payroll items for each employee
     let items: PayrollItem[] = []

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -34,7 +34,7 @@ import {
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Payroll, PayrollTemplate, PayrollItem } from "@/lib/types"
+import { Payroll, PayrollTemplate, PayrollItem, Employee } from "@/lib/types"
 import { format } from "date-fns"
 
 export default function SMEPayrollPage() {
@@ -42,6 +42,7 @@ export default function SMEPayrollPage() {
   const router = useRouter()
   const [templates, setTemplates] = useState<PayrollTemplate[]>([])
   const [payrolls, setPayrolls] = useState<Payroll[]>([])
+  const [employees, setEmployees] = useState<Employee[]>([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
   const [sendingEmails, setSendingEmails] = useState<string | null>(null) // payrollId
@@ -53,6 +54,13 @@ export default function SMEPayrollPage() {
 
   // Period selection (always yearly)
   const [selectedYear, setSelectedYear] = useState("")
+
+  // Employee selection / grouping
+  const [employeeScope, setEmployeeScope] = useState<'all' | 'selected' | 'department' | 'role'>('all')
+  const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([])
+  const [selectedDepartment, setSelectedDepartment] = useState<string>("")
+  const [selectedRole, setSelectedRole] = useState<string>("")
+  const [employeeSearch, setEmployeeSearch] = useState("")
 
   // View payroll
   const [selectedPayroll, setSelectedPayroll] = useState<Payroll | null>(null)
@@ -81,6 +89,7 @@ export default function SMEPayrollPage() {
     if (user) {
       fetchTemplates()
       fetchPayrolls()
+      fetchEmployees()
     }
   }, [user])
 
@@ -152,6 +161,56 @@ export default function SMEPayrollPage() {
     }
   }
 
+  const fetchEmployees = async () => {
+    if (!user) return
+    try {
+      const token = await user.getIdToken()
+      const response = await fetch('/api/employees', {
+        headers: { 'Authorization': `Bearer ${token}` }
+      })
+      const data = await response.json()
+      if (data.success) {
+        const active = (data.data || []).filter((e: Employee) => e.status === 'active')
+        setEmployees(active)
+      }
+    } catch (e) {
+      console.error('Error fetching employees:', e)
+    }
+  }
+
+  const departments = useMemo(() => {
+    return Array.from(new Set(employees.map(e => e.department).filter(Boolean) as string[])).sort()
+  }, [employees])
+
+  const roles = useMemo(() => {
+    return Array.from(
+      new Set(
+        employees
+          .map(e => (e.jobTitle || e.position || '').trim())
+          .filter(Boolean)
+      )
+    ).sort()
+  }, [employees])
+
+  const filteredEmployeesForPicker = useMemo(() => {
+    const q = employeeSearch.trim().toLowerCase()
+    if (!q) return employees
+    return employees.filter((e) => {
+      const name = `${e.firstName} ${e.middleName || ''} ${e.lastName}`.toLowerCase()
+      return (
+        name.includes(q) ||
+        (e.employeeNumber || '').toLowerCase().includes(q) ||
+        (e.email || '').toLowerCase().includes(q) ||
+        (e.department || '').toLowerCase().includes(q) ||
+        (e.jobTitle || e.position || '').toLowerCase().includes(q)
+      )
+    })
+  }, [employees, employeeSearch])
+
+  const toggleEmployee = (id: string) => {
+    setSelectedEmployeeIds((prev) => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
+  }
+
   const createDefaultTemplate = async () => {
     if (!user) return
 
@@ -186,6 +245,18 @@ export default function SMEPayrollPage() {
       toast.error('Please select a template and year')
       return
     }
+    if (employeeScope === 'selected' && selectedEmployeeIds.length === 0) {
+      toast.error('Please select at least one employee')
+      return
+    }
+    if (employeeScope === 'department' && !selectedDepartment) {
+      toast.error('Please select a department')
+      return
+    }
+    if (employeeScope === 'role' && !selectedRole) {
+      toast.error('Please select a role')
+      return
+    }
 
     setGenerating(true)
     try {
@@ -196,19 +267,24 @@ export default function SMEPayrollPage() {
       const periodLabel = String(year)
 
       const token = await user.getIdToken()
+      const requestBody: any = {
+        templateId: selectedTemplateId,
+        periodStart,
+        periodEnd,
+        periodType: 'yearly',
+        periodLabel
+      }
+      if (employeeScope === 'selected') requestBody.employeeIds = selectedEmployeeIds
+      if (employeeScope === 'department') requestBody.department = selectedDepartment
+      if (employeeScope === 'role') requestBody.role = selectedRole
+
       const response = await fetch('/api/payroll/generate', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          templateId: selectedTemplateId,
-          periodStart,
-          periodEnd,
-          periodType: 'yearly',
-          periodLabel
-        })
+        body: JSON.stringify(requestBody)
       })
 
       const data = await response.json()
@@ -855,6 +931,80 @@ export default function SMEPayrollPage() {
     })
   }
 
+  const employeePayrollGroups = useMemo(() => {
+    if (!selectedPayroll?.items?.length) return []
+
+    type Group = {
+      employeeId: string
+      employeeName?: string
+      employeeNumber?: string
+      employeeEmail?: string
+      items: PayrollItem[]
+      totals: {
+        gross: number
+        deductions: number
+        net: number
+        paye: number
+      }
+    }
+
+    const map = new Map<string, Group>()
+    for (const it of selectedPayroll.items) {
+      if (!it?.employeeId) continue
+      const key = it.employeeId
+      const existing = map.get(key)
+      const gross = it.grossSalary || 0
+      const deductions = it.totalDeductions || 0
+      const net = it.netSalary || 0
+      const paye = it.paye?.amount || 0
+
+      if (!existing) {
+        map.set(key, {
+          employeeId: key,
+          employeeName: it.employeeName,
+          employeeNumber: it.employeeNumber,
+          employeeEmail: it.employeeEmail,
+          items: [it],
+          totals: { gross, deductions, net, paye },
+        })
+      } else {
+        existing.items.push(it)
+        existing.totals.gross += gross
+        existing.totals.deductions += deductions
+        existing.totals.net += net
+        existing.totals.paye += paye
+      }
+    }
+
+    const monthOrder: Record<string, number> = {
+      january: 1,
+      february: 2,
+      march: 3,
+      april: 4,
+      may: 5,
+      june: 6,
+      july: 7,
+      august: 8,
+      september: 9,
+      october: 10,
+      november: 11,
+      december: 12,
+    }
+
+    const groups = Array.from(map.values())
+    groups.forEach((g) => {
+      g.items.sort((a, b) => {
+        const aAny = a as any
+        const bAny = b as any
+        const am = aAny.month || (aAny.monthName ? monthOrder[String(aAny.monthName).toLowerCase()] : 0) || 0
+        const bm = bAny.month || (bAny.monthName ? monthOrder[String(bAny.monthName).toLowerCase()] : 0) || 0
+        return am - bm
+      })
+    })
+
+    return groups.sort((a, b) => (a.employeeName || "").localeCompare(b.employeeName || ""))
+  }, [selectedPayroll])
+
   const sendPayrollEmails = async (payroll: Payroll, employeeIds?: string[]) => {
     if (!user) return
 
@@ -1060,7 +1210,9 @@ export default function SMEPayrollPage() {
       <Card>
         <CardHeader>
               <CardTitle>Generate Payroll</CardTitle>
-              <CardDescription>Select a template and period to generate payroll for all active employees</CardDescription>
+              <CardDescription>
+                Select a template and year, then choose who to include (all employees, selected employees, or by department/role).
+              </CardDescription>
         </CardHeader>
             <CardContent className="space-y-4">
               {/* Template Selection */}
@@ -1125,6 +1277,116 @@ export default function SMEPayrollPage() {
                 <p className="text-xs text-muted-foreground">
                   Payroll will be generated for all 12 months of the selected year
                 </p>
+              </div>
+
+              {/* Who to include */}
+              <div className="space-y-2">
+                <Label>Who to include</Label>
+                <Select
+                  value={employeeScope}
+                  onValueChange={(v) => {
+                    setEmployeeScope(v as any)
+                    setSelectedEmployeeIds([])
+                    setSelectedDepartment("")
+                    setSelectedRole("")
+                    setEmployeeSearch("")
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select scope" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All active employees</SelectItem>
+                    <SelectItem value="selected">Select employees</SelectItem>
+                    <SelectItem value="department">By department</SelectItem>
+                    <SelectItem value="role">By role</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                {employeeScope === 'department' && (
+                  <div className="space-y-2">
+                    <Select value={selectedDepartment} onValueChange={setSelectedDepartment}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select department" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {departments.map((d) => (
+                          <SelectItem key={d} value={d}>
+                            {d}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Includes employees in the selected department.
+                    </p>
+                  </div>
+                )}
+
+                {employeeScope === 'role' && (
+                  <div className="space-y-2">
+                    <Select value={selectedRole} onValueChange={setSelectedRole}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {roles.map((r) => (
+                          <SelectItem key={r} value={r}>
+                            {r}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      Role is taken from employee Job Title / Position.
+                    </p>
+                  </div>
+                )}
+
+                {employeeScope === 'selected' && (
+                  <div className="space-y-2 rounded-lg border p-3">
+                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between">
+                      <Label className="text-sm">Select employees</Label>
+                      <div className="text-xs text-muted-foreground">
+                        {selectedEmployeeIds.length} selected
+                      </div>
+                    </div>
+                    <Input
+                      value={employeeSearch}
+                      onChange={(e) => setEmployeeSearch(e.target.value)}
+                      placeholder="Search by name, email, department, role..."
+                      className="h-9 text-sm"
+                    />
+                    <div className="max-h-56 overflow-auto pr-1 space-y-2">
+                      {filteredEmployeesForPicker.map((e) => {
+                        const checked = selectedEmployeeIds.includes(e.id)
+                        return (
+                          <label key={e.id} className="flex items-start gap-2 cursor-pointer rounded-md p-2 hover:bg-muted/40">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleEmployee(e.id)}
+                              className="mt-1"
+                            />
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium truncate">
+                                {e.firstName} {e.middleName} {e.lastName}
+                              </div>
+                              <div className="text-xs text-muted-foreground truncate">
+                                {(e.jobTitle || e.position || '—')} • {(e.department || '—')}
+                              </div>
+                            </div>
+                          </label>
+                        )
+                      })}
+                      {filteredEmployeesForPicker.length === 0 && (
+                        <div className="text-sm text-muted-foreground py-3 text-center">
+                          No employees match your search.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <Button 
@@ -1449,7 +1711,7 @@ export default function SMEPayrollPage() {
           <DialogHeader>
             <DialogTitle>Payroll Details - {selectedPayroll?.period}</DialogTitle>
             <DialogDescription>
-              {selectedPayroll?.items.length} employees • Generated on {selectedPayroll && format(new Date(selectedPayroll.generatedAt), 'MMM dd, yyyy')}
+              {employeePayrollGroups.length} employees • Generated on {selectedPayroll && format(new Date(selectedPayroll.generatedAt), 'MMM dd, yyyy')}
             </DialogDescription>
           </DialogHeader>
           {selectedPayroll && (
@@ -1488,47 +1750,47 @@ export default function SMEPayrollPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {selectedPayroll.items.map((item, index) => {
-                      const isExpanded = expandedEmployees.has(item.employeeId)
+                    {employeePayrollGroups.map((group) => {
+                      const isExpanded = expandedEmployees.has(group.employeeId)
                       return (
-                        <Card key={item.employeeId || index} className="overflow-hidden">
+                        <Card key={group.employeeId} className="overflow-hidden">
                           <div 
                             className="p-4 cursor-pointer hover:bg-muted/50 transition-colors"
-                            onClick={() => toggleEmployeeExpansion(item.employeeId)}
+                            onClick={() => toggleEmployeeExpansion(group.employeeId)}
                           >
                             <div className="flex items-center justify-between">
                               <div className="flex-1">
                                 <div className="flex items-center gap-3">
-                                  <h3 className="font-semibold text-base">{item.employeeName}</h3>
-                                  {item.employeeNumber && (
+                                  <h3 className="font-semibold text-base">{group.employeeName}</h3>
+                                  {group.employeeNumber && (
                                     <Badge variant="outline" className="text-xs">
-                                      {item.employeeNumber}
+                                      {group.employeeNumber}
                                     </Badge>
                                   )}
                                 </div>
-                                {item.employeeEmail && (
-                                  <p className="text-sm text-muted-foreground mt-1">{item.employeeEmail}</p>
+                                {group.employeeEmail && (
+                                  <p className="text-sm text-muted-foreground mt-1">{group.employeeEmail}</p>
                                 )}
                               </div>
                               <div className="flex items-center gap-6 mr-4">
                                 <div className="text-right">
-                                  <p className="text-xs text-muted-foreground">Gross</p>
-                                  <p className="font-semibold">{formatCurrency(item.grossSalary)}</p>
+                                  <p className="text-xs text-muted-foreground">Gross (Year)</p>
+                                  <p className="font-semibold">{formatCurrency(group.totals.gross)}</p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="text-xs text-muted-foreground">Deductions</p>
-                                  <p className="font-semibold text-destructive">{formatCurrency(item.totalDeductions)}</p>
+                                  <p className="text-xs text-muted-foreground">Deductions (Year)</p>
+                                  <p className="font-semibold text-destructive">{formatCurrency(group.totals.deductions)}</p>
                                 </div>
                                 <div className="text-right">
-                                  <p className="text-xs text-muted-foreground">Net</p>
-                                  <p className="font-semibold text-primary text-lg">{formatCurrency(item.netSalary)}</p>
+                                  <p className="text-xs text-muted-foreground">Net (Year)</p>
+                                  <p className="font-semibold text-primary text-lg">{formatCurrency(group.totals.net)}</p>
                                 </div>
                                 <Button
                                   variant="ghost"
                                   size="sm"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    router.push(`/dashboard-sme/employees/${item.employeeId}`)
+                                    router.push(`/dashboard-sme/employees/${group.employeeId}`)
                                   }}
                                   title="View Employee Details & Payment History"
                                 >
@@ -1539,7 +1801,7 @@ export default function SMEPayrollPage() {
                                   size="sm"
                                   onClick={(e) => {
                                     e.stopPropagation()
-                                    toggleEmployeeExpansion(item.employeeId)
+                                    toggleEmployeeExpansion(group.employeeId)
                                   }}
                                 >
                                   {isExpanded ? (
@@ -1554,272 +1816,17 @@ export default function SMEPayrollPage() {
 
                           {isExpanded && (
                             <div className="border-t bg-muted/30 p-4 space-y-4">
-                              {/* Earnings Breakdown */}
-                              <div>
-                                <h4 className="text-sm font-semibold mb-3">Earnings</h4>
-                                <div className="space-y-2">
-                                  <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">Basic Salary</span>
-                                    <span className="font-medium">{formatCurrency(item.basicSalary)}</span>
-                                  </div>
-                                  {item.allowances && item.allowances.length > 0 && (
-                                    <>
-                                      {item.allowances.map((allowance, idx) => (
-                                        <div key={idx} className="flex justify-between text-sm pl-4">
-                                          <span className="text-muted-foreground">
-                                            {allowance.name}
-                                            {!allowance.taxable && (
-                                              <Badge variant="secondary" className="ml-2 text-xs">Non-taxable</Badge>
-                                            )}
-                                          </span>
-                                          <span className="font-medium">{formatCurrency(allowance.amount)}</span>
-                                        </div>
-                                      ))}
-                                    </>
-                                  )}
-                                  <div className="flex justify-between text-sm font-semibold pt-2 border-t">
-                                    <span>Gross Salary</span>
-                                    <span>{formatCurrency(item.grossSalary)}</span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Deductions Breakdown */}
-                              <div>
-                                <h4 className="text-sm font-semibold mb-3">Deductions</h4>
-                                <div className="space-y-2">
-                                  {/* Pension */}
-                                  <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">
-                                      Pension (Employee) - 8%
-                                    </span>
-                                    <span className="font-medium">{formatCurrency(item.pension.employee)}</span>
-                                  </div>
-                                  {item.pension.employer > 0 && (
-                                    <div className="flex justify-between text-sm pl-4">
-                                      <span className="text-muted-foreground text-xs">Pension (Employer) - 10%</span>
-                                      <span className="font-medium text-xs">{formatCurrency(item.pension.employer)}</span>
-                                    </div>
-                                  )}
-
-                                  {/* NHF */}
-                                  {item.nhf && (
-                                    <div className="flex justify-between text-sm">
-                                      <span className="text-muted-foreground">NHF (2.5%)</span>
-                                      <span className="font-medium">{formatCurrency(item.nhf.amount)}</span>
-                                    </div>
-                                  )}
-
-                                  {/* NHIS */}
-                                  {item.nhis && (
-                                    <div className="flex justify-between text-sm">
-                                      <span className="text-muted-foreground">NHIS</span>
-                                      <span className="font-medium">{formatCurrency(item.nhis.amount)}</span>
-                                    </div>
-                                  )}
-
-                                  {/* PAYE */}
-                                  <div className="flex justify-between text-sm">
-                                    <span className="text-muted-foreground">PAYE Tax</span>
-                                    <span className="font-medium text-destructive">{formatCurrency(item.paye.amount)}</span>
-                                  </div>
-
-                                  {/* Other Deductions */}
-                                  {item.otherDeductions && item.otherDeductions.length > 0 && (
-                                    <>
-                                      {item.otherDeductions.map((deduction, idx) => (
-                                        <div key={idx} className="flex justify-between text-sm pl-4">
-                                          <span className="text-muted-foreground">{deduction.name}</span>
-                                          <span className="font-medium">{formatCurrency(deduction.amount)}</span>
-                                        </div>
-                                      ))}
-                                    </>
-                                  )}
-
-                                  <div className="flex justify-between text-sm font-semibold pt-2 border-t">
-                                    <span>Total Deductions</span>
-                                    <span className="text-destructive">{formatCurrency(item.totalDeductions)}</span>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* Tax Breakdown */}
-                              {item.paye.taxBreakdown && (
-                                <div>
-                                  <h4 className="text-sm font-semibold mb-3">Tax Calculation Breakdown (2026 Tax Reform)</h4>
-                                  <div className="space-y-2 text-sm bg-background p-3 rounded-lg border">
-                                    <div className="flex justify-between">
-                                      <span className="text-muted-foreground">Annual Gross Income</span>
-                                      <span className="font-medium">{formatCurrency(item.paye.taxBreakdown.grossIncome)}</span>
-                                    </div>
-                                    
-                                    {item.paye.taxBreakdown.reliefs && (
-                                      <div className="mt-2 pt-2 border-t">
-                                        <p className="text-xs font-semibold text-muted-foreground mb-2">Reliefs Applied:</p>
-                                        {item.paye.taxBreakdown.reliefs.rentRelief > 0 && (
-                                          <div className="flex justify-between text-xs pl-2">
-                                            <span className="text-muted-foreground">Rent Relief (20% capped at ₦500K)</span>
-                                            <span>{formatCurrency(item.paye.taxBreakdown.reliefs.rentRelief)}</span>
-                                          </div>
-                                        )}
-                                        {item.paye.taxBreakdown.reliefs.pension > 0 && (
-                                          <div className="flex justify-between text-xs pl-2">
-                                            <span className="text-muted-foreground">Pension Contribution</span>
-                                            <span>{formatCurrency(item.paye.taxBreakdown.reliefs.pension)}</span>
-                                          </div>
-                                        )}
-                                        {item.paye.taxBreakdown.reliefs.housingFund > 0 && (
-                                          <div className="flex justify-between text-xs pl-2">
-                                            <span className="text-muted-foreground">NHF</span>
-                                            <span>{formatCurrency(item.paye.taxBreakdown.reliefs.housingFund)}</span>
-                                          </div>
-                                        )}
-                                        {item.paye.taxBreakdown.reliefs.healthInsurance > 0 && (
-                                          <div className="flex justify-between text-xs pl-2">
-                                            <span className="text-muted-foreground">NHIS</span>
-                                            <span>{formatCurrency(item.paye.taxBreakdown.reliefs.healthInsurance)}</span>
-                                          </div>
-                                        )}
-                                        {item.paye.taxBreakdown.reliefs.transportAllowance > 0 && (
-                                          <div className="flex justify-between text-xs pl-2">
-                                            <span className="text-muted-foreground">Transport Allowance (exempt)</span>
-                                            <span>{formatCurrency(item.paye.taxBreakdown.reliefs.transportAllowance)}</span>
-                                          </div>
-                                        )}
-                                        <div className="flex justify-between text-xs font-medium pt-1 border-t mt-1">
-                                          <span>Total Reliefs</span>
-                                          <span>{formatCurrency(item.paye.taxBreakdown.totalReliefs)}</span>
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    <div className="flex justify-between pt-2 border-t mt-2">
-                                      <span className="text-muted-foreground">Annual Taxable Income</span>
-                                      <span className="font-medium">{formatCurrency(item.paye.taxBreakdown.taxableIncome)}</span>
-                                    </div>
-
-                                    {item.paye.taxBreakdown.taxBrackets && item.paye.taxBreakdown.taxBrackets.length > 0 && (
-                                      <div className="mt-2 pt-2 border-t">
-                                        <p className="text-xs font-semibold text-muted-foreground mb-2">Tax by Bracket:</p>
-                                        {item.paye.taxBreakdown.taxBrackets.map((bracket: any, idx: number) => (
-                                          <div key={idx} className="flex justify-between text-xs pl-2 mb-1">
-                                            <span className="text-muted-foreground">
-                                              {bracket.rate === 0 
-                                                ? 'First ₦800,000 (0%)'
-                                                : bracket.rate === 15
-                                                ? '₦800K - ₦3M (15%)'
-                                                : bracket.rate === 18
-                                                ? '₦3M - ₦12M (18%)'
-                                                : bracket.rate === 21
-                                                ? '₦12M - ₦25M (21%)'
-                                                : bracket.rate === 23
-                                                ? '₦25M - ₦50M (23%)'
-                                                : `Above ₦50M (25%)`}
-                                            </span>
-                                            <span>{formatCurrency(bracket.tax)}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    )}
-
-                                    <div className="flex justify-between pt-2 border-t mt-2 font-semibold">
-                                      <span>Annual Tax Payable</span>
-                                      <span>{formatCurrency(item.paye.taxBreakdown.totalTax)}</span>
-                                    </div>
-                                    <div className="flex justify-between text-xs text-muted-foreground">
-                                      <span>Monthly PAYE (Annual ÷ 12)</span>
-                                      <span>{formatCurrency(item.paye.amount)}</span>
-                                    </div>
-                                    {item.paye.taxBreakdown.effectiveRate && (
-                                      <div className="flex justify-between text-xs text-muted-foreground pt-1">
-                                        <span>Effective Tax Rate</span>
-                                        <span>{item.paye.taxBreakdown.effectiveRate}%</span>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Remittance Information */}
-                              {item.remittanceInfo && (
-                                <div>
-                                  <h4 className="text-sm font-semibold mb-3">Remittance Information</h4>
-                                  <div className="space-y-2 text-sm bg-amber-50 dark:bg-amber-950/20 p-3 rounded-lg border border-amber-200 dark:border-amber-800">
-                                    <div>
-                                      <p className="font-medium text-xs mb-1">PAYE: {formatCurrency(item.remittanceInfo.paye.amount)}</p>
-                                      <p className="text-xs text-muted-foreground pl-2">
-                                        Remit to: {item.remittanceInfo.paye.authorityName || (item.remittanceInfo.paye.authority === 'state-irs' ? 'State IRS' : 'NRS')}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground pl-2">
-                                        Deadline: {format(new Date(item.remittanceInfo.paye.deadline), 'MMM dd, yyyy')} (10th of next month)
-                                      </p>
-                                    </div>
-                                    <div>
-                                      <p className="font-medium text-xs mb-1">
-                                        Pension: {formatCurrency(item.remittanceInfo.pension.totalAmount)} 
-                                        {' '}(Employee: {formatCurrency(item.remittanceInfo.pension.employeeAmount)}, 
-                                        {' '}Employer: {formatCurrency(item.remittanceInfo.pension.employerAmount)})
-                                      </p>
-                                      <p className="text-xs text-muted-foreground pl-2">
-                                        Remit to: PFA (Pension Fund Administrator)
-                                      </p>
-                                      <p className="text-xs text-muted-foreground pl-2">
-                                        Deadline: {format(new Date(item.remittanceInfo.pension.deadline), 'MMM dd, yyyy')} (7 days after payment)
-                                      </p>
-                                    </div>
-                                    {item.remittanceInfo.nhf && (
-                                      <div>
-                                        <p className="font-medium text-xs mb-1">NHF: {formatCurrency(item.remittanceInfo.nhf.amount)}</p>
-                                        <p className="text-xs text-muted-foreground pl-2">
-                                          Remit to: Federal Mortgage Bank
-                                        </p>
-                                        <p className="text-xs text-muted-foreground pl-2">
-                                          Deadline: {format(new Date(item.remittanceInfo.nhf.deadline), 'MMM dd, yyyy')}
-                                        </p>
-                                      </div>
-                                    )}
-                                    {item.remittanceInfo.nhis && (
-                                      <div>
-                                        <p className="font-medium text-xs mb-1">NHIS: {formatCurrency(item.remittanceInfo.nhis.amount)}</p>
-                                        <p className="text-xs text-muted-foreground pl-2">
-                                          Remit to: HMO (Health Maintenance Organization)
-                                        </p>
-                                        <p className="text-xs text-muted-foreground pl-2">
-                                          Deadline: {format(new Date(item.remittanceInfo.nhis.deadline), 'MMM dd, yyyy')}
-                                        </p>
-                                      </div>
-                                    )}
-                                    <p className="text-xs text-amber-800 dark:text-amber-200 mt-2 pt-2 border-t border-amber-300 dark:border-amber-700">
-                                      ⚠️ Late remittance attracts penalties (10% per annum + CBN rate interest)
-                                    </p>
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Actions */}
-                              <div className="flex items-center gap-2 pt-2 border-t">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={(e) => {
-                                    e.stopPropagation()
-                                    printPayrollSlip(selectedPayroll, item)
-                                  }}
-                                  className="flex-1"
-                                >
-                                  <Printer className="w-4 h-4 mr-2" />
-                                  Print Slip
-                                </Button>
-                                {item.employeeEmail && (
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="text-sm font-semibold">Monthly Breakdown</div>
+                                {group.employeeEmail && (
                                   <Button
                                     variant="outline"
                                     size="sm"
                                     onClick={(e) => {
                                       e.stopPropagation()
-                                      sendPayrollEmails(selectedPayroll, [item.employeeId])
+                                      sendPayrollEmails(selectedPayroll, [group.employeeId])
                                     }}
                                     disabled={sendingEmails === selectedPayroll.id}
-                                    className="flex-1"
                                   >
                                     {sendingEmails === selectedPayroll.id ? (
                                       <>
@@ -1834,6 +1841,38 @@ export default function SMEPayrollPage() {
                                     )}
                                   </Button>
                                 )}
+                              </div>
+
+                              <div className="space-y-3">
+                                {group.items.map((mi, miIndex) => (
+                                  <div
+                                    key={`${group.employeeId}-${(mi as any).monthlyPeriodStart || (mi as any).month || (mi as any).monthName || miIndex}`}
+                                    className="rounded-lg border bg-background p-4"
+                                  >
+                                    <div className="flex items-start justify-between gap-3">
+                                      <div className="min-w-0">
+                                        <div className="font-semibold">
+                                          {(mi as any).monthlyPeriod || ((mi as any).monthName ? `${(mi as any).monthName} ${selectedPayroll.period}` : selectedPayroll.period)}
+                                        </div>
+                                        <div className="text-xs text-muted-foreground mt-1">
+                                          Gross {formatCurrency(mi.grossSalary)} • Deductions {formatCurrency(mi.totalDeductions)} • Net{" "}
+                                          <span className="text-primary font-semibold">{formatCurrency(mi.netSalary)}</span>
+                                        </div>
+                                      </div>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          printPayrollSlip(selectedPayroll, mi)
+                                        }}
+                                      >
+                                        <Printer className="w-4 h-4 mr-2" />
+                                        Print Slip
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ))}
                               </div>
                             </div>
                           )}

@@ -138,6 +138,20 @@ export async function POST(
       )
     }
 
+    // Prevent duplicates: only one "paid" record per month (year-month) per employee.
+    const monthKeyFromISO = (iso: string) => {
+      const d = new Date(iso)
+      if (Number.isNaN(d.getTime())) return null
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    }
+    const newMonthKey = monthKeyFromISO(periodStart)
+    if (!newMonthKey) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid periodStart date' },
+        { status: 400 }
+      )
+    }
+
     // Create payment record
     const paymentRecord = {
       id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -158,6 +172,17 @@ export async function POST(
 
     // Update employee document with new payment record
     const existingRecords = employeeData?.paymentRecords || []
+    const hasPaidForMonth = existingRecords.some((r: any) => {
+      if (r?.status !== 'paid') return false
+      const mk = typeof r?.periodStart === 'string' ? monthKeyFromISO(r.periodStart) : null
+      return mk === newMonthKey
+    })
+    if (hasPaidForMonth) {
+      return NextResponse.json(
+        { success: false, error: 'Payment already recorded for this month' },
+        { status: 409 }
+      )
+    }
     const updatedRecords = [...existingRecords, paymentRecord]
 
     await employeeDoc.ref.update({
