@@ -44,9 +44,9 @@ export function SubscriptionRequiredModal({
 
   const availablePlans = getAvailablePlans()
 
-  // Check if migration is needed
-  // - Freelancer trying to subscribe to GOLD or PLATINUM (needs to migrate to creator)
-  // - Creator trying to subscribe to PRO (needs to migrate to freelancer)
+  // Migration should happen ONLY after successful payment (in /api/subscription/verify).
+  // We still show an informational modal before payment when switching between
+  // Freelancer <-> Creator plan families.
   const needsMigration = (planType: SubscriptionType): boolean => {
     if (businessType === 'freelancer' && (planType === 'GOLD' || planType === 'PLATINUM')) {
       return true
@@ -92,60 +92,13 @@ export function SubscriptionRequiredModal({
 
   const handleMigrateAndSubscribe = async () => {
     if (!selectedPlan) return
-
-    try {
-      // Get auth token
-      const currentUser = auth.currentUser
-      if (!currentUser) {
-        router.push("/login")
-        return
-      }
-
-      const token = await currentUser.getIdToken()
-
-      // Determine target business type based on plan
-      let targetBusinessType: string
-      if (businessType === 'freelancer' && (selectedPlan === 'GOLD' || selectedPlan === 'PLATINUM')) {
-        targetBusinessType = 'creator'
-      } else if (businessType === 'creator' && selectedPlan === 'PRO') {
-        targetBusinessType = 'freelancer'
-      } else {
-        throw new Error("Invalid migration path")
-      }
-
-      // Update business type
-      const updateResponse = await fetch("/api/user/update-business-type", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          businessType: targetBusinessType
-        })
-      })
-
-      const updateData = await updateResponse.json()
-
-      if (!updateResponse.ok || !updateData.success) {
-        throw new Error(updateData.error || "Failed to update business type")
-      }
-
-      // Migration successful - proceed silently to payment
-      // Close migration modals first
-      setShowMigrationModal(false)
-      setShowFreelancerMigrationModal(false)
-      // Close subscription modal
-      onOpenChange(false)
-      // Small delay to ensure modals close, then proceed with subscription
-      setTimeout(() => {
-        proceedWithSubscription(selectedPlan)
-      }, 300)
-    } catch (error) {
-      console.error("Migration error:", error)
-      toast.error(error instanceof Error ? error.message : "Failed to migrate account")
-      throw error
-    }
+    // Do NOT update businessType here. Proceed to payment; verify route will migrate on success.
+    setShowMigrationModal(false)
+    setShowFreelancerMigrationModal(false)
+    onOpenChange(false)
+    setTimeout(() => {
+      proceedWithSubscription(selectedPlan)
+    }, 200)
   }
 
   const proceedWithSubscription = async (planType: SubscriptionType) => {

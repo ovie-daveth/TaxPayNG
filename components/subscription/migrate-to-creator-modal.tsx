@@ -65,7 +65,7 @@ export function MigrateToCreatorModal({
                   You're about to migrate from a <strong>Freelancer</strong> account to a <strong>Creator</strong> account.
                 </p>
                 <p className="text-[10px] sm:text-xs text-muted-foreground">
-                  The {planName} plan is designed for content creators and influencers. By continuing, your account type will be changed to "Creator" and you'll be redirected to the Creator Dashboard after payment.
+                  The {planName} plan is designed for content creators and influencers. By continuing, you'll proceed to payment. Your account type will be changed to "Creator" <strong>only after successful payment</strong>, and you'll be redirected to the Creator Dashboard.
                 </p>
               </div>
             </div>
@@ -76,7 +76,7 @@ export function MigrateToCreatorModal({
             <ul className="space-y-1 sm:space-y-1.5 text-[10px] sm:text-xs text-muted-foreground list-disc list-inside">
               <li>Your dashboard will switch to the Creator Dashboard</li>
               <li>You'll have access to creator-specific features</li>
-              <li>Your account type will be permanently changed to "Creator"</li>
+              <li>Your account type will be changed to "Creator" after successful payment</li>
               <li>You can still access all your existing data</li>
             </ul>
           </div>
