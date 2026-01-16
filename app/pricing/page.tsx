@@ -18,10 +18,10 @@ import { toast } from "sonner"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { useRouter } from "next/navigation"
-import { auth } from "@/firebase/firebase"
 import { MigrateToCreatorModal } from "@/components/subscription/migrate-to-creator-modal"
 import { SubscriptionType } from "@/lib/types"
 import { subscriptionService, getPlanPriceDisplay } from "@/lib/services/subscriptionService"
+import { auth } from "@/firebase/firebase"
 import { DEFAULT_FREE_TRIAL_DAYS, DEFAULT_YEARLY_DISCOUNT_PERCENT } from "@/lib/constants/pricing"
 
 export default function PricingPage() {
@@ -70,11 +70,10 @@ export default function PricingPage() {
     load()
   }, [])
 
-  // Check if migration is needed (freelancer trying to subscribe to GOLD or PLATINUM)
+  // We only migrate AFTER successful payment (handled in /api/subscription/verify),
+  // never before payment initialization.
   const needsMigration = (planType: string): boolean => {
-    const needs = profile?.businessType === 'freelancer' && (planType === 'GOLD' || planType === 'PLATINUM')
-    console.log('Pricing page - needsMigration check:', { businessType: profile?.businessType, planType, needs })
-    return needs
+    return profile?.businessType === 'freelancer' && (planType === 'GOLD' || planType === 'PLATINUM')
   }
 
   const handleSubscribe = async (planType: string) => {
@@ -84,60 +83,20 @@ export default function PricingPage() {
       return
     }
 
-    // Check if migration is needed
+    // If migration is needed, show info modal but DO NOT update businessType yet.
     if (needsMigration(planType)) {
-      console.log('Pricing page - Migration needed, showing migration modal')
       setSelectedPlan(planType as SubscriptionType)
-      // Show migration modal immediately
       setShowMigrationModal(true)
       return
     }
 
-    // Proceed with subscription
     await proceedWithSubscription(planType)
   }
 
   const handleMigrateAndSubscribe = async () => {
     if (!selectedPlan) return
-
-    try {
-      // Get auth token
-      const currentUser = auth.currentUser
-      if (!currentUser) {
-        router.push("/login?redirect=/pricing")
-        return
-      }
-
-      const token = await currentUser.getIdToken()
-
-      // Update business type to creator
-      const updateResponse = await fetch("/api/user/update-business-type", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          businessType: 'creator'
-        })
-      })
-
-      const updateData = await updateResponse.json()
-
-      if (!updateResponse.ok || !updateData.success) {
-        throw new Error(updateData.error || "Failed to update business type")
-      }
-
-      toast.success("Account migrated to Creator successfully!")
-      
-      // Close migration modal and proceed with subscription
-      setShowMigrationModal(false)
-      await proceedWithSubscription(selectedPlan)
-    } catch (error) {
-      console.error("Migration error:", error)
-      toast.error(error instanceof Error ? error.message : "Failed to migrate account")
-      throw error
-    }
+    setShowMigrationModal(false)
+    await proceedWithSubscription(selectedPlan)
   }
 
   const proceedWithSubscription = async (planType: string) => {
