@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Users, Receipt, BookOpen, UserCheck, BarChart3, FolderOpen, Bell, Calculator } from "lucide-react"
+import { Users, Receipt, BookOpen, UserCheck, BarChart3, FolderOpen, Bell, Calculator, CreditCard, Loader2 } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useAdmin } from "@/lib/hooks/useAdmin"
 import { toast } from "sonner"
@@ -15,6 +15,8 @@ import { adminService } from "@/lib/services/adminService"
 import { AdminDashboardSkeleton } from "@/components/ui/skeletons"
 import { StatsOverview } from "@/components/admin/stats-overview"
 import { DashboardCharts } from "@/components/admin/dashboard-charts"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 
 export default function AdminDashboard() {
   const router = useRouter()
@@ -32,6 +34,18 @@ export default function AdminDashboard() {
   const [allTransactions, setAllTransactions] = useState<any[]>([])
   const [allTaxCalculations, setAllTaxCalculations] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [pricingLoading, setPricingLoading] = useState(false)
+  const [pricingSaving, setPricingSaving] = useState(false)
+  const [pricingForm, setPricingForm] = useState({
+    freeTrialDays: 14,
+    yearlyDiscountPercent: 25,
+    PRO: 2500,
+    GOLD: 6000,
+    PLATINUM: 12500,
+    SmallBusiness: 12500,
+    BigBusiness: 37500
+  })
+  const [pricingMeta, setPricingMeta] = useState<{ updatedAt?: string; updatedBy?: string } | null>(null)
 
   // Ensure admin document exists in Firestore (for security rules)
   useEffect(() => {
@@ -134,6 +148,91 @@ export default function AdminDashboard() {
       fetchStats()
     }
   }, [user, isAdmin])
+
+  // Load pricing config for admin edits
+  useEffect(() => {
+    const loadPricing = async () => {
+      if (!user || !isAdmin) return
+      setPricingLoading(true)
+      try {
+        const token = await user.getIdToken()
+        const res = await fetch("/api/admin/pricing-config", {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          }
+        })
+        const data = await res.json()
+        if (!res.ok || !data?.success) {
+          throw new Error(data?.error || "Failed to load pricing config")
+        }
+
+        const cfg = data.data || {}
+        const toNaira = (kobo?: number, fallback?: number) =>
+          typeof kobo === "number" && Number.isFinite(kobo) ? Math.round(kobo / 100) : (fallback ?? 0)
+
+        setPricingForm({
+          freeTrialDays: cfg.freeTrialDays ?? 14,
+          yearlyDiscountPercent: cfg.yearlyDiscountPercent ?? 25,
+          PRO: toNaira(cfg.plans?.PRO?.monthlyPrice, 2500),
+          GOLD: toNaira(cfg.plans?.GOLD?.monthlyPrice, 6000),
+          PLATINUM: toNaira(cfg.plans?.PLATINUM?.monthlyPrice, 12500),
+          SmallBusiness: toNaira(cfg.plans?.["Small Business"]?.monthlyPrice, 12500),
+          BigBusiness: toNaira(cfg.plans?.["Big Business"]?.monthlyPrice, 37500)
+        })
+        setPricingMeta({ updatedAt: cfg.updatedAt, updatedBy: cfg.updatedBy })
+      } catch (e: any) {
+        console.error(e)
+        toast.error(e?.message || "Failed to load pricing config")
+      } finally {
+        setPricingLoading(false)
+      }
+    }
+
+    loadPricing()
+  }, [user, isAdmin])
+
+  const savePricing = async () => {
+    if (!user) return
+    setPricingSaving(true)
+    try {
+      const token = await user.getIdToken()
+      const toKobo = (naira: number) => Math.round(Number(naira || 0) * 100)
+
+      const res = await fetch("/api/admin/pricing-config", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          freeTrialDays: Number(pricingForm.freeTrialDays),
+          yearlyDiscountPercent: Number(pricingForm.yearlyDiscountPercent),
+          plans: {
+            PRO: { monthlyPrice: toKobo(pricingForm.PRO) },
+            GOLD: { monthlyPrice: toKobo(pricingForm.GOLD) },
+            PLATINUM: { monthlyPrice: toKobo(pricingForm.PLATINUM) },
+            "Small Business": { monthlyPrice: toKobo(pricingForm.SmallBusiness) },
+            "Big Business": { monthlyPrice: toKobo(pricingForm.BigBusiness) }
+          }
+        })
+      })
+
+      const data = await res.json()
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || "Failed to save pricing config")
+      }
+
+      setPricingMeta({ updatedAt: data.data?.updatedAt, updatedBy: data.data?.updatedBy })
+      toast.success("Pricing updated successfully")
+    } catch (e: any) {
+      console.error(e)
+      toast.error(e?.message || "Failed to save pricing")
+    } finally {
+      setPricingSaving(false)
+    }
+  }
 
 
   if (authLoading || adminLoading || loading) {
@@ -290,6 +389,115 @@ export default function AdminDashboard() {
                   </Button>
                 </Link>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Pricing & Free Trial */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="w-5 h-5" />
+                Pricing & Free Trial
+              </CardTitle>
+              <CardDescription>Update subscription prices and free trial length</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {pricingLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Loading pricing config...
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Free Trial (days)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={90}
+                        value={pricingForm.freeTrialDays}
+                        onChange={(e) => setPricingForm((p) => ({ ...p, freeTrialDays: Number(e.target.value) }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Yearly Discount (%)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={80}
+                        value={pricingForm.yearlyDiscountPercent}
+                        onChange={(e) => setPricingForm((p) => ({ ...p, yearlyDiscountPercent: Number(e.target.value) }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>PRO (Monthly, ₦)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={pricingForm.PRO}
+                        onChange={(e) => setPricingForm((p) => ({ ...p, PRO: Number(e.target.value) }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>GOLD (Monthly, ₦)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={pricingForm.GOLD}
+                        onChange={(e) => setPricingForm((p) => ({ ...p, GOLD: Number(e.target.value) }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>PLATINUM (Monthly, ₦)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={pricingForm.PLATINUM}
+                        onChange={(e) => setPricingForm((p) => ({ ...p, PLATINUM: Number(e.target.value) }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Small Business (Monthly, ₦)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={pricingForm.SmallBusiness}
+                        onChange={(e) => setPricingForm((p) => ({ ...p, SmallBusiness: Number(e.target.value) }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Big Business (Monthly, ₦)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={pricingForm.BigBusiness}
+                        onChange={(e) => setPricingForm((p) => ({ ...p, BigBusiness: Number(e.target.value) }))}
+                      />
+                    </div>
+                  </div>
+
+                  {pricingMeta?.updatedAt && (
+                    <div className="text-xs text-muted-foreground">
+                      Last updated {new Date(pricingMeta.updatedAt).toLocaleString()} by {pricingMeta.updatedBy || "unknown"}
+                    </div>
+                  )}
+
+                  <Button onClick={savePricing} disabled={pricingSaving} className="w-full">
+                    {pricingSaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save Pricing"
+                    )}
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
 

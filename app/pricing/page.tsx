@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -21,7 +21,8 @@ import { useRouter } from "next/navigation"
 import { auth } from "@/firebase/firebase"
 import { MigrateToCreatorModal } from "@/components/subscription/migrate-to-creator-modal"
 import { SubscriptionType } from "@/lib/types"
-import { subscriptionService, getPlanPrice, getPlanPriceDisplay } from "@/lib/services/subscriptionService"
+import { subscriptionService, getPlanPriceDisplay } from "@/lib/services/subscriptionService"
+import { DEFAULT_FREE_TRIAL_DAYS, DEFAULT_YEARLY_DISCOUNT_PERCENT } from "@/lib/constants/pricing"
 
 export default function PricingPage() {
   const { user, loading: authLoading } = useAuth()
@@ -31,6 +32,43 @@ export default function PricingPage() {
   const [showMigrationModal, setShowMigrationModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
+  const [pricingConfig, setPricingConfig] = useState<any | null>(null)
+
+  const freeTrialDays = pricingConfig?.freeTrialDays ?? DEFAULT_FREE_TRIAL_DAYS
+  const yearlyDiscountPercent = pricingConfig?.yearlyDiscountPercent ?? DEFAULT_YEARLY_DISCOUNT_PERCENT
+
+  const getPlanWithOverrides = (planId: Exclude<SubscriptionType, null>) => {
+    const base = subscriptionService.getPlan(planId)
+    if (!base) return null
+    const overrideMonthly = pricingConfig?.plans?.[planId]?.monthlyPrice
+    const monthlyPrice = typeof overrideMonthly === "number" && overrideMonthly > 0 ? overrideMonthly : base.monthlyPrice
+    const yearlyPrice = Math.round(12 * monthlyPrice * (1 - yearlyDiscountPercent / 100))
+    const format = (priceInKobo: number) => {
+      const priceInNaira = priceInKobo / 100
+      return `₦${priceInNaira.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+    }
+    return {
+      ...base,
+      monthlyPrice,
+      yearlyPrice,
+      monthlyPriceDisplay: format(monthlyPrice),
+      yearlyPriceDisplay: format(yearlyPrice)
+    }
+  }
+
+  // Load pricing config (prices + free trial days)
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch("/api/pricing-config")
+        const data = await res.json()
+        if (data?.success) setPricingConfig(data.data)
+      } catch {
+        // Ignore and fall back to defaults
+      }
+    }
+    load()
+  }, [])
 
   // Check if migration is needed (freelancer trying to subscribe to GOLD or PLATINUM)
   const needsMigration = (planType: string): boolean => {
@@ -202,7 +240,7 @@ export default function PricingPage() {
           <div className="text-center mb-8 sm:mb-12 md:mb-16">
             <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-2 sm:mb-3 md:mb-4">Simple, Transparent Pricing</h1>
             <p className="text-sm sm:text-base md:text-lg text-muted-foreground max-w-2xl mx-auto px-4 mb-4 sm:mb-6">
-              Choose the plan that fits your business needs. All plans include a 3-day free trial.
+              Choose the plan that fits your business needs. All plans include a {freeTrialDays}-day free trial.
             </p>
             
             {/* Billing Interval Toggle */}
@@ -253,7 +291,9 @@ export default function PricingPage() {
                   {billingInterval === 'monthly' ? (
                     <>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">₦2,500</span>
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">
+                      {getPlanPriceDisplay(getPlanWithOverrides('PRO')!, 'monthly')}
+                    </span>
                       </div>
                       <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
                     </>
@@ -261,7 +301,7 @@ export default function PricingPage() {
                     <>
                       <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">
                         {(() => {
-                          const plan = subscriptionService.getPlan('PRO')
+                          const plan = getPlanWithOverrides('PRO')
                           if (!plan) return '₦30,000'
                           const grossYearly = (plan.monthlyPrice * 12) / 100 // Convert kobo to naira
                           return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
@@ -269,10 +309,10 @@ export default function PricingPage() {
                       </span>
                       <div className="flex items-baseline gap-2">
                         <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">
-                          {getPlanPriceDisplay(subscriptionService.getPlan('PRO')!, 'yearly')}
+                          {getPlanPriceDisplay(getPlanWithOverrides('PRO')!, 'yearly')}
                         </span>
                     <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
-                          25% OFF
+                          {yearlyDiscountPercent}% OFF
                     </Badge>
                   </div>
                       <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
@@ -344,7 +384,9 @@ export default function PricingPage() {
                           {billingInterval === 'monthly' ? (
                             <>
                           <div className="flex items-baseline gap-2">
-                            <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦6,000</span>
+                            <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
+                              {getPlanPriceDisplay(getPlanWithOverrides('GOLD')!, 'monthly')}
+                            </span>
                               </div>
                               <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
                             </>
@@ -352,7 +394,7 @@ export default function PricingPage() {
                             <>
                               <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">
                                 {(() => {
-                                  const plan = subscriptionService.getPlan('GOLD')
+                                  const plan = getPlanWithOverrides('GOLD')
                                   if (!plan) return '₦72,000'
                                   const grossYearly = (plan.monthlyPrice * 12) / 100 // Convert kobo to naira
                                   return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
@@ -360,10 +402,10 @@ export default function PricingPage() {
                               </span>
                               <div className="flex items-baseline gap-2">
                                 <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
-                                  {getPlanPriceDisplay(subscriptionService.getPlan('GOLD')!, 'yearly')}
+                                  {getPlanPriceDisplay(getPlanWithOverrides('GOLD')!, 'yearly')}
                                 </span>
                             <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
-                                  25% OFF
+                                  {yearlyDiscountPercent}% OFF
                             </Badge>
                           </div>
                               <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
@@ -432,7 +474,9 @@ export default function PricingPage() {
                           {billingInterval === 'monthly' ? (
                             <>
                           <div className="flex items-baseline gap-2">
-                            <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦12,500</span>
+                            <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
+                              {getPlanPriceDisplay(getPlanWithOverrides('PLATINUM')!, 'monthly')}
+                            </span>
                               </div>
                               <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
                             </>
@@ -440,7 +484,7 @@ export default function PricingPage() {
                             <>
                               <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">
                                 {(() => {
-                                  const plan = subscriptionService.getPlan('PLATINUM')
+                                  const plan = getPlanWithOverrides('PLATINUM')
                                   if (!plan) return '₦150,000'
                                   const grossYearly = (plan.monthlyPrice * 12) / 100 // Convert kobo to naira
                                   return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
@@ -448,10 +492,10 @@ export default function PricingPage() {
                               </span>
                               <div className="flex items-baseline gap-2">
                                 <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
-                                  {getPlanPriceDisplay(subscriptionService.getPlan('PLATINUM')!, 'yearly')}
+                                  {getPlanPriceDisplay(getPlanWithOverrides('PLATINUM')!, 'yearly')}
                                 </span>
                             <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
-                                  25% OFF
+                                  {yearlyDiscountPercent}% OFF
                             </Badge>
                           </div>
                               <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
@@ -555,7 +599,9 @@ export default function PricingPage() {
                   {billingInterval === 'monthly' ? (
                     <>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦12,500</span>
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
+                      {getPlanPriceDisplay(getPlanWithOverrides('Small Business')!, 'monthly')}
+                    </span>
                       </div>
                       <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
                     </>
@@ -563,7 +609,7 @@ export default function PricingPage() {
                     <>
                       <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">
                         {(() => {
-                          const plan = subscriptionService.getPlan('Small Business')
+                          const plan = getPlanWithOverrides('Small Business')
                           if (!plan) return '₦150,000'
                           const grossYearly = (plan.monthlyPrice * 12) / 100 // Convert kobo to naira
                           return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
@@ -571,10 +617,10 @@ export default function PricingPage() {
                       </span>
                       <div className="flex items-baseline gap-2">
                         <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
-                          {getPlanPriceDisplay(subscriptionService.getPlan('Small Business')!, 'yearly')}
+                          {getPlanPriceDisplay(getPlanWithOverrides('Small Business')!, 'yearly')}
                         </span>
                     <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
-                          25% OFF
+                          {yearlyDiscountPercent}% OFF
                     </Badge>
                   </div>
                       <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
@@ -640,7 +686,9 @@ export default function PricingPage() {
                   {billingInterval === 'monthly' ? (
                     <>
                         <div className="flex items-baseline gap-2">
-                          <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦37,500</span>
+                          <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
+                            {getPlanPriceDisplay(getPlanWithOverrides('Big Business')!, 'monthly')}
+                          </span>
                       </div>
                       <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
                     </>
@@ -648,7 +696,7 @@ export default function PricingPage() {
                     <>
                       <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">
                         {(() => {
-                          const plan = subscriptionService.getPlan('Big Business')
+                          const plan = getPlanWithOverrides('Big Business')
                           if (!plan) return '₦450,000'
                           const grossYearly = (plan.monthlyPrice * 12) / 100 // Convert kobo to naira
                           return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
@@ -656,10 +704,10 @@ export default function PricingPage() {
                       </span>
                       <div className="flex items-baseline gap-2">
                         <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
-                          {getPlanPriceDisplay(subscriptionService.getPlan('Big Business')!, 'yearly')}
+                          {getPlanPriceDisplay(getPlanWithOverrides('Big Business')!, 'yearly')}
                         </span>
                           <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
-                          25% OFF
+                          {yearlyDiscountPercent}% OFF
                           </Badge>
                         </div>
                       <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
@@ -705,7 +753,7 @@ export default function PricingPage() {
                     Do you offer a free trial?
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground text-xs sm:text-sm">
-                    Yes! All plans come with a 3-day free trial. No credit card required to start. You can explore all features and see how OTax simplifies your tax management before committing.
+                    Yes! All plans come with a {freeTrialDays}-day free trial. No credit card required to start. You can explore all features and see how OTax simplifies your tax management before committing.
                   </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="general-2" className="border border-border rounded-lg px-3 sm:px-4 mb-3 sm:mb-4">

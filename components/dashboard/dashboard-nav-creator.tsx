@@ -182,7 +182,6 @@ export function DashboardNavCreator() {
             {!sidebarCollapsed && (
               <>
                 <OtaxLogo />
-                <span className="font-semibold text-lg whitespace-nowrap">- Creators</span>
               </>
             )}
           </Link>

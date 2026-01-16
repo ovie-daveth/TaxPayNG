@@ -713,6 +713,12 @@ function SignupPageContent() {
       onOpenChange={setShowVerificationDialog}
       email={pendingEmail || formData.email.trim()}
       verifyEndpoint="/api/verify-signup-token"
+      resendEndpoint="/api/send-signup-verification"
+      resendBody={() => ({
+        email: (pendingEmail || formData.email).trim(),
+        name: (formData.fullName.trim() || "there"),
+        businessType: formData.businessType || "freelancer",
+      })}
       successMessage="Email verified! Completing your signup..."
       onVerified={handleTokenVerified}
     />

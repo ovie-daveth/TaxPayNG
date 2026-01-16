@@ -156,6 +156,21 @@ export function useAuth() {
           console.error('Error creating default reminders:', reminderError)
           // Don't fail signup if reminders fail
         }
+
+        // Send welcome email (best-effort, idempotent on server)
+        try {
+          const idToken = await user.getIdToken()
+          await fetch('/api/user/send-welcome-email', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${idToken}`,
+              'Content-Type': 'application/json'
+            }
+          })
+        } catch (welcomeError) {
+          console.error('Error sending welcome email:', welcomeError)
+          // Don't fail signup if welcome email fails
+        }
         
         // Sign out the user immediately after signup (no auto-login)
         const userId = user.uid
@@ -385,6 +400,21 @@ export function useAuth() {
           } catch (reminderError) {
             console.error('Error creating default reminders:', reminderError)
             // Don't fail signup if reminders fail
+          }
+
+          // Send welcome email (best-effort, idempotent on server)
+          try {
+            const idToken = await user.getIdToken()
+            await fetch('/api/user/send-welcome-email', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${idToken}`,
+                'Content-Type': 'application/json'
+              }
+            })
+          } catch (welcomeError) {
+            console.error('Error sending welcome email:', welcomeError)
+            // Don't fail signup if welcome email fails
           }
         }
       }
