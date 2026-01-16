@@ -94,14 +94,32 @@ export default function AdminUsersPage() {
 
       try {
         setLoading(true)
-        const usersSnapshot = await getDocs(query(
-          collection(db, "userProfiles"),
-          orderBy("createdAt", "desc")
-        ))
-        const usersData = usersSnapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
+        // NOTE: createdAt is historically inconsistent in Firestore (string vs Timestamp).
+        // We fetch unsorted and sort reliably in-memory.
+        const usersSnapshot = await getDocs(collection(db, "userProfiles"))
+
+        const usersData = usersSnapshot.docs.map(d => ({
+          id: d.id,
+          ...d.data()
         }))
+
+        const toMillis = (v: any): number => {
+          if (!v) return 0
+          // Firestore Timestamp
+          if (v instanceof Timestamp || (v?.toDate && typeof v.toDate === "function")) {
+            return v.toDate().getTime()
+          }
+          if (typeof v === "string" || typeof v === "number") {
+            const dt = new Date(v)
+            return isNaN(dt.getTime()) ? 0 : dt.getTime()
+          }
+          if (typeof v === "object" && v.seconds !== undefined) {
+            return Number(v.seconds) * 1000
+          }
+          return 0
+        }
+
+        usersData.sort((a: any, b: any) => toMillis(b.createdAt) - toMillis(a.createdAt))
         setUsers(usersData)
       } catch (error) {
         console.error("Error fetching users:", error)
@@ -115,6 +133,34 @@ export default function AdminUsersPage() {
       fetchUsers()
     }
   }, [user, isAdmin])
+
+  const refreshUsers = async () => {
+    try {
+      const usersSnapshot = await getDocs(collection(db, "userProfiles"))
+      const usersData = usersSnapshot.docs.map(d => ({
+        id: d.id,
+        ...d.data()
+      }))
+      const toMillis = (v: any): number => {
+        if (!v) return 0
+        if (v instanceof Timestamp || (v?.toDate && typeof v.toDate === "function")) {
+          return v.toDate().getTime()
+        }
+        if (typeof v === "string" || typeof v === "number") {
+          const dt = new Date(v)
+          return isNaN(dt.getTime()) ? 0 : dt.getTime()
+        }
+        if (typeof v === "object" && v.seconds !== undefined) {
+          return Number(v.seconds) * 1000
+        }
+        return 0
+      }
+      usersData.sort((a: any, b: any) => toMillis(b.createdAt) - toMillis(a.createdAt))
+      setUsers(usersData)
+    } catch (e) {
+      console.error("Error refreshing users:", e)
+    }
+  }
 
   // Helper function to safely format dates
   const formatDate = (dateValue: any): string => {
@@ -719,15 +765,7 @@ export default function AdminUsersPage() {
       setExtendTrialDays("7")
 
       // Refresh users list
-      const usersSnapshot = await getDocs(query(
-        collection(db, "userProfiles"),
-        orderBy("createdAt", "desc")
-      ))
-      const usersData = usersSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }))
-      setUsers(usersData)
+      await refreshUsers()
     } catch (error: any) {
       console.error("Extend trial error:", error)
       toast.error(error.message || "Failed to extend free trial")
@@ -784,15 +822,7 @@ export default function AdminUsersPage() {
       setBulkExtendTrialDays("7")
 
       // Refresh users list
-      const usersSnapshot = await getDocs(query(
-        collection(db, "userProfiles"),
-        orderBy("createdAt", "desc")
-      ))
-      const usersData = usersSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      }))
-      setUsers(usersData)
+      await refreshUsers()
     } catch (error: any) {
       console.error("Bulk extend trial error:", error)
       toast.error(error.message || "Failed to extend free trial")

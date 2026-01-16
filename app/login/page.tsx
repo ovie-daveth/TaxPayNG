@@ -82,54 +82,7 @@ export default function LoginPage() {
 
     console.log("Login redirect - profile loaded, businessType:", profile.businessType, "taxId:", !!profile.taxId, "createdAt:", profile.createdAt, "updatedAt:", profile.updatedAt)
 
-    // Check if user needs to select business type
-    // This should ONLY happen for NEW Google signups where:
-    // 1. Profile was created very recently (within 30 seconds - indicates immediate Google signup)
-    // 2. Profile has NOT been updated since creation (indicates no prior interaction)
-    // 3. businessType is 'freelancer' (default for Google signups without selection)
-    // 4. No taxId exists (user hasn't completed onboarding)
-    // 
-    // We should NOT redirect if:
-    // - Profile has been updated after creation (user has interacted with their profile before)
-    // - Profile is older than 30 seconds (not a new signup)
-    // - User has any other profile data indicating they've used the system before
-    
-    // If businessType is null/undefined, redirect (shouldn't happen, but handle it)
-    if (!profile.businessType) {
-      console.log("Redirecting to select-business-type - profile missing businessType")
-      router.push("/select-business-type")
-      return
-    }
-
-    // Only check for business type selection if businessType is 'freelancer' and no taxId
-    if (profile.businessType === 'freelancer' && !profile.taxId) {
-      // Check if user signed in with Google by checking provider data
-      const isGoogleUser = user?.providerData?.some((provider: any) => provider.providerId === 'google.com') || false
-      
-      const createdAt = profile.createdAt ? new Date(profile.createdAt) : null
-      const updatedAt = profile.updatedAt ? new Date(profile.updatedAt) : null
-      const now = new Date()
-      
-      // Calculate profile age
-      const profileAge = createdAt ? (now.getTime() - createdAt.getTime()) : Infinity
-      const isVeryNewProfile = profileAge < 30000 // Created within last 30 seconds
-      
-      // Check if profile has been updated after creation (indicates user has interacted with profile)
-      const hasBeenUpdated = updatedAt && createdAt && (updatedAt.getTime() - createdAt.getTime()) > 5000 // Updated more than 5 seconds after creation
-      
-      // Only redirect if ALL of these are true:
-      // 1. Google user
-      // 2. Very new profile (created within 30 seconds)
-      // 3. Profile has NOT been updated since creation (no prior interaction)
-      if (isGoogleUser && isVeryNewProfile && !hasBeenUpdated) {
-        console.log("Redirecting to select-business-type - New Google signup with freelancer type")
-        router.push("/select-business-type")
-        return
-      } else {
-        console.log("Skipping business type redirect - isGoogleUser:", isGoogleUser, "profileAge:", profileAge, "ms", "hasBeenUpdated:", hasBeenUpdated)
-        // User has an existing profile, continue with normal redirect flow
-      }
-    }
+    // Google signup is disabled; we never redirect to a business-type selection page.
 
     // Tax Consultant-specific redirects
     if (profile.businessType === 'consultant') {
@@ -226,14 +179,11 @@ export default function LoginPage() {
           refetchProfile().catch(console.error)
         }, 300)
         
-        // Check if user needs to select business type
-        if (result.needsBusinessTypeSelection) {
-          toast.success('Signed in with Google! Please select your business type.')
-          // Redirect will be handled by useEffect after profile loads
-        } else {
-          toast.success('Signed in with Google successfully!')
-          // Redirect will be handled by useEffect after profile loads
-        }
+        toast.success('Signed in with Google successfully!')
+        // Redirect will be handled by useEffect after profile loads
+      } else if (result.error === 'NO_ACCOUNT') {
+        toast.error("You don’t have an account yet. Please sign up first.")
+        router.push("/signup")
       } else if (result.error === 'ACCOUNT_LINKING_REQUIRED' && result.needsPassword && result.email && result.credential) {
         // Account exists with email/password - show dialog to link accounts
         setLinkAccountEmail(result.email)
