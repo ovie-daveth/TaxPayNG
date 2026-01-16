@@ -14,6 +14,8 @@ interface TokenInputDialogProps {
   onVerified: () => void
   verifyEndpoint?: string
   successMessage?: string
+  resendEndpoint?: string
+  resendBody?: object | (() => object)
 }
 
 export function TokenInputDialog({
@@ -23,9 +25,12 @@ export function TokenInputDialog({
   onVerified,
   verifyEndpoint,
   successMessage,
+  resendEndpoint,
+  resendBody,
 }: TokenInputDialogProps) {
   const [token, setToken] = useState("")
   const [verifying, setVerifying] = useState(false)
+  const [resending, setResending] = useState(false)
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -66,9 +71,42 @@ export function TokenInputDialog({
   }
 
   const handleResend = async () => {
-    // This would trigger resending the token
-    // For now, just show a message
-    toast.info("Please use the code already sent to your email")
+    if (!resendEndpoint) {
+      toast.info("Please use the code already sent to your email")
+      return
+    }
+
+    setResending(true)
+    try {
+      const body = typeof resendBody === "function" ? resendBody() : (resendBody || { email })
+      const response = await fetch(resendEndpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        toast.error(data.error || "Failed to resend code")
+        return
+      }
+
+      // Some endpoints may return "alreadyVerified"
+      if (data?.alreadyVerified) {
+        toast.success("Email already verified. Continue signing up.")
+        return
+      }
+
+      toast.success("Verification code resent! Please check your email.")
+    } catch (error) {
+      console.error("Resend error:", error)
+      toast.error("Failed to resend code. Please try again.")
+    } finally {
+      setResending(false)
+    }
   }
 
   return (
@@ -134,9 +172,9 @@ export function TokenInputDialog({
               type="button"
               onClick={handleResend}
               className="text-sm text-muted-foreground hover:text-foreground underline"
-              disabled={verifying}
+              disabled={verifying || resending}
             >
-              Didn't receive the code? Resend
+              {resending ? "Resending..." : "Didn't receive the code? Resend"}
             </button>
           </div>
         </form>

@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
     const db = getAdminDb();
     const now = new Date();
     const freeTrialEndDate = new Date(now);
-    freeTrialEndDate.setDate(freeTrialEndDate.getDate() + 7);
+    freeTrialEndDate.setDate(freeTrialEndDate.getDate() + 14);
 
     const profileData: any = {
       userId: user.uid,

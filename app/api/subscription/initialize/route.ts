@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminAuth, getAdminDb } from '@/lib/firebase-admin'
 import { subscriptionService } from '@/lib/services/subscriptionService'
 import { SubscriptionType } from '@/lib/types'
+import { getPricingConfigAdmin, getEffectivePlanPriceKobo } from '@/lib/services/pricingConfigService'
 
 // Initialize Paystack
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY
@@ -65,7 +66,8 @@ export async function POST(request: NextRequest) {
     }
 
     const plan = subscriptionService.getPlan(subscriptionType)!
-    const amount = subscriptionService.getPlanPrice(subscriptionType, interval) // Amount in kobo based on interval
+    const pricingConfig = await getPricingConfigAdmin()
+    const amount = getEffectivePlanPriceKobo(subscriptionType, interval, pricingConfig) // Amount in kobo based on interval
     
     if (!amount) {
       return NextResponse.json(

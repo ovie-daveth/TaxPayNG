@@ -709,6 +709,14 @@ export default function HomePage() {
         open={showTokenDialog}
         onOpenChange={setShowTokenDialog}
         email={pendingEmail}
+        resendEndpoint="/api/send-waitlist-verification"
+        resendBody={() => ({
+          email: waitlistData.email.trim() || pendingEmail,
+          name: waitlistData.name.trim() || "there",
+          phone: waitlistData.phone || undefined,
+          userType: waitlistData.userType || undefined,
+          platformExpectations: waitlistData.platformExpectations || undefined,
+        })}
         onVerified={() => {
           setIsSubmitted(true)
           setWaitlistData({ name: "", email: "", phone: "", userType: "", platformExpectations: "" })

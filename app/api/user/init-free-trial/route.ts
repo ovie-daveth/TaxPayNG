@@ -4,7 +4,7 @@ import { getAdminAuth, getAdminDb } from '@/lib/firebase-admin'
 /**
  * Initialize free trial for a newly created user profile
  * This endpoint uses Admin SDK to bypass Firestore security rules
- * and securely set free trial fields (3 days from now)
+ * and securely set free trial fields (14 days from now)
  */
 export async function POST(request: NextRequest) {
   try {
@@ -61,10 +61,10 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Set up free trial (3 days from now)
+    // Set up free trial (14 days from now)
     const now = new Date()
     const freeTrialEndDate = new Date(now)
-    freeTrialEndDate.setDate(freeTrialEndDate.getDate() + 3)
+    freeTrialEndDate.setDate(freeTrialEndDate.getDate() + 14)
 
     // Update profile with free trial fields using Admin SDK (bypasses security rules)
     await profileDoc.ref.update({
