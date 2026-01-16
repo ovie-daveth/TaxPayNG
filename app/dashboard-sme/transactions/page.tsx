@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/hooks/useAuth"
 import { useTransactions } from "@/lib/hooks/useTransactions"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Search, Filter, Download, FileText, ChevronDown } from "lucide-react"
+import { Search, Filter, Download, FileText, ChevronDown, FileCheck2 } from "lucide-react"
 import { TransactionList } from "@/components/transactions/transaction-list"
 import { TransactionFilters } from "@/components/transactions/transaction-filters"
 import { TransactionsSkeleton } from "@/components/ui/skeletons"
@@ -25,7 +25,7 @@ export default function SMETransactionsPage() {
   const [filters, setFilters] = useState<TransactionFiltersType>({})
   const [currentPage, setCurrentPage] = useState(1)
   const [reportModalOpen, setReportModalOpen] = useState(false)
-  const [reportType, setReportType] = useState<'income' | 'expense' | 'self-assessment'>('income')
+  const [reportType, setReportType] = useState<'income' | 'expense' | 'tax-assessment'>('income')
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null)
   
@@ -218,12 +218,12 @@ export default function SMETransactionsPage() {
                   <DropdownMenuItem 
                     className="group cursor-pointer"
                     onClick={() => {
-                      setReportType('self-assessment')
+                      setReportType('tax-assessment')
                       setReportModalOpen(true)
                     }}
                   >
-                    <FileText className="w-4 h-4 mr-2 text-foreground group-hover:text-foreground dark:group-hover:text-gray-100" />
-                    Self Assessment Report
+                    <FileCheck2 className="w-4 h-4 mr-2 text-foreground group-hover:text-foreground dark:group-hover:text-gray-100" />
+                    Tax Assessment (CIT)
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>

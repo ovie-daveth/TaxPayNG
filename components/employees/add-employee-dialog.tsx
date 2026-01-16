@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Loader2, Plus, X } from "lucide-react"
 import { toast } from "sonner"
-import type { Employee } from "@/lib/types"
+import type { Employee, PayrollTemplate } from "@/lib/types"
 
 interface AddEmployeeDialogProps {
   open: boolean
@@ -23,6 +23,8 @@ interface AddEmployeeDialogProps {
 export function AddEmployeeDialog({ open, onOpenChange, employee, onSuccess }: AddEmployeeDialogProps) {
   const { user } = useAuth()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [templates, setTemplates] = useState<PayrollTemplate[]>([])
+  const [templatesLoading, setTemplatesLoading] = useState(false)
   const [formData, setFormData] = useState({
     employeeNumber: '',
     firstName: '',
@@ -46,6 +48,8 @@ export function AddEmployeeDialog({ open, onOpenChange, employee, onSuccess }: A
     employmentDate: '',
     status: 'active' as 'active' | 'inactive' | 'terminated' | 'on-leave',
     basicSalary: '',
+    payrollTemplateId: '',
+    payrollTemplateName: '',
     taxIdentificationNumber: '',
     taxState: '',
     taxExempt: false,
@@ -89,6 +93,8 @@ export function AddEmployeeDialog({ open, onOpenChange, employee, onSuccess }: A
         employmentDate: employee.employmentDate || '',
         status: employee.status || 'active',
         basicSalary: employee.basicSalary?.toString() || '',
+        payrollTemplateId: employee.payrollTemplateId || '',
+        payrollTemplateName: employee.payrollTemplateName || '',
         taxIdentificationNumber: employee.taxIdentificationNumber || '',
         taxState: employee.taxState || '',
         taxExempt: employee.taxExempt || false,
@@ -130,6 +136,8 @@ export function AddEmployeeDialog({ open, onOpenChange, employee, onSuccess }: A
         employmentDate: '',
         status: 'active',
         basicSalary: '',
+        payrollTemplateId: '',
+        payrollTemplateName: '',
         taxIdentificationNumber: '',
         taxState: '',
         taxExempt: false,
@@ -149,6 +157,32 @@ export function AddEmployeeDialog({ open, onOpenChange, employee, onSuccess }: A
     }
   }, [employee, open])
 
+  // Fetch payroll templates for assignment
+  useEffect(() => {
+    const fetchTemplates = async () => {
+      if (!user || !open) return
+      setTemplatesLoading(true)
+      try {
+        const token = await user.getIdToken()
+        const res = await fetch('/api/payroll/templates', {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        const data = await res.json()
+        if (data.success) {
+          setTemplates(data.data || [])
+        } else {
+          setTemplates([])
+        }
+      } catch (e) {
+        console.error('Error fetching payroll templates:', e)
+        setTemplates([])
+      } finally {
+        setTemplatesLoading(false)
+      }
+    }
+    fetchTemplates()
+  }, [user, open])
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user) return
@@ -166,6 +200,8 @@ export function AddEmployeeDialog({ open, onOpenChange, employee, onSuccess }: A
       const payload = {
         ...formData,
         basicSalary: formData.basicSalary ? parseFloat(formData.basicSalary) : undefined,
+        payrollTemplateId: formData.payrollTemplateId || undefined,
+        payrollTemplateName: formData.payrollTemplateName || undefined,
         address: Object.values(formData.address).some(v => v) ? formData.address : undefined,
         bankAccount: Object.values(formData.bankAccount).some(v => v) ? formData.bankAccount : undefined,
         emergencyContact: formData.emergencyContact.name ? formData.emergencyContact : undefined
@@ -453,6 +489,40 @@ export function AddEmployeeDialog({ open, onOpenChange, employee, onSuccess }: A
             {/* Payroll Information Tab */}
             <TabsContent value="payroll" className="space-y-4 mt-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="sm:col-span-2">
+                  <Label>Payroll Template</Label>
+                  <Select
+                    value={formData.payrollTemplateId || "unassigned"}
+                    onValueChange={(value) => {
+                      if (value === "unassigned") {
+                        setFormData({ ...formData, payrollTemplateId: "", payrollTemplateName: "" })
+                        return
+                      }
+                      const t = templates.find((x) => x.id === value)
+                      setFormData({
+                        ...formData,
+                        payrollTemplateId: value,
+                        payrollTemplateName: t?.name || ""
+                      })
+                    }}
+                    disabled={templatesLoading}
+                  >
+                    <SelectTrigger className="text-xs sm:text-sm">
+                      <SelectValue placeholder={templatesLoading ? "Loading templates..." : "Select payroll template"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="unassigned">Unassigned (use selected template when generating)</SelectItem>
+                      {templates.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.name}{t.isDefault ? " (Default)" : ""}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Assigning a template helps payroll generation pick the right employees for each payroll run.
+                  </p>
+                </div>
                 <div>
                   <Label htmlFor="basicSalary">Basic Salary (₦) - Monthly</Label>
                   <Input

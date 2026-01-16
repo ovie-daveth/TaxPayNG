@@ -160,10 +160,19 @@ export function DashboardHeader() {
       case "/dashboard/reports":
         return {
           title: "Reports & Filings",
-          subtitle: "Generate tax reports and self-assessment filings for LIRS/FIRS",
+          subtitle: isSME
+            ? "Generate company tax assessment (CIT) and business reports for FIRS"
+            : "Generate tax reports and self-assessment filings for LIRS/FIRS",
           buttonText: "New Report",
           buttonIcon: Plus,
-          buttonAction: () => checkSubscription(() => router.push(`${basePath}/reports/generate/self-assessment`))
+          buttonAction: () =>
+            checkSubscription(() =>
+              router.push(
+                isSME
+                  ? `${basePath}/reports/generate/tax-assessment`
+                  : `${basePath}/reports/generate/self-assessment`
+              )
+            )
         }
       case "/dashboard/filing-requests":
         return {

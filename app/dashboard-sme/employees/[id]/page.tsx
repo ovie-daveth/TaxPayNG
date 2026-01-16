@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useMemo, useState, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -27,7 +27,7 @@ import {
   ChevronDown
 } from "lucide-react"
 import { toast } from "sonner"
-import { Employee, PayrollItem } from "@/lib/types"
+import { Employee, PayrollItem, PayrollTemplate } from "@/lib/types"
 import { format } from "date-fns"
 
 export default function EmployeeDetailPage() {
@@ -40,6 +40,12 @@ export default function EmployeeDetailPage() {
   const [payrollHistory, setPayrollHistory] = useState<any[]>([])
   const [paymentRecords, setPaymentRecords] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
+  const [showGeneratePayrollDialog, setShowGeneratePayrollDialog] = useState(false)
+  const [templates, setTemplates] = useState<PayrollTemplate[]>([])
+  const [templatesLoading, setTemplatesLoading] = useState(false)
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>("")
+  const [generatingPayroll, setGeneratingPayroll] = useState(false)
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [selectedPayrollItem, setSelectedPayrollItem] = useState<any | null>(null)
   const [processingPayment, setProcessingPayment] = useState(false)
@@ -96,6 +102,75 @@ export default function EmployeeDetailPage() {
     }
   }
 
+  const fetchTemplates = async () => {
+    if (!user) return
+    setTemplatesLoading(true)
+    try {
+      const token = await user.getIdToken()
+      const res = await fetch('/api/payroll/templates', {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      const data = await res.json()
+      if (data.success) {
+        setTemplates(data.data || [])
+        // Default template selection: employee assignment -> first template
+        const preferred = employee?.payrollTemplateId || data.data?.[0]?.id || ""
+        setSelectedTemplateId(preferred)
+      }
+    } catch (e) {
+      console.error('Error fetching templates:', e)
+    } finally {
+      setTemplatesLoading(false)
+    }
+  }
+
+  const handleGeneratePayrollForEmployee = async () => {
+    if (!user || !employee) return
+    if (!selectedTemplateId) {
+      toast.error("Please select a payroll template")
+      return
+    }
+
+    setGeneratingPayroll(true)
+    try {
+      const year = selectedYear
+      const periodStart = new Date(year, 0, 1).toISOString()
+      const periodEnd = new Date(year, 11, 31).toISOString()
+      const periodLabel = String(year)
+
+      const token = await user.getIdToken()
+      const response = await fetch('/api/payroll/generate', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          templateId: selectedTemplateId,
+          periodStart,
+          periodEnd,
+          periodType: 'yearly',
+          periodLabel,
+          employeeIds: [employee.id]
+        })
+      })
+
+      const data = await response.json()
+      if (data.success) {
+        toast.success("Payroll generated for this employee")
+        setShowGeneratePayrollDialog(false)
+        await fetchEmployeeData()
+      } else {
+        toast.error(data.error || "Failed to generate payroll")
+      }
+    } catch (e: any) {
+      console.error('Error generating payroll:', e)
+      toast.error(e?.message || "Failed to generate payroll")
+    } finally {
+      setGeneratingPayroll(false)
+    }
+  }
+
   const handlePayClick = (payrollItem: any) => {
     setSelectedPayrollItem(payrollItem)
     setShowPaymentDialog(true)
@@ -134,7 +209,7 @@ export default function EmployeeDetailPage() {
         toast.success("Payment recorded successfully")
         setShowPaymentDialog(false)
         setSelectedPayrollItem(null)
-        fetchEmployeeData() // Refresh data
+        setPaymentRecords((prev) => [...prev, data.data])
       } else {
         toast.error(data.error || "Failed to record payment")
       }
@@ -146,94 +221,85 @@ export default function EmployeeDetailPage() {
     }
   }
 
-  const getPaymentStatus = (payrollItem: any) => {
-    const payment = paymentRecords.find(
-      p => p.payrollId === payrollItem.payrollId && 
-      p.periodStart === payrollItem.periodStart
-    )
-    return payment || null
+  const toMonthKey = (dateString?: string) => {
+    if (!dateString) return null
+    const d = new Date(dateString)
+    if (Number.isNaN(d.getTime())) return null
+    const y = d.getFullYear()
+    const m = String(d.getMonth() + 1).padStart(2, "0")
+    return `${y}-${m}`
+  }
+
+  const getPaymentForMonth = (monthKey: string) => {
+    // Consider the month "paid" if any payment record exists for that month
+    // (do not couple to payrollId so re-generated payrolls still reflect payments)
+    const matches = paymentRecords.filter((p) => toMonthKey(p.periodStart) === monthKey)
+    if (matches.length === 0) return null
+    // Prefer the latest paidAt/createdAt
+    const sorted = [...matches].sort((a, b) => {
+      const da = new Date(a.paidAt || a.createdAt || 0).getTime()
+      const db = new Date(b.paidAt || b.createdAt || 0).getTime()
+      return db - da
+    })
+    return sorted[0]
   }
 
   const formatCurrency = (amount: number) => {
     return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
 
-  // Group payroll history by month/year for accordion
-  const groupedPayrolls = payrollHistory.reduce((acc: any, item: any) => {
-    let monthKey = ''
-    
-    // Priority 1: Use periodStart date (most reliable)
-    if (item.periodStart) {
-      try {
-        const date = new Date(item.periodStart)
-        if (!isNaN(date.getTime())) {
-          const year = date.getFullYear()
-          const month = date.getMonth() + 1
-          monthKey = `${year}-${String(month).padStart(2, '0')}`
-        }
-      } catch (e) {
-        console.error('Error parsing periodStart:', e)
-      }
-    }
-    
-    // Priority 2: Parse period string (e.g., "January 2026", "Q1 2024", etc.)
-    if (!monthKey && item.period) {
-      // Try to match month name pattern
-      const periodMatch = item.period.match(/(January|February|March|April|May|June|July|August|September|October|November|December)\s+(\d{4})/i)
-      if (periodMatch) {
-        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-        const monthIndex = monthNames.findIndex(m => m.toLowerCase() === periodMatch[1].toLowerCase())
-        if (monthIndex !== -1) {
-          monthKey = `${periodMatch[2]}-${String(monthIndex + 1).padStart(2, '0')}`
-        }
-      } else {
-        // Try to parse quarter format (Q1 2024, Q2 2024, etc.)
-        const quarterMatch = item.period.match(/Q([1-4])\s+(\d{4})/i)
-        if (quarterMatch) {
-          const quarter = parseInt(quarterMatch[1])
-          const year = quarterMatch[2]
-          // Q1 = Jan-Mar (month 1), Q2 = Apr-Jun (month 4), Q3 = Jul-Sep (month 7), Q4 = Oct-Dec (month 10)
-          const month = (quarter - 1) * 3 + 1
-          monthKey = `${year}-${String(month).padStart(2, '0')}`
-        }
-      }
-    }
-    
-    // Priority 3: Use generatedAt as fallback
-    if (!monthKey && item.generatedAt) {
-      try {
-        const date = new Date(item.generatedAt)
-        if (!isNaN(date.getTime())) {
-          const year = date.getFullYear()
-          const month = date.getMonth() + 1
-          monthKey = `${year}-${String(month).padStart(2, '0')}`
-        }
-      } catch (e) {
-        console.error('Error parsing generatedAt:', e)
-      }
-    }
-    
-    // Fallback: use current date if nothing works
-    if (!monthKey) {
-      const now = new Date()
-      monthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-    }
-    
-    if (!acc[monthKey]) {
-      acc[monthKey] = []
-    }
-    acc[monthKey].push(item)
-    return acc
-  }, {})
+  const availableYears = useMemo(() => {
+    const years = new Set<number>()
+    payrollHistory.forEach((h) => {
+      const mk = toMonthKey(h.periodStart)
+      if (!mk) return
+      const y = parseInt(mk.split("-")[0])
+      if (!Number.isNaN(y)) years.add(y)
+    })
+    years.add(new Date().getFullYear())
+    return Array.from(years).sort((a, b) => b - a)
+  }, [payrollHistory])
 
-  // Sort months in descending order (most recent first)
-  const sortedMonths = Object.keys(groupedPayrolls).sort((a, b) => b.localeCompare(a))
+  const monthsInYear = useMemo(() => {
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ]
+    return monthNames.map((name, idx) => {
+      const month = idx + 1
+      const monthKey = `${selectedYear}-${String(month).padStart(2, "0")}`
+      const periodStart = new Date(selectedYear, idx, 1).toISOString()
+      const periodEnd = new Date(selectedYear, idx + 1, 0).toISOString()
+      return { month, name, monthKey, periodStart, periodEnd }
+    })
+  }, [selectedYear])
 
-  const formatMonthYear = (monthKey: string) => {
-    const [year, month] = monthKey.split('-')
-    const date = new Date(parseInt(year), parseInt(month) - 1)
-    return format(date, 'MMMM yyyy')
-  }
+  const payrollByMonthKey = useMemo(() => {
+    // Pick the most recently generated payroll entry for each month in the selected year.
+    const entries = [...payrollHistory].sort((a, b) => {
+      const da = new Date(a.generatedAt || 0).getTime()
+      const db = new Date(b.generatedAt || 0).getTime()
+      return db - da
+    })
+    const map = new Map<string, any>()
+    for (const entry of entries) {
+      const mk = toMonthKey(entry.periodStart)
+      if (!mk) continue
+      if (!mk.startsWith(`${selectedYear}-`)) continue
+      if (!map.has(mk)) map.set(mk, entry)
+    }
+    return map
+  }, [payrollHistory, selectedYear])
 
   if (loading) {
     return (
@@ -345,205 +411,244 @@ export default function EmployeeDetailPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {payrollHistory.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Calendar className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No payroll history found for this employee</p>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-muted-foreground" />
+              <div className="text-sm text-muted-foreground">Year</div>
             </div>
-          ) : (
-            <Accordion type="single" collapsible className="w-full">
-              {sortedMonths.map((monthKey) => {
-                const monthPayrolls = groupedPayrolls[monthKey]
-                const monthTotal = monthPayrolls.reduce((sum: number, item: any) => sum + (item.item.netSalary || 0), 0)
-                const paidCount = monthPayrolls.filter((item: any) => getPaymentStatus(item)).length
-                const pendingCount = monthPayrolls.length - paidCount
+            <div className="w-full sm:w-[180px]">
+              <Select
+                value={String(selectedYear)}
+                onValueChange={(v) => setSelectedYear(parseInt(v))}
+              >
+                <SelectTrigger className="h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableYears.map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
-                return (
-                  <AccordionItem key={monthKey} value={monthKey} className="border rounded-lg mb-3 px-4">
-                    <AccordionTrigger className="hover:no-underline py-4">
-                      <div className="flex items-center justify-between w-full pr-4">
-                        <div className="flex items-center gap-4">
-                          <div className="p-2 bg-primary/10 rounded-lg">
-                            <Calendar className="w-5 h-5 text-primary" />
-                          </div>
-                          <div className="text-left">
-                            <h3 className="text-lg font-semibold">{formatMonthYear(monthKey)}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {monthPayrolls.length} payroll{monthPayrolls.length !== 1 ? 's' : ''} • 
-                              {paidCount > 0 && (
-                                <span className="text-green-600 ml-1">
-                                  {paidCount} paid
-                                </span>
-                              )}
-                              {pendingCount > 0 && (
-                                <span className="text-orange-600 ml-1">
-                                  {pendingCount} pending
-                                </span>
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <p className="text-xs text-muted-foreground">Total</p>
-                            <p className="text-lg font-bold text-primary">{formatCurrency(monthTotal)}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent>
-                      <div className="space-y-4 pb-4">
-                        {monthPayrolls.map((historyItem: any) => {
-                          const payment = getPaymentStatus(historyItem)
-                          const item = historyItem.item
-
-                          return (
-                            <Card key={historyItem.payrollId} className="border-l-4 border-l-primary">
-                              <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <CardTitle className="text-base">{historyItem.period}</CardTitle>
-                                    <CardDescription className="text-xs">
-                                      Generated on {format(new Date(historyItem.generatedAt), 'MMM dd, yyyy')}
-                                    </CardDescription>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    {payment ? (
-                                      <Badge variant="default" className="gap-1.5">
-                                        <CheckCircle2 className="w-3 h-3" />
-                                        Paid
-                                      </Badge>
-                                    ) : (
-                                      <Badge variant="secondary" className="gap-1.5">
-                                        <Clock className="w-3 h-3" />
-                                        Pending
-                                      </Badge>
-                                    )}
-                                    {!payment && (
-                                      <Button
-                                        size="sm"
-                                        onClick={() => handlePayClick(historyItem)}
-                                        className="h-8"
-                                      >
-                                        <CreditCard className="w-3.5 h-3.5 mr-1.5" />
-                                        Pay
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                              </CardHeader>
-                              <CardContent className="pt-0">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                  {/* Earnings */}
-                                  <div className="space-y-2">
-                                    <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                                      <div className="w-1 h-4 bg-green-500 rounded"></div>
-                                      Earnings
-                                    </h4>
-                                    <div className="space-y-2 text-sm">
-                                      <div className="flex justify-between py-1">
-                                        <span className="text-muted-foreground">Basic Salary</span>
-                                        <span className="font-medium">{formatCurrency(item.basicSalary)}</span>
-                                      </div>
-                                      {item.allowances.map((allowance: any, idx: number) => (
-                                        <div key={idx} className="flex justify-between py-1">
-                                          <span className="text-muted-foreground">{allowance.name}</span>
-                                          <span className="font-medium">{formatCurrency(allowance.amount)}</span>
-                                        </div>
-                                      ))}
-                                      <div className="flex justify-between font-semibold pt-2 border-t mt-2">
-                                        <span>Gross Salary</span>
-                                        <span className="text-green-600">{formatCurrency(item.grossSalary)}</span>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Deductions */}
-                                  <div className="space-y-2">
-                                    <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
-                                      <div className="w-1 h-4 bg-red-500 rounded"></div>
-                                      Deductions
-                                    </h4>
-                                    <div className="space-y-2 text-sm">
-                                      <div className="flex justify-between py-1">
-                                        <span className="text-muted-foreground">PAYE</span>
-                                        <span className="font-medium text-red-600">{formatCurrency(item.paye.amount)}</span>
-                                      </div>
-                                      <div className="flex justify-between py-1">
-                                        <span className="text-muted-foreground">Pension (Employee)</span>
-                                        <span className="font-medium text-red-600">{formatCurrency(item.pension.employee)}</span>
-                                      </div>
-                                      {item.nhf && (
-                                        <div className="flex justify-between py-1">
-                                          <span className="text-muted-foreground">NHF</span>
-                                          <span className="font-medium text-red-600">{formatCurrency(item.nhf.amount)}</span>
-                                        </div>
-                                      )}
-                                      {item.nhis && (
-                                        <div className="flex justify-between py-1">
-                                          <span className="text-muted-foreground">NHIS</span>
-                                          <span className="font-medium text-red-600">{formatCurrency(item.nhis.amount)}</span>
-                                        </div>
-                                      )}
-                                      <div className="flex justify-between font-semibold pt-2 border-t mt-2">
-                                        <span>Total Deductions</span>
-                                        <span className="text-red-600">{formatCurrency(
-                                          item.paye.amount + 
-                                          item.pension.employee + 
-                                          (item.nhf?.amount || 0) + 
-                                          (item.nhis?.amount || 0)
-                                        )}</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Net Salary */}
-                                <div className="pt-4 mt-4 border-t">
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-base font-semibold">Net Salary</span>
-                                    <span className="text-2xl font-bold text-primary">{formatCurrency(item.netSalary)}</span>
-                                  </div>
-                                </div>
-
-                                {/* Payment Info */}
-                                {payment && (
-                                  <div className="pt-4 mt-4 border-t bg-green-50 dark:bg-green-950/20 p-4 rounded-lg">
-                                    <h4 className="font-semibold mb-3 text-sm flex items-center gap-2">
-                                      <CheckCircle2 className="w-4 h-4 text-green-600" />
-                                      Payment Details
-                                    </h4>
-                                    <div className="grid grid-cols-2 gap-3 text-sm">
-                                      <div>
-                                        <span className="text-muted-foreground">Paid On</span>
-                                        <p className="font-medium">{format(new Date(payment.paidAt!), 'MMM dd, yyyy')}</p>
-                                      </div>
-                                      {payment.paymentMethod && (
-                                        <div>
-                                          <span className="text-muted-foreground">Payment Method</span>
-                                          <p className="font-medium capitalize">{payment.paymentMethod.replace('_', ' ')}</p>
-                                        </div>
-                                      )}
-                                      {payment.paymentReference && (
-                                        <div className="col-span-2">
-                                          <span className="text-muted-foreground">Reference</span>
-                                          <p className="font-medium">{payment.paymentReference}</p>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                )}
-                              </CardContent>
-                            </Card>
-                          )
-                        })}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                )
-              })}
-            </Accordion>
+          {payrollHistory.length === 0 && (
+            <div className="rounded-lg border bg-muted/20 p-4">
+              <div className="text-sm text-muted-foreground">
+                No payroll generated yet for this employee.
+              </div>
+              <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                <Button
+                  onClick={() => {
+                    setShowGeneratePayrollDialog(true)
+                    fetchTemplates()
+                  }}
+                  className="sm:w-auto"
+                >
+                  Generate Payroll for this employee
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => router.push('/dashboard-sme/payroll')}
+                  className="sm:w-auto"
+                >
+                  Go to Payroll
+                </Button>
+              </div>
+            </div>
           )}
+
+          <Accordion type="single" collapsible className="w-full">
+            {monthsInYear.map((m) => {
+              const historyItem = payrollByMonthKey.get(m.monthKey) || null
+              const payment = getPaymentForMonth(m.monthKey)
+              const item = historyItem?.item as PayrollItem | undefined
+
+              const badge = historyItem
+                ? payment
+                  ? { variant: "default" as const, icon: <CheckCircle2 className="w-3 h-3" />, label: "Paid" }
+                  : { variant: "secondary" as const, icon: <Clock className="w-3 h-3" />, label: "Pending" }
+                : { variant: "secondary" as const, icon: <Clock className="w-3 h-3" />, label: "No payroll" }
+
+              return (
+                <AccordionItem key={m.monthKey} value={m.monthKey} className="border rounded-lg mb-3 px-4">
+                  <AccordionTrigger className="hover:no-underline py-4">
+                    <div className="flex items-center justify-between w-full pr-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-lg">
+                          <Calendar className="w-5 h-5 text-primary" />
+                        </div>
+                        <div className="text-left">
+                          <h3 className="text-base sm:text-lg font-semibold">
+                            {m.name} {selectedYear}
+                          </h3>
+                          <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground">
+                            {historyItem ? (
+                              <span>
+                                Generated {historyItem.generatedAt ? format(new Date(historyItem.generatedAt), "MMM dd, yyyy") : "—"}
+                              </span>
+                            ) : (
+                              <span>No payroll generated for this month</span>
+                            )}
+                            {item?.netSalary !== undefined && (
+                              <span className="text-primary font-semibold">
+                                • {formatCurrency(item.netSalary)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <Badge variant={badge.variant} className="gap-1.5 shrink-0">
+                        {badge.icon}
+                        {badge.label}
+                      </Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent>
+                    <div className="space-y-4 pb-4">
+                      {!historyItem || !item ? (
+                        <div className="rounded-lg border bg-muted/20 p-4 text-sm text-muted-foreground">
+                          Generate payroll to see this employee’s monthly breakdown for {m.name} {selectedYear}.
+                        </div>
+                      ) : (
+                        <Card className="border-l-4 border-l-primary">
+                          <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <CardTitle className="text-base truncate">{historyItem.period || `${m.name} ${selectedYear}`}</CardTitle>
+                                <CardDescription className="text-xs">
+                                  {m.name} breakdown (monthly payroll)
+                                </CardDescription>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                {!payment && (
+                                  <Button
+                                    size="sm"
+                                    onClick={() => handlePayClick(historyItem)}
+                                    className="h-8"
+                                  >
+                                    <CreditCard className="w-3.5 h-3.5 mr-1.5" />
+                                    Mark as Paid
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              {/* Earnings */}
+                              <div className="space-y-2">
+                                <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                                  <div className="w-1 h-4 bg-green-500 rounded"></div>
+                                  Earnings
+                                </h4>
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex justify-between py-1">
+                                    <span className="text-muted-foreground">Basic Salary</span>
+                                    <span className="font-medium">{formatCurrency(item.basicSalary || 0)}</span>
+                                  </div>
+                                  {(item.allowances || []).map((allowance: any, idx: number) => (
+                                    <div key={idx} className="flex justify-between py-1">
+                                      <span className="text-muted-foreground">{allowance.name}</span>
+                                      <span className="font-medium">{formatCurrency(allowance.amount)}</span>
+                                    </div>
+                                  ))}
+                                  <div className="flex justify-between font-semibold pt-2 border-t mt-2">
+                                    <span>Gross Salary</span>
+                                    <span className="text-green-600">{formatCurrency(item.grossSalary || 0)}</span>
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* Deductions */}
+                              <div className="space-y-2">
+                                <h4 className="font-semibold text-sm mb-3 flex items-center gap-2">
+                                  <div className="w-1 h-4 bg-red-500 rounded"></div>
+                                  Deductions
+                                </h4>
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex justify-between py-1">
+                                    <span className="text-muted-foreground">PAYE</span>
+                                    <span className="font-medium text-red-600">{formatCurrency(item.paye?.amount || 0)}</span>
+                                  </div>
+                                  <div className="flex justify-between py-1">
+                                    <span className="text-muted-foreground">Pension (Employee)</span>
+                                    <span className="font-medium text-red-600">{formatCurrency(item.pension?.employee || 0)}</span>
+                                  </div>
+                                  {item.nhf && (
+                                    <div className="flex justify-between py-1">
+                                      <span className="text-muted-foreground">NHF</span>
+                                      <span className="font-medium text-red-600">{formatCurrency(item.nhf.amount)}</span>
+                                    </div>
+                                  )}
+                                  {item.nhis && (
+                                    <div className="flex justify-between py-1">
+                                      <span className="text-muted-foreground">NHIS</span>
+                                      <span className="font-medium text-red-600">{formatCurrency(item.nhis.amount)}</span>
+                                    </div>
+                                  )}
+                                  <div className="flex justify-between font-semibold pt-2 border-t mt-2">
+                                    <span>Total Deductions</span>
+                                    <span className="text-red-600">
+                                      {formatCurrency(
+                                        (item.paye?.amount || 0) +
+                                          (item.pension?.employee || 0) +
+                                          (item.nhf?.amount || 0) +
+                                          (item.nhis?.amount || 0)
+                                      )}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Net Salary */}
+                            <div className="pt-4 mt-4 border-t">
+                              <div className="flex justify-between items-center">
+                                <span className="text-base font-semibold">Net Salary</span>
+                                <span className="text-2xl font-bold text-primary">{formatCurrency(item.netSalary || 0)}</span>
+                              </div>
+                            </div>
+
+                            {/* Payment Info */}
+                            {payment && (
+                              <div className="pt-4 mt-4 border-t bg-green-50 dark:bg-green-950/20 p-4 rounded-lg">
+                                <h4 className="font-semibold mb-3 text-sm flex items-center gap-2">
+                                  <CheckCircle2 className="w-4 h-4 text-green-600" />
+                                  Payment Details
+                                </h4>
+                                <div className="grid grid-cols-2 gap-3 text-sm">
+                                  <div>
+                                    <span className="text-muted-foreground">Paid On</span>
+                                    <p className="font-medium">{payment.paidAt ? format(new Date(payment.paidAt), "MMM dd, yyyy") : "—"}</p>
+                                  </div>
+                                  {payment.paymentMethod && (
+                                    <div>
+                                      <span className="text-muted-foreground">Payment Method</span>
+                                      <p className="font-medium capitalize">{String(payment.paymentMethod).replace("_", " ")}</p>
+                                    </div>
+                                  )}
+                                  {payment.paymentReference && (
+                                    <div className="col-span-2">
+                                      <span className="text-muted-foreground">Reference</span>
+                                      <p className="font-medium">{payment.paymentReference}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              )
+            })}
+          </Accordion>
         </CardContent>
       </Card>
 
@@ -661,6 +766,72 @@ export default function EmployeeDetailPage() {
                   <CheckCircle2 className="w-4 h-4 mr-2" />
                   Mark as Paid
                 </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Generate Payroll Dialog */}
+      <Dialog open={showGeneratePayrollDialog} onOpenChange={setShowGeneratePayrollDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Generate Payroll</DialogTitle>
+            <DialogDescription>
+              Generate yearly payroll (Jan–Dec) for {employee?.firstName} {employee?.lastName} using a selected template.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label>Payroll Template</Label>
+              <Select
+                value={selectedTemplateId}
+                onValueChange={setSelectedTemplateId}
+                disabled={templatesLoading}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={templatesLoading ? "Loading templates..." : "Select template"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates.map((t) => (
+                    <SelectItem key={t.id} value={t.id}>
+                      {t.name}{t.isDefault ? " (Default)" : ""}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Year</Label>
+              <Select value={String(selectedYear)} onValueChange={(v) => setSelectedYear(parseInt(v))}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map((y) => (
+                    <SelectItem key={y} value={String(y)}>
+                      {y}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowGeneratePayrollDialog(false)} disabled={generatingPayroll}>
+              Cancel
+            </Button>
+            <Button onClick={handleGeneratePayrollForEmployee} disabled={generatingPayroll || templatesLoading}>
+              {generatingPayroll ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                "Generate"
               )}
             </Button>
           </DialogFooter>
