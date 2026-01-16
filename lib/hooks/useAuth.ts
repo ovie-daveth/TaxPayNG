@@ -57,6 +57,7 @@ interface SignUpData {
   businessType: BusinessType
   phone?: string
   agentStates?: string[]
+  consultantStates?: string[]
 }
 
 interface SignInData {
@@ -293,7 +294,9 @@ export function useAuth() {
     }
   }
 
-  const signInWithGoogle = async (businessType?: BusinessType) => {
+  // Google is SIGN-IN ONLY.
+  // If the user has no existing profile, we treat them as not registered and ask them to sign up.
+  const signInWithGoogle = async () => {
     try {
       setAuthState(prev => ({ ...prev, loading: true, error: null }))
 
@@ -320,102 +323,16 @@ export function useAuth() {
         return { success: false, error: 'Failed to sign in with Google' }
       }
 
-      // Check if this is a new Firebase auth account or existing one
-      // Compare creationTime with lastSignInTime - if they're the same (or very close), it's a new account
-      const creationTime = user.metadata.creationTime ? new Date(user.metadata.creationTime).getTime() : 0
-      const lastSignInTime = user.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime).getTime() : 0
-      const timeDifference = Math.abs(lastSignInTime - creationTime)
-      const isNewFirebaseAccount = timeDifference < 5000 // 5 seconds threshold - if creation and last sign in are within 5 seconds, it's new
-
       // Check if user profile exists in Firestore
       const existingProfile = await userService.getProfile(user.uid)
 
-      // If account is not new (created more than 5 seconds before last sign in) and we're on signup page, it's an existing user
-      // businessType is only passed when called from signup page
-      if (!isNewFirebaseAccount && businessType !== undefined) {
-        // User is trying to sign up but account already exists
-        // Sign them out and return error
+      // If there's no profile, treat as not registered (Google signup disabled).
+      if (!existingProfile) {
         await signOut(auth)
         setAuthState(prev => ({ ...prev, loading: false, error: null }))
-        return { 
-          success: false, 
-          error: 'An account with this email already exists. Please sign in instead.' 
-        }
-      }
-
-      if (!existingProfile) {
-        // New user - create profile
-        // Extract name from Google profile
-        const displayName = user.displayName || ''
-        const nameParts = displayName.split(' ')
-        const firstName = nameParts[0] || ''
-        const lastName = nameParts.slice(1).join(' ') || ''
-
-        // Create profile data (free trial will be initialized via API endpoint)
-        const profileData: any = {
-          email: user.email || '',
-          firstName: firstName,
-          lastName: lastName,
-          businessType: businessType || 'freelancer', // Default to freelancer if not provided
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-
-        // Add consultant-specific fields if businessType is consultant
-        if (businessType === 'consultant') {
-          profileData.consultantKycCompleted = false
-          profileData.role = 'consultant' // Set role to consultant
-          // Note: phone and consultantStates will need to be added later via profile completion
-        }
-
-        const profileResult = await userService.upsertProfile(user.uid, profileData)
-
-        if (profileResult && profileResult.success) {
-          // Initialize free trial for new users
-          try {
-            const idToken = await user.getIdToken()
-            const initTrialResponse = await fetch('/api/user/init-free-trial', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${idToken}`,
-                'Content-Type': 'application/json'
-              }
-            })
-            
-            if (initTrialResponse.ok) {
-              const trialData = await initTrialResponse.json()
-              console.log("Free trial initialized:", trialData)
-            } else {
-              console.warn('Failed to initialize free trial, but signup succeeded')
-            }
-          } catch (trialError) {
-            console.error('Error initializing free trial:', trialError)
-            // Don't fail signup if free trial initialization fails
-          }
-          
-          // Create default reminders for the user
-          try {
-            const { createDefaultReminders } = await import('@/lib/utils/defaultReminders')
-            await createDefaultReminders(user.uid, businessType || 'freelancer')
-          } catch (reminderError) {
-            console.error('Error creating default reminders:', reminderError)
-            // Don't fail signup if reminders fail
-          }
-
-          // Send welcome email (best-effort, idempotent on server)
-          try {
-            const idToken = await user.getIdToken()
-            await fetch('/api/user/send-welcome-email', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${idToken}`,
-                'Content-Type': 'application/json'
-              }
-            })
-          } catch (welcomeError) {
-            console.error('Error sending welcome email:', welcomeError)
-            // Don't fail signup if welcome email fails
-          }
+        return {
+          success: false,
+          error: 'NO_ACCOUNT',
         }
       }
 
@@ -428,8 +345,7 @@ export function useAuth() {
       return { 
         success: true, 
         userId: user.uid, 
-        isNewUser: !existingProfile,
-        needsBusinessTypeSelection: !existingProfile && !businessType // New user without business type
+        isNewUser: false,
       }
     } catch (error: unknown) {
       let errorMessage = 'An error occurred during Google sign in'

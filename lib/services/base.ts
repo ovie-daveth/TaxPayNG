@@ -128,13 +128,16 @@ export class BaseService {
     const prepared = { ...data }
     
     if (includeTimestamps) {
-      // Only set updatedAt to serverTimestamp if it's not already provided as a string (preserve ISO strings)
+      // IMPORTANT: Store timestamps as ISO strings (not serverTimestamp/Timestamp objects).
+      // This keeps ordering consistent across the app (including admin sorting) and avoids
+      // client-side "serverTimestamp" placeholder objects showing up in UI state.
+      const nowIso = new Date().toISOString()
+
       if (typeof prepared.updatedAt !== 'string') {
-        prepared.updatedAt = serverTimestamp()
+        prepared.updatedAt = nowIso
       }
-      // Only set createdAt to serverTimestamp if it doesn't already exist as a string (preserve ISO strings)
       if (!prepared.id && typeof prepared.createdAt !== 'string') {
-        prepared.createdAt = serverTimestamp()
+        prepared.createdAt = nowIso
       }
     }
 
