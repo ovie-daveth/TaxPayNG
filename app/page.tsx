@@ -3,6 +3,7 @@
 import type React from "react"
 import { cloneElement, isValidElement, useState } from "react"
 import Link from "next/link"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -209,19 +210,19 @@ export default function HomePage() {
           {/* Social Proof */}
           <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 lg:gap-8 text-xs sm:text-sm text-muted-foreground animate-in fade-in duration-1800 px-4">
             <div className="flex items-center gap-1.5 sm:gap-2">
-              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 flex-shrink-0" />
+              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 shrink-0" />
               <span>No Credit Card Required</span>
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2">
-              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 flex-shrink-0" />
+              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 shrink-0" />
               <span>30-Day Money Back</span>
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2">
-              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 flex-shrink-0" />
+              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 shrink-0" />
               <span>IRS & NRS Compliant</span>
             </div>
             <div className="flex items-center gap-1.5 sm:gap-2">
-              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 flex-shrink-0" />
+              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5 text-green-600 shrink-0" />
               <span className="hidden sm:inline">Based on the latest NRS regulations</span>
               <span className="sm:hidden">Latest NRS regulations</span>
             </div>
@@ -393,7 +394,7 @@ export default function HomePage() {
           {/* Testimonial Section */}
           <div className="bg-card border-2 border-primary/20 rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-12 lg:p-16 shadow-2xl">
             <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-primary/10 rounded-full flex items-center justify-center flex-shrink-0 mx-auto sm:mx-0">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 md:w-16 md:h-16 bg-primary/10 rounded-full flex items-center justify-center shrink-0 mx-auto sm:mx-0">
                 <Users className="w-6 h-6 sm:w-7 sm:h-7 md:w-8 md:h-8 text-primary" />
               </div>
               <div className="flex-1 text-center sm:text-left">
@@ -572,6 +573,106 @@ export default function HomePage() {
       </section> */}
 
       {/* CTA Section */}
+      {/* Mobile App Coming Soon */}
+      <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 md:py-20 lg:py-24">
+        <div className="max-w-6xl mx-auto">
+          <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl border bg-card p-6 sm:p-8 md:p-12 shadow-xl">
+            <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-blue-500/10 pointer-events-none" />
+
+            <div className="relative z-10 grid gap-8 md:grid-cols-2 md:items-center">
+              {/* Image only (left) */}
+              <div className="relative mx-auto w-full max-w-[520px] md:max-w-[560px]">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-transparent to-blue-500/20 blur-2xl" />
+                <div className="relative overflow-hidden">
+                  <Image
+                    src="/mobile_app_1.png"
+                    alt="OTax mobile app preview"
+                    width={1400}
+                    height={1000}
+                    priority={false}
+                    className="h-auto w-full object-contain"
+                  />
+                </div>
+              </div>
+
+              {/* Writeups (right) */}
+              <div className="space-y-4">
+                <div>
+                  <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs sm:text-sm font-medium text-primary mb-4">
+                    <Smartphone className="w-4 h-4" />
+                    Mobile App Coming Soon
+                  </div>
+                  <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-3">
+                    Manage your taxes on the go
+                  </h2>
+                  <p className="text-sm sm:text-base md:text-lg text-muted-foreground leading-relaxed max-w-xl">
+                    We’re building the OTax mobile app for iOS and Android so SMEs, freelancers, and creators can
+                    track transactions, generate payroll, and stay compliant—anytime, anywhere.
+                  </p>
+
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <span className="inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+                      iOS
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+                      Android
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+                      Offline-first drafts
+                    </span>
+                    <span className="inline-flex items-center rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground">
+                      Push reminders
+                    </span>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border bg-background/60 backdrop-blur p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <ScanLine className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-sm sm:text-base">Scan receipts instantly</div>
+                      <div className="text-xs sm:text-sm text-muted-foreground">
+                        Capture receipts and let OCR auto-fill your expenses.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border bg-background/60 backdrop-blur p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <Bell className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-sm sm:text-base">Never miss deadlines</div>
+                      <div className="text-xs sm:text-sm text-muted-foreground">
+                        Smart reminders for PAYE, VAT, CIT, filings, and renewals.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border bg-background/60 backdrop-blur p-4">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <Receipt className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <div className="font-semibold text-sm sm:text-base">Quick payroll & reporting</div>
+                      <div className="text-xs sm:text-sm text-muted-foreground">
+                        Generate payroll slips and reports faster with fewer clicks.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 md:py-20 lg:py-24">
         <div className="max-w-5xl mx-auto relative overflow-hidden">
           {/* Background decoration */}
