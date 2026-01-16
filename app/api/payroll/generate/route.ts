@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     const userId = decodedToken.uid
 
     const body = await request.json()
-    const { templateId, periodStart, periodEnd, periodType, periodLabel } = body
+    const { templateId, periodStart, periodEnd, periodType, periodLabel, employeeIds, department, role } = body
 
     if (!templateId || !periodStart || !periodEnd || !periodType || !periodLabel) {
       return NextResponse.json(
@@ -46,7 +46,12 @@ export async function POST(request: NextRequest) {
         end: periodEnd,
         type: periodType
       },
-      periodLabel
+      periodLabel,
+      {
+        employeeIds: Array.isArray(employeeIds) ? employeeIds : undefined,
+        department: typeof department === 'string' ? department : undefined,
+        role: typeof role === 'string' ? role : undefined
+      }
     )
 
     return NextResponse.json({

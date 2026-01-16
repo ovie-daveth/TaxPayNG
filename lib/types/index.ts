@@ -948,6 +948,12 @@ export interface Employee {
   
   // Payroll details
   basicSalary?: number // Monthly basic salary in NGN
+  /**
+   * Payroll template assignment.
+   * If set, this employee will be included when generating payroll with that template.
+   */
+  payrollTemplateId?: string
+  payrollTemplateName?: string
   allowances?: Array<{
     name: string
     amount: number
@@ -1055,6 +1061,16 @@ export interface PayrollItem {
   employeeNumber?: string
   employeeName: string
   employeeEmail?: string
+
+  /**
+   * Yearly payrolls are generated with monthly breakdowns (12 items per employee).
+   * These fields identify the month each item represents.
+   */
+  month?: number // 1-12
+  monthName?: string // "January"..."December"
+  monthlyPeriod?: string // e.g. "January 2026"
+  monthlyPeriodStart?: string // ISO date
+  monthlyPeriodEnd?: string // ISO date
   
   // Earnings
   basicSalary: number

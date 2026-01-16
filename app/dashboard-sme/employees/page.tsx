@@ -306,7 +306,7 @@ export default function SMEEmployeesPage() {
                 <CardContent className="p-4">
                   <div className="flex items-start gap-3">
                     {/* Avatar/Icon */}
-                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                       <User className="w-6 h-6 text-primary" />
                     </div>
                     
@@ -370,13 +370,13 @@ export default function SMEEmployeesPage() {
                           <div className="space-y-1">
                             {employee.email && (
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <Mail className="w-3.5 h-3.5 flex-shrink-0" />
+                                <Mail className="w-3.5 h-3.5 shrink-0" />
                                 <span className="truncate">{employee.email}</span>
                               </div>
                             )}
                             {employee.phone && (
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <Phone className="w-3.5 h-3.5 flex-shrink-0" />
+                                <Phone className="w-3.5 h-3.5 shrink-0" />
                                 <span>{employee.phone}</span>
                               </div>
                             )}
@@ -387,16 +387,26 @@ export default function SMEEmployeesPage() {
                         <div className="flex flex-wrap items-center gap-3 text-xs">
                           {(employee.jobTitle || employee.position) && (
                             <div className="flex items-center gap-1.5 text-muted-foreground">
-                              <Briefcase className="w-3.5 h-3.5 flex-shrink-0" />
+                              <Briefcase className="w-3.5 h-3.5 shrink-0" />
                               <span>{employee.jobTitle || employee.position}</span>
                             </div>
                           )}
                           {employee.department && (
                             <div className="flex items-center gap-1.5 text-muted-foreground">
-                              <Building2 className="w-3.5 h-3.5 flex-shrink-0" />
+                              <Building2 className="w-3.5 h-3.5 shrink-0" />
                               <span>{employee.department}</span>
                             </div>
                           )}
+                        </div>
+
+                        {/* Payroll Template Assignment */}
+                        <div className="flex flex-wrap items-center gap-2 pt-1">
+                          <Badge variant={employee.payrollTemplateId ? "outline" : "secondary"} className="text-[10px]">
+                            Payroll Template
+                          </Badge>
+                          <span className="text-xs text-muted-foreground">
+                            {employee.payrollTemplateName || "Unassigned"}
+                          </span>
                         </div>
                         
                         {/* Status & Salary */}
@@ -448,6 +458,7 @@ export default function SMEEmployeesPage() {
                       <TableHead className="text-xs sm:text-sm">Contact</TableHead>
                       <TableHead className="text-xs sm:text-sm">Position</TableHead>
                       <TableHead className="text-xs sm:text-sm">Department</TableHead>
+                      <TableHead className="text-xs sm:text-sm">Payroll Template</TableHead>
                       <TableHead className="text-xs sm:text-sm">Status</TableHead>
                       <TableHead className="text-xs sm:text-sm">Monthly Salary</TableHead>
                       <TableHead className="text-xs sm:text-sm text-right">Actions</TableHead>
@@ -483,6 +494,17 @@ export default function SMEEmployeesPage() {
                         </TableCell>
                         <TableCell className="text-xs sm:text-sm">
                           {employee.department || '-'}
+                        </TableCell>
+                        <TableCell className="text-xs sm:text-sm">
+                          {employee.payrollTemplateName ? (
+                            <Badge variant="outline" className="text-xs">
+                              {employee.payrollTemplateName}
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-xs">
+                              Unassigned
+                            </Badge>
+                          )}
                         </TableCell>
                         <TableCell>
                           <Badge
