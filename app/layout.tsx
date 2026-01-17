@@ -19,9 +19,9 @@ export const metadata: Metadata = {
     description: 'Simplifying tax processes with OTax App.',
     url: 'https://otaxng.com',
     siteName: 'OTax',
-    images: [
+    images: [ 
       {
-        url: '/otax_dark.png',
+        url: '/logootax.jpg',
         width: 800,
         height: 600,
         alt: 'OTax Logo',
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'OTax App',
     description: 'Simplifying tax processes with OTax App.',
-    images: ['/otax_dark.png'],
+    images: ['/logootax.jpg'],
   },
   icons: {
     icon: 'logootax.jpg',
