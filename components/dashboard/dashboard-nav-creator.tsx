@@ -111,6 +111,11 @@ export function DashboardNavCreator() {
   const mobileAddButton = getMobileAddButton()
   const AddButtonIcon = mobileAddButton.icon
 
+  // Close the mobile menu whenever navigation occurs (e.g., when BusinessSwitcher "Manage" navigates)
+  useEffect(() => {
+    setIsMobileMenuOpen(false)
+  }, [pathname])
+
   useEffect(() => {
     const checkFilingRequests = async () => {
       if (!user?.uid) {

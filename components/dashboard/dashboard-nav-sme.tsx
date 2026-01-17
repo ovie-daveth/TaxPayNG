@@ -40,6 +40,11 @@ export function DashboardNavSME() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [hasFilingRequests, setHasFilingRequests] = useState(false)
   
+  // Close the mobile menu whenever navigation occurs (e.g., when BusinessSwitcher "Manage" navigates)
+  useEffect(() => {
+    setIsMobileMenuOpen(false)
+  }, [pathname])
+  
   // Get page info for mobile add button
   const getMobileAddButton = () => {
     switch (pathname) {
