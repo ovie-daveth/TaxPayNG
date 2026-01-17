@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminAuth, getAdminDb } from '@/lib/firebase-admin'
 import { getPricingConfigAdmin, setPricingConfigAdmin } from '@/lib/services/pricingConfigService'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization')
@@ -24,7 +26,10 @@ export async function GET(request: NextRequest) {
     }
 
     const config = await getPricingConfigAdmin()
-    return NextResponse.json({ success: true, data: config })
+    return NextResponse.json(
+      { success: true, data: config },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    )
   } catch (error: any) {
     return NextResponse.json(
       { success: false, error: error?.message || 'Failed to fetch pricing config' },
@@ -76,18 +81,37 @@ export async function POST(request: NextRequest) {
       if (typeof plans !== 'object' || Array.isArray(plans) || plans === null) {
         return NextResponse.json({ success: false, error: 'Invalid plans' }, { status: 400 })
       }
-      // Expect kobo numbers per plan
+      // Expect kobo numbers per plan (and optional displayName strings)
       const cleanedPlans: any = {}
       for (const [planId, v] of Object.entries(plans)) {
-        const monthlyPrice = Number((v as any)?.monthlyPrice)
-        if (!Number.isFinite(monthlyPrice) || monthlyPrice <= 0) continue
-        cleanedPlans[planId] = { monthlyPrice: Math.round(monthlyPrice) }
+        const monthlyPriceRaw = (v as any)?.monthlyPrice
+        const monthlyPrice = monthlyPriceRaw !== undefined ? Number(monthlyPriceRaw) : undefined
+        const displayNameRaw = (v as any)?.displayName
+        const displayName = typeof displayNameRaw === 'string' ? displayNameRaw.trim() : undefined
+
+        // Allow updating displayName even if price is unchanged.
+        const next: any = {}
+        if (monthlyPrice !== undefined) {
+          if (Number.isFinite(monthlyPrice) && monthlyPrice > 0) {
+            next.monthlyPrice = Math.round(monthlyPrice)
+          }
+        }
+        if (displayName) {
+          // Avoid absurdly long names
+          next.displayName = displayName.slice(0, 50)
+        }
+
+        if (Object.keys(next).length === 0) continue
+        cleanedPlans[planId] = next
       }
       updates.plans = cleanedPlans
     }
 
     const updated = await setPricingConfigAdmin(updates, decoded.email || decoded.uid)
-    return NextResponse.json({ success: true, data: updated })
+    return NextResponse.json(
+      { success: true, data: updated },
+      { headers: { 'Cache-Control': 'no-store, max-age=0' } }
+    )
   } catch (error: any) {
     return NextResponse.json(
       { success: false, error: error?.message || 'Failed to update pricing config' },

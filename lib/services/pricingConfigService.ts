@@ -7,6 +7,11 @@ export type BillingInterval = 'monthly' | 'yearly'
 
 export interface PricingConfigPlanOverride {
   monthlyPrice: number // in kobo
+  /**
+   * Human-friendly display name for the plan (admin-controlled).
+   * Example: "PRO", "GOLD", "PLATINUM", "Small Business"
+   */
+  displayName?: string
 }
 
 export interface PricingConfig {
@@ -25,7 +30,9 @@ export function calculateYearlyPriceFromMonthly(monthlyPriceKobo: number, yearly
 export function getDefaultPricingConfig(): PricingConfig {
   const plans: Record<string, PricingConfigPlanOverride> = {}
   for (const [planId, plan] of Object.entries(SUBSCRIPTION_PLANS)) {
-    plans[planId] = { monthlyPrice: plan.monthlyPrice }
+    // Default display names should match the public pricing page headings.
+    // Admin can override this via the pricing config in Firestore.
+    plans[planId] = { monthlyPrice: plan.monthlyPrice, displayName: planId }
   }
 
   return {
@@ -51,14 +58,19 @@ export async function getPricingConfigAdmin(): Promise<PricingConfig> {
   const data = snap.data() as Partial<PricingConfig>
   const defaults = getDefaultPricingConfig()
 
-  // Merge with defaults to ensure new plans/fields exist
+  // Merge with defaults to ensure new plans/fields exist (deep merge per plan)
+  const mergedPlans: Record<string, PricingConfigPlanOverride> = { ...defaults.plans }
+  for (const [planId, override] of Object.entries((data.plans || {}) as Record<string, PricingConfigPlanOverride>)) {
+    mergedPlans[planId] = {
+      ...(mergedPlans[planId] || {}),
+      ...(override || {})
+    }
+  }
+
   return {
     ...defaults,
     ...data,
-    plans: {
-      ...defaults.plans,
-      ...(data.plans || {})
-    }
+    plans: mergedPlans
   }
 }
 
@@ -70,13 +82,18 @@ export async function setPricingConfigAdmin(
   const ref = db.collection('appConfig').doc('pricing')
 
   const current = await getPricingConfigAdmin()
+  const mergedPlans: Record<string, PricingConfigPlanOverride> = { ...(current.plans || {}) }
+  for (const [planId, override] of Object.entries((updates.plans || {}) as Record<string, PricingConfigPlanOverride>)) {
+    mergedPlans[planId] = {
+      ...(mergedPlans[planId] || {}),
+      ...(override || {})
+    }
+  }
+
   const next: PricingConfig = {
     ...current,
     ...updates,
-    plans: {
-      ...current.plans,
-      ...(updates.plans || {})
-    },
+    plans: mergedPlans,
     updatedAt: new Date().toISOString(),
     updatedBy
   }

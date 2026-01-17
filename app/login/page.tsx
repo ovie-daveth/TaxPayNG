@@ -16,10 +16,12 @@ import { useTheme } from "next-themes"
 import Image from "next/image"
 import { toast } from "sonner"
 import { Separator } from "@/components/ui/separator"
+import { GoogleBusinessTypeDialog } from "@/components/auth/google-business-type-dialog"
+import type { BusinessType } from "@/lib/types"
 
 export default function LoginPage() {
   const router = useRouter()
-  const { signIn, signInWithGoogle, linkGoogleToEmailAccount, user, loading } = useAuth()
+  const { signIn, signInWithGoogle, completeGoogleProfile, linkGoogleToEmailAccount, user, loading } = useAuth()
   const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
   const { theme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -43,6 +45,7 @@ export default function LoginPage() {
   const [linkAccountCredential, setLinkAccountCredential] = useState<any>(null)
   const [isLinkingAccount, setIsLinkingAccount] = useState(false)
   const [showLinkPassword, setShowLinkPassword] = useState(false)
+  const [showGoogleBusinessTypeDialog, setShowGoogleBusinessTypeDialog] = useState(false)
 
   useEffect(() => {
     console.log("Login redirect effect - user:", !!user, "loading:", loading, "profileLoading:", profileLoading, "profile:", !!profile)
@@ -181,9 +184,9 @@ export default function LoginPage() {
         
         toast.success('Signed in with Google successfully!')
         // Redirect will be handled by useEffect after profile loads
-      } else if (result.error === 'NO_ACCOUNT') {
-        toast.error("You don’t have an account yet. Please sign up first.")
-        router.push("/signup")
+      } else if (result.error === 'MISSING_PROFILE') {
+        // Auth user exists but profile doesn't. Complete onboarding via modal.
+        setShowGoogleBusinessTypeDialog(true)
       } else if (result.error === 'ACCOUNT_LINKING_REQUIRED' && result.needsPassword && result.email && result.credential) {
         // Account exists with email/password - show dialog to link accounts
         setLinkAccountEmail(result.email)
@@ -195,6 +198,26 @@ export default function LoginPage() {
     } catch (error) {
       console.error('Google sign in error:', error)
       toast.error('Failed to sign in with Google')
+    } finally {
+      setIsGoogleLoading(false)
+    }
+  }
+
+  const handleGoogleBusinessTypeSelected = async (businessType: BusinessType) => {
+    setShowGoogleBusinessTypeDialog(false)
+    setIsGoogleLoading(true)
+    try {
+      const res = await completeGoogleProfile(businessType)
+      if (!res.success) {
+        toast.error(res.error || "Failed to complete signup")
+        return
+      }
+      await refetchProfile()
+      toast.success("Welcome! Your account is ready.")
+      // Redirect is handled by useEffect once profile loads.
+    } catch (e) {
+      console.error(e)
+      toast.error("Failed to complete signup")
     } finally {
       setIsGoogleLoading(false)
     }
@@ -469,6 +492,12 @@ export default function LoginPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <GoogleBusinessTypeDialog
+        open={showGoogleBusinessTypeDialog}
+        onOpenChange={setShowGoogleBusinessTypeDialog}
+        onSelect={handleGoogleBusinessTypeSelected}
+      />
     </div>
   )
 }

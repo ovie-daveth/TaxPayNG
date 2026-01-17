@@ -111,6 +111,12 @@ export async function GET(request: NextRequest) {
         businessType = 'creator'
         console.log(`Updating businessType to 'creator' for user ${userId} subscribing to ${subscriptionType}`)
       }
+
+      // If user subscribes to PRO, ensure businessType is 'freelancer' (for creator downgrades)
+      if (subscriptionType === 'PRO' && businessType === 'creator') {
+        businessType = 'freelancer'
+        console.log(`Updating businessType to 'freelancer' for user ${userId} subscribing to PRO`)
+      }
       
       // Get storage limit based on subscription type
       const getStorageLimit = (type: string): number => {
@@ -171,6 +177,9 @@ export async function GET(request: NextRequest) {
       // Update businessType if it changed
       if ((subscriptionType === 'GOLD' || subscriptionType === 'PLATINUM') && profileData?.businessType !== 'creator') {
         updateData.businessType = 'creator'
+      }
+      if (subscriptionType === 'PRO' && profileData?.businessType === 'creator') {
+        updateData.businessType = 'freelancer'
       }
       
       await db.collection('userProfiles').doc(profileDoc.id).update(updateData)
@@ -248,6 +257,7 @@ export async function POST(request: NextRequest) {
         if (!userProfilesSnapshot.empty) {
           const profileDoc = userProfilesSnapshot.docs[0]
           const profileData = profileDoc.data()
+          let businessType = profileData?.businessType
           const getStorageLimit = (type: string): number => {
             switch (type) {
               case 'PRO': return 500 * 1024 * 1024
@@ -306,6 +316,12 @@ export async function POST(request: NextRequest) {
           if ((subscriptionType === 'GOLD' || subscriptionType === 'PLATINUM') && profileData?.businessType !== 'creator') {
             updateData.businessType = 'creator'
             console.log(`Updating businessType to 'creator' for user ${userId} subscribing to ${subscriptionType} (webhook)`)
+          }
+
+          // If user subscribes to PRO, ensure businessType is 'freelancer' (creator downgrade) - webhook path
+          if (subscriptionType === 'PRO' && profileData?.businessType === 'creator') {
+            updateData.businessType = 'freelancer'
+            console.log(`Updating businessType to 'freelancer' for user ${userId} subscribing to PRO (webhook)`)
           }
 
           await db.collection('userProfiles').doc(profileDoc.id).update(updateData)

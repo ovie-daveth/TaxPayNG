@@ -6,15 +6,15 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Check, Loader2 } from "lucide-react"
-import { subscriptionService, getPlanPriceDisplay } from "@/lib/services/subscriptionService"
+import { subscriptionService } from "@/lib/services/subscriptionService"
 import { SubscriptionType, BusinessType } from "@/lib/types"
-import { MigrateToCreatorModal } from "./migrate-to-creator-modal"
-import { MigrateToFreelancerModal } from "./migrate-to-freelancer-modal"
 import { toast } from "sonner"
 import { useRouter } from "next/navigation"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { Badge as UIBadge } from "@/components/ui/badge"
+import { usePricingConfig } from "@/lib/hooks/usePricingConfig"
+import { DEFAULT_YEARLY_DISCOUNT_PERCENT } from "@/lib/constants/pricing"
 
 interface ChangePlanModalProps {
   open: boolean
@@ -38,9 +38,7 @@ export function ChangePlanModal({
   onBillingIntervalChange
 }: ChangePlanModalProps) {
   const router = useRouter()
-  const [showMigrationModal, setShowMigrationModal] = useState(false)
-  const [showFreelancerMigrationModal, setShowFreelancerMigrationModal] = useState(false)
-  const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
+  const { pricingConfig } = usePricingConfig()
   const [internalBillingInterval, setInternalBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
   
   // Use external billing interval if provided, otherwise use internal state
@@ -58,47 +56,32 @@ export function ChangePlanModal({
   }
 
   const availablePlans = getAvailablePlans()
-
-  // Check if migration is needed
-  // - Freelancer trying to subscribe to GOLD or PLATINUM (needs to migrate to creator)
-  // - Creator trying to subscribe to PRO (needs to migrate to freelancer)
-  const needsMigration = (planType: SubscriptionType): boolean => {
-    if (businessType === 'freelancer' && (planType === 'GOLD' || planType === 'PLATINUM')) {
-      return true
+  const yearlyDiscountPercent = pricingConfig?.yearlyDiscountPercent ?? DEFAULT_YEARLY_DISCOUNT_PERCENT
+  const format = (priceInKobo: number) => {
+    const priceInNaira = priceInKobo / 100
+    return `₦${priceInNaira.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+  }
+  const getPlanWithOverrides = (planType: SubscriptionType) => {
+    const base = subscriptionService.getPlan(planType)
+    if (!base) return null
+    const overrideMonthly = pricingConfig?.plans?.[planType as any]?.monthlyPrice
+    const overrideNameRaw = pricingConfig?.plans?.[planType as any]?.displayName
+    const overrideName = typeof overrideNameRaw === "string" ? overrideNameRaw.trim() : ""
+    const monthlyPrice = typeof overrideMonthly === "number" && overrideMonthly > 0 ? overrideMonthly : base.monthlyPrice
+    const yearlyPrice = Math.round(12 * monthlyPrice * (1 - yearlyDiscountPercent / 100))
+    return {
+      ...base,
+      name: overrideName || (planType as any),
+      monthlyPrice,
+      yearlyPrice,
+      monthlyPriceDisplay: format(monthlyPrice),
+      yearlyPriceDisplay: format(yearlyPrice)
     }
-    if (businessType === 'creator' && planType === 'PRO') {
-      return true
-    }
-    return false
   }
 
   const handlePlanSelect = async (planType: SubscriptionType) => {
-    // Check if migration is needed
-    if (needsMigration(planType)) {
-      setSelectedPlan(planType)
-      // Show appropriate migration modal based on direction
-      if (businessType === 'creator' && planType === 'PRO') {
-        setShowFreelancerMigrationModal(true)
-      } else if (businessType === 'freelancer' && (planType === 'GOLD' || planType === 'PLATINUM')) {
-        setShowMigrationModal(true)
-      }
-      return
-    }
-
-    // No migration needed, proceed with plan selection with billing interval
+    // Migration (if needed) is handled by the parent settings page to avoid double-modals.
     await onSelectPlan(planType, billingInterval)
-  }
-
-  const handleMigrateAndSubscribe = async () => {
-    if (!selectedPlan) return
-
-    // Do NOT update businessType here. Proceed to payment; verify route will migrate on success.
-    setShowMigrationModal(false)
-    setShowFreelancerMigrationModal(false)
-    onOpenChange(false)
-    setTimeout(() => {
-      onSelectPlan(selectedPlan, billingInterval)
-    }, 200)
   }
 
   const isCurrentPlan = (planType: SubscriptionType) => {
@@ -130,7 +113,7 @@ export function ChangePlanModal({
           <DialogTitle>Change Subscription Plan</DialogTitle>
           <DialogDescription>
             {currentPlan 
-              ? `You're currently on the ${currentPlan} plan. Choose a new plan below.`
+              ? `You're currently on the ${(getPlanWithOverrides(currentPlan)?.name ?? currentPlan)} plan. Choose a new plan below.`
               : 'Select a subscription plan to unlock all features.'}
           </DialogDescription>
         </DialogHeader>
@@ -151,7 +134,7 @@ export function ChangePlanModal({
             </Label>
             {billingInterval === 'yearly' && (
               <UIBadge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 text-xs font-semibold ml-2">
-                Save 25%
+                Save {yearlyDiscountPercent}%
               </UIBadge>
             )}
           </div>
@@ -159,7 +142,7 @@ export function ChangePlanModal({
 
         <div className="grid md:grid-cols-3 gap-6 mt-6">
           {availablePlans.map((planType) => {
-            const plan = subscriptionService.getPlan(planType)
+            const plan = getPlanWithOverrides(planType)
             if (!plan) return null
 
             const isCurrent = isCurrentPlan(planType)
@@ -236,10 +219,10 @@ export function ChangePlanModal({
                         </span>
                         <div className="flex items-baseline gap-2">
                           <span className="text-3xl font-bold">
-                            {getPlanPriceDisplay(plan, 'yearly')}
+                            {plan.yearlyPriceDisplay}
                           </span>
                           <UIBadge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 py-0.5 text-xs font-semibold">
-                            25% OFF
+                            {yearlyDiscountPercent}% OFF
                           </UIBadge>
                         </div>
                         <span className="text-sm text-muted-foreground">/year</span>
@@ -302,36 +285,6 @@ export function ChangePlanModal({
         </div>
       </DialogContent>
     </Dialog>
-
-    {/* Migration modal - Creator (for freelancer -> creator) */}
-    {selectedPlan && businessType === 'freelancer' && (
-      <MigrateToCreatorModal
-        open={showMigrationModal}
-        onOpenChange={(isOpen) => {
-          setShowMigrationModal(isOpen)
-          if (!isOpen) {
-            setSelectedPlan(null)
-          }
-        }}
-        planType={selectedPlan}
-        onConfirm={handleMigrateAndSubscribe}
-      />
-    )}
-
-    {/* Migration modal - Freelancer (for creator -> freelancer) */}
-    {selectedPlan && businessType === 'creator' && (
-      <MigrateToFreelancerModal
-        open={showFreelancerMigrationModal}
-        onOpenChange={(isOpen) => {
-          setShowFreelancerMigrationModal(isOpen)
-          if (!isOpen) {
-            setSelectedPlan(null)
-          }
-        }}
-        planType={selectedPlan}
-        onConfirm={handleMigrateAndSubscribe}
-      />
-    )}
     </>
   )
 }

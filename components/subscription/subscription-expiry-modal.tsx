@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { AlertTriangle, Clock } from "lucide-react"
 import { subscriptionService } from "@/lib/services/subscriptionService"
 import { OneTouchResubscribeButton } from "./one-touch-resubscribe-button"
+import { usePricingConfig } from "@/lib/hooks/usePricingConfig"
 
 interface SubscriptionExpiryModalProps {
   open: boolean
@@ -40,6 +41,7 @@ export function SubscriptionExpiryModal({
   }
 
   const daysUntilExpiry = getDaysUntilExpiry()
+  const { pricingConfig } = usePricingConfig()
   const plan = subscriptionService.getPlan(subscriptionType as any)
 
   return (
@@ -79,7 +81,10 @@ export function SubscriptionExpiryModal({
                 <span className="text-xs sm:text-sm text-muted-foreground">Current Plan:</span>
                 <span className="text-xs sm:text-sm font-semibold">
                   {plan 
-                    ? (plan.id === 'PRO' ? 'PRO' : plan.id === 'GOLD' ? 'GOLD' : plan.id === 'PLATINUM' ? 'PLATINUM' : plan.name)
+                    ? (() => {
+                        const override = pricingConfig?.plans?.[plan.id as any]?.displayName
+                        return (typeof override === 'string' && override.trim()) ? override.trim() : plan.id
+                      })()
                     : subscriptionType}
                 </span>
               </div>
