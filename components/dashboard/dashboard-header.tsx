@@ -1,7 +1,7 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
-import { Plus, FileText, Calculator, Bell, Settings, Receipt, Download, FileCheck, BarChart3, ArrowLeft, Store } from "lucide-react"
+import { Plus, FileText, Calculator, Bell, Settings, Receipt, Download, FileCheck, BarChart3, Store } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { UploadDocumentDialog } from "../documents/upload-document-dialog"
 import { useState } from "react"
@@ -252,8 +252,6 @@ export function DashboardHeader() {
 
   const pageInfo = getPageInfo(pathname)
   const ButtonIcon = pageInfo.buttonIcon
-  const showBackButton = pathname !== "/dashboard" && pathname !== "/dashboard/"
-
   return (
     <div className="border-b border-border bg-card w-full">
       <div className={cn(
@@ -272,17 +270,6 @@ export function DashboardHeader() {
         )}>
           <div className="flex-1 min-w-0 w-full md:w-auto">
             <div className="flex items-center gap-2">
-              {/* Back button beside title - Mobile only */}
-              {showBackButton && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => router.back()}
-                  className="md:hidden h-7 w-7 p-0 mr-1 shrink-0"
-                >
-                  <ArrowLeft className="w-4 h-4" />
-                </Button>
-              )}
               <div className="flex-1 min-w-0">
                 <h1 className={cn(
                   "font-bold",
