@@ -256,9 +256,13 @@ export function DashboardNavSME() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => router.push('/marketplace')}
-              className="h-8 w-8"
-              title="Marketplace"
+              onClick={() => {
+                toast.message("Marketplace is coming soon", {
+                  description: "We’re working on it. Please check back shortly."
+                })
+              }}
+              className="h-8 w-8 opacity-60 cursor-not-allowed"
+              title="Marketplace (Coming Soon)"
             >
               <Store className="w-4 h-4" />
             </Button>
