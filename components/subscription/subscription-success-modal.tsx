@@ -8,10 +8,12 @@ import { CheckCircle, Sparkles, ChevronDown, ChevronUp, Heart } from "lucide-rea
 import { subscriptionService } from "@/lib/services/subscriptionService"
 import { SubscriptionType } from "@/lib/types"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
+import { usePricingConfig } from "@/lib/hooks/usePricingConfig"
 
 export function SubscriptionSuccessModal() {
   const router = useRouter()
   const { profile } = useUserProfile()
+  const { pricingConfig } = usePricingConfig()
   const [isOpen, setIsOpen] = useState(false)
   const [plan, setPlan] = useState<ReturnType<typeof subscriptionService.getPlan> | null>(null)
   const [showAllFeatures, setShowAllFeatures] = useState(false)
@@ -81,7 +83,8 @@ export function SubscriptionSuccessModal() {
             </DialogTitle>
             <DialogDescription className="text-xs sm:text-sm mt-1 sm:mt-2">
               {(() => {
-                const planDisplayName = plan.id === 'PRO' ? 'PRO' : plan.id === 'GOLD' ? 'GOLD' : plan.id === 'PLATINUM' ? 'PLATINUM' : plan.name
+                const override = pricingConfig?.plans?.[plan.id as any]?.displayName
+                const planDisplayName = (typeof override === 'string' && override.trim()) ? override.trim() : plan.id
                 return isFirstTime 
                   ? `Welcome to ${planDisplayName}! Your subscription is now active.`
                   : profile?.renewalCount 

@@ -65,10 +65,10 @@ export async function checkTrialManipulation(userId: string): Promise<boolean> {
       const trialStart = profile.freeTrialStartDate ? new Date(profile.freeTrialStartDate) : null;
       const now = new Date();
 
-      // Trial should be 3 days from start
+      // Trial should be 14 days from start
       if (trialStart) {
         const expectedEnd = new Date(trialStart);
-        expectedEnd.setDate(expectedEnd.getDate() + 3);
+        expectedEnd.setDate(expectedEnd.getDate() + 14);
         
         // Allow 1 day buffer for timezone differences
         const daysDifference = Math.abs((trialEnd.getTime() - expectedEnd.getTime()) / (1000 * 60 * 60 * 24));

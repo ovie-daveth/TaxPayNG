@@ -57,6 +57,7 @@ interface SignUpData {
   businessType: BusinessType
   phone?: string
   agentStates?: string[]
+  consultantStates?: string[]
 }
 
 interface SignInData {
@@ -156,6 +157,21 @@ export function useAuth() {
           console.error('Error creating default reminders:', reminderError)
           // Don't fail signup if reminders fail
         }
+
+        // Send welcome email (best-effort, idempotent on server)
+        try {
+          const idToken = await user.getIdToken()
+          await fetch('/api/user/send-welcome-email', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${idToken}`,
+              'Content-Type': 'application/json'
+            }
+          })
+        } catch (welcomeError) {
+          console.error('Error sending welcome email:', welcomeError)
+          // Don't fail signup if welcome email fails
+        }
         
         // Sign out the user immediately after signup (no auto-login)
         const userId = user.uid
@@ -176,6 +192,134 @@ export function useAuth() {
       }
       
     } catch (error: unknown) {
+      // Recovery path: Auth account already exists but profile may be missing.
+      if (error instanceof FirebaseError && error.code === 'auth/email-already-in-use') {
+        try {
+          // If the email is Google-only (no password), we cannot complete password signup.
+          const methods = await fetchSignInMethodsForEmail(auth, data.email)
+          const hasPassword = methods.includes('password')
+          const hasGoogle = methods.includes('google.com')
+
+          if (!hasPassword && hasGoogle) {
+            // Recoverable: if Auth exists but profile is missing, we can create the profile server-side
+            // (email ownership is proven via the signup token verification step).
+            const ensureRes = await fetch('/api/auth/ensure-profile', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                email: data.email,
+                firstName: data.firstName,
+                lastName: data.lastName,
+                businessType: data.businessType,
+                phone: data.phone,
+                consultantStates: data.consultantStates
+              })
+            })
+
+            if (ensureRes.ok) {
+              const ensureData = await ensureRes.json()
+              setAuthState(prev => ({ ...prev, loading: false, error: null }))
+              // Note: user still has no password provider; they must log in with Google.
+              return { success: true, userId: ensureData.userId, recoveredGoogleOnly: true }
+            }
+
+            const ensureErr = await ensureRes.json().catch(() => ({} as any))
+            const msg = ensureErr?.error === 'ACCOUNT_EXISTS'
+              ? 'This email already has an account. Please log in instead.'
+              : 'This email is registered with Google. Please use "Continue with Google" to sign up/sign in.'
+            setAuthState(prev => ({ ...prev, loading: false, error: msg }))
+            return { success: false, error: ensureErr?.error || 'GOOGLE_ONLY_USER' }
+          }
+
+          if (!hasPassword) {
+            const msg = 'This email is already registered. Please log in instead.'
+            setAuthState(prev => ({ ...prev, loading: false, error: msg }))
+            return { success: false, error: msg }
+          }
+
+          // Sign in with the provided password to prove ownership, then check/create profile.
+          const existingCred = await signInWithEmailAndPassword(auth, data.email, data.password)
+          const user = existingCred.user
+
+          const existingProfile = await userService.getProfile(user.uid)
+          if (existingProfile) {
+            // Real duplicate: profile exists → this is not a signup.
+            await signOut(auth)
+            setAuthState({ user: null, loading: false, error: null })
+            return { success: false, error: 'ACCOUNT_EXISTS' }
+          }
+
+          // Profile is missing → create it and proceed like a normal signup.
+          await updateProfile(user, { displayName: `${data.firstName} ${data.lastName}` })
+
+          const profileData: any = {
+            email: data.email,
+            firstName: data.firstName,
+            lastName: data.lastName,
+            businessType: data.businessType,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          }
+
+          if (data.businessType === 'consultant') {
+            profileData.phone = data.phone
+            profileData.consultantStates = data.consultantStates || []
+            profileData.consultantKycCompleted = false
+            profileData.role = 'consultant'
+          }
+
+          const profileResult = await userService.upsertProfile(user.uid, profileData)
+          if (!profileResult?.success) {
+            await signOut(auth)
+            setAuthState({ user: null, loading: false, error: null })
+            return { success: false, error: profileResult?.error || 'Failed to create profile' }
+          }
+
+          // Free trial + reminders + welcome email (best-effort)
+          try {
+            const idToken = await user.getIdToken()
+            await fetch('/api/user/init-free-trial', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${idToken}`,
+                'Content-Type': 'application/json'
+              }
+            })
+          } catch (trialError) {
+            console.error('Error initializing free trial (recovered signup):', trialError)
+          }
+
+          try {
+            const { createDefaultReminders } = await import('@/lib/utils/defaultReminders')
+            await createDefaultReminders(user.uid, data.businessType)
+          } catch (reminderError) {
+            console.error('Error creating default reminders (recovered signup):', reminderError)
+          }
+
+          try {
+            const idToken = await user.getIdToken()
+            await fetch('/api/user/send-welcome-email', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${idToken}`,
+                'Content-Type': 'application/json'
+              }
+            })
+          } catch (welcomeError) {
+            console.error('Error sending welcome email (recovered signup):', welcomeError)
+          }
+
+          const userId = user.uid
+          await signOut(auth)
+          setAuthState({ user: null, loading: false, error: null })
+          return { success: true, userId, recovered: true }
+        } catch (recoveryError: any) {
+          const msg = mapFirebaseAuthError(recoveryError?.code || 'auth/email-already-in-use', recoveryError?.message)
+          setAuthState(prev => ({ ...prev, loading: false, error: msg }))
+          return { success: false, error: msg }
+        }
+      }
+
       let errorMessage = 'An error occurred during sign up'
       if (error instanceof FirebaseError) {
         errorMessage = mapFirebaseAuthError(error.code, error.message)
@@ -278,7 +422,9 @@ export function useAuth() {
     }
   }
 
-  const signInWithGoogle = async (businessType?: BusinessType) => {
+  // Google is SIGN-IN ONLY.
+  // If the user has no existing profile, we treat them as not registered and ask them to sign up.
+  const signInWithGoogle = async () => {
     try {
       setAuthState(prev => ({ ...prev, loading: true, error: null }))
 
@@ -305,87 +451,21 @@ export function useAuth() {
         return { success: false, error: 'Failed to sign in with Google' }
       }
 
-      // Check if this is a new Firebase auth account or existing one
-      // Compare creationTime with lastSignInTime - if they're the same (or very close), it's a new account
-      const creationTime = user.metadata.creationTime ? new Date(user.metadata.creationTime).getTime() : 0
-      const lastSignInTime = user.metadata.lastSignInTime ? new Date(user.metadata.lastSignInTime).getTime() : 0
-      const timeDifference = Math.abs(lastSignInTime - creationTime)
-      const isNewFirebaseAccount = timeDifference < 5000 // 5 seconds threshold - if creation and last sign in are within 5 seconds, it's new
-
       // Check if user profile exists in Firestore
       const existingProfile = await userService.getProfile(user.uid)
 
-      // If account is not new (created more than 5 seconds before last sign in) and we're on signup page, it's an existing user
-      // businessType is only passed when called from signup page
-      if (!isNewFirebaseAccount && businessType !== undefined) {
-        // User is trying to sign up but account already exists
-        // Sign them out and return error
-        await signOut(auth)
-        setAuthState(prev => ({ ...prev, loading: false, error: null }))
-        return { 
-          success: false, 
-          error: 'An account with this email already exists. Please sign in instead.' 
-        }
-      }
-
+      // If there's no profile, the user signed in with Google but onboarding wasn't completed.
+      // Keep them signed in and let the UI complete profile creation (business type selection).
       if (!existingProfile) {
-        // New user - create profile
-        // Extract name from Google profile
-        const displayName = user.displayName || ''
-        const nameParts = displayName.split(' ')
-        const firstName = nameParts[0] || ''
-        const lastName = nameParts.slice(1).join(' ') || ''
-
-        // Create profile data (free trial will be initialized via API endpoint)
-        const profileData: any = {
-          email: user.email || '',
-          firstName: firstName,
-          lastName: lastName,
-          businessType: businessType || 'freelancer', // Default to freelancer if not provided
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString()
-        }
-
-        // Add consultant-specific fields if businessType is consultant
-        if (businessType === 'consultant') {
-          profileData.consultantKycCompleted = false
-          profileData.role = 'consultant' // Set role to consultant
-          // Note: phone and consultantStates will need to be added later via profile completion
-        }
-
-        const profileResult = await userService.upsertProfile(user.uid, profileData)
-
-        if (profileResult && profileResult.success) {
-          // Initialize free trial for new users
-          try {
-            const idToken = await user.getIdToken()
-            const initTrialResponse = await fetch('/api/user/init-free-trial', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${idToken}`,
-                'Content-Type': 'application/json'
-              }
-            })
-            
-            if (initTrialResponse.ok) {
-              const trialData = await initTrialResponse.json()
-              console.log("Free trial initialized:", trialData)
-            } else {
-              console.warn('Failed to initialize free trial, but signup succeeded')
-            }
-          } catch (trialError) {
-            console.error('Error initializing free trial:', trialError)
-            // Don't fail signup if free trial initialization fails
-          }
-          
-          // Create default reminders for the user
-          try {
-            const { createDefaultReminders } = await import('@/lib/utils/defaultReminders')
-            await createDefaultReminders(user.uid, businessType || 'freelancer')
-          } catch (reminderError) {
-            console.error('Error creating default reminders:', reminderError)
-            // Don't fail signup if reminders fail
-          }
+        setAuthState({
+          user,
+          loading: false,
+          error: null
+        })
+        return {
+          success: false,
+          error: 'MISSING_PROFILE',
+          userId: user.uid
         }
       }
 
@@ -398,8 +478,7 @@ export function useAuth() {
       return { 
         success: true, 
         userId: user.uid, 
-        isNewUser: !existingProfile,
-        needsBusinessTypeSelection: !existingProfile && !businessType // New user without business type
+        isNewUser: false,
       }
     } catch (error: unknown) {
       let errorMessage = 'An error occurred during Google sign in'
@@ -455,6 +534,183 @@ export function useAuth() {
       }
       setAuthState(prev => ({ ...prev, loading: false, error: errorMessage }))
       return { success: false, error: errorMessage }
+    }
+  }
+
+  // Google SIGN-UP (no business-type page/dialog).
+  // Called from the signup page after the user has selected businessType on the form.
+  const signUpWithGoogle = async (businessType: BusinessType) => {
+    try {
+      setAuthState(prev => ({ ...prev, loading: true, error: null }))
+
+      const provider = new GoogleAuthProvider()
+      const result = await signInWithPopup(auth, provider)
+      const user = result.user
+
+      if (!user) {
+        return { success: false, error: 'Failed to sign up with Google' }
+      }
+
+      // If profile already exists, this is NOT a signup. Block it.
+      const existingProfile = await userService.getProfile(user.uid)
+      if (existingProfile) {
+        await signOut(auth)
+        setAuthState(prev => ({ ...prev, loading: false, error: null }))
+        return { success: false, error: 'ACCOUNT_EXISTS' }
+      }
+
+      const displayName = user.displayName || ''
+      const nameParts = displayName.split(' ')
+      const firstName = nameParts[0] || ''
+      const lastName = nameParts.slice(1).join(' ') || ''
+
+      const profileData: any = {
+        email: (user.email || '').toLowerCase(),
+        firstName,
+        lastName,
+        businessType,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+
+      if (businessType === 'consultant') {
+        profileData.consultantKycCompleted = false
+        profileData.role = 'consultant'
+      }
+
+      const profileResult = await userService.upsertProfile(user.uid, profileData)
+      if (!profileResult?.success) {
+        await signOut(auth)
+        setAuthState(prev => ({ ...prev, loading: false, error: null }))
+        return { success: false, error: profileResult?.error || 'Failed to create profile' }
+      }
+
+      try {
+        const idToken = await user.getIdToken()
+        await fetch('/api/user/init-free-trial', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
+      } catch (trialError) {
+        console.error('Error initializing free trial (Google signup):', trialError)
+      }
+
+      try {
+        const { createDefaultReminders } = await import('@/lib/utils/defaultReminders')
+        await createDefaultReminders(user.uid, businessType)
+      } catch (reminderError) {
+        console.error('Error creating default reminders (Google signup):', reminderError)
+      }
+
+      try {
+        const idToken = await user.getIdToken()
+        await fetch('/api/user/send-welcome-email', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
+      } catch (welcomeError) {
+        console.error('Error sending welcome email (Google signup):', welcomeError)
+      }
+
+      setAuthState({ user, loading: false, error: null })
+      return { success: true, userId: user.uid, isNewUser: true }
+    } catch (error: unknown) {
+      let errorMessage = 'An error occurred during Google sign up'
+      if (error instanceof FirebaseError) {
+        if (error.code === 'auth/popup-closed-by-user') {
+          errorMessage = 'Sign up cancelled'
+        } else {
+          errorMessage = mapFirebaseAuthError(error.code, error.message)
+        }
+      } else if (error && typeof error === 'object' && 'message' in error) {
+        errorMessage = String((error as { message?: unknown }).message) || errorMessage
+      }
+      setAuthState(prev => ({ ...prev, loading: false, error: errorMessage }))
+      return { success: false, error: errorMessage }
+    }
+  }
+
+  // Complete profile creation for an already authenticated Google user (when Auth user exists but userProfile doesn't).
+  const completeGoogleProfile = async (businessType: BusinessType) => {
+    try {
+      const currentUser = auth.currentUser
+      if (!currentUser) {
+        return { success: false, error: 'User not authenticated' }
+      }
+
+      const existingProfile = await userService.getProfile(currentUser.uid)
+      if (existingProfile) {
+        return { success: true, userId: currentUser.uid, alreadyExisted: true }
+      }
+
+      const displayName = currentUser.displayName || ''
+      const nameParts = displayName.split(' ')
+      const firstName = nameParts[0] || ''
+      const lastName = nameParts.slice(1).join(' ') || ''
+
+      const profileData: any = {
+        email: (currentUser.email || '').toLowerCase(),
+        firstName,
+        lastName,
+        businessType,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+
+      if (businessType === 'consultant') {
+        profileData.consultantKycCompleted = false
+        profileData.role = 'consultant'
+      }
+
+      const profileResult = await userService.upsertProfile(currentUser.uid, profileData)
+      if (!profileResult?.success) {
+        return { success: false, error: profileResult?.error || 'Failed to create profile' }
+      }
+
+      // Initialize free trial + reminders + welcome email (best-effort)
+      try {
+        const idToken = await currentUser.getIdToken()
+        await fetch('/api/user/init-free-trial', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
+      } catch (trialError) {
+        console.error('Error initializing free trial (Google profile completion):', trialError)
+      }
+
+      try {
+        const { createDefaultReminders } = await import('@/lib/utils/defaultReminders')
+        await createDefaultReminders(currentUser.uid, businessType)
+      } catch (reminderError) {
+        console.error('Error creating default reminders (Google profile completion):', reminderError)
+      }
+
+      try {
+        const idToken = await currentUser.getIdToken()
+        await fetch('/api/user/send-welcome-email', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${idToken}`,
+            'Content-Type': 'application/json'
+          }
+        })
+      } catch (welcomeError) {
+        console.error('Error sending welcome email (Google profile completion):', welcomeError)
+      }
+
+      return { success: true, userId: currentUser.uid, alreadyExisted: false }
+    } catch (error: any) {
+      console.error('Error completing Google profile:', error)
+      return { success: false, error: error?.message || 'Failed to complete profile' }
     }
   }
 
@@ -577,6 +833,8 @@ export function useAuth() {
     signUp,
     signIn,
     signInWithGoogle,
+    signUpWithGoogle,
+    completeGoogleProfile,
     logout,
     resetPassword,
     setPasswordForGoogleUser,

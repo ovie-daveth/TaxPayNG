@@ -111,6 +111,11 @@ export function DashboardNavCreator() {
   const mobileAddButton = getMobileAddButton()
   const AddButtonIcon = mobileAddButton.icon
 
+  // Close the mobile menu whenever navigation occurs (e.g., when BusinessSwitcher "Manage" navigates)
+  useEffect(() => {
+    setIsMobileMenuOpen(false)
+  }, [pathname])
+
   useEffect(() => {
     const checkFilingRequests = async () => {
       if (!user?.uid) {
@@ -182,7 +187,6 @@ export function DashboardNavCreator() {
             {!sidebarCollapsed && (
               <>
                 <OtaxLogo />
-                <span className="font-semibold text-lg whitespace-nowrap">- Creators</span>
               </>
             )}
           </Link>
@@ -306,9 +310,13 @@ export function DashboardNavCreator() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => router.push('/marketplace')}
-              className="h-8 w-8"
-              title="Marketplace"
+              onClick={() => {
+                toast.message("Marketplace is coming soon", {
+                  description: "We’re working on it. Please check back shortly."
+                })
+              }}
+              className="h-8 w-8 opacity-60 cursor-not-allowed"
+              title="Marketplace (Coming Soon)"
             >
               <Store className="w-4 h-4" />
             </Button>

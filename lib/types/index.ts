@@ -55,8 +55,10 @@ export interface UserProfile {
   subscriptionExpiryDate?: string // ISO string - when subscription expires (31 days for monthly, 365 days for yearly)
   // Free Trial fields
   freeTrialStartDate?: string // ISO string - when free trial started
-  freeTrialEndDate?: string // ISO string - when free trial ends (3 days from start)
+  freeTrialEndDate?: string // ISO string - when free trial ends (14 days from start)
   freeTrialUsed?: boolean // Whether user has used their free trial
+  // Email lifecycle fields
+  welcomeEmailSentAt?: string // ISO string - when welcome email was successfully sent
   /**
    * Multi-Entity Business Management (PLATINUM, Small Business, Big Business):
    * The currently active business entity context for this user.

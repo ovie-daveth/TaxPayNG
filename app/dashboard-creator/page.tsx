@@ -43,14 +43,14 @@ export default function CreatorDashboardPage() {
               <h1 className="text-xl sm:text-2xl md:text-3xl font-bold tracking-tight">
                 {activeView === 'platform' ? 'Platform Analytics' 
                   : activeView === 'advanced' ? 'Advanced Analytics'
-                  : 'Creator Performance Overview'}
+                  : 'Performance Overview'}
               </h1>
               <p className="text-xs sm:text-sm md:text-base text-muted-foreground max-w-2xl">
                 {activeView === 'platform' 
                   ? 'Track income, expenses, and profitability by platform'
                   : activeView === 'advanced'
                   ? 'Unlock powerful financial insights, trend analysis, forecasting, and comparative analytics'
-                  : 'Track income from partnered brands, platform payouts, and deductible expenses in one place. Stay ahead of quarterly tax obligations with automated reminders tailored for Nigerian creators.'
+                  : 'Track income from partnered brands, platform payouts, and deductible expenses in one place. Stay ahead of quarterly tax obligations with automated reminders.'
                 }
               </p>
             </div>

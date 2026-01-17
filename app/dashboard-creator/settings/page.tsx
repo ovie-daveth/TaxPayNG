@@ -24,7 +24,7 @@ import { Badge } from "@/components/ui/badge"
 import { User, Building2, CreditCard, Bell, Shield, Upload, X, CheckCircle2, Loader2, ExternalLink, HelpCircle, MessageSquare, Mail, Send } from "lucide-react"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
 import { useSubscription } from "@/lib/hooks/useSubscription"
-import { subscriptionService, getPlanPriceDisplay } from "@/lib/services/subscriptionService"
+import { subscriptionService } from "@/lib/services/subscriptionService"
 import { getAuth } from "firebase/auth"
 import { auth } from "@/firebase/firebase"
 import { reauthenticateWithCredential, updatePassword, EmailAuthProvider } from "firebase/auth"
@@ -35,6 +35,8 @@ import { OneTouchResubscribeButton } from "@/components/subscription/one-touch-r
 import { SubscriptionType, PlatformConnection } from "@/lib/types"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { VATQualificationSection } from "@/components/settings/vat-qualification-section"
+import { usePricingConfig } from "@/lib/hooks/usePricingConfig"
+import { DEFAULT_YEARLY_DISCOUNT_PERCENT } from "@/lib/constants/pricing"
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -42,6 +44,7 @@ export default function SettingsPage() {
   const { user, loading: authLoading, setPasswordForGoogleUser } = useAuth()
   const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
   const { isSubscribed, subscriptionType, isExpired, isExpiringSoon, subscriptionExpiryDate, freeTrialStatus } = useSubscription()
+  const { pricingConfig } = usePricingConfig()
   const { sidebarCollapsed } = useSidebar()
   const [isSaving, setIsSaving] = useState(false)
   const [processingSubscription, setProcessingSubscription] = useState<string | null>(null)
@@ -49,6 +52,7 @@ export default function SettingsPage() {
   const [showMigrationModal, setShowMigrationModal] = useState(false)
   const [showFreelancerMigrationModal, setShowFreelancerMigrationModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
+  const [selectedPlanInterval, setSelectedPlanInterval] = useState<'monthly' | 'yearly'>('monthly')
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
   const kycSectionRef = useRef<HTMLDivElement>(null)
   // KYC: Means of identification (NIN, International Passport, Voter's Card, Driver's License, etc.)
@@ -136,6 +140,31 @@ export default function SettingsPage() {
   // Loading state: show skeleton while auth or profile is loading
   const isLoading = authLoading || profileLoading
 
+  const yearlyDiscountPercent = pricingConfig?.yearlyDiscountPercent ?? DEFAULT_YEARLY_DISCOUNT_PERCENT
+  const formatKobo = (priceInKobo: number) => {
+    const priceInNaira = priceInKobo / 100
+    return `₦${priceInNaira.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+  }
+  const getPlanWithOverrides = (planType: SubscriptionType) => {
+    const base = subscriptionService.getPlan(planType)
+    if (!base) return null
+    const overrideMonthly = pricingConfig?.plans?.[planType as any]?.monthlyPrice
+    const overrideNameRaw = pricingConfig?.plans?.[planType as any]?.displayName
+    const overrideName = typeof overrideNameRaw === "string" ? overrideNameRaw.trim() : ""
+    const monthlyPrice = typeof overrideMonthly === "number" && overrideMonthly > 0 ? overrideMonthly : base.monthlyPrice
+    const yearlyPrice = Math.round(12 * monthlyPrice * (1 - yearlyDiscountPercent / 100))
+    return {
+      ...base,
+      name: overrideName || (planType as any),
+      monthlyPrice,
+      yearlyPrice,
+      monthlyPriceDisplay: formatKobo(monthlyPrice),
+      yearlyPriceDisplay: formatKobo(yearlyPrice),
+      // Backward compat: some UIs use plan.priceDisplay
+      priceDisplay: formatKobo(monthlyPrice),
+    }
+  }
+
   useEffect(() => {
     if (profileLoading || !profile) {
       return
@@ -198,58 +227,23 @@ export default function SettingsPage() {
     if (!selectedPlan) return
 
     try {
-      // Get auth token
-      const currentUser = auth.currentUser
-      if (!currentUser) {
-        router.push("/login")
-        return
-      }
-
-      const token = await currentUser.getIdToken()
-
-      // Determine target business type based on plan
-      let targetBusinessType: string
-      if (profile?.businessType === 'freelancer' && (selectedPlan === 'GOLD' || selectedPlan === 'PLATINUM')) {
-        targetBusinessType = 'creator'
-      } else if (profile?.businessType === 'creator' && selectedPlan === 'PRO') {
-        targetBusinessType = 'freelancer'
-      } else {
-        throw new Error("Invalid migration path")
-      }
-
-      // Update business type
-      const updateResponse = await fetch("/api/user/update-business-type", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          businessType: targetBusinessType
-        })
-      })
-
-      const updateData = await updateResponse.json()
-
-      if (!updateResponse.ok || !updateData.success) {
-        throw new Error(updateData.error || "Failed to update business type")
-      }
-
-      // Migration successful - proceed silently to payment
-      // Close migration modals
+      // IMPORTANT: Do NOT update businessType before payment.
+      // BusinessType migration happens after successful payment in /api/subscription/verify.
       setShowMigrationModal(false)
       setShowFreelancerMigrationModal(false)
-      // Small delay to ensure modal closes, then proceed with subscription
+      const plan = selectedPlan
+      const interval = selectedPlanInterval
+      setSelectedPlan(null)
       setTimeout(() => {
-        handleSubscribeDirect(selectedPlan)
-      }, 300)
+        handleSubscribeDirect(plan, interval)
+      }, 200)
     } catch (error) {
       console.error("Migration error:", error)
       toast.error(error instanceof Error ? error.message : "Failed to migrate account")
     }
   }
 
-  const handleSubscribeDirect = async (planType: SubscriptionType) => {
+  const handleSubscribeDirect = async (planType: SubscriptionType, intervalOverride?: 'monthly' | 'yearly') => {
     if (!user?.uid) {
       toast.error("User not authenticated")
       return
@@ -270,6 +264,7 @@ export default function SettingsPage() {
       }
 
       const token = await currentUser.getIdToken()
+      const effectiveInterval = intervalOverride ?? billingInterval
 
       // Initialize subscription payment
       const response = await fetch("/api/subscription/initialize", {
@@ -280,7 +275,7 @@ export default function SettingsPage() {
         },
         body: JSON.stringify({
           subscriptionType: planType,
-          interval: billingInterval
+          interval: effectiveInterval
         })
       })
 
@@ -306,14 +301,13 @@ export default function SettingsPage() {
   }
 
   const handleSubscribe = async (planType: SubscriptionType, interval?: 'monthly' | 'yearly') => {
-    // Update billing interval if provided
-    if (interval) {
-      setBillingInterval(interval)
-    }
+    const effectiveInterval = interval ?? billingInterval
+    if (interval) setBillingInterval(interval)
     
     // Check if migration is needed
     if (needsMigration(planType)) {
       setSelectedPlan(planType)
+      setSelectedPlanInterval(effectiveInterval)
       // Show appropriate migration modal based on direction
       if (profile?.businessType === 'creator' && planType === 'PRO') {
         setShowFreelancerMigrationModal(true)
@@ -324,7 +318,7 @@ export default function SettingsPage() {
     }
 
     // No migration needed, proceed with subscription
-    await handleSubscribeDirect(planType)
+    await handleSubscribeDirect(planType, effectiveInterval)
   }
 
   useEffect(() => {
@@ -1730,32 +1724,112 @@ export default function SettingsPage() {
                     {(!isSubscribed || isExpired) ? (
                       <div className="space-y-3 sm:space-y-4">
                         <div className="p-4 sm:p-5 md:p-6 border rounded-lg bg-muted/50">
-                          <h3 className="text-base sm:text-lg font-semibold mb-2">Choose a Subscription Plan</h3>
-                          <p className="text-xs sm:text-sm text-muted-foreground mb-3 sm:mb-4">
-                            Select a plan to unlock all features and start managing your taxes efficiently.
-                          </p>
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
+                          <div className="mb-4 sm:mb-6">
+                            <h3 className="text-base sm:text-lg font-semibold mb-2">Choose a Subscription Plan</h3>
+                            <p className="text-xs sm:text-sm text-muted-foreground mb-4">
+                              Select a plan to unlock all features and start managing your taxes efficiently.
+                            </p>
+
+                            {/* Billing Interval Toggle */}
+                            <div className="flex items-center justify-center gap-3 mb-4 sm:mb-6 p-3 sm:p-4 bg-background rounded-lg border">
+                              <Label htmlFor="billing-toggle-creator" className={`text-sm cursor-pointer ${billingInterval === 'monthly' ? 'font-semibold' : 'text-muted-foreground'}`}>
+                                Monthly
+                              </Label>
+                              <Switch
+                                id="billing-toggle-creator"
+                                checked={billingInterval === 'yearly'}
+                                onCheckedChange={(checked) => setBillingInterval(checked ? 'yearly' : 'monthly')}
+                              />
+                              <Label htmlFor="billing-toggle-creator" className={`text-sm cursor-pointer ${billingInterval === 'yearly' ? 'font-semibold' : 'text-muted-foreground'}`}>
+                                Yearly
+                              </Label>
+                              {billingInterval === 'yearly' && (
+                                <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 text-xs font-semibold ml-2">
+                                  Save {yearlyDiscountPercent}%
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="grid gap-3 sm:gap-4 grid-cols-1 md:grid-cols-3">
                             {(() => {
-                              // Get plans based on business type
-                              const availablePlans = profile?.businessType === 'sme' 
-                                ? (['Small Business', 'Big Business'] as const)
-                                : (['PRO', 'GOLD', 'PLATINUM'] as const)
-                              
+                              const availablePlans = (['PRO', 'GOLD', 'PLATINUM'] as const)
                               return availablePlans.map((planType) => {
-                                const plan = subscriptionService.getPlan(planType)
+                                const plan = getPlanWithOverrides(planType)
                                 if (!plan) return null
+
+                                const isProcessing = processingSubscription === planType
                                 return (
-                                  <Card key={planType} className="p-3 sm:p-4">
-                                    <div className="space-y-2">
-                                      <h4 className="text-sm sm:text-base font-semibold">{plan.name}</h4>
-                                      <p className="text-xl sm:text-2xl font-bold">{plan.priceDisplay}</p>
-                                      <p className="text-xs text-muted-foreground">per month</p>
+                                  <Card key={planType} className="p-4 sm:p-6 transition-all hover:border-primary">
+                                    <div className="space-y-3 sm:space-y-4">
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="min-w-0">
+                                          <h4 className="text-base sm:text-lg font-semibold mb-1">{plan.name}</h4>
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            {planType === 'PRO' && (
+                                              <Badge variant="secondary" className="text-xs">Basic</Badge>
+                                            )}
+                                            {planType === 'GOLD' && (
+                                              <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 text-xs">
+                                                Advanced
+                                              </Badge>
+                                            )}
+                                            {planType === 'PLATINUM' && (
+                                              <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200 text-xs">
+                                                Premium
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="space-y-2">
+                                        {billingInterval === 'monthly' ? (
+                                          <>
+                                            <div className="flex items-baseline gap-2">
+                                              <span className="text-2xl sm:text-3xl font-bold">{plan.monthlyPriceDisplay}</span>
+                                            </div>
+                                            <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
+                                          </>
+                                        ) : (
+                                          <>
+                                            <span className="text-xs font-medium text-muted-foreground line-through">
+                                              {(() => {
+                                                const grossYearly = (plan.monthlyPrice * 12) / 100
+                                                return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+                                              })()}
+                                            </span>
+                                            <div className="flex items-baseline gap-2">
+                                              <span className="text-2xl sm:text-3xl font-bold">{plan.yearlyPriceDisplay}</span>
+                                              <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 py-0.5 text-xs font-semibold">
+                                                {yearlyDiscountPercent}% OFF
+                                              </Badge>
+                                            </div>
+                                            <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
+                                          </>
+                                        )}
+                                      </div>
+
+                                      <ul className="space-y-2 text-xs sm:text-sm">
+                                        {plan.features.slice(0, 4).map((feature, idx) => (
+                                          <li key={idx} className="flex items-start gap-2">
+                                            <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                                            <span className="text-muted-foreground">{feature}</span>
+                                          </li>
+                                        ))}
+                                        {plan.features.length > 4 && (
+                                          <li className="text-xs text-muted-foreground">
+                                            +{plan.features.length - 4} more features
+                                          </li>
+                                        )}
+                                      </ul>
+
                                       <Button
-                                        className="w-full mt-3 sm:mt-4 text-xs sm:text-sm h-9 sm:h-10"
-                                        onClick={() => handleSubscribe(planType)}
-                                        disabled={processingSubscription === planType}
+                                        className="w-full mt-4 sm:mt-6 text-xs sm:text-sm h-9 sm:h-10"
+                                        onClick={() => handleSubscribe(planType, billingInterval)}
+                                        disabled={isProcessing}
                                       >
-                                        {processingSubscription === planType ? (
+                                        {isProcessing ? (
                                           <>
                                             <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-2 animate-spin" />
                                             Processing...
@@ -1779,11 +1853,11 @@ export default function SettingsPage() {
                             <div>
                               <h3 className="text-base sm:text-lg font-semibold">Current Plan</h3>
                               <p className="text-xs sm:text-sm text-muted-foreground">
-                                {subscriptionType} - {(() => {
-                                  const plan = subscriptionService.getPlan(subscriptionType)
+                                {(getPlanWithOverrides(subscriptionType)?.name ?? subscriptionType)} - {(() => {
+                                  const plan = getPlanWithOverrides(subscriptionType)
                                   if (!plan) return 'N/A'
                                   const interval = (profile?.subscriptionInterval as 'monthly' | 'yearly' | undefined) || 'monthly'
-                                  const priceDisplay = getPlanPriceDisplay(plan, interval)
+                                  const priceDisplay = interval === 'yearly' ? plan.yearlyPriceDisplay : plan.monthlyPriceDisplay
                                   const period = interval === 'yearly' ? '/year' : '/month'
                                   return `${priceDisplay}${period}`
                                 })()}
@@ -1939,7 +2013,7 @@ export default function SettingsPage() {
                             setNotificationPreferences(prev => ({ ...prev, emailNotifications: !checked }))
                           }
                         }}
-                        className="flex-shrink-0" 
+                        className="shrink-0" 
                       />
                     </div>
                     <Separator />
@@ -1953,7 +2027,7 @@ export default function SettingsPage() {
                       <Switch 
                         checked={false}
                         disabled
-                        className="flex-shrink-0" 
+                        className="shrink-0" 
                       />
                     </div>
                   </div>

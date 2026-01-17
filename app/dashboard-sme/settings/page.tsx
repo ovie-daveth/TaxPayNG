@@ -23,7 +23,7 @@ import { Badge } from "@/components/ui/badge"
 import { User, Building2, CreditCard, Bell, Shield, Upload, X, CheckCircle2, Loader2, ExternalLink, HelpCircle, MessageSquare, Mail, Send } from "lucide-react"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
 import { useSubscription } from "@/lib/hooks/useSubscription"
-import { subscriptionService, getPlanPriceDisplay } from "@/lib/services/subscriptionService"
+import { subscriptionService } from "@/lib/services/subscriptionService"
 import { getAuth } from "firebase/auth"
 import { auth } from "@/firebase/firebase"
 import { reauthenticateWithCredential, updatePassword, EmailAuthProvider } from "firebase/auth"
@@ -33,6 +33,8 @@ import { OneTouchResubscribeButton } from "@/components/subscription/one-touch-r
 import { SubscriptionType } from "@/lib/types"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { VATQualificationSection } from "@/components/settings/vat-qualification-section"
+import { usePricingConfig } from "@/lib/hooks/usePricingConfig"
+import { DEFAULT_YEARLY_DISCOUNT_PERCENT } from "@/lib/constants/pricing"
 
 export default function SettingsPage() {
   const router = useRouter()
@@ -40,12 +42,14 @@ export default function SettingsPage() {
   const { user, loading: authLoading, setPasswordForGoogleUser } = useAuth()
   const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
   const { isSubscribed, subscriptionType, isExpired, isExpiringSoon, subscriptionExpiryDate, freeTrialStatus } = useSubscription()
+  const { pricingConfig } = usePricingConfig()
   const { sidebarCollapsed } = useSidebar()
   const [isSaving, setIsSaving] = useState(false)
   const [processingSubscription, setProcessingSubscription] = useState<string | null>(null)
   const [showChangePlanModal, setShowChangePlanModal] = useState(false)
   const [showMigrationModal, setShowMigrationModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
+  const [selectedPlanInterval, setSelectedPlanInterval] = useState<'monthly' | 'yearly'>('monthly')
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
   const kycSectionRef = useRef<HTMLDivElement>(null)
   // KYC: Means of identification (NIN, International Passport, Voter's Card, Driver's License, etc.)
@@ -120,6 +124,30 @@ export default function SettingsPage() {
   // Loading state: show skeleton while auth or profile is loading
   const isLoading = authLoading || profileLoading
 
+  const yearlyDiscountPercent = pricingConfig?.yearlyDiscountPercent ?? DEFAULT_YEARLY_DISCOUNT_PERCENT
+  const formatKobo = (priceInKobo: number) => {
+    const priceInNaira = priceInKobo / 100
+    return `₦${priceInNaira.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+  }
+  const getPlanWithOverrides = (planType: SubscriptionType) => {
+    const base = subscriptionService.getPlan(planType)
+    if (!base) return null
+    const overrideMonthly = pricingConfig?.plans?.[planType as any]?.monthlyPrice
+    const overrideNameRaw = pricingConfig?.plans?.[planType as any]?.displayName
+    const overrideName = typeof overrideNameRaw === "string" ? overrideNameRaw.trim() : ""
+    const monthlyPrice = typeof overrideMonthly === "number" && overrideMonthly > 0 ? overrideMonthly : base.monthlyPrice
+    const yearlyPrice = Math.round(12 * monthlyPrice * (1 - yearlyDiscountPercent / 100))
+    return {
+      ...base,
+      name: overrideName || (planType as any),
+      monthlyPrice,
+      yearlyPrice,
+      monthlyPriceDisplay: formatKobo(monthlyPrice),
+      yearlyPriceDisplay: formatKobo(yearlyPrice),
+      priceDisplay: formatKobo(monthlyPrice),
+    }
+  }
+
   useEffect(() => {
     if (profileLoading || !profile) {
       return
@@ -190,47 +218,22 @@ export default function SettingsPage() {
     if (!selectedPlan) return
 
     try {
-      // Get auth token
-      const currentUser = auth.currentUser
-      if (!currentUser) {
-        router.push("/login")
-        return
-      }
-
-      const token = await currentUser.getIdToken()
-
-      // Update business type to creator
-      const updateResponse = await fetch("/api/user/update-business-type", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          businessType: 'creator'
-        })
-      })
-
-      const updateData = await updateResponse.json()
-
-      if (!updateResponse.ok || !updateData.success) {
-        throw new Error(updateData.error || "Failed to update business type")
-      }
-
-      // Migration successful - proceed silently to payment
-      // Close migration modal
+      // IMPORTANT: Do NOT update businessType before payment.
+      // BusinessType migration happens after successful payment in /api/subscription/verify.
       setShowMigrationModal(false)
-      // Small delay to ensure modal closes, then proceed with subscription
+      const plan = selectedPlan
+      const interval = selectedPlanInterval
+      setSelectedPlan(null)
       setTimeout(() => {
-        handleSubscribeDirect(selectedPlan)
-      }, 300)
+        handleSubscribeDirect(plan, interval)
+      }, 200)
     } catch (error) {
       console.error("Migration error:", error)
       toast.error(error instanceof Error ? error.message : "Failed to migrate account")
     }
   }
 
-  const handleSubscribeDirect = async (planType: SubscriptionType) => {
+  const handleSubscribeDirect = async (planType: SubscriptionType, intervalOverride?: 'monthly' | 'yearly') => {
     if (!user?.uid) {
       toast.error("User not authenticated")
       return
@@ -251,6 +254,7 @@ export default function SettingsPage() {
       }
 
       const token = await currentUser.getIdToken()
+      const effectiveInterval = intervalOverride ?? billingInterval
 
       // Initialize subscription payment
       const response = await fetch("/api/subscription/initialize", {
@@ -261,7 +265,7 @@ export default function SettingsPage() {
         },
         body: JSON.stringify({
           subscriptionType: planType,
-          interval: billingInterval
+          interval: effectiveInterval
         })
       })
 
@@ -287,20 +291,19 @@ export default function SettingsPage() {
   }
 
   const handleSubscribe = async (planType: SubscriptionType, interval?: 'monthly' | 'yearly') => {
-    // Update billing interval if provided
-    if (interval) {
-      setBillingInterval(interval)
-    }
+    const effectiveInterval = interval ?? billingInterval
+    if (interval) setBillingInterval(interval)
     
     // Check if migration is needed
     if (needsMigration(planType)) {
       setSelectedPlan(planType)
+      setSelectedPlanInterval(effectiveInterval)
       setShowMigrationModal(true)
       return
     }
 
     // No migration needed, proceed with subscription
-    await handleSubscribeDirect(planType)
+    await handleSubscribeDirect(planType, effectiveInterval)
   }
 
   useEffect(() => {
@@ -1285,7 +1288,7 @@ export default function SettingsPage() {
                               </Label>
                               {billingInterval === 'yearly' && (
                                 <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 text-xs font-semibold ml-2">
-                                  Save 25%
+                                  Save {yearlyDiscountPercent}%
                                 </Badge>
                               )}
                             </div>
@@ -1299,7 +1302,7 @@ export default function SettingsPage() {
                                 : (['PRO', 'GOLD', 'PLATINUM'] as const)
                               
                               return availablePlans.map((planType) => {
-                                const plan = subscriptionService.getPlan(planType)
+                                const plan = getPlanWithOverrides(planType)
                                 if (!plan) return null
                                 
                                 const isProcessing = processingSubscription === planType
@@ -1340,10 +1343,10 @@ export default function SettingsPage() {
                                             </span>
                                             <div className="flex items-baseline gap-2">
                                               <span className="text-2xl sm:text-3xl font-bold">
-                                                {getPlanPriceDisplay(plan, 'yearly')}
+                                                {plan.yearlyPriceDisplay}
                                               </span>
                                               <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 py-0.5 text-xs font-semibold">
-                                                25% OFF
+                                                {yearlyDiscountPercent}% OFF
                                               </Badge>
                                             </div>
                                             <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
@@ -1396,11 +1399,11 @@ export default function SettingsPage() {
                             <div>
                               <h3 className="text-base sm:text-lg font-semibold">Current Plan</h3>
                               <p className="text-xs sm:text-sm text-muted-foreground">
-                                {subscriptionType} - {(() => {
-                                  const plan = subscriptionService.getPlan(subscriptionType)
+                                {(getPlanWithOverrides(subscriptionType)?.name ?? subscriptionType)} - {(() => {
+                                  const plan = getPlanWithOverrides(subscriptionType)
                                   if (!plan) return 'N/A'
                                   const interval = (profile?.subscriptionInterval as 'monthly' | 'yearly' | undefined) || 'monthly'
-                                  const priceDisplay = getPlanPriceDisplay(plan, interval)
+                                  const priceDisplay = interval === 'yearly' ? plan.yearlyPriceDisplay : plan.monthlyPriceDisplay
                                   const period = interval === 'yearly' ? '/year' : '/month'
                                   return `${priceDisplay}${period}`
                                 })()}
@@ -1556,7 +1559,7 @@ export default function SettingsPage() {
                             setNotificationPreferences(prev => ({ ...prev, emailNotifications: !checked }))
                           }
                         }}
-                        className="flex-shrink-0" 
+                        className="shrink-0" 
                       />
                     </div>
                     <Separator />
@@ -1570,7 +1573,7 @@ export default function SettingsPage() {
                       <Switch 
                         checked={false}
                         disabled
-                        className="flex-shrink-0" 
+                        className="shrink-0"
                       />
                     </div>
                   </div>

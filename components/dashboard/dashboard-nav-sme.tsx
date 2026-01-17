@@ -40,6 +40,11 @@ export function DashboardNavSME() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [hasFilingRequests, setHasFilingRequests] = useState(false)
   
+  // Close the mobile menu whenever navigation occurs (e.g., when BusinessSwitcher "Manage" navigates)
+  useEffect(() => {
+    setIsMobileMenuOpen(false)
+  }, [pathname])
+  
   // Get page info for mobile add button
   const getMobileAddButton = () => {
     switch (pathname) {
@@ -256,9 +261,13 @@ export function DashboardNavSME() {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => router.push('/marketplace')}
-              className="h-8 w-8"
-              title="Marketplace"
+              onClick={() => {
+                toast.message("Marketplace is coming soon", {
+                  description: "We’re working on it. Please check back shortly."
+                })
+              }}
+              className="h-8 w-8 opacity-60 cursor-not-allowed"
+              title="Marketplace (Coming Soon)"
             >
               <Store className="w-4 h-4" />
             </Button>

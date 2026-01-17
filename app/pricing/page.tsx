@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -18,10 +18,11 @@ import { toast } from "sonner"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { useRouter } from "next/navigation"
-import { auth } from "@/firebase/firebase"
 import { MigrateToCreatorModal } from "@/components/subscription/migrate-to-creator-modal"
 import { SubscriptionType } from "@/lib/types"
-import { subscriptionService, getPlanPrice, getPlanPriceDisplay } from "@/lib/services/subscriptionService"
+import { subscriptionService, getPlanPriceDisplay } from "@/lib/services/subscriptionService"
+import { auth } from "@/firebase/firebase"
+import { DEFAULT_FREE_TRIAL_DAYS, DEFAULT_YEARLY_DISCOUNT_PERCENT } from "@/lib/constants/pricing"
 
 export default function PricingPage() {
   const { user, loading: authLoading } = useAuth()
@@ -31,12 +32,51 @@ export default function PricingPage() {
   const [showMigrationModal, setShowMigrationModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
+  const [pricingConfig, setPricingConfig] = useState<any | null>(null)
 
-  // Check if migration is needed (freelancer trying to subscribe to GOLD or PLATINUM)
+  const freeTrialDays = pricingConfig?.freeTrialDays ?? DEFAULT_FREE_TRIAL_DAYS
+  const yearlyDiscountPercent = pricingConfig?.yearlyDiscountPercent ?? DEFAULT_YEARLY_DISCOUNT_PERCENT
+
+  const getPlanWithOverrides = (planId: Exclude<SubscriptionType, null>) => {
+    const base = subscriptionService.getPlan(planId)
+    if (!base) return null
+    const overrideMonthly = pricingConfig?.plans?.[planId]?.monthlyPrice
+    const overrideNameRaw = pricingConfig?.plans?.[planId]?.displayName
+    const overrideName = typeof overrideNameRaw === "string" ? overrideNameRaw.trim() : ""
+    const monthlyPrice = typeof overrideMonthly === "number" && overrideMonthly > 0 ? overrideMonthly : base.monthlyPrice
+    const yearlyPrice = Math.round(12 * monthlyPrice * (1 - yearlyDiscountPercent / 100))
+    const format = (priceInKobo: number) => {
+      const priceInNaira = priceInKobo / 100
+      return `₦${priceInNaira.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
+    }
+    return {
+      ...base,
+      name: overrideName || (planId as any),
+      monthlyPrice,
+      yearlyPrice,
+      monthlyPriceDisplay: format(monthlyPrice),
+      yearlyPriceDisplay: format(yearlyPrice)
+    }
+  }
+
+  // Load pricing config (prices + free trial days)
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await fetch("/api/pricing-config")
+        const data = await res.json()
+        if (data?.success) setPricingConfig(data.data)
+      } catch {
+        // Ignore and fall back to defaults
+      }
+    }
+    load()
+  }, [])
+
+  // We only migrate AFTER successful payment (handled in /api/subscription/verify),
+  // never before payment initialization.
   const needsMigration = (planType: string): boolean => {
-    const needs = profile?.businessType === 'freelancer' && (planType === 'GOLD' || planType === 'PLATINUM')
-    console.log('Pricing page - needsMigration check:', { businessType: profile?.businessType, planType, needs })
-    return needs
+    return profile?.businessType === 'freelancer' && (planType === 'GOLD' || planType === 'PLATINUM')
   }
 
   const handleSubscribe = async (planType: string) => {
@@ -46,60 +86,20 @@ export default function PricingPage() {
       return
     }
 
-    // Check if migration is needed
+    // If migration is needed, show info modal but DO NOT update businessType yet.
     if (needsMigration(planType)) {
-      console.log('Pricing page - Migration needed, showing migration modal')
       setSelectedPlan(planType as SubscriptionType)
-      // Show migration modal immediately
       setShowMigrationModal(true)
       return
     }
 
-    // Proceed with subscription
     await proceedWithSubscription(planType)
   }
 
   const handleMigrateAndSubscribe = async () => {
     if (!selectedPlan) return
-
-    try {
-      // Get auth token
-      const currentUser = auth.currentUser
-      if (!currentUser) {
-        router.push("/login?redirect=/pricing")
-        return
-      }
-
-      const token = await currentUser.getIdToken()
-
-      // Update business type to creator
-      const updateResponse = await fetch("/api/user/update-business-type", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          businessType: 'creator'
-        })
-      })
-
-      const updateData = await updateResponse.json()
-
-      if (!updateResponse.ok || !updateData.success) {
-        throw new Error(updateData.error || "Failed to update business type")
-      }
-
-      toast.success("Account migrated to Creator successfully!")
-      
-      // Close migration modal and proceed with subscription
-      setShowMigrationModal(false)
-      await proceedWithSubscription(selectedPlan)
-    } catch (error) {
-      console.error("Migration error:", error)
-      toast.error(error instanceof Error ? error.message : "Failed to migrate account")
-      throw error
-    }
+    setShowMigrationModal(false)
+    await proceedWithSubscription(selectedPlan)
   }
 
   const proceedWithSubscription = async (planType: string) => {
@@ -202,7 +202,7 @@ export default function PricingPage() {
           <div className="text-center mb-8 sm:mb-12 md:mb-16">
             <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-bold mb-2 sm:mb-3 md:mb-4">Simple, Transparent Pricing</h1>
             <p className="text-sm sm:text-base md:text-lg text-muted-foreground max-w-2xl mx-auto px-4 mb-4 sm:mb-6">
-              Choose the plan that fits your business needs. All plans include a 3-day free trial.
+              Choose the plan that fits your business needs. All plans include a {freeTrialDays}-day free trial.
             </p>
             
             {/* Billing Interval Toggle */}
@@ -241,7 +241,7 @@ export default function PricingPage() {
             <Card className="relative flex flex-col">
               <CardHeader className="p-4 sm:p-6">
                       <div className="flex items-center gap-2 mb-2">
-                        <CardTitle className="text-xl sm:text-2xl">PRO</CardTitle>
+                        <CardTitle className="text-xl sm:text-2xl">{getPlanWithOverrides('PRO')?.name || 'PRO'}</CardTitle>
                         <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-medium">
                           Basic
                         </span>
@@ -253,7 +253,9 @@ export default function PricingPage() {
                   {billingInterval === 'monthly' ? (
                     <>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">₦2,500</span>
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">
+                      {getPlanPriceDisplay(getPlanWithOverrides('PRO')!, 'monthly')}
+                    </span>
                       </div>
                       <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
                     </>
@@ -261,7 +263,7 @@ export default function PricingPage() {
                     <>
                       <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">
                         {(() => {
-                          const plan = subscriptionService.getPlan('PRO')
+                          const plan = getPlanWithOverrides('PRO')
                           if (!plan) return '₦30,000'
                           const grossYearly = (plan.monthlyPrice * 12) / 100 // Convert kobo to naira
                           return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
@@ -269,10 +271,10 @@ export default function PricingPage() {
                       </span>
                       <div className="flex items-baseline gap-2">
                         <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground">
-                          {getPlanPriceDisplay(subscriptionService.getPlan('PRO')!, 'yearly')}
+                          {getPlanPriceDisplay(getPlanWithOverrides('PRO')!, 'yearly')}
                         </span>
                     <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
-                          25% OFF
+                          {yearlyDiscountPercent}% OFF
                     </Badge>
                   </div>
                       <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
@@ -331,7 +333,7 @@ export default function PricingPage() {
                     </div>
                     <CardHeader className="p-4 sm:p-6">
                       <div className="flex items-center gap-2 mb-2">
-                        <CardTitle className="text-xl sm:text-2xl">GOLD</CardTitle>
+                        <CardTitle className="text-xl sm:text-2xl">{getPlanWithOverrides('GOLD')?.name || 'GOLD'}</CardTitle>
                         <span className="text-xs bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 px-2 py-1 rounded-full font-medium">
                           Advanced
                         </span>
@@ -344,7 +346,9 @@ export default function PricingPage() {
                           {billingInterval === 'monthly' ? (
                             <>
                           <div className="flex items-baseline gap-2">
-                            <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦6,000</span>
+                            <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
+                              {getPlanPriceDisplay(getPlanWithOverrides('GOLD')!, 'monthly')}
+                            </span>
                               </div>
                               <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
                             </>
@@ -352,7 +356,7 @@ export default function PricingPage() {
                             <>
                               <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">
                                 {(() => {
-                                  const plan = subscriptionService.getPlan('GOLD')
+                                  const plan = getPlanWithOverrides('GOLD')
                                   if (!plan) return '₦72,000'
                                   const grossYearly = (plan.monthlyPrice * 12) / 100 // Convert kobo to naira
                                   return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
@@ -360,10 +364,10 @@ export default function PricingPage() {
                               </span>
                               <div className="flex items-baseline gap-2">
                                 <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
-                                  {getPlanPriceDisplay(subscriptionService.getPlan('GOLD')!, 'yearly')}
+                                  {getPlanPriceDisplay(getPlanWithOverrides('GOLD')!, 'yearly')}
                                 </span>
                             <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
-                                  25% OFF
+                                  {yearlyDiscountPercent}% OFF
                             </Badge>
                           </div>
                               <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
@@ -419,7 +423,7 @@ export default function PricingPage() {
                   <Card className="relative flex flex-col">
                     <CardHeader className="p-4 sm:p-6">
                       <div className="flex items-center gap-2 mb-2">
-                        <CardTitle className="text-xl sm:text-2xl">PLATINUM</CardTitle>
+                        <CardTitle className="text-xl sm:text-2xl">{getPlanWithOverrides('PLATINUM')?.name || 'PLATINUM'}</CardTitle>
                         <span className="text-xs bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-medium">
                           Individual Businesses
                         </span>
@@ -432,7 +436,9 @@ export default function PricingPage() {
                           {billingInterval === 'monthly' ? (
                             <>
                           <div className="flex items-baseline gap-2">
-                            <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦12,500</span>
+                            <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
+                              {getPlanPriceDisplay(getPlanWithOverrides('PLATINUM')!, 'monthly')}
+                            </span>
                               </div>
                               <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
                             </>
@@ -440,7 +446,7 @@ export default function PricingPage() {
                             <>
                               <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">
                                 {(() => {
-                                  const plan = subscriptionService.getPlan('PLATINUM')
+                                  const plan = getPlanWithOverrides('PLATINUM')
                                   if (!plan) return '₦150,000'
                                   const grossYearly = (plan.monthlyPrice * 12) / 100 // Convert kobo to naira
                                   return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
@@ -448,10 +454,10 @@ export default function PricingPage() {
                               </span>
                               <div className="flex items-baseline gap-2">
                                 <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
-                                  {getPlanPriceDisplay(subscriptionService.getPlan('PLATINUM')!, 'yearly')}
+                                  {getPlanPriceDisplay(getPlanWithOverrides('PLATINUM')!, 'yearly')}
                                 </span>
                             <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
-                                  25% OFF
+                                  {yearlyDiscountPercent}% OFF
                             </Badge>
                           </div>
                               <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
@@ -546,7 +552,7 @@ export default function PricingPage() {
                 Most Popular
               </div>
               <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-xl sm:text-2xl">Small Business</CardTitle>
+                <CardTitle className="text-xl sm:text-2xl">{getPlanWithOverrides('Small Business')?.name || 'Small Business'}</CardTitle>
                       <CardDescription className="space-y-2 text-xs sm:text-sm">
                         <p>For businesses with annual turnover ≤ ₦50-100 million and fixed assets ≤ ₦250 million (excluding professional services).</p>
                         <p className="text-xs font-medium text-primary">May qualify for tax exemptions under NTA 2025</p>
@@ -555,7 +561,9 @@ export default function PricingPage() {
                   {billingInterval === 'monthly' ? (
                     <>
                   <div className="flex items-baseline gap-2">
-                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦12,500</span>
+                    <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
+                      {getPlanPriceDisplay(getPlanWithOverrides('Small Business')!, 'monthly')}
+                    </span>
                       </div>
                       <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
                     </>
@@ -563,7 +571,7 @@ export default function PricingPage() {
                     <>
                       <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">
                         {(() => {
-                          const plan = subscriptionService.getPlan('Small Business')
+                          const plan = getPlanWithOverrides('Small Business')
                           if (!plan) return '₦150,000'
                           const grossYearly = (plan.monthlyPrice * 12) / 100 // Convert kobo to naira
                           return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
@@ -571,10 +579,10 @@ export default function PricingPage() {
                       </span>
                       <div className="flex items-baseline gap-2">
                         <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
-                          {getPlanPriceDisplay(subscriptionService.getPlan('Small Business')!, 'yearly')}
+                          {getPlanPriceDisplay(getPlanWithOverrides('Small Business')!, 'yearly')}
                         </span>
                     <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
-                          25% OFF
+                          {yearlyDiscountPercent}% OFF
                     </Badge>
                   </div>
                       <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
@@ -631,7 +639,7 @@ export default function PricingPage() {
                       Coming Soon
               </div>
               <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-xl sm:text-2xl">Big Business</CardTitle>
+                    <CardTitle className="text-xl sm:text-2xl">{getPlanWithOverrides('Big Business')?.name || 'Big Business'}</CardTitle>
                       <CardDescription className="space-y-2 text-xs sm:text-sm">
                         <p>For businesses with turnover above small business threshold, fixed assets exceeding ₦250 million, or providing professional services.</p>
                         <p className="text-xs font-medium text-muted-foreground">Subject to full corporate tax regime</p>
@@ -640,7 +648,9 @@ export default function PricingPage() {
                   {billingInterval === 'monthly' ? (
                     <>
                         <div className="flex items-baseline gap-2">
-                          <span className="text-2xl sm:text-3xl md:text-4xl font-bold">₦37,500</span>
+                          <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
+                            {getPlanPriceDisplay(getPlanWithOverrides('Big Business')!, 'monthly')}
+                          </span>
                       </div>
                       <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
                     </>
@@ -648,7 +658,7 @@ export default function PricingPage() {
                     <>
                       <span className="text-xs sm:text-sm font-medium text-muted-foreground line-through">
                         {(() => {
-                          const plan = subscriptionService.getPlan('Big Business')
+                          const plan = getPlanWithOverrides('Big Business')
                           if (!plan) return '₦450,000'
                           const grossYearly = (plan.monthlyPrice * 12) / 100 // Convert kobo to naira
                           return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
@@ -656,10 +666,10 @@ export default function PricingPage() {
                       </span>
                       <div className="flex items-baseline gap-2">
                         <span className="text-2xl sm:text-3xl md:text-4xl font-bold">
-                          {getPlanPriceDisplay(subscriptionService.getPlan('Big Business')!, 'yearly')}
+                          {getPlanPriceDisplay(getPlanWithOverrides('Big Business')!, 'yearly')}
                         </span>
                           <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 sm:px-2 py-0.5 sm:py-1 text-xs font-semibold">
-                          25% OFF
+                          {yearlyDiscountPercent}% OFF
                           </Badge>
                         </div>
                       <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
@@ -705,7 +715,7 @@ export default function PricingPage() {
                     Do you offer a free trial?
                   </AccordionTrigger>
                   <AccordionContent className="text-muted-foreground text-xs sm:text-sm">
-                    Yes! All plans come with a 3-day free trial. No credit card required to start. You can explore all features and see how OTax simplifies your tax management before committing.
+                    Yes! All plans come with a {freeTrialDays}-day free trial. No credit card required to start. You can explore all features and see how OTax simplifies your tax management before committing.
                   </AccordionContent>
                 </AccordionItem>
                 <AccordionItem value="general-2" className="border border-border rounded-lg px-3 sm:px-4 mb-3 sm:mb-4">

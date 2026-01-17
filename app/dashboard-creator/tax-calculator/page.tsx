@@ -359,11 +359,11 @@ export default function CreatorTaxCalculatorPage() {
           </div>
           <div className="flex-1 space-y-2">
             <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
-              Tax Calculator for Creators
+              Tax Calculator
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
-              Estimate PAYE, personal income tax, and deductibles for your creator business. Track sponsorships, ad
-              revenue, affiliate payouts, and creator-specific expenses in one calculation designed for Nigeria's 2025 tax rules.
+              Estimate PAYE, personal income tax, and deductibles. Track sponsorships, ad revenue, affiliate payouts,
+              and business expenses in one calculation designed for Nigeria's 2025 tax rules.
             </p>
             <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-muted-foreground">
               <span className="inline-flex items-center gap-1 rounded-full border border-primary/20 bg-primary/10 px-2.5 py-1">
