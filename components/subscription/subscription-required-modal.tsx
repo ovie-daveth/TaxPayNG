@@ -46,10 +46,13 @@ export function SubscriptionRequiredModal({
     const base = subscriptionService.getPlan(planType)
     if (!base) return null
     const overrideMonthly = pricingConfig?.plans?.[planType as any]?.monthlyPrice
+    const overrideNameRaw = pricingConfig?.plans?.[planType as any]?.displayName
+    const overrideName = typeof overrideNameRaw === "string" ? overrideNameRaw.trim() : ""
     const monthlyPrice = typeof overrideMonthly === "number" && overrideMonthly > 0 ? overrideMonthly : base.monthlyPrice
     const yearlyPrice = Math.round(12 * monthlyPrice * (1 - yearlyDiscountPercent / 100))
     return {
       ...base,
+      name: overrideName || (planType as any),
       monthlyPrice,
       yearlyPrice,
       monthlyPriceDisplay: format(monthlyPrice),

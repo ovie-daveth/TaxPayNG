@@ -49,6 +49,7 @@ export default function SettingsPage() {
   const [showChangePlanModal, setShowChangePlanModal] = useState(false)
   const [showMigrationModal, setShowMigrationModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
+  const [selectedPlanInterval, setSelectedPlanInterval] = useState<'monthly' | 'yearly'>('monthly')
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
   const kycSectionRef = useRef<HTMLDivElement>(null)
   // KYC: Means of identification (NIN, International Passport, Voter's Card, Driver's License, etc.)
@@ -132,10 +133,13 @@ export default function SettingsPage() {
     const base = subscriptionService.getPlan(planType)
     if (!base) return null
     const overrideMonthly = pricingConfig?.plans?.[planType as any]?.monthlyPrice
+    const overrideNameRaw = pricingConfig?.plans?.[planType as any]?.displayName
+    const overrideName = typeof overrideNameRaw === "string" ? overrideNameRaw.trim() : ""
     const monthlyPrice = typeof overrideMonthly === "number" && overrideMonthly > 0 ? overrideMonthly : base.monthlyPrice
     const yearlyPrice = Math.round(12 * monthlyPrice * (1 - yearlyDiscountPercent / 100))
     return {
       ...base,
+      name: overrideName || (planType as any),
       monthlyPrice,
       yearlyPrice,
       monthlyPriceDisplay: formatKobo(monthlyPrice),
@@ -214,47 +218,22 @@ export default function SettingsPage() {
     if (!selectedPlan) return
 
     try {
-      // Get auth token
-      const currentUser = auth.currentUser
-      if (!currentUser) {
-        router.push("/login")
-        return
-      }
-
-      const token = await currentUser.getIdToken()
-
-      // Update business type to creator
-      const updateResponse = await fetch("/api/user/update-business-type", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          businessType: 'creator'
-        })
-      })
-
-      const updateData = await updateResponse.json()
-
-      if (!updateResponse.ok || !updateData.success) {
-        throw new Error(updateData.error || "Failed to update business type")
-      }
-
-      // Migration successful - proceed silently to payment
-      // Close migration modal
+      // IMPORTANT: Do NOT update businessType before payment.
+      // BusinessType migration happens after successful payment in /api/subscription/verify.
       setShowMigrationModal(false)
-      // Small delay to ensure modal closes, then proceed with subscription
+      const plan = selectedPlan
+      const interval = selectedPlanInterval
+      setSelectedPlan(null)
       setTimeout(() => {
-        handleSubscribeDirect(selectedPlan)
-      }, 300)
+        handleSubscribeDirect(plan, interval)
+      }, 200)
     } catch (error) {
       console.error("Migration error:", error)
       toast.error(error instanceof Error ? error.message : "Failed to migrate account")
     }
   }
 
-  const handleSubscribeDirect = async (planType: SubscriptionType) => {
+  const handleSubscribeDirect = async (planType: SubscriptionType, intervalOverride?: 'monthly' | 'yearly') => {
     if (!user?.uid) {
       toast.error("User not authenticated")
       return
@@ -275,6 +254,7 @@ export default function SettingsPage() {
       }
 
       const token = await currentUser.getIdToken()
+      const effectiveInterval = intervalOverride ?? billingInterval
 
       // Initialize subscription payment
       const response = await fetch("/api/subscription/initialize", {
@@ -285,7 +265,7 @@ export default function SettingsPage() {
         },
         body: JSON.stringify({
           subscriptionType: planType,
-          interval: billingInterval
+          interval: effectiveInterval
         })
       })
 
@@ -311,20 +291,19 @@ export default function SettingsPage() {
   }
 
   const handleSubscribe = async (planType: SubscriptionType, interval?: 'monthly' | 'yearly') => {
-    // Update billing interval if provided
-    if (interval) {
-      setBillingInterval(interval)
-    }
+    const effectiveInterval = interval ?? billingInterval
+    if (interval) setBillingInterval(interval)
     
     // Check if migration is needed
     if (needsMigration(planType)) {
       setSelectedPlan(planType)
+      setSelectedPlanInterval(effectiveInterval)
       setShowMigrationModal(true)
       return
     }
 
     // No migration needed, proceed with subscription
-    await handleSubscribeDirect(planType)
+    await handleSubscribeDirect(planType, effectiveInterval)
   }
 
   useEffect(() => {
@@ -1420,7 +1399,7 @@ export default function SettingsPage() {
                             <div>
                               <h3 className="text-base sm:text-lg font-semibold">Current Plan</h3>
                               <p className="text-xs sm:text-sm text-muted-foreground">
-                                {subscriptionType} - {(() => {
+                                {(getPlanWithOverrides(subscriptionType)?.name ?? subscriptionType)} - {(() => {
                                   const plan = getPlanWithOverrides(subscriptionType)
                                   if (!plan) return 'N/A'
                                   const interval = (profile?.subscriptionInterval as 'monthly' | 'yearly' | undefined) || 'monthly'

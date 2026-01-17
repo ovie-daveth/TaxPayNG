@@ -41,6 +41,8 @@ export default function PricingPage() {
     const base = subscriptionService.getPlan(planId)
     if (!base) return null
     const overrideMonthly = pricingConfig?.plans?.[planId]?.monthlyPrice
+    const overrideNameRaw = pricingConfig?.plans?.[planId]?.displayName
+    const overrideName = typeof overrideNameRaw === "string" ? overrideNameRaw.trim() : ""
     const monthlyPrice = typeof overrideMonthly === "number" && overrideMonthly > 0 ? overrideMonthly : base.monthlyPrice
     const yearlyPrice = Math.round(12 * monthlyPrice * (1 - yearlyDiscountPercent / 100))
     const format = (priceInKobo: number) => {
@@ -49,6 +51,7 @@ export default function PricingPage() {
     }
     return {
       ...base,
+      name: overrideName || (planId as any),
       monthlyPrice,
       yearlyPrice,
       monthlyPriceDisplay: format(monthlyPrice),
@@ -238,7 +241,7 @@ export default function PricingPage() {
             <Card className="relative flex flex-col">
               <CardHeader className="p-4 sm:p-6">
                       <div className="flex items-center gap-2 mb-2">
-                        <CardTitle className="text-xl sm:text-2xl">PRO</CardTitle>
+                        <CardTitle className="text-xl sm:text-2xl">{getPlanWithOverrides('PRO')?.name || 'PRO'}</CardTitle>
                         <span className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-medium">
                           Basic
                         </span>
@@ -330,7 +333,7 @@ export default function PricingPage() {
                     </div>
                     <CardHeader className="p-4 sm:p-6">
                       <div className="flex items-center gap-2 mb-2">
-                        <CardTitle className="text-xl sm:text-2xl">GOLD</CardTitle>
+                        <CardTitle className="text-xl sm:text-2xl">{getPlanWithOverrides('GOLD')?.name || 'GOLD'}</CardTitle>
                         <span className="text-xs bg-amber-100 dark:bg-amber-900 text-amber-800 dark:text-amber-200 px-2 py-1 rounded-full font-medium">
                           Advanced
                         </span>
@@ -420,7 +423,7 @@ export default function PricingPage() {
                   <Card className="relative flex flex-col">
                     <CardHeader className="p-4 sm:p-6">
                       <div className="flex items-center gap-2 mb-2">
-                        <CardTitle className="text-xl sm:text-2xl">PLATINUM</CardTitle>
+                        <CardTitle className="text-xl sm:text-2xl">{getPlanWithOverrides('PLATINUM')?.name || 'PLATINUM'}</CardTitle>
                         <span className="text-xs bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-medium">
                           Individual Businesses
                         </span>
@@ -549,7 +552,7 @@ export default function PricingPage() {
                 Most Popular
               </div>
               <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-xl sm:text-2xl">Small Business</CardTitle>
+                <CardTitle className="text-xl sm:text-2xl">{getPlanWithOverrides('Small Business')?.name || 'Small Business'}</CardTitle>
                       <CardDescription className="space-y-2 text-xs sm:text-sm">
                         <p>For businesses with annual turnover ≤ ₦50-100 million and fixed assets ≤ ₦250 million (excluding professional services).</p>
                         <p className="text-xs font-medium text-primary">May qualify for tax exemptions under NTA 2025</p>
@@ -636,7 +639,7 @@ export default function PricingPage() {
                       Coming Soon
               </div>
               <CardHeader className="p-4 sm:p-6">
-                <CardTitle className="text-xl sm:text-2xl">Big Business</CardTitle>
+                    <CardTitle className="text-xl sm:text-2xl">{getPlanWithOverrides('Big Business')?.name || 'Big Business'}</CardTitle>
                       <CardDescription className="space-y-2 text-xs sm:text-sm">
                         <p>For businesses with turnover above small business threshold, fixed assets exceeding ₦250 million, or providing professional services.</p>
                         <p className="text-xs font-medium text-muted-foreground">Subject to full corporate tax regime</p>

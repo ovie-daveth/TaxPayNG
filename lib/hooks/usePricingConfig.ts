@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react"
 
 export interface PricingConfigPlanOverride {
   monthlyPrice: number // in kobo
+  displayName?: string
 }
 
 export interface PricingConfig {

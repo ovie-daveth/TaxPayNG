@@ -39,10 +39,15 @@ export default function AdminDashboard() {
   const [pricingForm, setPricingForm] = useState({
     freeTrialDays: 14,
     yearlyDiscountPercent: 25,
+    PROName: 'PRO',
     PRO: 2500,
+    GOLDName: 'GOLD',
     GOLD: 6000,
+    PLATINUMName: 'PLATINUM',
     PLATINUM: 12500,
+    SmallBusinessName: 'Small Business',
     SmallBusiness: 12500,
+    BigBusinessName: 'Big Business',
     BigBusiness: 37500
   })
   const [pricingMeta, setPricingMeta] = useState<{ updatedAt?: string; updatedBy?: string } | null>(null)
@@ -175,10 +180,15 @@ export default function AdminDashboard() {
         setPricingForm({
           freeTrialDays: cfg.freeTrialDays ?? 14,
           yearlyDiscountPercent: cfg.yearlyDiscountPercent ?? 25,
+          PROName: cfg.plans?.PRO?.displayName ?? 'PRO',
           PRO: toNaira(cfg.plans?.PRO?.monthlyPrice, 2500),
+          GOLDName: cfg.plans?.GOLD?.displayName ?? 'GOLD',
           GOLD: toNaira(cfg.plans?.GOLD?.monthlyPrice, 6000),
+          PLATINUMName: cfg.plans?.PLATINUM?.displayName ?? 'PLATINUM',
           PLATINUM: toNaira(cfg.plans?.PLATINUM?.monthlyPrice, 12500),
+          SmallBusinessName: cfg.plans?.["Small Business"]?.displayName ?? 'Small Business',
           SmallBusiness: toNaira(cfg.plans?.["Small Business"]?.monthlyPrice, 12500),
+          BigBusinessName: cfg.plans?.["Big Business"]?.displayName ?? 'Big Business',
           BigBusiness: toNaira(cfg.plans?.["Big Business"]?.monthlyPrice, 37500)
         })
         setPricingMeta({ updatedAt: cfg.updatedAt, updatedBy: cfg.updatedBy })
@@ -210,11 +220,11 @@ export default function AdminDashboard() {
           freeTrialDays: Number(pricingForm.freeTrialDays),
           yearlyDiscountPercent: Number(pricingForm.yearlyDiscountPercent),
           plans: {
-            PRO: { monthlyPrice: toKobo(pricingForm.PRO) },
-            GOLD: { monthlyPrice: toKobo(pricingForm.GOLD) },
-            PLATINUM: { monthlyPrice: toKobo(pricingForm.PLATINUM) },
-            "Small Business": { monthlyPrice: toKobo(pricingForm.SmallBusiness) },
-            "Big Business": { monthlyPrice: toKobo(pricingForm.BigBusiness) }
+            PRO: { monthlyPrice: toKobo(pricingForm.PRO), displayName: String(pricingForm.PROName || '').trim() },
+            GOLD: { monthlyPrice: toKobo(pricingForm.GOLD), displayName: String(pricingForm.GOLDName || '').trim() },
+            PLATINUM: { monthlyPrice: toKobo(pricingForm.PLATINUM), displayName: String(pricingForm.PLATINUMName || '').trim() },
+            "Small Business": { monthlyPrice: toKobo(pricingForm.SmallBusiness), displayName: String(pricingForm.SmallBusinessName || '').trim() },
+            "Big Business": { monthlyPrice: toKobo(pricingForm.BigBusiness), displayName: String(pricingForm.BigBusinessName || '').trim() }
           }
         })
       })
@@ -434,12 +444,31 @@ export default function AdminDashboard() {
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div className="space-y-2">
+                      <Label>PRO Display Name</Label>
+                      <Input
+                        value={pricingForm.PROName}
+                        onChange={(e) => setPricingForm((p) => ({ ...p, PROName: e.target.value }))}
+                        placeholder="e.g., PRO"
+                      />
+                    </div>
+                    <div className="space-y-2">
                       <Label>PRO (Monthly, ₦)</Label>
                       <Input
                         type="number"
                         min={0}
                         value={pricingForm.PRO}
                         onChange={(e) => setPricingForm((p) => ({ ...p, PRO: Number(e.target.value) }))}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>GOLD Display Name</Label>
+                      <Input
+                        value={pricingForm.GOLDName}
+                        onChange={(e) => setPricingForm((p) => ({ ...p, GOLDName: e.target.value }))}
+                        placeholder="e.g., GOLD"
                       />
                     </div>
                     <div className="space-y-2">
@@ -452,6 +481,14 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="space-y-2">
+                      <Label>PLATINUM Display Name</Label>
+                      <Input
+                        value={pricingForm.PLATINUMName}
+                        onChange={(e) => setPricingForm((p) => ({ ...p, PLATINUMName: e.target.value }))}
+                        placeholder="e.g., PLATINUM"
+                      />
+                    </div>
+                    <div className="space-y-2">
                       <Label>PLATINUM (Monthly, ₦)</Label>
                       <Input
                         type="number"
@@ -461,12 +498,28 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <div className="space-y-2">
+                      <Label>Small Business Display Name</Label>
+                      <Input
+                        value={pricingForm.SmallBusinessName}
+                        onChange={(e) => setPricingForm((p) => ({ ...p, SmallBusinessName: e.target.value }))}
+                        placeholder="e.g., Small Business"
+                      />
+                    </div>
+                    <div className="space-y-2">
                       <Label>Small Business (Monthly, ₦)</Label>
                       <Input
                         type="number"
                         min={0}
                         value={pricingForm.SmallBusiness}
                         onChange={(e) => setPricingForm((p) => ({ ...p, SmallBusiness: Number(e.target.value) }))}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Big Business Display Name</Label>
+                      <Input
+                        value={pricingForm.BigBusinessName}
+                        onChange={(e) => setPricingForm((p) => ({ ...p, BigBusinessName: e.target.value }))}
+                        placeholder="e.g., Big Business"
                       />
                     </div>
                     <div className="space-y-2">

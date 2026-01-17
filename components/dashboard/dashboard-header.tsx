@@ -19,6 +19,7 @@ import { SubscriptionRequiredModal } from "../subscription/subscription-required
 import { BusinessSwitcher } from "@/components/business/business-switcher"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
 import { cn } from "@/lib/utils"
+import { toast } from "sonner"
 
 export function DashboardHeader() {
   const pathname = usePathname()
@@ -314,9 +315,13 @@ export function DashboardHeader() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => router.push('/marketplace')}
+                  onClick={() => {
+                    toast.message("Marketplace is coming soon", {
+                      description: "We’re working on it. Please check back shortly."
+                    })
+                  }}
                   className={cn(
-                    "h-8 text-xs whitespace-nowrap",
+                    "h-8 text-xs whitespace-nowrap opacity-80",
                     sidebarCollapsed 
                       ? "md:h-8 lg:h-10 md:px-1.5 lg:px-3 lg:text-sm" 
                       : "md:h-8 lg:h-10 md:px-2 lg:px-3 lg:text-sm"
