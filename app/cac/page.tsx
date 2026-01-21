@@ -68,8 +68,8 @@ export default function CacServicesPage() {
           ))}
         </div>
 
-        <div>
-          <p>Registration with OTax includes continued access to updates, professional guidance, and business consultancy to support your operations over time.</p>
+        <div className='mt-10'>
+          <p className='text-sm text-muted-foreground text-center'>Registration with OTax includes continued access to updates, professional guidance, and business consultancy to support your operations over time. For more information, please <Link href="mailto:otax.ng@gmail.com" className='text-primary underline'>contact us</Link>.</p>
         </div>
       </div>
 
