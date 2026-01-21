@@ -39,6 +39,7 @@ export default function CacServicesPage() {
             </Badge>
             <Badge variant="secondary">Document upload supported</Badge>
             <Badge variant="secondary">Admin gets notified instantly</Badge>
+            <Badge variant="secondary">We contact you immediately via your email and phone for updates</Badge>
           </div>
         </div>
 
@@ -65,6 +66,10 @@ export default function CacServicesPage() {
               </CardFooter>
             </Card>
           ))}
+        </div>
+
+        <div>
+          <p>Registration with OTax includes continued access to updates, professional guidance, and business consultancy to support your operations over time.</p>
         </div>
       </div>
 
