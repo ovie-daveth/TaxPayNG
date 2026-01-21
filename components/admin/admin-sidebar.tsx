@@ -14,12 +14,14 @@ import {
   Calculator, 
   BookOpen, 
   UserCheck,
+  Building2,
   Menu,
   X,
   LogOut,
   DollarSign,
   ClipboardList,
-  Shield
+  Shield,
+  PhoneCall
 } from "lucide-react"
 import { signOut } from "firebase/auth"
 import { auth } from "@/firebase/firebase"
@@ -37,6 +39,8 @@ const navItems = [
   { href: "/admin/dashboard/transactions", label: "Transactions", icon: Receipt },
   { href: "/admin/dashboard/documents", label: "Documents", icon: FolderOpen },
   { href: "/admin/dashboard/filing-requests", label: "Filing Requests", icon: ClipboardList },
+  { href: "/admin/dashboard/cac-requests", label: "CAC Requests", icon: Building2 },
+  { href: "/admin/dashboard/cac-officers", label: "CAC Officers", icon: PhoneCall },
   { href: "/admin/dashboard/reminders", label: "Reminders", icon: Bell },
   { href: "/admin/dashboard/tax-calculations", label: "Tax Calculations", icon: Calculator },
   { href: "/admin/dashboard/exchange-rates", label: "Exchange Rates", icon: DollarSign },

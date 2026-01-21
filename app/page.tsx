@@ -20,6 +20,7 @@ import { SiteHeader } from "@/components/site-header"
 import { useRouter } from "next/navigation"
 import { sendWaitlistVerification } from "@/lib/utils/emailVerification"
 import { TokenInputDialog } from "@/components/waitlist/token-input-dialog"
+import { CAC_REGISTRATION_TYPES, formatNaira } from "@/lib/constants/cac"
 
 export default function HomePage() {
   const { user, logout, loading } = useAuth()
@@ -226,6 +227,56 @@ export default function HomePage() {
               <span className="hidden sm:inline">Based on the latest NRS regulations</span>
               <span className="sm:hidden">Latest NRS regulations</span>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* CAC Registration Section */}
+      <section className="container mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 md:py-20 relative">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
+            <div>
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-medium mb-3">
+                <Building2 className="w-4 h-4" />
+                Business registration
+              </div>
+              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight">
+                Register with CAC — Business Name, LLC, and Incorporated Trustees
+              </h2>
+              <p className="text-muted-foreground mt-2 max-w-2xl">
+                Pick what you want to register, see what it entails, submit your documents, then pay securely via Paystack.
+              </p>
+            </div>
+            <Link href="/cac" className="shrink-0">
+              <Button size="lg" className="w-full md:w-auto">
+                Explore CAC services <ArrowRight className="ml-2 w-4 h-4" />
+              </Button>
+            </Link>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+            {CAC_REGISTRATION_TYPES.map((t) => (
+              <div key={t.type} className="rounded-2xl border bg-card p-6 hover:shadow-md transition-shadow">
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="font-semibold text-lg">{t.type === "LLC" ? "Get an LLC registration" : t.title}</div>
+                  <div className="text-xs text-muted-foreground">from</div>
+                </div>
+                <div className="text-2xl font-bold mb-2">{formatNaira(t.priceFromNaira)}</div>
+                <p className="text-sm text-muted-foreground mb-4">{t.shortDescription}</p>
+                <div className="flex gap-2">
+                  <Link href="/cac" className="w-full">
+                    <Button variant="outline" className="w-full">
+                      Learn more
+                    </Button>
+                  </Link>
+                  <Link href={`/cac/register/${t.slug}`} className="w-full">
+                    <Button className="w-full">
+                      Start <ArrowRight className="ml-2 w-4 h-4" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
