@@ -1,4 +1,5 @@
 import { BaseService } from './base'
+import { Timestamp } from 'firebase/firestore'
 import { Reminder, ApiResponse, PaginatedResponse } from '@/lib/types'
 
 export class ReminderService extends BaseService {
@@ -206,8 +207,8 @@ export class ReminderService extends BaseService {
       return await this.getAll([
         { field: 'userId', operator: '==', value: userId },
         { field: 'isCompleted', operator: '==', value: false },
-        { field: 'dueDate', operator: '>=', value: now.toISOString() },
-        { field: 'dueDate', operator: '<=', value: futureDate.toISOString() }
+        { field: 'dueDate', operator: '>=', value: Timestamp.fromDate(now) },
+        { field: 'dueDate', operator: '<=', value: Timestamp.fromDate(futureDate) }
       ], 'dueDate', 'asc')
     } catch (error) {
       console.error('Error getting upcoming reminders:', error)
@@ -223,7 +224,7 @@ export class ReminderService extends BaseService {
       return await this.getAll([
         { field: 'userId', operator: '==', value: userId },
         { field: 'isCompleted', operator: '==', value: false },
-        { field: 'dueDate', operator: '<', value: now.toISOString() }
+        { field: 'dueDate', operator: '<', value: Timestamp.fromDate(now) }
       ], 'dueDate', 'asc')
     } catch (error) {
       console.error('Error getting overdue reminders:', error)
