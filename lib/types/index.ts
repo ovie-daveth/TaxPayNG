@@ -1,5 +1,106 @@
 export type BusinessType = 'freelancer' | 'creator' | 'sme'  | 'consultant'
 
+// CAC Registration
+export type CacRegistrationType = 'BUSINESS_NAME' | 'LLC' | 'INCORPORATED_TRUSTEES'
+
+export interface CacOfficerProfitSharing {
+  /**
+   * Fixed platform fee (in NGN) taken on every CAC registration before percentage split applies.
+   * Example: 10000
+   */
+  standardFeeNaira: number
+  /**
+   * Platform percentage (0-100) applied to the remainder (amount - standardFeeNaira).
+   * Example: BUSINESS_NAME => 5, others => 8
+   */
+  platformPctByType: Partial<Record<CacRegistrationType, number>>
+  /**
+   * Fallback platform percentage (0-100) if not set for a given type.
+   */
+  defaultPlatformPct: number
+}
+
+export interface CacOfficer {
+  id: string
+  name: string
+  phone: string
+  email?: string
+  isActive: boolean
+  profitSharing: CacOfficerProfitSharing
+  createdAt: string
+  updatedAt: string
+}
+
+export type CacRequestStatus =
+  | 'draft'
+  | 'payment_pending'
+  | 'paid'
+  | 'in_progress'
+  | 'completed'
+  | 'cancelled'
+
+export interface CacUploadedFile {
+  url: string
+  fileId?: string
+  name?: string
+  size?: number
+  originalName?: string
+}
+
+export interface CacRequest {
+  id: string
+  type: CacRegistrationType
+  status: CacRequestStatus
+  amountKobo: number
+  currency: 'NGN'
+  paystackReference?: string
+  paystackAccessCode?: string
+  paidAt?: string
+  createdAt: string
+  updatedAt: string
+  /**
+   * Admin-side assignment (optional)
+   */
+  cacOfficerId?: string
+  cacOfficerName?: string
+  cacOfficerPhone?: string
+  /**
+   * Snapshot of profit split used for this request (optional)
+   */
+  profitSplit?: {
+    standardFeeNaira: number
+    platformPct: number
+    platformTakeNaira: number
+    officerTakeNaira: number
+    computedAt: string
+  }
+  /**
+   * Generated summary file for the officer (optional)
+   */
+  submissionSummary?: {
+    pdfUrl: string
+    pdfFileId?: string
+    generatedAt: string
+  }
+
+  // Contact
+  contactName: string
+  contactEmail: string
+  contactPhone: string
+
+  // Optional linkage if user was logged in
+  userId?: string
+
+  // For LLC pricing
+  shareCapitalBand?: string
+
+  // Form payload (type-specific)
+  payload: any
+
+  // Uploaded supporting documents
+  uploads?: Record<string, CacUploadedFile[]>
+}
+
 // Subscription Types
 export type SubscriptionType = 'PRO' | 'GOLD' | 'PLATINUM' | 'Small Business' | 'Big Business' | null
 
