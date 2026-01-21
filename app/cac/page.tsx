@@ -69,7 +69,7 @@ export default function CacServicesPage() {
       </div>
 
       <Dialog open={!!openType} onOpenChange={(o) => (!o ? setOpenType(null) : null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>{openInfo?.entry?.title || "Details"}</DialogTitle>
             <DialogDescription>
