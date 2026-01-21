@@ -39,6 +39,7 @@ export default function CacServicesPage() {
             </Badge>
             <Badge variant="secondary">Document upload supported</Badge>
             <Badge variant="secondary">Admin gets notified instantly</Badge>
+            <Badge variant="secondary">We contact you immediately via your email and phone for updates</Badge>
           </div>
         </div>
 
