@@ -67,6 +67,10 @@ export default function CacServicesPage() {
             </Card>
           ))}
         </div>
+
+        <div>
+          <p>Registration with OTax includes continued access to updates, professional guidance, and business consultancy to support your operations over time.</p>
+        </div>
       </div>
 
       <Dialog open={!!openType} onOpenChange={(o) => (!o ? setOpenType(null) : null)}>
