@@ -23,6 +23,7 @@ import { sendSignupVerification } from "@/lib/utils/emailVerification"
 import { Separator } from "@/components/ui/separator"
 import { BusinessType } from "@/lib/types"
 import { GoogleBusinessTypeDialog } from "@/components/auth/google-business-type-dialog"
+import { PhoneVerificationDialog } from "@/components/auth/phone-verification-dialog"
 
 function LogoImage(): React.JSX.Element {
   const { theme, resolvedTheme } = useTheme()
@@ -113,6 +114,8 @@ function SignupPageContent() {
   const pendingSignupDataRef = useRef<SignupPayload | null>(null)
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [showPhoneVerification, setShowPhoneVerification] = useState(false)
+  const [verifiedPhone, setVerifiedPhone] = useState<string | null>(null)
 
   const handleGoogleSignUp = async () => {
     // Separate flow: Google signup uses popup to select business type
@@ -256,8 +259,8 @@ function SignupPageContent() {
         firstName: payload.firstName,
         lastName: payload.lastName,
         businessType: payload.businessType,
+        phone: payload.phone,
         ...(payload.businessType === 'consultant' && {
-          phone: payload.phone,
           consultantStates: payload.consultantStates
         })
       })
@@ -290,9 +293,11 @@ function SignupPageContent() {
           }
         }
         
-        toast.success('Account created successfully! Please log in to continue.')
+        toast.success('Account created successfully!')
         setVerifiedEmail(payload.email.toLowerCase())
-        setSignupSuccess(true)
+        
+        // Show phone verification dialog
+        setShowPhoneVerification(true)
       } else {
         toast.error(result?.error || 'Failed to create account')
       }
@@ -302,6 +307,12 @@ function SignupPageContent() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  const handlePhoneVerified = () => {
+    setVerifiedPhone(formData.phone)
+    toast.success('Phone verified! Please log in to continue.')
+    setSignupSuccess(true)
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -325,12 +336,14 @@ function SignupPageContent() {
       return
     }
 
+    // Validate phone number (required for all users)
+    if (!formData.phone || formData.phone.trim() === '') {
+      toast.error('Phone number is required')
+      return
+    }
+
     // Validate consultant-specific fields
     if (formData.businessType === 'consultant') {
-      if (!formData.phone || formData.phone.trim() === '') {
-        toast.error('Phone number is required for tax consultants')
-        return
-      }
       if (formData.consultantStates.length === 0) {
         toast.error('Please select at least one state you can handle')
         return
@@ -356,8 +369,8 @@ function SignupPageContent() {
       firstName,
       lastName,
       businessType,
+      phone: formData.phone.trim(),
       ...(formData.businessType === 'consultant' && {
-        phone: formData.phone.trim(),
         consultantStates: formData.consultantStates
       })
     }
@@ -498,25 +511,26 @@ function SignupPageContent() {
               />
             </div>
 
+            {/* Phone Number Field - Required for all users */}
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="text-sm font-medium">Phone Number</Label>
+              <Input 
+                id="phone" 
+                type="tel" 
+                placeholder="08012345678" 
+                value={formData.phone}
+                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                required 
+                className="h-11 sm:h-12 text-base border-2 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+              />
+              <p className="text-xs text-muted-foreground">
+                You'll need to verify this number after signup
+              </p>
+            </div>
+
             {/* Tax Consultant-specific fields */}
             {isConsultant && (
               <>
-                <div className="space-y-2">
-                  <Label htmlFor="phone" className="text-sm font-medium">Phone Number *</Label>
-                  <Input 
-                    id="phone" 
-                    type="tel" 
-                    placeholder="08012345678" 
-                    value={formData.phone}
-                    onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                    required 
-                    className="h-11 sm:h-12 text-base border-2 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Required for tax consultant registration
-                  </p>
-                </div>
-
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">States You Can Handle *</Label>
                   <p className="text-xs sm:text-sm text-muted-foreground mb-3">
@@ -698,6 +712,13 @@ function SignupPageContent() {
         open={showGoogleBusinessTypeDialog}
         onOpenChange={setShowGoogleBusinessTypeDialog}
         onSelect={handleGoogleBusinessTypeSelected}
+      />
+
+      <PhoneVerificationDialog
+        open={showPhoneVerification}
+        onOpenChange={setShowPhoneVerification}
+        phoneNumber={formData.phone}
+        onVerified={handlePhoneVerified}
       />
 
       {/* Coming Soon Modal */}

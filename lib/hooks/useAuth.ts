@@ -107,13 +107,14 @@ export function useAuth() {
         firstName: data.firstName,
         lastName: data.lastName,
         businessType: data.businessType,
+        phone: data.phone, // Add phone for all users
+        phoneVerified: false, // Initialize as not verified
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
 
       // Add consultant-specific fields if businessType is consultant
       if (data.businessType === 'consultant') {
-        profileData.phone = data.phone
         profileData.consultantStates = data.consultantStates || []
         profileData.consultantKycCompleted = false
         profileData.role = 'consultant' // Set role to consultant
