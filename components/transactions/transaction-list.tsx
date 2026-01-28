@@ -444,6 +444,18 @@ export function TransactionList({
             <tr>
               <th className="text-left py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs font-medium text-muted-foreground w-[50px] md:w-[120px]">Date Created</th>
               <th className="text-left py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs font-medium text-muted-foreground w-[50px] md:w-[120px]">Transaction Date</th>
+              <th className="text-left py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs font-medium text-muted-foreground w-[50px] md:w-[120px]">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="cursor-help underline decoration-dotted">Payment Date</span>
+                    </TooltipTrigger>
+                    <TooltipContent className="max-w-xs">
+                      <p>This is the actual date the transaction is recorded by law, when money moved.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </th>
               <th className="text-left py-1.5 md:py-2 px-1 md:px-2 text-[10px] md:text-xs font-medium text-muted-foreground w-[20px] md:w-[130px]">Description</th>
               <th className="text-left py-1.5 md:py-2 px-1 md:px-2 text-[10px] md:text-xs font-medium text-muted-foreground w-[20px] md:w-[120px]">Category</th>
               <th className="text-left py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs font-medium text-muted-foreground w-[50px] md:w-[120px]">Payment Method</th>
@@ -477,7 +489,10 @@ export function TransactionList({
                     {transaction.createdAt ? formatDate(transaction.createdAt) : '-'}
                   </td>
                   <td className="py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs align-middle">
-                    {formatDate(transaction.transactionDate || transaction.valueDate || transaction.date)}
+                    {formatDate(transaction.transactionDate || transaction.date)}
+                  </td>
+                  <td className="py-1.5 md:py-2 px-2 md:px-3 text-[10px] md:text-xs align-middle">
+                    {transaction.valueDate ? formatDate(transaction.valueDate) : '-'}
                   </td>
                   <td className="py-1.5 md:py-2 px-1 md:px-2 align-middle max-w-[100px] md:max-w-[150px] lg:max-w-[200px]">
                     <div className="flex items-center gap-1 md:gap-2 min-w-0 w-full">

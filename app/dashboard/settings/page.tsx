@@ -389,12 +389,6 @@ export default function SettingsPage() {
                 <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Profile</span>
               </TabsTrigger>
-              {profile?.businessType !== 'freelancer' && (
-                <TabsTrigger value="business" className="flex items-center gap-1 sm:gap-2 cursor-pointer text-xs sm:text-sm">
-                  <Building2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-                  <span className="hidden sm:inline">Business</span>
-                </TabsTrigger>
-              )}
               <TabsTrigger value="subscription" className="flex items-center gap-1 sm:gap-2 cursor-pointer text-xs sm:text-sm">
                 <CreditCard className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span className="hidden sm:inline">Subscription</span>

@@ -73,15 +73,15 @@ export function ExportReportPreview({ reportData, onBack, onExport, isExporting 
   }
   
   const sortedTransactions = uniqueTransactions.sort((a, b) => {
-    // Prioritize createdAt, then fallback to other date fields
-    const dateA = getCreatedAtTime(a.createdAt) || 
+    // For sorting, prioritize valueDate (when money moved), then transactionDate, then date
+    const dateA = (a.valueDate ? new Date(a.valueDate).getTime() : 0) ||
                   (a.transactionDate ? new Date(a.transactionDate).getTime() : 0) ||
-                  (a.valueDate ? new Date(a.valueDate).getTime() : 0) ||
-                  (a.date ? new Date(a.date).getTime() : 0)
-    const dateB = getCreatedAtTime(b.createdAt) || 
+                  (a.date ? new Date(a.date).getTime() : 0) ||
+                  getCreatedAtTime(a.createdAt)
+    const dateB = (b.valueDate ? new Date(b.valueDate).getTime() : 0) ||
                   (b.transactionDate ? new Date(b.transactionDate).getTime() : 0) ||
-                  (b.valueDate ? new Date(b.valueDate).getTime() : 0) ||
-                  (b.date ? new Date(b.date).getTime() : 0)
+                  (b.date ? new Date(b.date).getTime() : 0) ||
+                  getCreatedAtTime(b.createdAt)
     return dateB - dateA
   })
 

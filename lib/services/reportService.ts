@@ -149,7 +149,8 @@ export class ReportService extends BaseService {
       if (!matchesPlatform) return false
       
       // Get transaction date and created date
-      const txnDateStr = txn.date || txn.transactionDate || txn.valueDate
+      // Use valueDate (when money moved) as primary, fallback to transactionDate, then date
+      const txnDateStr = txn.valueDate || txn.transactionDate || txn.date
       const txnDate = txnDateStr ? new Date(txnDateStr) : null
       const createdDate = txn.createdAt ? new Date(txn.createdAt) : null
       
@@ -336,7 +337,8 @@ export class ReportService extends BaseService {
         }
         
         // Get transaction date and created date
-        const txnDateStr = txn.date || txn.transactionDate || txn.valueDate
+        // Use valueDate (when money moved) as primary, fallback to transactionDate, then date
+        const txnDateStr = txn.valueDate || txn.transactionDate || txn.date
         const txnDate = txnDateStr ? new Date(txnDateStr) : null
         const createdDate = txn.createdAt ? new Date(txn.createdAt) : null
         
@@ -363,7 +365,7 @@ export class ReportService extends BaseService {
         periodEnd: periodEnd.toISOString(),
         totalFiltered: filteredTransactions.length,
         expenseTransactions: filteredTransactions.filter(t => t.type === 'expense').map(t => {
-          const txnDateStr = t.date || t.transactionDate || t.valueDate
+          const txnDateStr = t.valueDate || t.transactionDate || t.date
           const txnDate = txnDateStr ? new Date(txnDateStr) : null
           const createdDate = t.createdAt ? new Date(t.createdAt) : null
           const txnDateInPeriod = txnDate && !isNaN(txnDate.getTime()) && txnDate >= periodStart && txnDate <= periodEnd
@@ -991,16 +993,16 @@ export class ReportService extends BaseService {
       { field: 'userId', operator: '==', value: userId }
     ])
     
-    // Filter transactions by period - use transaction date only for tax calculations
-    // Tax calculations must use the actual transaction date to maintain correct year attribution
-    // Priority: transactionDate > valueDate > date (createdAt only as absolute fallback for legacy transactions)
+    // Filter transactions by period - use valueDate (when money moved) for tax calculations
+    // Tax calculations should use when money actually moved to maintain correct year attribution
+    // Priority: valueDate > transactionDate > date (createdAt only as absolute fallback for legacy transactions)
     const filteredTransactions = allTransactions.filter(txn => {
       if (entityId && txn.entityId !== entityId) return false
       
-      // Use transaction date (when transaction actually occurred) for tax period filtering
-      // This ensures transactions are attributed to the correct tax year
-      // Priority: transactionDate > valueDate > date > createdAt (only if no transaction date exists)
-      const txnDateStr = txn.transactionDate || txn.valueDate || txn.date
+      // Use valueDate (when money actually moved) for tax period filtering
+      // This ensures transactions are attributed to the correct tax year based on cash flow
+      // Priority: valueDate > transactionDate > date > createdAt (only if no value date exists)
+      const txnDateStr = txn.valueDate || txn.transactionDate || txn.date
       let dateToUse: Date | null = null
       
       if (txnDateStr) {
