@@ -7,10 +7,12 @@ import { Sparkles, X } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 import { cn } from "@/lib/utils"
+import { SubscriptionRequiredModal } from "./subscription-required-modal"
 
 export function FreeTrialBanner() {
   const { freeTrialStatus, isBlocked, loading } = useSubscription()
   const [dismissed, setDismissed] = useState(false)
+  const [openSubscriptionModal, setOpenSubscriptionModal] = useState(false)
 
   // Don't show if loading, blocked (shows modal instead), or not in free trial
   if (loading || isBlocked || !freeTrialStatus.isInFreeTrial || dismissed) {
@@ -22,6 +24,10 @@ export function FreeTrialBanner() {
   // Determine banner variant based on days remaining
   const isExpiringSoon = daysRemaining <= 2
   const variant = isExpiringSoon ? "warning" : "info"
+
+  const handleBringUpSubScriptionModal = () => {
+    setOpenSubscriptionModal(true)
+  }
 
   return (
     <Alert
@@ -71,7 +77,6 @@ export function FreeTrialBanner() {
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0 w-full sm:w-auto justify-end sm:justify-start">
-            <Link href="/pricing" className="flex-shrink-0">
               <Button
                 size="sm"
                 className={cn(
@@ -80,25 +85,16 @@ export function FreeTrialBanner() {
                     ? "bg-yellow-600 hover:bg-yellow-700 text-white"
                     : "bg-blue-600 hover:bg-blue-700 text-white"
                 )}
-                onClick={(e) => {
-                  e.stopPropagation()
-                }}
+                onClick={handleBringUpSubScriptionModal}
               >
                 Subscribe Now
               </Button>
-            </Link>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 flex-shrink-0"
-              onClick={() => setDismissed(true)}
-              aria-label="Dismiss banner"
-            >
-              <X className="h-4 w-4" />
-            </Button>
           </div>
         </div>
       </div>
+
+      <SubscriptionRequiredModal 
+      open={openSubscriptionModal} onOpenChange={setOpenSubscriptionModal} businessType={"freelancer"} />
     </Alert>
   )
 }

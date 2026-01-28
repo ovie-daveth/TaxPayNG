@@ -30,7 +30,6 @@ export default function TransactionsPage() {
     error,
     pagination,
     loadTransactions,
-    createTransaction,
     updateTransaction,
     deleteTransaction
   } = useTransactions(user?.uid || null)
