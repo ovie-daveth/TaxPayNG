@@ -48,7 +48,7 @@ export default function AdminUsersPage() {
   const [searchTerm, setSearchTerm] = useState("")
   const [actionDialog, setActionDialog] = useState<{
     open: boolean
-    type: 'delete' | 'disable' | 'enable' | 'warning' | 'mail' | 'assignRole' | null
+    type: 'delete' | 'disable' | 'enable' | 'warning' | 'mail' | 'assignRole' | 'extendTrial' | null
     user: any | null
   }>({
     open: false,
@@ -72,6 +72,7 @@ export default function AdminUsersPage() {
   const [bulkBusinessTypeFilter, setBulkBusinessTypeFilter] = useState<"all" | string>("all")
   const [subscriptionFilter, setSubscriptionFilter] = useState<"all" | "active" | "expired" | "none">("all")
   const [trialFilter, setTrialFilter] = useState<"all" | "active" | "expired" | "not_used">("all")
+  const [dateFilter, setDateFilter] = useState<"all" | "today" | "week" | "month" | "year">("all")
   const [extendTrialDialogOpen, setExtendTrialDialogOpen] = useState(false)
   const [extendTrialUser, setExtendTrialUser] = useState<any | null>(null)
   const [extendTrialDays, setExtendTrialDays] = useState<string>("7")
@@ -303,6 +304,24 @@ export default function AdminUsersPage() {
       if (trialFilter === "not_used" && trialStatus.status !== "not_used") return false
     }
 
+    // Business type filter
+    if (bulkBusinessTypeFilter !== "all") {
+      const businessType = u.businessType?.toString().toLowerCase().trim()
+      if (businessType !== bulkBusinessTypeFilter.toLowerCase()) return false
+    }
+
+    // Date filter (based on createdAt)
+    if (dateFilter !== "all" && u.createdAt) {
+      const userDate = new Date(u.createdAt)
+      const now = new Date()
+      const daysDiff = Math.floor((now.getTime() - userDate.getTime()) / (1000 * 60 * 60 * 24))
+      
+      if (dateFilter === "today" && daysDiff !== 0) return false
+      if (dateFilter === "week" && daysDiff > 7) return false
+      if (dateFilter === "month" && daysDiff > 30) return false
+      if (dateFilter === "year" && daysDiff > 365) return false
+    }
+
     return true
   })
 
@@ -462,17 +481,47 @@ export default function AdminUsersPage() {
       const currentUser = auth.currentUser
       const token = currentUser ? await currentUser.getIdToken() : undefined
 
-      // Filter users by business type
-      let filteredUsers = users
-      if (bulkBusinessTypeFilter !== "all") {
-        filteredUsers = users.filter((u: any) => {
+      // Filter users by business type, subscription status, and trial status
+      let filteredUsers = users.filter((u: any) => {
+        // Apply business type filter
+        if (bulkBusinessTypeFilter !== "all") {
           const businessType = u.businessType?.toString().toLowerCase().trim()
-          return businessType === bulkBusinessTypeFilter.toLowerCase()
-        })
-      }
+          if (businessType !== bulkBusinessTypeFilter.toLowerCase()) return false
+        }
+        
+        // Apply subscription filter
+        if (subscriptionFilter !== "all") {
+          const now = new Date()
+          const hasActiveSubscription = u.subscriptionEndDate && new Date(u.subscriptionEndDate) > now
+          const hasExpiredSubscription = u.subscriptionEndDate && new Date(u.subscriptionEndDate) <= now
+          
+          if (subscriptionFilter === "active" && !hasActiveSubscription) return false
+          if (subscriptionFilter === "expired" && !hasExpiredSubscription) return false
+          if (subscriptionFilter === "none" && u.subscriptionEndDate) return false
+        }
+        
+        // Apply trial filter
+        if (trialFilter !== "all") {
+          const now = new Date()
+          const hasActiveTrial = u.freeTrialEndDate && new Date(u.freeTrialEndDate) > now
+          const hasExpiredTrial = u.freeTrialEndDate && new Date(u.freeTrialEndDate) <= now
+          
+          if (trialFilter === "active" && !hasActiveTrial) return false
+          if (trialFilter === "expired" && !hasExpiredTrial) return false
+          if (trialFilter === "not_used" && u.freeTrialEndDate) return false
+        }
+        
+        return true
+      })
 
       if (filteredUsers.length === 0) {
-        toast.error(`No ${bulkBusinessTypeFilter === "all" ? "" : bulkBusinessTypeFilter} users found to send emails to`)
+        const filters = []
+        if (bulkBusinessTypeFilter !== "all") filters.push(bulkBusinessTypeFilter)
+        if (subscriptionFilter !== "all") filters.push(`${subscriptionFilter} subscription`)
+        if (trialFilter !== "all") filters.push(`${trialFilter} trial`)
+        
+        const filterLabel = filters.length > 0 ? ` with ${filters.join(", ")}` : ""
+        toast.error(`No users${filterLabel} found to send emails to`)
         setBulkSending(false)
         return
       }
@@ -587,6 +636,8 @@ export default function AdminUsersPage() {
       setBulkEditableSubject("")
       setBulkEditableBody("")
       setBulkBusinessTypeFilter("all")
+      setSubscriptionFilter("all")
+      setTrialFilter("all")
     } catch (error: any) {
       console.error("Bulk send error:", error)
       toast.error(error.message || "Failed to send bulk emails")
@@ -595,10 +646,16 @@ export default function AdminUsersPage() {
     }
   }
 
-  const handleOpenDialog = (type: 'delete' | 'disable' | 'enable' | 'warning' | 'mail' | 'assignRole', user: any) => {
-    setActionDialog({ open: true, type, user })
-    if (type === 'assignRole') {
-      setSelectedRole(user.role || 'user')
+  const handleOpenDialog = (type: 'delete' | 'disable' | 'enable' | 'warning' | 'mail' | 'assignRole' | 'extendTrial', user: any) => {
+    // Handle extendTrial separately with its own dialog
+    if (type === 'extendTrial') {
+      setExtendTrialUser(user)
+      setExtendTrialDialogOpen(true)
+    } else {
+      setActionDialog({ open: true, type, user })
+      if (type === 'assignRole') {
+        setSelectedRole(user.role || 'user')
+      }
     }
   }
 
@@ -1076,17 +1133,17 @@ export default function AdminUsersPage() {
           </Card>
         </div>
 
-        <div className="mb-6 space-y-4">
-          <div className="relative">
+        <div className="mb-6 space-y-4 flex items-center gap-5 justify-between">
+          <div className="relative w-1/3 -mb-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
               placeholder="Search users by name or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-10 h-10"
             />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <Select value={subscriptionFilter} onValueChange={(value: any) => setSubscriptionFilter(value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Subscription Status" />
@@ -1122,17 +1179,30 @@ export default function AdminUsersPage() {
                 ))}
               </SelectContent>
             </Select>
+            <Select value={dateFilter} onValueChange={(value: any) => setDateFilter(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Date Registered" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Time</SelectItem>
+                <SelectItem value="today">Today</SelectItem>
+                <SelectItem value="week">Last 7 Days</SelectItem>
+                <SelectItem value="month">Last 30 Days</SelectItem>
+                <SelectItem value="year">Last Year</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
         </div>
 
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-[130%]">
                 <thead className="border-b border-border">
                   <tr>
                     <th className="text-left p-4 font-semibold">Name</th>
                     <th className="text-left p-4 font-semibold">Email</th>
+                    <th className="text-left p-4 font-semibold">Phone</th>
                     <th className="text-left p-4 font-semibold">Business Type</th>
                     <th className="text-left p-4 font-semibold">Role</th>
                     <th className="text-left p-4 font-semibold">Status</th>
@@ -1153,6 +1223,9 @@ export default function AdminUsersPage() {
                           {u.firstName} {u.lastName}
                         </td>
                         <td className="p-4">{u.email}</td>
+                        <td className="p-4 text-sm text-muted-foreground">
+                          {u.phone || u.phoneNumber || 'N/A'}
+                        </td>
                         <td className="p-4">
                           <Badge variant="outline">{u.businessType || 'N/A'}</Badge>
                         </td>
@@ -1472,7 +1545,7 @@ export default function AdminUsersPage() {
           <div className="space-y-4 mt-4">
             {/* Business Type Filter */}
             <div>
-              <Label htmlFor="bulk-business-type">Send To</Label>
+              <Label htmlFor="bulk-business-type">Business Type</Label>
               <Select 
                 value={bulkBusinessTypeFilter} 
                 onValueChange={(value: string) => {
@@ -1483,12 +1556,54 @@ export default function AdminUsersPage() {
                   <SelectValue placeholder="Select business type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Users</SelectItem>
+                  <SelectItem value="all">All Business Types</SelectItem>
                   {businessTypes.map((type) => (
                     <SelectItem key={type} value={type}>
                       {type} Only
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Subscription Status Filter */}
+            <div>
+              <Label htmlFor="bulk-subscription-status">Subscription Status</Label>
+              <Select 
+                value={subscriptionFilter} 
+                onValueChange={(value: "all" | "active" | "expired" | "none") => {
+                  setSubscriptionFilter(value)
+                }}
+              >
+                <SelectTrigger id="bulk-subscription-status" className="mt-1">
+                  <SelectValue placeholder="Select subscription status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Subscription Status</SelectItem>
+                  <SelectItem value="active">Active Subscription Only</SelectItem>
+                  <SelectItem value="expired">Expired Subscription Only</SelectItem>
+                  <SelectItem value="none">No Subscription Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Trial Status Filter */}
+            <div>
+              <Label htmlFor="bulk-trial-status">Trial Status</Label>
+              <Select 
+                value={trialFilter} 
+                onValueChange={(value: "all" | "active" | "expired" | "not_used") => {
+                  setTrialFilter(value)
+                }}
+              >
+                <SelectTrigger id="bulk-trial-status" className="mt-1">
+                  <SelectValue placeholder="Select trial status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Trial Status</SelectItem>
+                  <SelectItem value="active">Active Trial Only</SelectItem>
+                  <SelectItem value="expired">Expired Trial Only</SelectItem>
+                  <SelectItem value="not_used">No Trial Used Only</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1502,12 +1617,38 @@ export default function AdminUsersPage() {
                   setBulkTemplate(value)
                   if (value !== "custom") {
                     // Load template preview for first recipient (if available)
-                    const filtered = bulkBusinessTypeFilter === "all" 
-                      ? users 
-                      : users.filter((u: any) => {
-                          const businessType = u.businessType?.toString().toLowerCase().trim()
-                          return businessType === bulkBusinessTypeFilter.toLowerCase()
-                        })
+                    const filtered = users.filter((u: any) => {
+                      // Apply business type filter
+                      if (bulkBusinessTypeFilter !== "all") {
+                        const businessType = u.businessType?.toString().toLowerCase().trim()
+                        if (businessType !== bulkBusinessTypeFilter.toLowerCase()) return false
+                      }
+                      
+                      // Apply subscription filter
+                      if (subscriptionFilter !== "all") {
+                        const now = new Date()
+                        const hasActiveSubscription = u.subscriptionEndDate && new Date(u.subscriptionEndDate) > now
+                        const hasExpiredSubscription = u.subscriptionEndDate && new Date(u.subscriptionEndDate) <= now
+                        
+                        if (subscriptionFilter === "active" && !hasActiveSubscription) return false
+                        if (subscriptionFilter === "expired" && !hasExpiredSubscription) return false
+                        if (subscriptionFilter === "none" && u.subscriptionEndDate) return false
+                      }
+                      
+                      // Apply trial filter
+                      if (trialFilter !== "all") {
+                        const now = new Date()
+                        const hasActiveTrial = u.freeTrialEndDate && new Date(u.freeTrialEndDate) > now
+                        const hasExpiredTrial = u.freeTrialEndDate && new Date(u.freeTrialEndDate) <= now
+                        
+                        if (trialFilter === "active" && !hasActiveTrial) return false
+                        if (trialFilter === "expired" && !hasExpiredTrial) return false
+                        if (trialFilter === "not_used" && u.freeTrialEndDate) return false
+                      }
+                      
+                      return true
+                    })
+                    
                     if (filtered.length > 0 && filtered[0].email) {
                       const preview = buildUserEmail(value as UserTemplateKey, filtered[0])
                       setBulkEditableSubject(preview.subject)
@@ -1566,19 +1707,53 @@ export default function AdminUsersPage() {
                 Recipients
               </p>
               {(() => {
-                const filtered = bulkBusinessTypeFilter === "all" 
-                  ? users 
-                  : users.filter((u: any) => {
-                      const businessType = u.businessType?.toString().toLowerCase().trim()
-                      return businessType === bulkBusinessTypeFilter.toLowerCase()
-                    })
+                const filtered = users.filter((u: any) => {
+                  // Apply business type filter
+                  if (bulkBusinessTypeFilter !== "all") {
+                    const businessType = u.businessType?.toString().toLowerCase().trim()
+                    if (businessType !== bulkBusinessTypeFilter.toLowerCase()) return false
+                  }
+                  
+                  // Apply subscription filter
+                  if (subscriptionFilter !== "all") {
+                    const now = new Date()
+                    const hasActiveSubscription = u.subscriptionEndDate && new Date(u.subscriptionEndDate) > now
+                    const hasExpiredSubscription = u.subscriptionEndDate && new Date(u.subscriptionEndDate) <= now
+                    
+                    if (subscriptionFilter === "active" && !hasActiveSubscription) return false
+                    if (subscriptionFilter === "expired" && !hasExpiredSubscription) return false
+                    if (subscriptionFilter === "none" && u.subscriptionEndDate) return false
+                  }
+                  
+                  // Apply trial filter
+                  if (trialFilter !== "all") {
+                    const now = new Date()
+                    const hasActiveTrial = u.freeTrialEndDate && new Date(u.freeTrialEndDate) > now
+                    const hasExpiredTrial = u.freeTrialEndDate && new Date(u.freeTrialEndDate) <= now
+                    
+                    if (trialFilter === "active" && !hasActiveTrial) return false
+                    if (trialFilter === "expired" && !hasExpiredTrial) return false
+                    if (trialFilter === "not_used" && u.freeTrialEndDate) return false
+                  }
+                  
+                  return true
+                })
+                
                 const count = filtered.filter((u: any) => u.email && u.userId).length
-                const typeLabel = bulkBusinessTypeFilter === "all" 
-                  ? "all users" 
-                  : `${bulkBusinessTypeFilter} users`
+                
+                // Build filter label
+                const filters = []
+                if (bulkBusinessTypeFilter !== "all") filters.push(bulkBusinessTypeFilter)
+                if (subscriptionFilter !== "all") filters.push(`${subscriptionFilter} subscription`)
+                if (trialFilter !== "all") filters.push(`${trialFilter} trial`)
+                
+                const filterLabel = filters.length > 0 
+                  ? filters.join(", ") 
+                  : "all users"
+                
                 return (
                   <p>
-                    {count} {typeLabel} {count === 1 ? "has" : "have"} valid {count === 1 ? "email" : "emails"} and will receive this message.
+                    {count} {filterLabel} {count === 1 ? "has" : "have"} valid {count === 1 ? "email" : "emails"} and will receive this message.
                   </p>
                 )
               })()}
@@ -1593,12 +1768,38 @@ export default function AdminUsersPage() {
               onClick={handleBulkSend} 
               className="flex items-center gap-2" 
               disabled={bulkSending || (() => {
-                const filtered = bulkBusinessTypeFilter === "all" 
-                  ? users 
-                  : users.filter((u: any) => {
-                      const businessType = u.businessType?.toString().toLowerCase().trim()
-                      return businessType === bulkBusinessTypeFilter.toLowerCase()
-                    })
+                const filtered = users.filter((u: any) => {
+                  // Apply business type filter
+                  if (bulkBusinessTypeFilter !== "all") {
+                    const businessType = u.businessType?.toString().toLowerCase().trim()
+                    if (businessType !== bulkBusinessTypeFilter.toLowerCase()) return false
+                  }
+                  
+                  // Apply subscription filter
+                  if (subscriptionFilter !== "all") {
+                    const now = new Date()
+                    const hasActiveSubscription = u.subscriptionEndDate && new Date(u.subscriptionEndDate) > now
+                    const hasExpiredSubscription = u.subscriptionEndDate && new Date(u.subscriptionEndDate) <= now
+                    
+                    if (subscriptionFilter === "active" && !hasActiveSubscription) return false
+                    if (subscriptionFilter === "expired" && !hasExpiredSubscription) return false
+                    if (subscriptionFilter === "none" && u.subscriptionEndDate) return false
+                  }
+                  
+                  // Apply trial filter
+                  if (trialFilter !== "all") {
+                    const now = new Date()
+                    const hasActiveTrial = u.freeTrialEndDate && new Date(u.freeTrialEndDate) > now
+                    const hasExpiredTrial = u.freeTrialEndDate && new Date(u.freeTrialEndDate) <= now
+                    
+                    if (trialFilter === "active" && !hasActiveTrial) return false
+                    if (trialFilter === "expired" && !hasExpiredTrial) return false
+                    if (trialFilter === "not_used" && u.freeTrialEndDate) return false
+                  }
+                  
+                  return true
+                })
+                
                 return filtered.filter((u: any) => u.email && u.userId).length === 0
               })()}
             >

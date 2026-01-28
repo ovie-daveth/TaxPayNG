@@ -107,13 +107,14 @@ export function useAuth() {
         firstName: data.firstName,
         lastName: data.lastName,
         businessType: data.businessType,
+        phone: data.phone || null,
+        phoneNumber: data.phone || null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
 
       // Add consultant-specific fields if businessType is consultant
       if (data.businessType === 'consultant') {
-        profileData.phone = data.phone
         profileData.consultantStates = data.consultantStates || []
         profileData.consultantKycCompleted = false
         profileData.role = 'consultant' // Set role to consultant
@@ -257,12 +258,13 @@ export function useAuth() {
             firstName: data.firstName,
             lastName: data.lastName,
             businessType: data.businessType,
+            phone: data.phone || null,
+            phoneNumber: data.phone || null,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString()
           }
 
           if (data.businessType === 'consultant') {
-            profileData.phone = data.phone
             profileData.consultantStates = data.consultantStates || []
             profileData.consultantKycCompleted = false
             profileData.role = 'consultant'
@@ -569,6 +571,8 @@ export function useAuth() {
         firstName,
         lastName,
         businessType,
+        phone: null,
+        phoneNumber: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
@@ -659,6 +663,8 @@ export function useAuth() {
         firstName,
         lastName,
         businessType,
+        phone: null,
+        phoneNumber: null,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
       }
