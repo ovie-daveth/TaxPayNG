@@ -4,6 +4,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button"
 import { Lock, AlertCircle } from "lucide-react"
 import { BusinessType } from "@/lib/types"
+import { useAuth } from "@/lib/hooks/useAuth"
+import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
 interface FreeTrialBlockedModalProps {
   open: boolean
@@ -13,6 +16,9 @@ interface FreeTrialBlockedModalProps {
 }
 
 export function FreeTrialBlockedModal({ open, onOpenChange, businessType = 'freelancer', onOpenSubscription }: FreeTrialBlockedModalProps) {
+  const { logout } = useAuth()
+  const router = useRouter()
+
   // Prevent closing the modal - user must subscribe
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen) {
@@ -74,9 +80,20 @@ export function FreeTrialBlockedModal({ open, onOpenChange, businessType = 'free
             <Button 
               variant="outline" 
               className="w-full"
-              onClick={() => {
-                // Sign out user
-                window.location.href = '/login'
+              onClick={async () => {
+                try {
+                  const result = await logout()
+                  if (result.success) {
+                    toast.success('Signed out successfully')
+                    router.push('/login')
+                  } else {
+                    toast.error(result.error || 'Failed to sign out')
+                  }
+                } catch (error) {
+                  toast.error('An error occurred during sign out')
+                  // Force redirect even if logout fails
+                  router.push('/login')
+                }
               }}
             >
               Sign Out
