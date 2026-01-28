@@ -79,6 +79,7 @@ export function CacRegistrationForm({ type }: { type: CacRegistrationType }) {
     registeredLga: "",
     aimsObjectives: "",
     trustees: [{ fullName: "", dateOfBirth: "", phone: "", email: "", occupation: "", address: "", lga: "" }],
+    shareholders: [] as Array<{ fullName: string; phone: string; email: string; occupation: string; address: string; lga: string; dateOfBirth: string }>,
     executiveMembers: [{ role: "Chairman", fullName: "" }, { role: "Secretary", fullName: "" }],
   })
 
@@ -93,6 +94,10 @@ export function CacRegistrationForm({ type }: { type: CacRegistrationType }) {
   const [llcDirectorUploads, setLlcDirectorUploads] = useState<UploadBucket[]>([emptyBucket()])
   const [llcShareholderUploads, setLlcShareholderUploads] = useState<UploadBucket[]>([])
 
+  // Trustees per-person document uploads
+  const [trusteesUploads, setTrusteesUploads] = useState<UploadBucket[]>([emptyBucket(), emptyBucket()])
+  const [trusteesShareholderUploads, setTrusteesShareholderUploads] = useState<UploadBucket[]>([])
+
   const amountNaira = useMemo(() => {
     if (type === "BUSINESS_NAME") return CAC_FEES_NAIRA.BUSINESS_NAME
     if (type === "INCORPORATED_TRUSTEES") return CAC_FEES_NAIRA.INCORPORATED_TRUSTEES
@@ -101,6 +106,55 @@ export function CacRegistrationForm({ type }: { type: CacRegistrationType }) {
   }, [type, llcPayload.shareCapitalBand])
 
   const amountKobo = amountNaira * 100
+
+  const getPaymentKey = (email: string) => {
+    const normalizedEmail = String(email || "").trim().toLowerCase()
+    const band = type === "LLC" ? llcPayload.shareCapitalBand : "NA"
+    return `cac-payment:${type}:${normalizedEmail}:${amountKobo}:${band}`
+  }
+
+  const readStoredPayment = (email: string) => {
+    if (typeof window === "undefined") return null
+    const key = getPaymentKey(email)
+    const raw = window.localStorage.getItem(key)
+    if (!raw) return null
+    try {
+      const data = JSON.parse(raw)
+      if (!data?.reference || !data?.requestId) {
+        window.localStorage.removeItem(key)
+        return null
+      }
+      return { key, data }
+    } catch {
+      window.localStorage.removeItem(key)
+      return null
+    }
+  }
+
+  const saveStoredPayment = (
+    email: string,
+    data: { reference: string; requestId: string }
+  ) => {
+    if (typeof window === "undefined") return
+    const key = getPaymentKey(email)
+    window.localStorage.setItem(
+      key,
+      JSON.stringify({
+        reference: data.reference,
+        requestId: data.requestId,
+        amountKobo,
+        type,
+        email: String(email || "").trim().toLowerCase(),
+        shareCapitalBand: type === "LLC" ? llcPayload.shareCapitalBand : undefined,
+        createdAt: new Date().toISOString(),
+      })
+    )
+  }
+
+  const clearStoredPayment = (email: string) => {
+    if (typeof window === "undefined") return
+    window.localStorage.removeItem(getPaymentKey(email))
+  }
 
   const expectedDocs = useMemo(() => {
     if (type === "BUSINESS_NAME") {
@@ -131,8 +185,8 @@ export function CacRegistrationForm({ type }: { type: CacRegistrationType }) {
     if (required(contact.phone, "Contact phone")) return required(contact.phone, "Contact phone")
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "Please enter a valid email address"
 
-    // Required uploads (non-LLC types use the generic uploader)
-    if (type !== "LLC") {
+    // Required uploads (business name uses the generic uploader)
+    if (type === "BUSINESS_NAME") {
       for (const key of Object.keys(expectedDocs) as UploadFieldKey[]) {
         const cfg = expectedDocs[key]
         if (cfg.required && (!uploads[key] || uploads[key].length === 0)) {
@@ -204,6 +258,30 @@ export function CacRegistrationForm({ type }: { type: CacRegistrationType }) {
     if (required(p.registeredLga, "Registered LGA")) return required(p.registeredLga, "Registered LGA")
     if (required(p.aimsObjectives, "Aims and objectives")) return required(p.aimsObjectives, "Aims and objectives")
     if (p.trustees.length < 2) return "Minimum of 2 trustees required"
+    
+    // Trustees documents: explicit per-trustee
+    for (let i = 0; i < p.trustees.length; i++) {
+      const b = trusteesUploads[i] || emptyBucket()
+      if (!b.ninSlips.length) return `Please upload NIN slip for Trustee ${i + 1}`
+      if (!b.signatures.length) return `Please upload signature for Trustee ${i + 1}`
+    }
+
+    // Shareholders optional, but if provided, their docs become required
+    for (let i = 0; i < p.shareholders.length; i++) {
+      const s = p.shareholders[i] || ({} as any)
+      const hasAny =
+        !!String(s.fullName || "").trim() ||
+        !!String(s.phone || "").trim() ||
+        !!String(s.email || "").trim() ||
+        !!String(s.occupation || "").trim() ||
+        !!String(s.address || "").trim() ||
+        !!String(s.lga || "").trim() ||
+        !!String(s.dateOfBirth || "").trim()
+      if (!hasAny) continue
+      const b = trusteesShareholderUploads[i] || emptyBucket()
+      if (!b.ninSlips.length) return `Please upload NIN slip for Shareholder ${i + 1}`
+      if (!b.signatures.length) return `Please upload signature for Shareholder ${i + 1}`
+    }
     return null
   }
 
@@ -252,6 +330,28 @@ export function CacRegistrationForm({ type }: { type: CacRegistrationType }) {
       return results
     }
 
+    if (type === "INCORPORATED_TRUSTEES") {
+      // Trustees uploads (explicit per trustee)
+      for (let i = 0; i < trusteesPayload.trustees.length; i++) {
+        const b = trusteesUploads[i] || emptyBucket()
+        const n = i + 1
+        await pushFiles(`trustee_${n}_ninSlips`, b.ninSlips)
+        await pushFiles(`trustee_${n}_signatures`, b.signatures)
+        await pushFiles(`trustee_${n}_passportPhotos`, b.passportPhotos)
+      }
+
+      // Shareholders uploads (optional)
+      for (let i = 0; i < trusteesPayload.shareholders.length; i++) {
+        const b = trusteesShareholderUploads[i] || emptyBucket()
+        const n = i + 1
+        await pushFiles(`trustee_shareholder_${n}_ninSlips`, b.ninSlips)
+        await pushFiles(`trustee_shareholder_${n}_signatures`, b.signatures)
+        await pushFiles(`trustee_shareholder_${n}_passportPhotos`, b.passportPhotos)
+      }
+
+      return results
+    }
+
     // Non-LLC: generic upload blocks
     const entries = Object.entries(uploads) as Array<[UploadFieldKey, File[]]>
     for (const [key, files] of entries) {
@@ -275,7 +375,67 @@ export function CacRegistrationForm({ type }: { type: CacRegistrationType }) {
     }
 
     setIsSubmitting(true)
+    const normalizedEmail = String(contact.email || "").trim()
+
+    const submitAfterPayment = async (reference: string, requestId: string) => {
+      const uploadToast = toast.loading("Uploading documents…")
+      try {
+        const uploaded = await uploadFiles()
+        toast.dismiss(uploadToast)
+
+        const attachToast = toast.loading("Submitting your details…")
+        const attachRes = await fetch("/api/cac/attach-uploads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            requestId,
+            reference,
+            payload: type === "BUSINESS_NAME" ? businessNamePayload : type === "LLC" ? llcPayload : trusteesPayload,
+            uploads: uploaded,
+            shareCapitalBand: type === "LLC" ? llcPayload.shareCapitalBand : undefined,
+          }),
+        })
+        const attachData = await attachRes.json()
+        toast.dismiss(attachToast)
+        if (!attachRes.ok || !attachData?.success) {
+          throw new Error(attachData?.error || "Failed to submit request details")
+        }
+
+        clearStoredPayment(normalizedEmail)
+        toast.success("Payment successful — request submitted")
+        router.push(`/cac/success?requestId=${encodeURIComponent(requestId)}`)
+      } catch (e: any) {
+        toast.dismiss(uploadToast)
+        toast.error(e?.message || "Payment was successful, but document upload failed. Please retry submission.")
+      }
+    }
+
     try {
+      const stored = readStoredPayment(normalizedEmail)
+      if (stored?.data?.reference) {
+        const resumeToast = toast.loading("Checking previous payment…")
+        try {
+          const verifyRes = await fetch("/api/cac/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ reference: stored.data.reference }),
+          })
+          const verifyData = await verifyRes.json()
+          toast.dismiss(resumeToast)
+          if (verifyRes.ok && verifyData?.success) {
+            saveStoredPayment(normalizedEmail, {
+              reference: stored.data.reference,
+              requestId: verifyData.data.requestId,
+            })
+            await submitAfterPayment(stored.data.reference, verifyData.data.requestId)
+            return
+          }
+        } catch {
+          toast.dismiss(resumeToast)
+        }
+        clearStoredPayment(normalizedEmail)
+      }
+
       const initToast = toast.loading("Initializing payment…")
       const initRes = await fetch("/api/cac/initialize", {
         method: "POST",
@@ -295,7 +455,7 @@ export function CacRegistrationForm({ type }: { type: CacRegistrationType }) {
 
       await payWithPaystackInline({
         publicKey,
-        email: String(contact.email).trim(),
+        email: normalizedEmail,
         amountKobo: initData.data.amountKobo,
         reference: initData.data.reference,
         metadata: { cacRequestId: initData.data.requestId, type },
@@ -314,36 +474,11 @@ export function CacRegistrationForm({ type }: { type: CacRegistrationType }) {
               throw new Error(verifyData?.error || "Payment verification failed")
             }
 
-            // Upload documents ONLY after payment is confirmed, to avoid duplicate uploads on payment retry.
-            const uploadToast = toast.loading("Uploading documents…")
-            try {
-              const uploaded = await uploadFiles()
-              toast.dismiss(uploadToast)
-
-              const attachToast = toast.loading("Submitting your details…")
-              const attachRes = await fetch("/api/cac/attach-uploads", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  requestId: verifyData.data.requestId,
-                  reference: ref,
-                  payload: type === "BUSINESS_NAME" ? businessNamePayload : type === "LLC" ? llcPayload : trusteesPayload,
-                  uploads: uploaded,
-                  shareCapitalBand: type === "LLC" ? llcPayload.shareCapitalBand : undefined,
-                }),
-              })
-              const attachData = await attachRes.json()
-              toast.dismiss(attachToast)
-              if (!attachRes.ok || !attachData?.success) {
-                throw new Error(attachData?.error || "Failed to submit request details")
-              }
-
-              toast.success("Payment successful — request submitted")
-              router.push(`/cac/success?requestId=${encodeURIComponent(verifyData.data.requestId)}`)
-            } catch (e: any) {
-              toast.dismiss(uploadToast)
-              toast.error(e?.message || "Payment was successful, but document upload failed. Please contact support.")
-            }
+            saveStoredPayment(normalizedEmail, {
+              reference: ref,
+              requestId: verifyData.data.requestId,
+            })
+            await submitAfterPayment(ref, verifyData.data.requestId)
           } catch (e: any) {
             toast.dismiss(verifyToast)
             toast.error(e?.message || "Payment verified failed")
@@ -1096,16 +1231,20 @@ export function CacRegistrationForm({ type }: { type: CacRegistrationType }) {
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() =>
+                    onClick={() => {
                       setTrusteesPayload((p) => ({
                         ...p,
                         trustees: [...p.trustees, { fullName: "", dateOfBirth: "", phone: "", email: "", occupation: "", address: "", lga: "" }],
                       }))
-                    }
+                      setTrusteesUploads((p) => [...p, emptyBucket()])
+                    }}
                   >
                     <Plus className="w-4 h-4 mr-1" />
                     Add trustee
                   </Button>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Enter each trustee’s details and upload their documents right below their card.
                 </div>
                 <div className="space-y-4">
                   {trusteesPayload.trustees.map((t, idx) => (
@@ -1113,7 +1252,10 @@ export function CacRegistrationForm({ type }: { type: CacRegistrationType }) {
                       <div className="flex items-center justify-between mb-3">
                         <div className="text-sm font-medium">Trustee {idx + 1}</div>
                         {trusteesPayload.trustees.length > 2 ? (
-                          <Button type="button" variant="ghost" size="sm" onClick={() => setTrusteesPayload((p) => ({ ...p, trustees: p.trustees.filter((_, i) => i !== idx) }))}>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => {
+                            setTrusteesPayload((p) => ({ ...p, trustees: p.trustees.filter((_, i) => i !== idx) }))
+                            setTrusteesUploads((p) => p.filter((_, i) => i !== idx))
+                          }}>
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         ) : null}
@@ -1169,6 +1311,280 @@ export function CacRegistrationForm({ type }: { type: CacRegistrationType }) {
                           }} />
                         </div>
                       </div>
+
+                      <div className="mt-4 rounded-lg border p-3 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-semibold">Trustee documents</div>
+                            <div className="text-xs text-muted-foreground">
+                              Upload this trustee’s NIN slip and signature. Passport photo is optional.
+                            </div>
+                          </div>
+                        </div>
+
+                        {(Object.keys(trusteesUploads[idx] || emptyBucket()) as UploadFieldKey[]).map((key) => {
+                          const required = key === "ninSlips" || key === "signatures"
+                          const label =
+                            key === "ninSlips"
+                              ? "NIN slip"
+                              : key === "signatures"
+                                ? "Signature photo"
+                                : "Passport photo (optional)"
+                          const inputId = `cac-trustee-${idx}-${key}`
+                          const bucket = trusteesUploads[idx] || emptyBucket()
+
+                          return (
+                            <div key={key} className="space-y-2">
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <div className="text-sm font-medium">
+                                    {label} {required ? <span className="text-destructive">*</span> : null}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">PDF/JPG/PNG recommended</div>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-2"
+                                  onClick={() => {
+                                    const input = document.getElementById(inputId) as HTMLInputElement | null
+                                    input?.click()
+                                  }}
+                                >
+                                  <FileUp className="w-4 h-4" />
+                                  Add files
+                                </Button>
+                              </div>
+                              <input
+                                id={inputId}
+                                className="hidden"
+                                type="file"
+                                multiple
+                                onChange={(e) => {
+                                  const files = Array.from(e.target.files || [])
+                                  setTrusteesUploads((p) => {
+                                    const next = [...p]
+                                    next[idx] = next[idx] || emptyBucket()
+                                    next[idx] = { ...next[idx], [key]: [...(next[idx][key] || []), ...files] }
+                                    return next
+                                  })
+                                  e.currentTarget.value = ""
+                                }}
+                              />
+                              {bucket[key]?.length ? (
+                                <div className="rounded-lg border p-3 space-y-2">
+                                  {bucket[key].map((f, fIdx) => (
+                                    <div key={`${f.name}-${fIdx}`} className="flex items-center justify-between gap-3">
+                                      <div className="text-sm truncate">{f.name}</div>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                          setTrusteesUploads((p) => {
+                                            const next = [...p]
+                                            next[idx] = next[idx] || emptyBucket()
+                                            next[idx] = { ...next[idx], [key]: next[idx][key].filter((_, i) => i !== fIdx) }
+                                            return next
+                                          })
+                                        }
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-xs text-muted-foreground">No files added yet.</div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-lg border p-4 bg-muted/10 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-base font-semibold">Shareholders (optional)</div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      (setTrusteesPayload((p) => ({
+                        ...p,
+                        shareholders: [...p.shareholders, { fullName: "", phone: "", email: "", occupation: "", address: "", lga: "", dateOfBirth: "" }],
+                      })),
+                      setTrusteesShareholderUploads((p) => [...p, emptyBucket()]))
+                    }
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Add shareholder
+                  </Button>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Shareholders are optional. If you add any, please upload their documents under each card.
+                </div>
+                <div className="space-y-4">
+                  {trusteesPayload.shareholders.map((s, idx) => (
+                    <div key={idx} className="rounded-lg border p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="text-sm font-medium">Shareholder {idx + 1}</div>
+                        {trusteesPayload.shareholders.length > 0 ? (
+                          <Button type="button" variant="ghost" size="sm" onClick={() => {
+                            setTrusteesPayload((p) => ({ ...p, shareholders: p.shareholders.filter((_, i) => i !== idx) }))
+                            setTrusteesShareholderUploads((p) => p.filter((_, i) => i !== idx))
+                          }}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        ) : null}
+                      </div>
+                      <div className="grid md:grid-cols-3 gap-4">
+                        <div className="space-y-2">
+                          <Label>Full name</Label>
+                          <Input value={s.fullName} onChange={(e) => {
+                            const v = e.target.value
+                            setTrusteesPayload((p) => ({ ...p, shareholders: p.shareholders.map((x, i) => (i === idx ? { ...x, fullName: v } : x)) }))
+                          }} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Phone</Label>
+                          <Input value={s.phone} onChange={(e) => {
+                            const v = e.target.value
+                            setTrusteesPayload((p) => ({ ...p, shareholders: p.shareholders.map((x, i) => (i === idx ? { ...x, phone: v } : x)) }))
+                          }} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Email</Label>
+                          <Input value={s.email} onChange={(e) => {
+                            const v = e.target.value
+                            setTrusteesPayload((p) => ({ ...p, shareholders: p.shareholders.map((x, i) => (i === idx ? { ...x, email: v } : x)) }))
+                          }} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Occupation</Label>
+                          <Input value={s.occupation} onChange={(e) => {
+                            const v = e.target.value
+                            setTrusteesPayload((p) => ({ ...p, shareholders: p.shareholders.map((x, i) => (i === idx ? { ...x, occupation: v } : x)) }))
+                          }} />
+                        </div>
+                        <div className="space-y-2 md:col-span-2">
+                          <Label>Residential address</Label>
+                          <Input value={s.address} onChange={(e) => {
+                            const v = e.target.value
+                            setTrusteesPayload((p) => ({ ...p, shareholders: p.shareholders.map((x, i) => (i === idx ? { ...x, address: v } : x)) }))
+                          }} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>LGA</Label>
+                          <Input value={s.lga} onChange={(e) => {
+                            const v = e.target.value
+                            setTrusteesPayload((p) => ({ ...p, shareholders: p.shareholders.map((x, i) => (i === idx ? { ...x, lga: v } : x)) }))
+                          }} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Date of birth</Label>
+                          <Input type="date" value={s.dateOfBirth} onChange={(e) => {
+                            const v = e.target.value
+                            setTrusteesPayload((p) => ({ ...p, shareholders: p.shareholders.map((x, i) => (i === idx ? { ...x, dateOfBirth: v } : x)) }))
+                          }} />
+                        </div>
+                      </div>
+
+                      <div className="mt-4 rounded-lg border p-3 space-y-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-semibold">Shareholder documents</div>
+                            <div className="text-xs text-muted-foreground">
+                              Upload this shareholder’s NIN slip and signature. Passport photo is optional.
+                            </div>
+                          </div>
+                        </div>
+
+                        {(Object.keys(trusteesShareholderUploads[idx] || emptyBucket()) as UploadFieldKey[]).map((key) => {
+                          const required = key === "ninSlips" || key === "signatures"
+                          const label =
+                            key === "ninSlips"
+                              ? "NIN slip"
+                              : key === "signatures"
+                                ? "Signature photo"
+                                : "Passport photo (optional)"
+                          const inputId = `cac-trustee-shareholder-${idx}-${key}`
+                          const bucket = trusteesShareholderUploads[idx] || emptyBucket()
+
+                          return (
+                            <div key={key} className="space-y-2">
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <div className="text-sm font-medium">
+                                    {label} {required ? <span className="text-destructive">*</span> : null}
+                                  </div>
+                                  <div className="text-xs text-muted-foreground">PDF/JPG/PNG recommended</div>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="gap-2"
+                                  onClick={() => {
+                                    const input = document.getElementById(inputId) as HTMLInputElement | null
+                                    input?.click()
+                                  }}
+                                >
+                                  <FileUp className="w-4 h-4" />
+                                  Add files
+                                </Button>
+                              </div>
+                              <input
+                                id={inputId}
+                                className="hidden"
+                                type="file"
+                                multiple
+                                onChange={(e) => {
+                                  const files = Array.from(e.target.files || [])
+                                  setTrusteesShareholderUploads((p) => {
+                                    const next = [...p]
+                                    next[idx] = next[idx] || emptyBucket()
+                                    next[idx] = { ...next[idx], [key]: [...(next[idx][key] || []), ...files] }
+                                    return next
+                                  })
+                                  e.currentTarget.value = ""
+                                }}
+                              />
+                              {bucket[key]?.length ? (
+                                <div className="rounded-lg border p-3 space-y-2">
+                                  {bucket[key].map((f, fIdx) => (
+                                    <div key={`${f.name}-${fIdx}`} className="flex items-center justify-between gap-3">
+                                      <div className="text-sm truncate">{f.name}</div>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() =>
+                                          setTrusteesShareholderUploads((p) => {
+                                            const next = [...p]
+                                            next[idx] = next[idx] || emptyBucket()
+                                            next[idx] = { ...next[idx], [key]: next[idx][key].filter((_, i) => i !== fIdx) }
+                                            return next
+                                          })
+                                        }
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-xs text-muted-foreground">No files added yet.</div>
+                              )}
+                            </div>
+                          )
+                        })}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1193,7 +1609,7 @@ export function CacRegistrationForm({ type }: { type: CacRegistrationType }) {
         </CardContent>
       </Card>
 
-      {type !== "LLC" ? (
+      {type === "BUSINESS_NAME" ? (
         <Card>
           <CardHeader>
             <CardTitle>Documents upload</CardTitle>

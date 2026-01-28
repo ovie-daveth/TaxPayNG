@@ -39,6 +39,7 @@ export default function CacServicesPage() {
             </Badge>
             <Badge variant="secondary">Document upload supported</Badge>
             <Badge variant="secondary">Admin gets notified instantly</Badge>
+            <Badge variant="secondary">We contact you immediately via your email and phone for updates</Badge>
           </div>
         </div>
 
@@ -66,10 +67,14 @@ export default function CacServicesPage() {
             </Card>
           ))}
         </div>
+
+        <div className='mt-10'>
+          <p className='text-sm text-muted-foreground text-center'>Registration with OTax includes continued access to updates, professional guidance, and business consultancy to support your operations over time. For more information, please <Link href="mailto:otax.ng@gmail.com" className='text-primary underline'>contact us</Link>.</p>
+        </div>
       </div>
 
       <Dialog open={!!openType} onOpenChange={(o) => (!o ? setOpenType(null) : null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl overflow-y-auto max-h-[90vh]">
           <DialogHeader>
             <DialogTitle>{openInfo?.entry?.title || "Details"}</DialogTitle>
             <DialogDescription>
