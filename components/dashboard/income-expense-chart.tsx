@@ -162,21 +162,21 @@ export function IncomeExpenseChart({
         }, {})
 
         transactions.forEach((transaction) => {
-          // For chart bucketing, use transaction date if available and within period,
-          // otherwise use createdAt to ensure future-dated transactions are shown in current period
-          const transactionDate = transaction.transactionDate || transaction.valueDate || transaction.date
+          // For chart bucketing, use valueDate (when money moved) as primary
+          // Priority: valueDate > transactionDate > date
+          const transactionDate = transaction.valueDate || transaction.transactionDate || transaction.date
           const createdAt = transaction.createdAt
           
           let dateToUse: Date
           if (transactionDate) {
             const txnDate = new Date(transactionDate)
-            // If transaction date is within the period and not in the future beyond now, use it
+            // If value date is within the period and not in the future beyond now, use it
             // Otherwise, use createdAt to ensure transactions are visible in the period they were recorded
             if (txnDate >= periodStart && txnDate <= periodEnd && txnDate <= now) {
               dateToUse = txnDate
             } else {
-              // Future transaction date or outside period - use createdAt (which should be within period)
-              // Fallback to transaction date if createdAt is invalid
+              // Future value date or outside period - use createdAt (which should be within period)
+              // Fallback to value date if createdAt is invalid
               dateToUse = createdAt ? new Date(createdAt) : txnDate
             }
           } else {

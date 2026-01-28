@@ -169,7 +169,10 @@ export class PlatformAnalyticsService {
       let filteredTransactions = allTransactions
       if (startDate || endDate) {
         filteredTransactions = allTransactions.filter(txn => {
-          const txnDate = txn.date ? new Date(txn.date) : new Date(txn.createdAt)
+          // Use valueDate (when money moved) as primary, fallback to transactionDate, then date
+          const txnDate = txn.valueDate ? new Date(txn.valueDate) : 
+                         (txn.transactionDate ? new Date(txn.transactionDate) : 
+                         (txn.date ? new Date(txn.date) : new Date(txn.createdAt)))
           if (startDate && txnDate < new Date(startDate)) return false
           if (endDate && txnDate > new Date(endDate)) return false
           return true

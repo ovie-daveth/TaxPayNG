@@ -479,9 +479,9 @@ export class TransactionService extends BaseService {
       const end = endDate ? new Date(endDate) : null
       const filteredTransactions = transactions
         .map((transaction) => {
-          // Use transaction date (when transaction actually occurred) instead of createdAt
-          // Priority: transactionDate > valueDate > date > createdAt (fallback)
-          const transactionDate = transaction.transactionDate || transaction.valueDate || transaction.date || transaction.createdAt
+          // Use valueDate (when money actually moved) instead of createdAt
+          // Priority: valueDate > transactionDate > date > createdAt (fallback)
+          const transactionDate = transaction.valueDate || transaction.transactionDate || transaction.date || transaction.createdAt
           const recordDate = transactionDate ? new Date(transactionDate) : null
 
           // Preserve original transaction data for calculation (netAmount, transactionNature, taxClassification, etc.)
@@ -669,9 +669,9 @@ export class TransactionService extends BaseService {
               ? baseAmount
               : Number(String(baseAmount).replace(/[\u20A6,]/g, '').trim()) || 0
           
-          // For period filtering, use transaction date (when transaction actually occurred)
-          // Priority: transactionDate > valueDate > date > createdAt (fallback)
-          const transactionDate = transaction.transactionDate || transaction.valueDate || transaction.date || transaction.createdAt
+          // For period filtering, use valueDate (when money actually moved)
+          // Priority: valueDate > transactionDate > date > createdAt (fallback)
+          const transactionDate = transaction.valueDate || transaction.transactionDate || transaction.date || transaction.createdAt
           const recordDate = transactionDate ? new Date(transactionDate) : null
           
           return {

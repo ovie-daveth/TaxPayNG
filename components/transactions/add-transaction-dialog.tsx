@@ -203,6 +203,8 @@ export function AddTransactionDialog({
     amountDisplay: '', // Formatted display value with commas
     currency: 'NGN' as CurrencyCode,
     date: "",
+    // transactionDate: "",
+    // valueDate: "",
     category: '',
     paymentMethod: 'Bank Transfer',
     notes: '',
@@ -228,7 +230,7 @@ export function AddTransactionDialog({
   const [isManualEntryMode, setIsManualEntryMode] = useState(false) // Track if user explicitly chose manual entry
   const [customCategory, setCustomCategory] = useState('') // For "Other" category custom input
   const [showCustomCategoryModal, setShowCustomCategoryModal] = useState(false) // Modal for custom category
-  const { subscriptionType, hasAccess } = useSubscription()
+  const { hasAccess } = useSubscription()
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   
   // Phase 1: New fields for tax compliance
