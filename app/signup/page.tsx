@@ -255,6 +255,7 @@ function SignupPageContent() {
         password: payload.password,
         firstName: payload.firstName,
         lastName: payload.lastName,
+        phone: payload.phone,
         businessType: payload.businessType,
         ...(payload.businessType === 'consultant' && {
           phone: payload.phone,
@@ -319,6 +320,14 @@ function SignupPageContent() {
       return
     }
 
+    const phoneRegex = /^[0-9]{11,15}$/
+    // Validate phone number format
+
+    if(!phoneRegex.test(formData.phone)){
+      toast.error('Please enter a valid phone number')
+      return
+    }
+
     // Validate supported business type
     if (!['freelancer', 'creator', 'sme', 'consultant'].includes(formData.businessType)) {
       toast.error('Please select a supported business type')
@@ -355,6 +364,7 @@ function SignupPageContent() {
       password: formData.password,
       firstName,
       lastName,
+      phone: formData.phone.trim(),
       businessType,
       ...(formData.businessType === 'consultant' && {
         phone: formData.phone.trim(),
@@ -493,6 +503,18 @@ function SignupPageContent() {
                 placeholder="you@example.com" 
                 value={formData.email}
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                required 
+                className="h-11 sm:h-12 text-base border-2 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+              />
+            </div>
+            <div>
+               <Label htmlFor="phone" className="text-sm font-medium">Phone</Label>
+              <Input 
+                id="phone" 
+                type="tel" 
+                placeholder="08012345678" 
+                value={formData.phone}
+                onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                 required 
                 className="h-11 sm:h-12 text-base border-2 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
