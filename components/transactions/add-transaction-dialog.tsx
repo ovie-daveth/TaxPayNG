@@ -136,6 +136,16 @@ export function AddTransactionDialog({
           { value: "Platform Income", label: "Platform Income (Upwork, Fiverr, etc.)" },
           { value: "Retainer", label: "Retainer Fees" },
           { value: "Commission", label: "Commission-Based Income" },
+           { value: "Sales", label: "Product Sales" },
+    { value: "Digital Products", label: "Digital Products (Courses, E-books)" },
+    { value: "Licensing", label: "Licensing & Royalties" },
+
+    { value: "Interest", label: "Interest Income" },
+    { value: "Dividends", label: "Dividends" },
+    { value: "Investments", label: "Investment Returns" },
+
+    { value: "Rental", label: "Rental Income" },
+    { value: "Grants", label: "Grants & Funding" },
           { value: "Other", label: "Other" },
         ]
       } else {
