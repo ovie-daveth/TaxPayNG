@@ -35,6 +35,7 @@ export default function GenerateSelfAssessmentPage() {
   const [reportId, setReportId] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(true) // Start in edit mode by default
   const [isSaving, setIsSaving] = useState(false)
+  const [showFileButton, setShowFileButton] = useState(false)
   const selfAssessmentRef = useRef<SelfAssessmentPreviewHandle | null>(null)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [selectedPlatform, setSelectedPlatform] = useState<string | null>(null)
@@ -269,10 +270,9 @@ export default function GenerateSelfAssessmentPage() {
         setReportId(savedReportId)
         toast.success("Report saved successfully")
       }
-      // Close preview and redirect to reports page
-      setTimeout(() => {
-        router.push('/dashboard/reports')
-      }, 1000) // Small delay to show success message
+      // Show file button after successful save
+      setShowFileButton(true)
+      setIsEditing(false)
     } catch (error) {
       console.error("Error saving report:", error)
       toast.error(error instanceof Error ? error.message : "Failed to save report")
@@ -495,6 +495,8 @@ export default function GenerateSelfAssessmentPage() {
                   formData={formData}
                   isEditing={isEditing}
                   onDataChange={setReportData}
+                  showFileButton={showFileButton}
+                  reportId={reportId}
                 />
               ) : (
                 <Card className="p-8">
