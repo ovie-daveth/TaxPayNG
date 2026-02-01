@@ -20,6 +20,7 @@ import { format } from "date-fns"
 import jsPDF from "jspdf"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
 import { DocumentSelectionModal } from "@/components/filing/document-selection-modal"
+import { PaymentPortalSelectorModal } from "@/components/payment/payment-portal-selector-modal"
 
 interface PaymentData {
   rrr: string
@@ -55,6 +56,7 @@ export default function PaymentSuccessPage() {
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([])
   const [documentSelectMode, setDocumentSelectMode] = useState<"attachments" | "agent">("attachments")
   const [showNrsModal, setShowNrsModal] = useState(false)
+  const [showFilingPortalModal, setShowFilingPortalModal] = useState(false)
   const [downloadingPack, setDownloadingPack] = useState(false)
   const [downloadingDocs, setDownloadingDocs] = useState(false)
   const [printingReturn, setPrintingReturn] = useState(false)
@@ -228,7 +230,7 @@ export default function PaymentSuccessPage() {
       const year = (report as any)?.reportData?.period?.year || new Date().getFullYear()
       zip.file(
         "README.txt",
-        `OTax Filing Pack\n\nThis ZIP includes your payment receipt (if any) and supporting documents.\nYour self-assessment return should be printed from the app.\nYear: ${year}\nGenerated: ${new Date().toISOString()}\n`
+        `OTax Filing Pack\n\nThis ZIP includes your payment receipt (if any) and supporting documents.\n\nIMPORTANT: Please print your self-assessment return separately using the "Print Self-Assessment" button above.\n\nYear: ${year}\nGenerated: ${new Date().toISOString()}\n\nContents:\n- Payment receipt (if applicable)\n- ${selectedDocumentIds.length} supporting document(s)\n`
       )
 
       // Add receipt if exists
@@ -240,15 +242,28 @@ export default function PaymentSuccessPage() {
       // Add selected supporting docs (if any)
       if (selectedDocumentIds.length > 0) {
         const folder = zip.folder("supporting-documents")
-        await Promise.all(
-          selectedDocumentIds.map(async (docId) => {
+        let successCount = 0
+        let failCount = 0
+        
+        for (const docId of selectedDocumentIds) {
+          try {
             const docMeta = (await documentService.getById(docId)) as Document
             const res = await fetch(docMeta.url)
             if (!res.ok) throw new Error(`Failed to download ${docMeta.originalName}`)
             const blob = await res.blob()
             folder?.file(docMeta.originalName || `${docMeta.name}-${docId}`, blob)
-          })
-        )
+            successCount++
+          } catch (error) {
+            console.error(`Error downloading document ${docId}:`, error)
+            failCount++
+          }
+        }
+        
+        if (failCount > 0) {
+          toast.warning(`Downloaded ${successCount} of ${selectedDocumentIds.length} documents. ${failCount} failed.`)
+        } else {
+          toast.success(`Filing pack downloaded with ${successCount} document(s)!`)
+        }
       }
 
       const blob = await zip.generateAsync({ type: "blob" })
@@ -475,8 +490,8 @@ export default function PaymentSuccessPage() {
           {/* Download pack */}
           <Card>
             <CardHeader className="p-3 sm:p-4 md:p-6">
-              <CardTitle className="text-base sm:text-lg md:text-xl font-semibold">Download Filing Pack</CardTitle>
-              <CardDescription className="text-[11px] sm:text-xs md:text-sm mt-0.5 sm:mt-1">Print your self-assessment return and attach supporting documents before filing.</CardDescription>
+              <CardTitle className="text-base sm:text-lg md:text-xl font-semibold">Download report pack to file  manually to IRS office</CardTitle>
+              <CardDescription className="text-[11px] sm:text-xs md:text-sm mt-0.5 sm:mt-1">Print your self-assessment report and attach supporting documents before filing.</CardDescription>
             </CardHeader>
             <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
               <div className="space-y-1.5">
@@ -530,7 +545,7 @@ export default function PaymentSuccessPage() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
                 <Button
                   variant="outline"
                   onClick={printSelfAssessmentReport}
@@ -558,14 +573,6 @@ export default function PaymentSuccessPage() {
                   {downloadingDocs ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
                   Download Supporting Docs (ZIP)
                 </Button>
-                <Button
-                  onClick={downloadFilingPackZip}
-                  disabled={downloadingPack || !report?.reportData}
-                  className="h-9 sm:h-10 text-xs sm:text-sm justify-start"
-                >
-                  {downloadingPack ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Download className="w-4 h-4 mr-2" />}
-                  Download Full Filing Pack (ZIP)
-                </Button>
               </div>
               <p className="text-[11px] sm:text-xs text-muted-foreground">
                 Tip: The full pack includes your return PDF, receipt (if any), and selected supporting documents.
@@ -579,15 +586,15 @@ export default function PaymentSuccessPage() {
               <CardHeader className="p-3 sm:p-4 md:p-6">
                 <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
                   <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-                  File Yourself on NRS Portal
+                  File Yourself on official government Portal
                 </CardTitle>
                 <CardDescription className="text-[11px] sm:text-xs md:text-sm mt-0.5 sm:mt-1">
-                  Continue filing on the official NRS self-service portal.
+                  Continue filing on the official government portal, federal or state.
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-3 sm:p-4 md:p-6 pt-0 space-y-2">
                 <Button
-                  onClick={startSelfFiling}
+                  onClick={() => setShowFilingPortalModal(true)}
                   disabled={submitting || !report}
                   className="w-full h-10 sm:h-11 text-xs sm:text-sm"
                   size="lg"
@@ -595,11 +602,11 @@ export default function PaymentSuccessPage() {
                   {submitting ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Opening NRS...
+                      Opening Portal...
                     </>
                   ) : (
                     <>
-                      Continue to NRS Portal
+                      Continue Self Filing
                       <ExternalLink className="w-4 h-4 ml-2" />
                     </>
                   )}
@@ -671,6 +678,24 @@ export default function PaymentSuccessPage() {
           />
         </div>
       )}
+
+      {/* Filing Portal Selector Modal */}
+      <PaymentPortalSelectorModal
+        open={showFilingPortalModal}
+        onOpenChange={setShowFilingPortalModal}
+        userState={profile?.address?.state}
+        taxDescription="Self-Assessment Tax Filing"
+        taxDuration={`Tax Year ${report?.period?.year || new Date().getFullYear()}`}
+        period="yearly"
+        mode="filing"
+        reportId={reportId}
+        onFilingComplete={() => {
+          // Redirect to confirmation page after filing is complete
+          router.push(`${basePath}/reports/file/${reportId}/confirmation?amount=${paymentData.amount}`)
+        }}
+        onSelectNRC={() => {}}
+        onSelectStateIRS={() => {}}
+      />
 
       {/* NRS portal modal */}
       <Dialog open={showNrsModal} onOpenChange={setShowNrsModal}>

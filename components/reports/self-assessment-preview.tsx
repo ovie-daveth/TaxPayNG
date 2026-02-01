@@ -37,7 +37,7 @@ interface SelfAssessmentPreviewProps {
   onBack?: () => void
   reportId?: string
   showFileButton?: boolean
-  filingStatus?: 'not_filed' | 'filed' | 'submitted' | 'acknowledged'
+  filingStatus?: 'draft' | 'filed' | 'submitted' | 'acknowledged'
   filingMethod?: 'direct' | 'agent' | 'email' | null
   /**
    * When true, removes the outer padding/border/rounded corners on mobile so the preview can be full-bleed.
