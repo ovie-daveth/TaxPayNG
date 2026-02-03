@@ -102,13 +102,8 @@ export function DashboardNavSME() {
     }
   }
 
-  // Filter nav items based on whether user has filing requests
-  const filteredNavItems = navItems.filter(item => {
-    if (item.href === "/dashboard-sme/filing-requests") {
-      return hasFilingRequests
-    }
-    return true
-  })
+  // Filter nav items - filing requests is always visible
+  const filteredNavItems = navItems
 
   // Items shown in bottom nav - we keep high-frequency modules for SMEs
   const bottomNavItems = [

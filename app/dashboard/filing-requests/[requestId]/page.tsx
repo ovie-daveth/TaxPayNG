@@ -21,7 +21,8 @@ import {
   Clock,
   User,
   ExternalLink,
-  Download
+  Download,
+  Eye
 } from "lucide-react"
 import { FilingRequest } from "@/lib/types"
 import { MessagePanel } from "@/components/agent/message-panel"
@@ -35,6 +36,7 @@ export default function ClientFilingRequestPage() {
   const [request, setRequest] = useState<FilingRequest | null>(null)
   const [loading, setLoading] = useState(true)
   const [initialLoad, setInitialLoad] = useState(true)
+  const [previewDocument, setPreviewDocument] = useState<{ url: string; name: string } | null>(null)
   const previousStatusRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -313,6 +315,75 @@ export default function ClientFilingRequestPage() {
         </CardContent>
       </Card>
 
+      {/* Supporting Documents */}
+      {request.supportingDocuments && request.supportingDocuments.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              Supporting Documents ({request.supportingDocuments.length})
+            </CardTitle>
+            <CardDescription>
+              Documents submitted with this filing request
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 gap-3">
+              {request.supportingDocuments.map((doc, index) => {
+                const docObj = typeof doc === 'string' ? { id: doc, name: 'Document', type: 'Document' } : doc;
+                const docId = typeof doc === 'string' ? doc : (doc as any).id || (doc as any).fileId;
+                return (
+                  <div key={index} className="border rounded-lg p-4 bg-muted/30">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-sm truncate">{docObj.name || 'Document'}</p>
+                        <p className="text-xs text-muted-foreground">Type: {docObj.type || 'Document'}</p>
+                      </div>
+                      <div className="flex items-center gap-2 ml-4">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            try {
+                              // First fetch the document details from Firestore
+                              const docResponse = await fetch(`/api/documents/${docId}`);
+                              const docData = await docResponse.json();
+                              
+                              if (!docData.success || !docData.data?.fileId) {
+                                toast.error("Document not found");
+                                return;
+                              }
+                              
+                              // Then get the ImageKit URL using the fileId
+                              const response = await fetch(`/api/get-image-fileid?fileId=${docData.data.fileId}`);
+                              const data = await response.json();
+                              if (data.url) {
+                                setPreviewDocument({ 
+                                  url: data.url, 
+                                  name: docData.data.fileName || docObj.name || 'Document' 
+                                });
+                              } else {
+                                toast.error("Failed to load document");
+                              }
+                            } catch (error) {
+                              console.error("Error loading document:", error);
+                              toast.error("Failed to load document");
+                            }
+                          }}
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          View
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Request Details */}
       <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-4">
         <Card>
@@ -353,6 +424,49 @@ export default function ClientFilingRequestPage() {
       </div>
           </div>
         </main>
+
+      {/* Document Preview Modal */}
+      {previewDocument && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-background rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b">
+              <h3 className="font-semibold truncate flex-1">{previewDocument.name}</h3>
+              <div className="flex items-center gap-2 ml-4">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => window.open(previewDocument.url, '_blank')}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Open in New Tab
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setPreviewDocument(null)}
+                >
+                  Close
+                </Button>
+              </div>
+            </div>
+            <div className="flex-1 overflow-auto p-4">
+              {previewDocument.url.toLowerCase().endsWith('.pdf') ? (
+                <iframe
+                  src={previewDocument.url}
+                  className="w-full h-full min-h-[500px]"
+                  title={previewDocument.name}
+                />
+              ) : (
+                <img
+                  src={previewDocument.url}
+                  alt={previewDocument.name}
+                  className="max-w-full h-auto mx-auto"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

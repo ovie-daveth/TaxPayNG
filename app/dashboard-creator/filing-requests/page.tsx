@@ -132,11 +132,21 @@ export default function FilingRequestsPage() {
             <h3 className="text-sm sm:text-base md:text-lg font-medium mb-2">
               {searchTerm ? "No matching requests found" : "No filing requests yet"}
             </h3>
-            <p className="text-xs sm:text-sm text-muted-foreground px-2">
+            <p className="text-xs sm:text-sm text-muted-foreground px-2 mb-4">
               {searchTerm 
                 ? "Try adjusting your search terms"
                 : "When you file a tax return via an agent, your requests will appear here"}
             </p>
+            {!searchTerm && (
+              <Button
+                size="lg"
+                onClick={() => router.push("/dashboard-creator/reports/generate/self-assessment")}
+                className="mt-2"
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                File Tax Return
+              </Button>
+            )}
           </div>
         </Card>
       ) : (

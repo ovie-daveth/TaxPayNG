@@ -83,11 +83,24 @@ export default function FilingRequestDetailPage({ params }: { params: Promise<{ 
 
   const viewDocument = async (docId: string, docName: string) => {
     try {
-      const response = await fetch(`/api/get-image-fileid?fileId=${docId}`)
-      const data = await response.json()
+      // First fetch the document details from Firestore
+      const docResponse = await fetch(`/api/documents/${docId}`);
+      const docData = await docResponse.json();
+      
+      if (!docData.success || !docData.data?.fileId) {
+        toast.error("Document not found");
+        return;
+      }
+      
+      // Then get the ImageKit URL using the fileId
+      const response = await fetch(`/api/get-image-fileid?fileId=${docData.data.fileId}`);
+      const data = await response.json();
       
       if (data.url) {
-        setPreviewDocument({ url: data.url, name: docName })
+        setPreviewDocument({ 
+          url: data.url, 
+          name: docData.data.fileName || docName 
+        });
       } else {
         toast.error("Failed to load document")
       }
@@ -266,7 +279,8 @@ export default function FilingRequestDetailPage({ params }: { params: Promise<{ 
                   </h3>
                   <div className="grid grid-cols-1 gap-3">
                     {request.supportingDocuments.map((doc, index) => {
-                      const docObj = typeof doc === 'string' ? { name: doc, type: 'Document', fileId: doc } : doc;
+                      const docObj = typeof doc === 'string' ? { id: doc, name: 'Document', type: 'Document' } : doc;
+                      const docId = typeof doc === 'string' ? doc : (doc as any).id || (doc as any).fileId;
                       return (
                         <Card key={index} className="bg-muted/50">
                           <CardContent className="p-4">
@@ -281,7 +295,7 @@ export default function FilingRequestDetailPage({ params }: { params: Promise<{ 
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={() => viewDocument(docObj.fileId, docObj.name)}
+                                  onClick={() => viewDocument(docId, docObj.name || 'Document')}
                                 >
                                   <Eye className="w-4 h-4 mr-2" />
                                   View
