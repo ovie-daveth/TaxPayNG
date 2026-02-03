@@ -89,7 +89,6 @@ export default function FilingRequestsPage() {
     return (
       request.id.toLowerCase().includes(search) ||
       request.state.toLowerCase().includes(search) ||
-      request.rrr.toLowerCase().includes(search) ||
       request.assignedAgentName?.toLowerCase().includes(search) ||
       request.status.toLowerCase().includes(search)
     )
@@ -109,7 +108,7 @@ export default function FilingRequestsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-        <main className="mx-auto px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
+        <main className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
           <div className="space-y-4 sm:space-y-6">
         
       {/* Search */}
@@ -117,7 +116,7 @@ export default function FilingRequestsPage() {
         <div className="relative">
           <Search className="absolute left-2.5 sm:left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-3.5 h-3.5 sm:w-4 sm:h-4" />
           <Input
-            placeholder="Search by request ID, state, RRR..."
+            placeholder="Search by request ID, state, agent..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-8 sm:pl-10 h-9 sm:h-10 text-xs sm:text-sm"
@@ -125,7 +124,7 @@ export default function FilingRequestsPage() {
         </div>
       </Card>
 
-      {/* Requests List */}
+      {/* Requests Table */}
       {filteredRequests.length === 0 ? (
         <Card className="p-3 sm:p-4 md:p-5 lg:p-6">
           <div className="text-center py-6 sm:py-8 md:py-10 lg:py-12">
@@ -141,74 +140,116 @@ export default function FilingRequestsPage() {
           </div>
         </Card>
       ) : (
-        <div className="space-y-3 sm:space-y-4">
-          {filteredRequests.map((request) => (
-            <Card key={request.id} className="hover:shadow-md transition-shadow">
-              <CardContent className="p-3 sm:p-4 md:p-5 lg:p-6">
-                <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-3 sm:gap-4">
-                  <div className="flex-1 space-y-2 sm:space-y-3 md:space-y-4 w-full min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 md:gap-4">
+        <Card>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Request ID
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Report ID
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    State
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Assigned Agent
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Documents
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Submitted
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Last Updated
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                {filteredRequests.map((request) => (
+                  <tr key={request.id} className="hover:bg-muted/50 transition-colors">
+                    <td className="px-4 py-4 whitespace-nowrap">
                       {getStatusBadge(request.status)}
-                      <code className="text-xs font-mono text-muted-foreground break-all sm:break-normal">
+                    </td>
+                    <td className="px-4 py-4">
+                      <code className="text-xs font-mono text-muted-foreground">
                         {request.id.substring(0, 12)}...
                       </code>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-3 gap-2 sm:gap-3 md:gap-4">
-                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                        <MapPin className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
-                        <span className="text-xs sm:text-sm truncate">
-                          <span className="text-muted-foreground">State: </span>
-                          {request.state}
+                    </td>
+                    <td className="px-4 py-4">
+                      <code className="text-xs font-mono text-muted-foreground">
+                        {request.reportId ? request.reportId.substring(0, 12) + '...' : '-'}
+                      </code>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">{request.state}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      {request.assignedAgentName ? (
+                        <div className="flex items-center gap-2">
+                          <User className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm">{request.assignedAgentName}</span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">Not assigned</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm">
+                          {request.supportingDocuments?.length || 0} file{request.supportingDocuments?.length !== 1 ? 's' : ''}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                        <FileText className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
-                        <span className="text-xs sm:text-sm truncate">
-                          <span className="text-muted-foreground">RRR: </span>
-                          <code className="font-mono text-xs break-all">{request.rrr}</code>
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                        <Calendar className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
-                        <span className="text-xs sm:text-sm text-muted-foreground truncate">
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm text-muted-foreground">
                           {format(new Date(request.createdAt), 'MMM dd, yyyy')}
                         </span>
                       </div>
-                    </div>
-
-                    {request.assignedAgentName && (
-                      <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                        <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-muted-foreground flex-shrink-0" />
-                        <span className="text-xs sm:text-sm truncate">
-                          <span className="text-muted-foreground">Agent: </span>
-                          {request.assignedAgentName}
-                        </span>
-                      </div>
-                    )}
-
-                    {request.notes && (
-                      <div className="pt-2 border-t">
-                        <p className="text-xs text-muted-foreground mb-1">Latest Note:</p>
-                        <p className="text-xs sm:text-sm line-clamp-2 break-words">{request.notes}</p>
-                      </div>
-                    )}
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    onClick={() => router.push(`/dashboard-creator/filing-requests/${request.id}`)}
-                    className="ml-0 sm:ml-4 w-full sm:w-auto h-9 sm:h-10 text-xs sm:text-sm flex-shrink-0"
-                  >
-                    <span className="hidden sm:inline">View Details</span>
-                    <span className="sm:hidden">View</span>
-                    <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 ml-1.5 sm:ml-2" />
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      {request.updatedAt ? (
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">
+                            {format(new Date(request.updatedAt), 'MMM dd, yyyy')}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">-</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => router.push(`/dashboard-creator/filing-requests/${request.id}`)}
+                      >
+                        View
+                        <ArrowRight className="w-4 h-4 ml-2" />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
           </div>
         </main>
