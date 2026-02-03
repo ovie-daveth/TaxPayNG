@@ -81,35 +81,6 @@ export default function FilingRequestDetailPage({ params }: { params: Promise<{ 
     )
   }
 
-  const viewDocument = async (docId: string, docName: string) => {
-    try {
-      // First fetch the document details from Firestore
-      const docResponse = await fetch(`/api/documents/${docId}`);
-      const docData = await docResponse.json();
-      
-      if (!docData.success || !docData.data?.fileId) {
-        toast.error("Document not found");
-        return;
-      }
-      
-      // Then get the ImageKit URL using the fileId
-      const response = await fetch(`/api/get-image-fileid?fileId=${docData.data.fileId}`);
-      const data = await response.json();
-      
-      if (data.url) {
-        setPreviewDocument({ 
-          url: data.url, 
-          name: docData.data.fileName || docName 
-        });
-      } else {
-        toast.error("Failed to load document")
-      }
-    } catch (error) {
-      console.error("Error loading document:", error)
-      toast.error("Failed to load document")
-    }
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -279,27 +250,40 @@ export default function FilingRequestDetailPage({ params }: { params: Promise<{ 
                   </h3>
                   <div className="grid grid-cols-1 gap-3">
                     {request.supportingDocuments.map((doc, index) => {
-                      const docObj = typeof doc === 'string' ? { id: doc, name: 'Document', type: 'Document' } : doc;
-                      const docId = typeof doc === 'string' ? doc : (doc as any).id || (doc as any).fileId;
+                      // Check if doc is an object with url, name, type or just a string (old format)
+                      const isDocObject = typeof doc === 'object' && doc !== null && 'url' in doc
+                      const docUrl = isDocObject ? (doc as any).url : null
+                      const docName = isDocObject ? ((doc as any).name || 'Document') : 'Document'
+                      const docType = isDocObject ? ((doc as any).type || 'Document') : 'Document'
+                      
                       return (
                         <Card key={index} className="bg-muted/50">
                           <CardContent className="p-4">
                             <div className="flex items-center justify-between">
                               <div className="flex-1 min-w-0">
-                                <p className="font-medium text-sm truncate">{docObj.name}</p>
+                                <p className="font-medium text-sm truncate">{docName}</p>
                                 <p className="text-xs text-muted-foreground">
-                                  Type: {docObj.type}
+                                  Type: {docType}
                                 </p>
                               </div>
                               <div className="flex items-center gap-2 ml-4">
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => viewDocument(docId, docObj.name || 'Document')}
-                                >
-                                  <Eye className="w-4 h-4 mr-2" />
-                                  View
-                                </Button>
+                                {docUrl ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => {
+                                      setPreviewDocument({ 
+                                        url: docUrl, 
+                                        name: docName 
+                                      })
+                                    }}
+                                  >
+                                    <Eye className="w-4 h-4 mr-2" />
+                                    View
+                                  </Button>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground">URL not available</p>
+                                )}
                               </div>
                             </div>
                           </CardContent>

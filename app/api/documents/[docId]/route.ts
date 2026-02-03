@@ -33,6 +33,9 @@ export async function GET(
       data: {
         id: docSnap.id,
         ...data,
+        // Ensure fileId is available for backward compatibility
+        fileId: data?.imageKitFileId || data?.fileId || docSnap.id,
+        fileName: data?.originalName || data?.name || 'Document'
       },
     });
   } catch (error) {

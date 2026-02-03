@@ -21,6 +21,7 @@ import jsPDF from "jspdf"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
 import { DocumentSelectionModal } from "@/components/filing/document-selection-modal"
 import { PaymentPortalSelectorModal } from "@/components/payment/payment-portal-selector-modal"
+import { AgentPaymentModal } from "@/components/filing/agent-payment-modal"
 
 interface PaymentData {
   rrr: string
@@ -53,6 +54,7 @@ export default function PaymentSuccessPage() {
   const [receiptSaved, setReceiptSaved] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [showDocumentModal, setShowDocumentModal] = useState(false)
+  const [showAgentPaymentModal, setShowAgentPaymentModal] = useState(false)
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([])
   const [documentSelectMode, setDocumentSelectMode] = useState<"attachments" | "agent">("attachments")
   const [showNrsModal, setShowNrsModal] = useState(false)
@@ -333,6 +335,11 @@ export default function PaymentSuccessPage() {
   const handleAgentSubmission = () => {
     if (!user?.uid) return
     setDocumentSelectMode("agent")
+    setShowAgentPaymentModal(true)
+  }
+
+  const handleAgentPaymentSuccess = () => {
+    setShowAgentPaymentModal(false)
     setShowDocumentModal(true)
   }
 
@@ -352,9 +359,64 @@ export default function PaymentSuccessPage() {
       return
     }
 
-    // Agent flow
+    // Agent flow - convert document IDs to URLs
     setSubmitting(true)
     try {
+      // Fetch all document details and extract URLs
+      const documentUrls = await Promise.all(
+        documentIds.map(async (docId) => {
+          try {
+            const docResponse = await fetch(`/api/documents/${docId}`, {
+              credentials: 'include'
+            })
+            const docData = await docResponse.json()
+            
+            if (docData.success && docData.data) {
+              const doc = docData.data
+              // Return direct URL if available (Firebase Storage)
+              if (doc.url) {
+                return {
+                  url: doc.url,
+                  name: doc.fileName || doc.originalName || doc.name || 'Document',
+                  type: doc.type || 'Document'
+                }
+              }
+              
+              // If ImageKit file, get the URL
+              const fileId = doc.fileId || doc.imageKitFileId
+              if (fileId) {
+                const urlResponse = await fetch(`/api/get-image-fileid?fileId=${fileId}`, {
+                  credentials: 'include'
+                })
+                const urlData = await urlResponse.json()
+                
+                if (urlData.url) {
+                  return {
+                    url: urlData.url,
+                    name: doc.fileName || doc.originalName || doc.name || 'Document',
+                    type: doc.type || 'Document'
+                  }
+                }
+              }
+            }
+            
+            return null
+          } catch (error) {
+            console.error(`Error fetching document ${docId}:`, error)
+            return null
+          }
+        })
+      )
+      
+      // Filter out any null values
+      const validDocuments = documentUrls.filter(doc => doc !== null)
+      
+      if (validDocuments.length === 0) {
+        toast.error("Failed to load document URLs")
+        setSubmitting(false)
+        return
+      }
+      
       const response = await fetch("/api/filing/agent/assign", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -363,7 +425,7 @@ export default function PaymentSuccessPage() {
           state: "NRS",
           reportId: report.id,
           rrr: paymentData.rrr || "",
-          supportingDocuments: documentIds,
+          supportingDocuments: validDocuments,
           entityId: activeEntityId || undefined
         }),
       })
@@ -581,12 +643,12 @@ export default function PaymentSuccessPage() {
           </Card>
 
           {/* Filing options */}
-          <div className="grid gap-3 sm:gap-4">
+          <div className="grid lg:grid-cols-3 grid-cols-2 gap-3 sm:gap-4">
             <Card className="border-2">
               <CardHeader className="p-3 sm:p-4 md:p-6">
                 <CardTitle className="text-sm sm:text-base md:text-lg flex items-center gap-2">
                   <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
-                  File Yourself on official government Portal
+                  File Yourself on official Portal
                 </CardTitle>
                 <CardDescription className="text-[11px] sm:text-xs md:text-sm mt-0.5 sm:mt-1">
                   Continue filing on the official government portal, federal or state.
@@ -665,6 +727,15 @@ export default function PaymentSuccessPage() {
           userId={user.uid}
         />
       )}
+
+      {/* Agent Payment Modal */}
+      <AgentPaymentModal
+        open={showAgentPaymentModal}
+        onOpenChange={setShowAgentPaymentModal}
+        onPaymentSuccess={handleAgentPaymentSuccess}
+        reportId={reportId}
+        amount={25000}
+      />
 
       {/* Hidden full report renderer for printing (prints the entire assessment via SelfAssessmentPreview) */}
       {report?.reportData && (
