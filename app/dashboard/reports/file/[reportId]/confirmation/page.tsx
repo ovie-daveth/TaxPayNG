@@ -32,6 +32,7 @@ export default function FilingConfirmationPage() {
   const [uploadingPaymentReceipt, setUploadingPaymentReceipt] = useState(false)
   const [uploadingFilingProof, setUploadingFilingProof] = useState(false)
   const [uploadingAdditional, setUploadingAdditional] = useState(false)
+  const [filingReceipts, setFilingReceipts] = useState<Document[]>([])
 
   const [paymentReceiptFile, setPaymentReceiptFile] = useState<File | null>(null)
   const [filingProofFile, setFilingProofFile] = useState<File | null>(null)
@@ -58,6 +59,7 @@ export default function FilingConfirmationPage() {
   useEffect(() => {
     if (reportId && profile?.userId) {
       loadReport()
+      loadFilingReceipts()
     }
   }, [reportId, profile?.userId])
 
@@ -74,6 +76,25 @@ export default function FilingConfirmationPage() {
       console.error("Error loading report:", error)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const loadFilingReceipts = async () => {
+    if (!user?.uid) return
+
+    try {
+      // Fetch recent receipts from user's documents
+      const response = await documentService.getUserDocuments(user.uid)
+      const docs = response.data || []
+      // Filter for filing receipts uploaded in the last hour (likely from this session)
+      const recentFilingReceipts = docs.filter((doc: Document) => {
+        const isFilingReceipt = doc.type === 'receipt' && (doc.name?.includes('Filing Receipt') || doc.notes?.includes('Tax filing receipt'))
+        const uploadedRecently = doc.uploadedAt && (new Date().getTime() - new Date(doc.uploadedAt).getTime()) < 3600000 // 1 hour
+        return isFilingReceipt && uploadedRecently
+      })
+      setFilingReceipts(recentFilingReceipts)
+    } catch (error) {
+      console.error("Error loading filing receipts:", error)
     }
   }
 
@@ -279,73 +300,6 @@ export default function FilingConfirmationPage() {
             </CardContent>
           </Card>
 
-          {/* Payment Receipt (manual upload) */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Payment Receipt</CardTitle>
-              <CardDescription>Upload your tax payment receipt (if you paid)</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Alert>
-                <AlertTitle className="text-sm">Manual upload</AlertTitle>
-                <AlertDescription className="text-xs text-muted-foreground">
-                  Since payment can happen on an external portal, upload the receipt/reference you received so OTax can store it.
-                </AlertDescription>
-              </Alert>
-
-              {report.filingEvidence?.paymentReceipt ? (
-                <div className="rounded-lg border p-3 flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{report.filingEvidence.paymentReceipt.name}</p>
-                    <p className="text-xs text-muted-foreground truncate">{report.filingEvidence.paymentReceipt.url}</p>
-                  </div>
-                  <Button variant="outline" size="sm" asChild>
-                    <a href={report.filingEvidence!.paymentReceipt!.url} target="_blank" rel="noreferrer">
-                      View
-                    </a>
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <div className="space-y-2">
-                    <Label className="text-muted-foreground">Upload receipt</Label>
-                    <input
-                      type="file"
-                      accept=".pdf,image/*"
-                      onChange={(e) => setPaymentReceiptFile(e.target.files?.[0] || null)}
-                    />
-                  </div>
-                  <Button
-                    onClick={async () => {
-                      if (!paymentReceiptFile) return toast.error("Please choose a file")
-                      setUploadingPaymentReceipt(true)
-                      try {
-                        await uploadEvidence(paymentReceiptFile, "paymentReceipt")
-                        setPaymentReceiptFile(null)
-                        toast.success("Payment receipt uploaded")
-                      } catch (e) {
-                        console.error(e)
-                        toast.error(e instanceof Error ? e.message : "Failed to upload")
-                      } finally {
-                        setUploadingPaymentReceipt(false)
-                      }
-                    }}
-                    disabled={uploadingPaymentReceipt}
-                  >
-                    {uploadingPaymentReceipt ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Uploading...
-                      </>
-                    ) : (
-                      "Upload Payment Receipt"
-                    )}
-                  </Button>
-                </>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Filing Proof */}
           <Card>
             <CardHeader>
@@ -353,6 +307,31 @@ export default function FilingConfirmationPage() {
               <CardDescription>Upload proof of submission (confirmation email/screenshot/acknowledgment)</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Display uploaded filing receipts */}
+              {filingReceipts.length > 0 && (
+                <div className="space-y-2 pb-4 border-b">
+                  <p className="text-sm font-medium">Uploaded Filing Receipt{filingReceipts.length > 1 ? 's' : ''}</p>
+                  {filingReceipts.map((receipt) => (
+                    <div key={receipt.id} className="rounded-lg border bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-800 p-3 flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 className="w-4 h-4 text-green-600 dark:text-green-500 shrink-0" />
+                          <p className="text-sm font-medium truncate">{receipt.name}</p>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Uploaded {receipt.uploadedAt ? new Date(receipt.uploadedAt).toLocaleString() : 'recently'}
+                        </p>
+                      </div>
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={receipt.url} target="_blank" rel="noreferrer">
+                          View
+                        </a>
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {acknowledgmentNumber && (
                 <div className="p-4 bg-muted rounded-lg">
                   <p className="text-sm font-medium mb-2">IRS Acknowledgment</p>
@@ -410,11 +389,12 @@ export default function FilingConfirmationPage() {
                 </div>
               ) : (
                 <>
-                  <div className="space-y-2">
+                  <div className="space-x-2">
                     <Label className="text-muted-foreground">Upload proof</Label>
                     <input
                       type="file"
                       accept=".pdf,image/*"
+                      className="border rounded-md p-2"
                       onChange={(e) => setFilingProofFile(e.target.files?.[0] || null)}
                     />
                   </div>
@@ -469,13 +449,14 @@ export default function FilingConfirmationPage() {
                   <p className="text-xs text-muted-foreground">No additional evidence uploaded.</p>
                 )}
 
-                <div className="space-y-2">
+                <div className="space-x-2">
                   <Label className="text-muted-foreground">Upload additional files</Label>
                   <input
                     type="file"
                     multiple
                     accept=".pdf,image/*"
                     onChange={(e) => setAdditionalFiles(Array.from(e.target.files || []))}
+                    className="border rounded-md p-2"
                   />
                 </div>
                 <Button

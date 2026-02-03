@@ -143,13 +143,8 @@ export function DashboardNav() {
     action()
   }
 
-  // Filter nav items based on whether user has filing requests
-  const filteredNavItems = navItems.filter(item => {
-    if (item.href === "/dashboard/filing-requests") {
-      return hasFilingRequests
-    }
-    return true
-  })
+  // Filter nav items - filing requests is always visible
+  const filteredNavItems = navItems
 
   // Items shown in bottom nav - 5 items: Dashboard, Invoice, Tax Calculator, Transaction, Report
   const bottomNavItems = [

@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils"
 import { RadioGroup, RadioGroupItem } from "../ui/radio"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { useAuth } from "@/lib/hooks/useAuth"
-import { taxPaymentService, documentService } from "@/lib/services"
+import { taxPaymentService, documentService, reportService } from "@/lib/services"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
 import { toast } from "sonner"
 
@@ -39,6 +39,9 @@ interface PaymentPortalSelectorModalProps {
   taxDuration?: string
   period?: 'monthly' | 'quarterly' | 'yearly'
   onPaymentMade?: (receiptFile: File) => void
+  onFilingComplete?: () => void
+  mode?: 'payment' | 'filing'
+  reportId?: string
 }
 
 const STATE_IRS_PORTALS: Record<string, string> = {
@@ -91,6 +94,9 @@ export function PaymentPortalSelectorModal({
   taxDuration,
   period,
   onPaymentMade,
+  onFilingComplete,
+  mode = 'payment',
+  reportId,
 }: PaymentPortalSelectorModalProps) {
   const [selectedOption, setSelectedOption] = useState<"nrc" | "state">("nrc")
   const [processing, setProcessing] = useState(false)
@@ -142,19 +148,21 @@ export function PaymentPortalSelectorModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
-          <DialogTitle>Choose Payment Portal</DialogTitle>
+          <DialogTitle>Choose {mode === 'filing' ? 'Filing' : 'Payment'} Portal</DialogTitle>
           <DialogDescription>
-            Select where you'd like to make your tax payment. NRC is for federal payers (VAT, Development Fee, CIT), while State IRS is for those paying Personal Income Taxes.
+            Select where you'd like to {mode === 'filing' ? 'file your tax return' : 'make your tax payment'}. NRC is for federal {mode === 'filing' ? 'filing' : 'payers'} (VAT, Development Fee, CIT), while State IRS is for {mode === 'filing' ? 'filing' : 'those paying'} Personal Income Taxes.
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4 flex-1 overflow-y-auto">
-          <Alert className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20">
-            <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
-              We're working to make payment more seamless in-app. <span className="font-semibold">Coming soon!</span>
-            </AlertDescription>
-          </Alert>
+          {mode === 'payment' && (
+            <Alert className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20">
+              <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+              <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
+                We're working to make payment more seamless in-app. <span className="font-semibold">Coming soon!</span>
+              </AlertDescription>
+            </Alert>
+          )}
           <RadioGroup value={selectedOption} onValueChange={(v) => setSelectedOption(v as "nrc" | "state") }>
             {/* NRC Option */}
             <div
@@ -176,7 +184,7 @@ export function PaymentPortalSelectorModal({
                   National Revenue Center (NRC)
                 </Label>
                 <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-                  Pay through the centralized National Revenue Center portal. For federal taxes: VAT, Development Fee, and CIT (Company Income Tax).
+                  {mode === 'filing' ? 'File' : 'Pay'} through the centralized National Revenue Center portal. For federal taxes: VAT, Development Fee, and CIT (Company Income Tax).
                 </p>
                 <div className="mt-3 flex items-center gap-1 text-xs text-primary font-medium">
                   <ExternalLink className="w-3 h-3" />
@@ -212,7 +220,7 @@ export function PaymentPortalSelectorModal({
                     {selectedState || userState || "State"} IRS
                   </Label>
                   <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-                    Pay directly through your state's Internal Revenue Service portal. For Personal Income Taxes (PIT).
+                    {mode === 'filing' ? 'File' : 'Pay'} directly through your state's Internal Revenue Service portal. For Personal Income Taxes (PIT).
                   </p>
                   <div className="mt-3">
                     <Label className="text-xs">Choose state</Label>
@@ -274,7 +282,7 @@ export function PaymentPortalSelectorModal({
     <Dialog open={showTaxDetails} onOpenChange={setShowTaxDetails}>
       <DialogContent className="max-w-md w-[90vw] aspect-square flex flex-col items-center justify-center">
         <DialogHeader>
-          <DialogTitle className="text-center mb-6">Payment Details</DialogTitle>
+          <DialogTitle className="text-center mb-6">{mode === 'filing' ? 'Filing' : 'Payment'} Details</DialogTitle>
         </DialogHeader>
         <div className="space-y-6 w-full flex-1 flex flex-col justify-center">
           <div className="grid grid-cols-2 gap-4">
@@ -320,13 +328,13 @@ export function PaymentPortalSelectorModal({
         <div className="border-b bg-gradient-to-r from-primary/5 to-primary/10 shrink-0">
           <div className="p-4 md:p-6">
             <div className="flex items-center justify-between">
-              <DialogTitle className="text-lg md:text-2xl font-bold">Complete Payment</DialogTitle>
+              <DialogTitle className="text-lg md:text-2xl font-bold">Complete {mode === 'filing' ? 'Filing' : 'Payment'}</DialogTitle>
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setShowTaxDetails(!showTaxDetails)}
                 className="h-10 w-10 p-0"
-                title="View payment details"
+                title={`View ${mode === 'filing' ? 'filing' : 'payment'} details`}
               >
                 <Info className="h-5 w-5" />
               </Button>
@@ -339,7 +347,7 @@ export function PaymentPortalSelectorModal({
             {embeddedUrl ? (
                 <iframe
                   src={embeddedUrl}
-                  title="Payment Portal"
+                  title={`${mode === 'filing' ? 'Filing' : 'Payment'} Portal`}
               className="w-full h-full min-h-[calc(95vh-200px)] border-none"
                   sandbox="allow-forms allow-scripts allow-same-origin allow-popups allow-top-navigation"
                 />
@@ -351,7 +359,7 @@ export function PaymentPortalSelectorModal({
             Close
           </Button>
           <Button onClick={() => setShowReceiptUpload(true)}>
-            Payment Made
+            {mode === 'filing' ? 'Filing Completed' : 'Payment Made'}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -361,8 +369,79 @@ export function PaymentPortalSelectorModal({
     <ReceiptUploadModal
       open={showReceiptUpload}
       onOpenChange={setShowReceiptUpload}
+      mode={mode}
       onUpload={async (file) => {
-        if (!user?.uid || !taxAmount || !period || !taxDuration) {
+        if (!user?.uid) {
+          toast.error("User not authenticated. Please try again.")
+          return
+        }
+
+        // For filing mode, we don't need payment details
+        if (mode === 'filing') {
+          try {
+            // Upload receipt to ImageKit
+            const uploadResult = await uploadToImageKit(file, "filing-receipts", user.uid)
+            
+            // Save as a Document
+            const docRes = await documentService.uploadDocument(user.uid, {
+              file: file,
+              name: `Filing Receipt - ${taxDuration || new Date().getFullYear()}`,
+              type: "receipt",
+              imageKitUrl: uploadResult.url,
+              imageKitFileId: uploadResult.fileId,
+              fileSize: uploadResult.size,
+              notes: `Tax filing receipt for ${taxDescription || 'tax return'}`
+            })
+
+            if (!docRes.success || !docRes.data) {
+              throw new Error(docRes.error || "Failed to save receipt document")
+            }
+
+            const document = docRes.data as any
+
+            // If reportId is provided, attach receipt to report and update status to "filed"
+            if (reportId) {
+              await reportService.updateReport(reportId, "Self-Assessment", {
+                filingStatus: "filed",
+                filingMethod: "direct",
+                "filingEvidence.filingProof": {
+                  documentId: document.id,
+                  name: document.name,
+                  url: document.url,
+                  uploadedAt: document.uploadedAt
+                }
+              } as any)
+            }
+
+            // Store receipt URL for confirmation modal
+            setUploadedReceiptUrl(uploadResult.url)
+            setPaymentRecord({
+              amount: 0,
+              period: period || 'yearly',
+              taxDuration: taxDuration || new Date().getFullYear().toString(),
+              status: 'completed'
+            })
+
+            // Close receipt upload modal and show confirmation
+            setShowReceiptUpload(false)
+            setEmbeddedUrl(null)
+            setShowConfirmation(true)
+
+            // Call the callback if provided
+            if (onPaymentMade) {
+              onPaymentMade(file)
+            }
+
+            toast.success("Filing receipt uploaded successfully!")
+          } catch (error) {
+            console.error("Error processing filing receipt:", error)
+            toast.error(error instanceof Error ? error.message : "Failed to process filing receipt")
+          }
+          return
+        }
+
+        // Payment mode - require payment details
+        if (!taxAmount || !period || !taxDuration) {
           toast.error("Missing payment information. Please try again.")
           return
         }
@@ -434,16 +513,16 @@ export function PaymentPortalSelectorModal({
       }}
     />
 
-    {/* Payment Confirmation Modal */}
+    {/* Payment/Filing Confirmation Modal */}
     <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CheckCircle2 className="h-5 w-5 text-green-600" />
-            Payment Confirmed
+            {mode === 'filing' ? 'Filing' : 'Payment'} Confirmed
           </DialogTitle>
           <DialogDescription>
-            Your tax payment has been successfully recorded for the specified period.
+            Your tax {mode === 'filing' ? 'filing receipt' : 'payment'} has been successfully recorded{mode === 'payment' ? ' for the specified period' : ''}.
           </DialogDescription>
         </DialogHeader>
 
@@ -451,10 +530,12 @@ export function PaymentPortalSelectorModal({
           {paymentRecord && (
             <div className="rounded-lg border bg-muted/20 p-4 space-y-2">
               <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Amount</p>
-                  <p className="font-semibold">₦{paymentRecord.amount?.toLocaleString()}</p>
-                </div>
+                {mode === 'payment' && paymentRecord.amount > 0 && (
+                  <div>
+                    <p className="text-muted-foreground">Amount</p>
+                    <p className="font-semibold">₦{paymentRecord.amount?.toLocaleString()}</p>
+                  </div>
+                )}
                 <div>
                   <p className="text-muted-foreground">Period</p>
                   <p className="font-semibold capitalize">{paymentRecord.period}</p>
@@ -498,8 +579,14 @@ export function PaymentPortalSelectorModal({
             onClick={() => {
               setShowConfirmation(false)
               onOpenChange(false)
-              // Redirect to payment page
-              router.push(`${basePath}/payment`)
+              // Call filing complete callback if in filing mode
+              if (mode === 'filing' && onFilingComplete) {
+                onFilingComplete()
+              }
+              // Only redirect if no callback is provided and mode is payment (backward compatibility)
+              else if (!onPaymentMade && mode === 'payment') {
+                router.push(`${basePath}/payment`)
+              }
             }}
           >
             Done
@@ -515,9 +602,10 @@ interface ReceiptUploadModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onUpload: (file: File) => void
+  mode?: 'payment' | 'filing'
 }
 
-function ReceiptUploadModal({ open, onOpenChange, onUpload }: ReceiptUploadModalProps) {
+function ReceiptUploadModal({ open, onOpenChange, onUpload, mode = 'payment' }: ReceiptUploadModalProps) {
   const [uploading, setUploading] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
@@ -543,9 +631,9 @@ function ReceiptUploadModal({ open, onOpenChange, onUpload }: ReceiptUploadModal
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Upload Payment Receipt</DialogTitle>
+          <DialogTitle>Upload {mode === 'filing' ? 'Filing' : 'Payment'} Receipt</DialogTitle>
           <DialogDescription>
-            Upload your payment receipt to confirm the transaction.
+            Upload your {mode === 'filing' ? 'filing' : 'payment'} receipt to confirm the transaction.
           </DialogDescription>
         </DialogHeader>
 
