@@ -207,7 +207,7 @@ export function RecentReports() {
 
             <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0 w-full sm:w-auto justify-end sm:justify-start">
               <Badge variant={report.status === "submitted" ? "default" : report.status === "completed" ? "secondary" : "outline"} className="text-xs capitalize px-1.5 sm:px-2 py-0.5 sm:py-1">
-                {report.status}
+                {report.filingStatus === 'draft' ? 'Draft' : report.filingStatus === 'filed' ? 'Filed' : report.filingStatus === 'submitted' ? 'Submitted' : report.filingStatus === 'acknowledged' ? 'Acknowledged' : 'Not Filed'}
               </Badge>
               {report.filingMethod === 'agent' && report.filingStatus === 'submitted' && (
                 <Button 
@@ -224,7 +224,7 @@ export function RecentReports() {
                   <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </Button>
               )}
-              {report.status === 'draft' && (
+              {report.status === 'draft' && report.filingStatus != "filed" && (
                 <Button 
                   variant="ghost" 
                   size="icon"

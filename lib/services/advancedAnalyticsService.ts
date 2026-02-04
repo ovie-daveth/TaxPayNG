@@ -74,8 +74,8 @@ class AdvancedAnalyticsService {
       
       // Aggregate transactions by month
       transactions.forEach(txn => {
-        // Use transactionDate (when transaction occurred) first, then valueDate, then date as fallback
-        const dateString = txn.transactionDate || txn.valueDate || txn.date
+        // Use valueDate (when money moved) first, then transactionDate, then date as fallback
+        const dateString = txn.valueDate || txn.transactionDate || txn.date
         const txnDate = dateString ? new Date(dateString) : null
         if (!txnDate || isNaN(txnDate.getTime())) return
         
@@ -286,8 +286,8 @@ class AdvancedAnalyticsService {
       const monthlyMap: { [key: string]: { income: number; expenses: number } } = {}
       
       transactions.forEach(txn => {
-        // Use transactionDate (when transaction occurred) first, then valueDate, then date as fallback
-        const dateString = txn.transactionDate || txn.valueDate || txn.date
+        // Use valueDate (when money moved) first, then transactionDate, then date as fallback
+        const dateString = txn.valueDate || txn.transactionDate || txn.date
         const txnDate = dateString ? new Date(dateString) : null
         if (!txnDate || isNaN(txnDate.getTime())) return
         

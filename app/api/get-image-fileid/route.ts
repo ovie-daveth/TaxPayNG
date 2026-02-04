@@ -35,10 +35,11 @@ async function getUserId(request: NextRequest): Promise<string | null> {
 export async function GET(request: NextRequest) {
   try {
     const url = request.nextUrl.searchParams.get('url')
+    const fileId = request.nextUrl.searchParams.get('fileId')
 
-    if (!url) {
+    if (!url && !fileId) {
       return NextResponse.json(
-        { error: 'No URL provided' },
+        { error: 'No URL or fileId provided' },
         { status: 400 }
       )
     }
@@ -53,6 +54,28 @@ export async function GET(request: NextRequest) {
     }
 
     try {
+      // If fileId is provided, get file details directly
+      if (fileId) {
+        console.log(`Getting file details from ImageKit for fileId: ${fileId}`)
+        const fileDetails = await imagekit.getFileDetails(fileId)
+        
+        return NextResponse.json({
+          success: true,
+          fileId: fileDetails.fileId,
+          url: fileDetails.url,
+          size: fileDetails.size || 0,
+          name: fileDetails.name
+        })
+      }
+
+      // Otherwise proceed with URL lookup
+      if (!url) {
+        return NextResponse.json(
+          { error: 'URL is required' },
+          { status: 400 }
+        )
+      }
+      
       console.log(`Attempting to get fileId from ImageKit for URL: ${url}`)
       
       // ImageKit listFiles can search by URL

@@ -1,9 +1,11 @@
 "use client"
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Edit, Trash2, ExternalLink, CheckCircle2, Clock, X, Calendar, DollarSign, Mail, Phone, Building2, User, Loader2 } from "lucide-react"
+import { Label } from "@/components/ui/label"
+import { Input } from "@/components/ui/input"
+import { Edit, Trash2, ExternalLink, CheckCircle2, Clock, X, Calendar, DollarSign, Mail, Phone, Building2, User, Loader2, Upload, FileText } from "lucide-react"
 import { BrandDeal, BrandDealStatus, BrandDealType, Transaction } from "@/lib/types"
 import { format } from "date-fns"
 import { formatCurrencyAmount, CurrencyCode, fetchExchangeRate } from "@/lib/utils/currency"
@@ -13,6 +15,7 @@ import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { transactionService } from "@/lib/services"
 import { useTransactions } from "@/lib/hooks/useTransactions"
 import { useAuth } from "@/lib/hooks/useAuth"
+import { uploadToImageKit } from "@/lib/utils/imagekit"
 import { useState, useEffect } from "react"
 
 interface ViewBrandDealDialogProps {
@@ -39,6 +42,10 @@ export function ViewBrandDealDialog({
   const [isCreatingTransaction, setIsCreatingTransaction] = useState(false)
   const [isMarkingCompleted, setIsMarkingCompleted] = useState(false)
   const [currentDeal, setCurrentDeal] = useState<BrandDeal | null>(brandDeal)
+  const [showCompletionModal, setShowCompletionModal] = useState(false)
+  const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0])
+  const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [uploadingReceipt, setUploadingReceipt] = useState(false)
 
   // Update currentDeal when brandDeal prop changes
   useEffect(() => {
@@ -76,22 +83,142 @@ export function ViewBrandDealDialog({
     return labels[type]
   }
 
-  const handleMarkAsCompleted = async () => {
-    if (!profile?.userId || !currentDeal) return
+  const handleMarkAsCompleted = () => {
+    // Open modal to collect payment details before completing
+    setPaymentDate(currentDeal?.endDate?.split('T')[0] || new Date().toISOString().split('T')[0])
+    setReceiptFile(null)
+    setShowCompletionModal(true)
+  }
+
+  const handleConfirmCompletion = async () => {
+    if (!profile?.userId || !user?.uid || !currentDeal) return
     setIsMarkingCompleted(true)
+    
     try {
+      // Upload receipt if provided
+      let receiptUrl: string | undefined = undefined
+      if (receiptFile) {
+        setUploadingReceipt(true)
+        try {
+          const uploadResult = await uploadToImageKit(
+            receiptFile,
+            "brand-deals/receipts",
+            profile.userId
+          )
+          receiptUrl = uploadResult.url
+        } catch (uploadError) {
+          console.error("Error uploading receipt:", uploadError)
+          toast.error("Failed to upload receipt. Continuing without it.")
+        } finally {
+          setUploadingReceipt(false)
+        }
+      }
+      
+      // Mark as completed
       const result = await brandDealService.markAsCompleted(currentDeal.id, profile.userId)
       if (result.success && result.data) {
-        setCurrentDeal(result.data)
+        const completedDeal = result.data
+        setCurrentDeal(completedDeal)
         toast.success("Brand deal marked as completed")
+        
+        // Automatically create transaction
+        const transactionCurrency = (completedDeal.currency || 'NGN') as CurrencyCode
+        // Use brand deal date (endDate or startDate) as transaction date
+        const transactionDate = completedDeal.endDate || completedDeal.startDate || new Date().toISOString()
+        // Use payment date as valueDate
+        const valueDate = paymentDate
+        
+        // Calculate financial breakdown
+        const grossAmount = completedDeal.amount
+        const executionExpenses = completedDeal.executionExpenses || 0
+        const whtAmount = completedDeal.whtAmount || 0
+        const cashReceived = grossAmount
+        const taxableIncome = cashReceived - executionExpenses
+        
+        const transactionAmount = completedDeal.netIncome !== undefined 
+          ? completedDeal.netIncome 
+          : (taxableIncome > 0 ? taxableIncome : cashReceived)
+        
+        // Calculate NGN equivalent
+        let ngnEquivalent: number | undefined = undefined
+        let exchangeRate: number | undefined = undefined
+        
+        if (transactionCurrency !== 'NGN') {
+          if (completedDeal.netIncomeNgnEquivalent !== undefined && completedDeal.netIncomeNgnEquivalent !== null) {
+            ngnEquivalent = completedDeal.netIncomeNgnEquivalent
+            exchangeRate = transactionAmount > 0 ? ngnEquivalent / transactionAmount : completedDeal.exchangeRate
+          } else if (completedDeal.ngnEquivalent !== undefined && completedDeal.ngnEquivalent !== null) {
+            const grossNgn = completedDeal.ngnEquivalent
+            const expensesNgn = executionExpenses > 0 && completedDeal.exchangeRate
+              ? executionExpenses * completedDeal.exchangeRate
+              : executionExpenses
+            ngnEquivalent = grossNgn - expensesNgn
+            exchangeRate = completedDeal.exchangeRate
+          } else {
+            try {
+              exchangeRate = await fetchExchangeRate(transactionCurrency, 'NGN')
+              ngnEquivalent = transactionAmount * exchangeRate
+            } catch (error) {
+              console.error('Error fetching exchange rate:', error)
+            }
+          }
+        } else {
+          ngnEquivalent = transactionAmount
+          exchangeRate = 1
+        }
+        
+        const transactionData = {
+          entityId: completedDeal.entityId,
+          type: 'income' as const,
+          description: `${completedDeal.title} - ${completedDeal.brandName}${executionExpenses > 0 ? ` (Net: ${formatCurrencyAmount(transactionAmount, transactionCurrency)} after expenses)` : ''}`,
+          amount: transactionAmount,
+          currency: transactionCurrency,
+          exchangeRate: exchangeRate,
+          exchangeRateDate: exchangeRate ? transactionDate.split('T')[0] : undefined,
+          ngnEquivalent: ngnEquivalent,
+          date: transactionDate, // Brand deal date
+          valueDate: valueDate, // Payment date (when money moved)
+          transactionDate: transactionDate, // When transaction occurred
+          category: completedDeal.dealType === 'sponsorship' ? 'Brand Sponsorship' : 'Brand Deal',
+          paymentMethod: '',
+          receiptUrl: receiptUrl,
+          notes: `Brand deal: ${completedDeal.title}${executionExpenses > 0 || completedDeal.whtAmount ? `\nGross: ${formatCurrencyAmount(grossAmount, transactionCurrency)}${executionExpenses > 0 ? `\nExpenses: ${formatCurrencyAmount(executionExpenses, transactionCurrency)}` : ''}${completedDeal.whtAmount && completedDeal.whtAmount > 0 ? `\nWHT (Tax Credit): ${formatCurrencyAmount(completedDeal.whtAmount, transactionCurrency)} (Rate: ${completedDeal.whtRate || 0}%)${completedDeal.whtCertificateNumber ? `, Cert: ${completedDeal.whtCertificateNumber}` : ''}` : ''}\nNet Income: ${formatCurrencyAmount(transactionAmount, transactionCurrency)}` : ''}`,
+          tags: completedDeal.tags || [],
+          taxDeductible: false
+        }
+
+        const txResult = await createTransaction(transactionData)
+        if (txResult.success && 'data' in txResult && txResult.data) {
+          const transaction = (txResult as { success: true; data: Transaction }).data
+          // Link the transaction to the brand deal
+          const updateResult = await brandDealService.updateBrandDeal(completedDeal.id, profile.userId, {
+            linkedTransactionId: transaction.id,
+            paymentDate: valueDate
+          })
+          if (updateResult.success && updateResult.data) {
+            setCurrentDeal(updateResult.data)
+          }
+          
+          // Dispatch event to notify other components
+          const event = new CustomEvent('transactionChanged', {
+            detail: { type: 'created', transactionId: transaction.id }
+          })
+          window.dispatchEvent(event)
+          
+          toast.success("Transaction created automatically")
+        }
+        
+        setShowCompletionModal(false)
         onUpdate?.()
       } else {
         toast.error(result.error || "Failed to update brand deal")
       }
     } catch (error) {
+      console.error("Error marking as completed:", error)
       toast.error("Failed to update brand deal")
     } finally {
       setIsMarkingCompleted(false)
+      setUploadingReceipt(false)
     }
   }
 
@@ -268,6 +395,7 @@ export function ViewBrandDealDialog({
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -676,26 +804,7 @@ export function ViewBrandDealDialog({
                 )}
               </Button>
             )}
-            {!currentDeal.linkedTransactionId && currentDeal.status === "completed" && (
-              <Button
-                variant="outline"
-                onClick={handleCreateTransaction}
-                disabled={isCreatingTransaction}
-                className="flex-1"
-              >
-                {isCreatingTransaction ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <DollarSign className="w-4 h-4 mr-2" />
-                    Create Transaction
-                  </>
-                )}
-              </Button>
-            )}
+          
             {onEdit && currentDeal.status !== "completed" && currentDeal.status !== "cancelled" && (
               <Button
                 variant="outline"
@@ -725,6 +834,91 @@ export function ViewBrandDealDialog({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Completion Modal */}
+    <Dialog open={showCompletionModal} onOpenChange={setShowCompletionModal}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <CheckCircle2 className="w-5 h-5 text-green-600" />
+            Complete Brand Deal
+          </DialogTitle>
+          <DialogDescription>
+            Add payment details to complete this brand deal and create the transaction automatically.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="payment-date">Payment Date *</Label>
+            <Input
+              id="payment-date"
+              type="date"
+              value={paymentDate}
+              onChange={(e) => setPaymentDate(e.target.value)}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              When did the money actually arrive in your account?
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="receipt-file">Payment Receipt (Optional)</Label>
+            <Input
+              id="receipt-file"
+              type="file"
+              accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                if (file) {
+                  setReceiptFile(file)
+                }
+              }}
+            />
+            {receiptFile && (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <FileText className="w-4 h-4" />
+                <span>{receiptFile.name} ({(receiptFile.size / 1024 / 1024).toFixed(2)} MB)</span>
+              </div>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Upload payment confirmation, bank statement, or receipt
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2 sm:gap-0">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setShowCompletionModal(false)
+              setReceiptFile(null)
+            }}
+            disabled={isMarkingCompleted || uploadingReceipt}
+          >
+            Cancel
+          </Button>
+          <Button
+            onClick={handleConfirmCompletion}
+            disabled={isMarkingCompleted || uploadingReceipt || !paymentDate}
+          >
+            {(isMarkingCompleted || uploadingReceipt) ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                {uploadingReceipt ? "Uploading..." : "Processing..."}
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="w-4 h-4 mr-2" />
+                Complete & Create Transaction
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+    </>
   )
 }
 

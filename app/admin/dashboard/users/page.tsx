@@ -80,6 +80,8 @@ export default function AdminUsersPage() {
   const [bulkExtendTrialDialogOpen, setBulkExtendTrialDialogOpen] = useState(false)
   const [bulkExtendTrialDays, setBulkExtendTrialDays] = useState<string>("7")
   const [bulkExtendingTrial, setBulkExtendingTrial] = useState(false)
+  const [bulkExtendBusinessTypeFilter, setBulkExtendBusinessTypeFilter] = useState<"all" | string>("all")
+  const [bulkExtendTrialStatusFilter, setBulkExtendTrialStatusFilter] = useState<"all" | "active" | "expired" | "ending_soon" | "not_used">("all")
 
   useEffect(() => {
     if (!authLoading && !adminLoading) {
@@ -845,13 +847,51 @@ export default function AdminUsersPage() {
       const currentUser = auth.currentUser
       const token = currentUser ? await currentUser.getIdToken() : undefined
 
-      // Get all user IDs (or filtered users)
-      const userIds = filteredUsers
+      // Filter users by business type and trial status
+      const eligibleUsers = users.filter((u: any) => {
+        // Apply business type filter
+        if (bulkExtendBusinessTypeFilter !== "all") {
+          const businessType = u.businessType?.toString().toLowerCase().trim()
+          if (businessType !== bulkExtendBusinessTypeFilter.toLowerCase()) return false
+        }
+        
+        // Apply trial status filter
+        if (bulkExtendTrialStatusFilter !== "all") {
+          const now = new Date()
+          const hasActiveTrial = u.freeTrialEndDate && new Date(u.freeTrialEndDate) > now
+          const hasExpiredTrial = u.freeTrialEndDate && new Date(u.freeTrialEndDate) <= now
+          const trialEndDate = u.freeTrialEndDate ? new Date(u.freeTrialEndDate) : null
+          const daysRemaining = trialEndDate && hasActiveTrial 
+            ? Math.ceil((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+            : 0
+          
+          if (bulkExtendTrialStatusFilter === "active" && !hasActiveTrial) return false
+          if (bulkExtendTrialStatusFilter === "expired" && !hasExpiredTrial) return false
+          if (bulkExtendTrialStatusFilter === "ending_soon" && (!hasActiveTrial || daysRemaining > 3)) return false
+          if (bulkExtendTrialStatusFilter === "not_used" && u.freeTrialEndDate) return false
+        }
+        
+        return true
+      })
+
+      const userIds = eligibleUsers
         .filter((u: any) => u.userId)
         .map((u: any) => u.userId)
 
       if (userIds.length === 0) {
-        toast.error("No users found to extend trial for")
+        const filters = []
+        if (bulkExtendBusinessTypeFilter !== "all") filters.push(bulkExtendBusinessTypeFilter)
+        if (bulkExtendTrialStatusFilter !== "all") {
+          const statusLabels = {
+            "active": "active trial",
+            "expired": "expired trial",
+            "ending_soon": "trial ending soon",
+            "not_used": "trial not used"
+          }
+          filters.push(statusLabels[bulkExtendTrialStatusFilter])
+        }
+        const filterLabel = filters.length > 0 ? ` with ${filters.join(", ")}` : ""
+        toast.error(`No users${filterLabel} found to extend trial for`)
         setBulkExtendingTrial(false)
         return
       }
@@ -877,6 +917,8 @@ export default function AdminUsersPage() {
       toast.success(`Free trial extended by ${days} day(s) for ${data.summary?.successful || 0} user(s)`)
       setBulkExtendTrialDialogOpen(false)
       setBulkExtendTrialDays("7")
+      setBulkExtendBusinessTypeFilter("all")
+      setBulkExtendTrialStatusFilter("all")
 
       // Refresh users list
       await refreshUsers()
@@ -1877,14 +1919,55 @@ export default function AdminUsersPage() {
 
       {/* Extend Free Trial Dialog (Bulk) */}
       <Dialog open={bulkExtendTrialDialogOpen} onOpenChange={setBulkExtendTrialDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Extend Free Trial (Bulk)</DialogTitle>
             <DialogDescription>
-              Extend the free trial for all {filteredUsers.length} filtered user(s)
+              Extend the free trial for selected users based on filters
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
+            {/* Business Type Filter */}
+            <div>
+              <Label htmlFor="bulk-extend-business-type">Business Type</Label>
+              <Select 
+                value={bulkExtendBusinessTypeFilter} 
+                onValueChange={(value: string) => setBulkExtendBusinessTypeFilter(value)}
+              >
+                <SelectTrigger id="bulk-extend-business-type" className="mt-1">
+                  <SelectValue placeholder="Select business type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Business Types</SelectItem>
+                  {businessTypes.map((type) => (
+                    <SelectItem key={type} value={type}>
+                      {type}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Trial Status Filter */}
+            <div>
+              <Label htmlFor="bulk-extend-trial-status">Trial Status</Label>
+              <Select 
+                value={bulkExtendTrialStatusFilter} 
+                onValueChange={(value: any) => setBulkExtendTrialStatusFilter(value)}
+              >
+                <SelectTrigger id="bulk-extend-trial-status" className="mt-1">
+                  <SelectValue placeholder="Select trial status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Trial Status</SelectItem>
+                  <SelectItem value="active">Active Trial Only</SelectItem>
+                  <SelectItem value="expired">Expired Trial Only</SelectItem>
+                  <SelectItem value="ending_soon">Trial Ending Soon (≤3 days)</SelectItem>
+                  <SelectItem value="not_used">Trial Not Used Only</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             <div>
               <Label htmlFor="bulkTrialDays">Days to Add</Label>
               <Input
@@ -1896,22 +1979,96 @@ export default function AdminUsersPage() {
                 placeholder="7"
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Enter the number of days to add to the free trial period for all selected users
+                Enter the number of days to add to the free trial period
               </p>
             </div>
+            
             <div className="p-3 bg-muted rounded-md">
-              <p className="text-sm font-medium">Users Affected:</p>
-              <p className="text-sm text-muted-foreground">{filteredUsers.length} user(s) will have their trial extended</p>
+              <p className="text-sm font-medium mb-2">Users Affected:</p>
+              {(() => {
+                const now = new Date()
+                const eligible = users.filter((u: any) => {
+                  // Apply business type filter
+                  if (bulkExtendBusinessTypeFilter !== "all") {
+                    const businessType = u.businessType?.toString().toLowerCase().trim()
+                    if (businessType !== bulkExtendBusinessTypeFilter.toLowerCase()) return false
+                  }
+                  
+                  // Apply trial status filter
+                  if (bulkExtendTrialStatusFilter !== "all") {
+                    const hasActiveTrial = u.freeTrialEndDate && new Date(u.freeTrialEndDate) > now
+                    const hasExpiredTrial = u.freeTrialEndDate && new Date(u.freeTrialEndDate) <= now
+                    const trialEndDate = u.freeTrialEndDate ? new Date(u.freeTrialEndDate) : null
+                    const daysRemaining = trialEndDate && hasActiveTrial 
+                      ? Math.ceil((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                      : 0
+                    
+                    if (bulkExtendTrialStatusFilter === "active" && !hasActiveTrial) return false
+                    if (bulkExtendTrialStatusFilter === "expired" && !hasExpiredTrial) return false
+                    if (bulkExtendTrialStatusFilter === "ending_soon" && (!hasActiveTrial || daysRemaining > 3)) return false
+                    if (bulkExtendTrialStatusFilter === "not_used" && u.freeTrialEndDate) return false
+                  }
+                  
+                  return true
+                })
+                
+                const count = eligible.filter((u: any) => u.userId).length
+                const filters = []
+                if (bulkExtendBusinessTypeFilter !== "all") filters.push(bulkExtendBusinessTypeFilter)
+                if (bulkExtendTrialStatusFilter !== "all") {
+                  const statusLabels = {
+                    "active": "active trial",
+                    "expired": "expired trial",
+                    "ending_soon": "trial ending soon (≤3 days)",
+                    "not_used": "trial not used"
+                  }
+                  filters.push(statusLabels[bulkExtendTrialStatusFilter])
+                }
+                const filterLabel = filters.length > 0 ? ` (${filters.join(", ")})` : ""
+                
+                return (
+                  <p className="text-sm text-muted-foreground">
+                    {count} user(s){filterLabel} will have their trial extended by {bulkExtendTrialDays || "0"} day(s)
+                  </p>
+                )
+              })()}
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => {
               setBulkExtendTrialDialogOpen(false)
               setBulkExtendTrialDays("7")
+              setBulkExtendBusinessTypeFilter("all")
+              setBulkExtendTrialStatusFilter("all")
             }}>
               Cancel
             </Button>
-            <Button onClick={handleBulkExtendTrial} disabled={bulkExtendingTrial || filteredUsers.length === 0}>
+            <Button onClick={handleBulkExtendTrial} disabled={bulkExtendingTrial || (() => {
+              const now = new Date()
+              const eligible = users.filter((u: any) => {
+                if (bulkExtendBusinessTypeFilter !== "all") {
+                  const businessType = u.businessType?.toString().toLowerCase().trim()
+                  if (businessType !== bulkExtendBusinessTypeFilter.toLowerCase()) return false
+                }
+                
+                if (bulkExtendTrialStatusFilter !== "all") {
+                  const hasActiveTrial = u.freeTrialEndDate && new Date(u.freeTrialEndDate) > now
+                  const hasExpiredTrial = u.freeTrialEndDate && new Date(u.freeTrialEndDate) <= now
+                  const trialEndDate = u.freeTrialEndDate ? new Date(u.freeTrialEndDate) : null
+                  const daysRemaining = trialEndDate && hasActiveTrial 
+                    ? Math.ceil((trialEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
+                    : 0
+                  
+                  if (bulkExtendTrialStatusFilter === "active" && !hasActiveTrial) return false
+                  if (bulkExtendTrialStatusFilter === "expired" && !hasExpiredTrial) return false
+                  if (bulkExtendTrialStatusFilter === "ending_soon" && (!hasActiveTrial || daysRemaining > 3)) return false
+                  if (bulkExtendTrialStatusFilter === "not_used" && u.freeTrialEndDate) return false
+                }
+                
+                return true
+              })
+              return eligible.filter((u: any) => u.userId).length === 0
+            })()}>
               {bulkExtendingTrial ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />

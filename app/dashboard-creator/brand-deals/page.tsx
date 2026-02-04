@@ -8,8 +8,9 @@ import { useSubscription } from "@/lib/hooks/useSubscription"
 import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { Plus, Search, Filter, Handshake, Eye, Edit, Trash2, CheckCircle2, Clock, X, Calendar, MoreVertical } from "lucide-react"
+import { Plus, Search, Filter, Handshake, Eye, Edit, Trash2, CheckCircle2, Clock, X, Calendar, MoreVertical, AlertTriangle } from "lucide-react"
 import { Card } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
@@ -31,13 +32,16 @@ export default function BrandDealsPage() {
   const { profile } = useUserProfile()
   const { sidebarCollapsed } = useSidebar()
   const { activeEntityId } = useBusiness()
-  const { isSubscribed, isExpired, loading: subscriptionLoading } = useSubscription()
+  const { isSubscribed, isExpired, freeTrialStatus, loading: subscriptionLoading } = useSubscription()
   const [brandDeals, setBrandDeals] = useState<BrandDeal[]>([])
   const [loading, setLoading] = useState(true)
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false)
   const [selectedBrandDeal, setSelectedBrandDeal] = useState<BrandDeal | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [dealToDelete, setDealToDelete] = useState<string | null>(null)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<BrandDealStatus | "all">("all")
   const [typeFilter, setTypeFilter] = useState<BrandDealType | "all">("all")
@@ -78,7 +82,13 @@ export default function BrandDealsPage() {
 
   const requireSubscription = (action: () => void) => {
     if (subscriptionLoading) return
-    if (!isSubscribed || isExpired) {
+    // Allow free trial users to add brand deals
+    const hasActiveTrial = freeTrialStatus?.isInFreeTrial === true
+    if (!isSubscribed && !hasActiveTrial) {
+      setShowSubscriptionModal(true)
+      return
+    }
+    if (isExpired && !hasActiveTrial) {
       setShowSubscriptionModal(true)
       return
     }
@@ -92,22 +102,31 @@ export default function BrandDealsPage() {
     }
     window.addEventListener('createBrandDeal', handleCreateBrandDeal)
     return () => window.removeEventListener('createBrandDeal', handleCreateBrandDeal)
-  }, [isSubscribed, isExpired, subscriptionLoading])
+  }, [isSubscribed, isExpired, freeTrialStatus, subscriptionLoading])
 
-  const handleDelete = async (dealId: string) => {
-    if (!profile?.userId) return
-    if (!confirm("Are you sure you want to delete this brand deal?")) return
+  const handleDelete = (dealId: string) => {
+    setDealToDelete(dealId)
+    setShowDeleteConfirm(true)
+  }
 
+  const confirmDelete = async () => {
+    if (!profile?.userId || !dealToDelete) return
+
+    setIsDeleting(true)
     try {
-      const result = await brandDealService.deleteBrandDeal(dealId, profile.userId)
+      const result = await brandDealService.deleteBrandDeal(dealToDelete, profile.userId)
       if (result.success) {
         toast.success("Brand deal deleted successfully")
         loadBrandDeals()
+        setShowDeleteConfirm(false)
+        setDealToDelete(null)
       } else {
         toast.error(result.error || "Failed to delete brand deal")
       }
     } catch (error) {
       toast.error("Failed to delete brand deal")
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -593,6 +612,50 @@ export default function BrandDealsPage() {
           businessType={profile.businessType}
         />
       )}
+
+      {/* Delete Confirmation Modal */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-destructive" />
+              Delete Brand Deal
+            </DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this brand deal? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowDeleteConfirm(false)
+                setDealToDelete(null)
+              }}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmDelete}
+              disabled={isDeleting}
+            >
+              {isDeleting ? (
+                <>
+                  <Clock className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

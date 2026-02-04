@@ -221,10 +221,6 @@ export function AddBrandDealDialog({
 
     // Enforce subscription requirement (applies to create and update)
     if (subscriptionLoading) return
-    if (!isSubscribed || isExpired) {
-      onSubscriptionRequired?.()
-      return
-    }
 
     if (!user?.uid || !profile?.userId) {
       toast.error("User not authenticated")
@@ -277,9 +273,10 @@ export function AddBrandDealDialog({
         }
       }
 
-      // Calculate WHT, cash received, and taxable income
+      // Calculate WHT (tax credit), cash received, and taxable income
+      // WHT is NOT subtracted from cash received - it's a tax credit that reduces tax liability
       const calculatedWhtAmount = whtDeducted && whtRate > 0 ? (formData.amount * whtRate) / 100 : 0
-      const calculatedCashReceived = formData.amount - calculatedWhtAmount
+      const calculatedCashReceived = formData.amount // Full amount received (WHT is just recorded as tax credit)
       const calculatedTaxableIncome = calculatedCashReceived - totalExecutionExpenses
       const calculatedTaxableIncomeNgn = calculatedTaxableIncome > 0 && ngnEquivalentValue !== undefined
         ? (formData.currency === 'NGN' ? calculatedTaxableIncome : calculatedTaxableIncome * (exchangeRateValue || 1))
@@ -510,15 +507,15 @@ export function AddBrandDealDialog({
     ? executionExpensesDetails.reduce((sum, expense) => sum + (expense.amount || 0), 0)
     : 0
   
-  // Calculate WHT amount
+  // Calculate WHT amount (tax credit - does NOT reduce cash received)
   const whtAmount = whtDeducted && whtRate > 0 ? (formData.amount * whtRate) / 100 : 0
   
-  // Calculate cash received (what actually hits your bank account)
+  // Calculate cash received (full gross amount - WHT is just a tax credit, not a deduction)
   const cashReceived = formData.amount - whtAmount
   
   // Calculate taxable income (cash received - expenses)
   // Taxable income is what you pay tax on: money you received minus expenses you spent
-  const taxableIncome = cashReceived - totalExecutionExpenses
+  const taxableIncome = formData.amount - totalExecutionExpenses
   
   // NGN equivalents
   const taxableIncomeNgnEquivalent = taxableIncome > 0 && ngnEquivalent !== null 
@@ -881,7 +878,7 @@ export function AddBrandDealDialog({
                           💳 WHT Amount: <strong>{formatCurrencyAmount((formData.amount * whtRate) / 100, formData.currency as CurrencyCode)}</strong>
                         </p>
                         <p className="text-muted-foreground mt-1">
-                          Note: WHT is a <strong>tax credit</strong> (reduces cash received but not taxable income). It's tracked separately from expenses.
+                          Note: WHT is a <strong>tax credit</strong> that reduces your tax liability. It does NOT reduce your recorded income. Tracked separately for tax filing i.e remove it from tax payable.
                         </p>
                       </div>
                     )}
@@ -892,31 +889,35 @@ export function AddBrandDealDialog({
               {/* Financial Summary */}
               {(totalExecutionExpenses > 0 || whtDeducted) && (
                 <div className="p-4 bg-background rounded-lg border space-y-3">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground">Gross Amount</p>
-                      <p className="text-xl font-bold">{formatCurrencyAmount(formData.amount, formData.currency as CurrencyCode)}</p>
+                     <div className="">
+                       <p className="text-xl font-bold">{formatCurrencyAmount(formData.amount, formData.currency as CurrencyCode)}</p>
+                      {
+                        cashReceived !== formData.amount && <small className="text-xs text-muted-foreground italic -mt-2">Cash received {formatCurrencyAmount(cashReceived, formData.currency as CurrencyCode)}</small>
+                      }
+                     </div>
                     </div>
-                    
-                    {whtDeducted && whtRate > 0 && (
-                      <div className="space-y-1">
-                        <p className="text-xs font-medium text-muted-foreground">WHT (Tax Credit)</p>
-                        <p className="text-xl font-bold text-blue-600">
-                          {formatCurrencyAmount(whtAmount, formData.currency as CurrencyCode)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Rate: {whtRate}%</p>
-                      </div>
-                    )}
-                    
+{/* 
+                    { cashReceived !== formData.amount && (
                     <div className="space-y-1">
                       <p className="text-xs font-medium text-muted-foreground">Cash Received</p>
                       <p className="text-xl font-bold text-purple-600">
                         {formatCurrencyAmount(cashReceived, formData.currency as CurrencyCode)}
                       </p>
-                      {whtDeducted && whtRate > 0 && (
-                        <p className="text-xs text-muted-foreground">Gross − WHT</p>
-                      )}
                     </div>
+                    )} */}
+                    
+                    {/* {whtDeducted && whtRate > 0 && (
+                      <div className="space-y-1">
+                        <p className="text-xs font-medium text-muted-foreground">WHT (Tax Credit)</p>
+                        <p className="text-xl font-bold text-blue-600">
+                          {formatCurrencyAmount(whtAmount, formData.currency as CurrencyCode)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Rate: {whtRate}% • Reduces tax liability</p>
+                      </div>
+                    )} */}
                     
                     {totalExecutionExpenses > 0 && (
                       <div className="space-y-1">
@@ -932,7 +933,7 @@ export function AddBrandDealDialog({
                       <p className="text-xl font-bold text-green-600">
                         {formatCurrencyAmount(taxableIncome > 0 ? taxableIncome : cashReceived, formData.currency as CurrencyCode)}
                       </p>
-                      <p className="text-xs text-muted-foreground">Cash Received − Expenses (this is what you pay tax on)</p>
+                      <p className="text-xs text-muted-foreground">Gross Amount − Expenses (this is what you pay tax on)</p>
                     </div>
                   </div>
                 </div>

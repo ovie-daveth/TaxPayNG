@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Upload, FileText, Loader2, X } from "lucide-react"
+import { Upload, FileText, Loader2, X, Eye } from "lucide-react"
 import { Document } from "@/lib/types"
 import { documentService } from "@/lib/services"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
@@ -30,6 +30,7 @@ export function DocumentSelectionModal({
   const [selectedDocuments, setSelectedDocuments] = useState<Set<string>>(new Set())
   const [uploading, setUploading] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<Array<{ id: string; name: string }>>([])
+  const [previewDocument, setPreviewDocument] = useState<Document | null>(null)
 
   useEffect(() => {
     if (open && userId) {
@@ -163,6 +164,17 @@ export function DocumentSelectionModal({
                         {doc.type} • {(doc.size / 1024).toFixed(1)} KB
                       </p>
                     </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setPreviewDocument(doc)
+                      }}
+                      className="shrink-0"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
                   </div>
                 ))}
               </div>
@@ -241,6 +253,47 @@ export function DocumentSelectionModal({
           </div>
         </DialogFooter>
       </DialogContent>
+
+      {/* Document Preview Modal */}
+      <Dialog open={!!previewDocument} onOpenChange={(open) => !open && setPreviewDocument(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>{previewDocument?.name}</DialogTitle>
+            <DialogDescription>
+              {previewDocument?.type} • {previewDocument ? (previewDocument.size / 1024).toFixed(1) : '0'} KB
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            {previewDocument && (
+              <div className="w-full h-full min-h-[500px]">
+                {previewDocument.url?.toLowerCase().endsWith('.pdf') ? (
+                  <iframe
+                    src={previewDocument.url}
+                    className="w-full h-full min-h-[500px] border rounded"
+                    title={previewDocument.name}
+                  />
+                ) : (
+                  <img
+                    src={previewDocument.url}
+                    alt={previewDocument.name}
+                    className="w-full h-auto max-h-[70vh] object-contain"
+                  />
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPreviewDocument(null)}>
+              Close
+            </Button>
+            <Button asChild>
+              <a href={previewDocument?.url} target="_blank" rel="noopener noreferrer">
+                Open in New Tab
+              </a>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   )
 }

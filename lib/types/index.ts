@@ -835,7 +835,7 @@ export interface SavedClient {
 // Report Types
 export type ReportType = 'Self-Assessment' | 'Income Statement' | 'Expense Report' | 'Tax Summary' | 'Tax Assessment'
 export type ReportStatus = 'draft' | 'completed' | 'submitted'
-export type FilingStatus = 'not_filed' | 'filed' | 'submitted' | 'acknowledged'
+export type FilingStatus = 'draft' | 'filed' | 'submitted' | 'acknowledged'
 export type FilingMethod = 'direct' | 'agent' | 'email' | null
 
 export interface SavedReport {
