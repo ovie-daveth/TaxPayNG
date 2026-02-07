@@ -3,7 +3,7 @@ import { getFirestore, Firestore } from 'firebase-admin/firestore'
 import { getAuth, Auth } from 'firebase-admin/auth'
 
 let adminApp: App | null = null
-let adminDb: Firestore | null = null
+export let adminDb: Firestore | null = null
 
 /**
  * Initialize Firebase Admin SDK

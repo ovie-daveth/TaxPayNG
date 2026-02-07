@@ -4,7 +4,6 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { useAuth } from '@/lib/hooks/useAuth'
 import { userService } from '@/lib/services'
 import type { UserProfile, BusinessType } from '@/lib/types'
-import { normalizeBusinessType } from '@/lib/utils/businessTypeHelpers'
 
 interface UserProfileContextType {
   profile: UserProfile | null
@@ -38,7 +37,7 @@ export function UserProfileProvider({ children }: { children: ReactNode }) {
       const userProfile = await userService.getProfile(user.uid)
       
       // Normalize legacy 'agent' to 'consultant' for backward compatibility
-      if (userProfile && userProfile.businessType === 'agent') {
+      if (userProfile?.businessType === 'consultant') {
         // Normalize businessType and legacy fields
         const normalizedProfile: UserProfile = {
           ...userProfile,

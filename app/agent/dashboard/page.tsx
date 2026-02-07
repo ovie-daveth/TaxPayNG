@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { toast } from "sonner"
@@ -155,8 +153,6 @@ export default function AgentDashboardPage() {
   // Calculate earnings from completed requests
   const completedRequests = requests.filter(r => r.status === 'completed')
   const totalEarnings = completedRequests.length * 250 // 5% of ₦5,000 base fee = ₦250 per filing
-  const pendingEarnings = requests.filter(r => r.status === 'in_progress').length * 250
-  const allRequestsCount = requests.length
 
   return (
     <div className="space-y-6">
