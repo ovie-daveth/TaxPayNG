@@ -19,7 +19,6 @@ import Image from "next/image"
 import { toast } from "sonner"
 import { TokenInputDialog } from "@/components/waitlist/token-input-dialog"
 import { sendSignupVerification } from "@/lib/utils/emailVerification"
-import { Separator } from "@/components/ui/separator"
 import { BusinessType } from "@/lib/types"
 import { GoogleBusinessTypeDialog } from "@/components/auth/google-business-type-dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -597,10 +596,11 @@ function SignupPageContent() {
                     <SelectValue placeholder="Select business type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="freelancer">Freelancer/Self-Employed</SelectItem>
-                    <SelectItem value="creator">Creator / Influencer</SelectItem>
-                    <SelectItem value="sme">Small Business</SelectItem>
-                    <SelectItem value="consultant">Tax Consultant</SelectItem>
+                      <SelectItem value="freelancer">Independent Professional (Freelancer / Self-Employed)</SelectItem>
+                      <SelectItem value="creator">Content Creator / Influencer</SelectItem>
+                      <SelectItem value="sme">Registered Business (Small / Medium Enterprise)</SelectItem>
+                      <SelectItem value="consultant">Professional Services (Tax Consultant)</SelectItem>
+
                   </SelectContent>
                 </Select>
               </div>
