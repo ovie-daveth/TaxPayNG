@@ -174,7 +174,7 @@ export function DashboardNavCreator() {
         "hidden md:flex fixed left-0 top-0 h-screen flex-col border-r border-border bg-card transition-all duration-300 ease-in-out",
         sidebarCollapsed ? "w-16" : "w-64"
       )}>
-        <div className="p-6 border-b border-border flex items-center justify-between">
+        <div className="p-6 border-b border-border flex items-center justify-between flex-shrink-0">
           <Link href="/dashboard-creator" className={cn(
             "flex items-center gap-2 transition-all duration-300",
             sidebarCollapsed && "justify-center"
@@ -199,7 +199,7 @@ export function DashboardNavCreator() {
           </Button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-8">
+        <nav className="flex-1 p-4 space-y-8 overflow-y-auto">
           {filteredNavItems.map((item) => {
             const Icon = item.icon
             // For Dashboard, only match exact path (not sub-routes)
@@ -231,7 +231,7 @@ export function DashboardNavCreator() {
           })}
         </nav>
 
-        <div className="p-4 border-t border-border space-y-3">
+        <div className="p-4 border-t border-border space-y-3 flex-shrink-0">
           {/* Business Switcher - visible on mobile and tablet view, hidden on desktop */}
           <div className="block md:block lg:hidden mb-2">
             <BusinessSwitcher />
