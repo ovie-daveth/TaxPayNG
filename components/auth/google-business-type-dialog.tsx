@@ -33,9 +33,9 @@ export function GoogleBusinessTypeDialog({ open, onOpenChange, onSelect }: Googl
             onClick={() => handleSelect('freelancer')}
           >
             <div className="text-left min-w-0 w-full">
-              <div className="font-semibold">Freelancer</div>
+              <div className="font-semibold">Self Employed</div>
               <div className="text-sm text-muted-foreground wrap-break-word">
-                Individual contractor or consultant
+                Independent Professional (Freelancer / Self-Employed)
               </div>
             </div>
           </Button>
@@ -61,7 +61,7 @@ export function GoogleBusinessTypeDialog({ open, onOpenChange, onSelect }: Googl
             <div className="text-left min-w-0 w-full">
               <div className="font-semibold">Small/Medium Business</div>
               <div className="text-sm text-muted-foreground wrap-break-word">
-                Small or medium-sized enterprise
+                Registered Business (Small / Medium Enterprise)
               </div>
             </div>
           </Button>

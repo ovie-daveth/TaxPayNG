@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Check, Lock } from "lucide-react"
+import { Check, Lock, ChevronDown, ChevronUp } from "lucide-react"
 import { subscriptionService } from "@/lib/services/subscriptionService"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
@@ -36,12 +36,15 @@ export function SubscriptionRequiredModal({
   const [showFreelancerMigrationModal, setShowFreelancerMigrationModal] = useState(false)
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionType | null>(null)
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
+  const [expandedPlans, setExpandedPlans] = useState<Set<SubscriptionType>>(new Set())
 
   const yearlyDiscountPercent = pricingConfig?.yearlyDiscountPercent ?? DEFAULT_YEARLY_DISCOUNT_PERCENT
+  
   const format = (priceInKobo: number) => {
     const priceInNaira = priceInKobo / 100
     return `₦${priceInNaira.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
   }
+  
   const getPlanWithOverrides = (planType: SubscriptionType) => {
     const base = subscriptionService.getPlan(planType)
     if (!base) return null
@@ -68,11 +71,118 @@ export function SubscriptionRequiredModal({
     }
   }
 
+  const getPlanDescription = (planType: SubscriptionType): string => {
+    if (businessType === 'sme') {
+      if (planType === 'Small Business') {
+        return 'For businesses with annual turnover ≤ ₦50-100 million and fixed assets ≤ ₦250 million (excluding professional services). Qualifies for tax exemptions under NTA 2025.'
+      }
+      return 'For businesses with turnover above small business threshold, fixed assets exceeding ₦250 million, or providing professional services. Subject to full corporate tax regime.'
+    } else {
+      if (planType === 'PRO') {
+        return 'Perfect for tech freelancers, Virtual Assistants, copywriters, independent professionals and consultants who need to manage their taxes with ease'
+      }
+      if (planType === 'GOLD') {
+        return 'Ideal for content creators, influencers, digital creators and independent professionals & contractors managing multiple income streams'
+      }
+      return 'For individuals registered as BUSINESS NAMES with the Corporate Affairs Commission (CAC) in Nigeria'
+    }
+  }
+
+  const togglePlanFeatures = (planType: SubscriptionType) => {
+    setExpandedPlans(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(planType)) {
+        newSet.delete(planType)
+      } else {
+        newSet.add(planType)
+      }
+      return newSet
+    })
+  }
+
+  const getPlanFeatures = (planType: SubscriptionType): Array<{ text: string; comingSoon?: boolean }> => {
+    if (businessType === 'sme') {
+      if (planType === 'Small Business') {
+        return [
+          { text: 'Track up to 5,000 transactions/month' },
+          { text: 'Advanced tax calculations' },
+          { text: 'Small business tax exemption tracking' },
+          { text: 'IRS/NRS filing (VAT filing, WHT filing, PIT filing etc)' },
+          { text: 'Business invoice management' },
+          { text: 'Proper book keeping and business accounting' },
+          { text: 'Employee management and simple payroll system' },
+          { text: 'Manage PAYE and remit', comingSoon: true },
+          { text: 'Document storage (15GB total)' },
+          { text: 'Receipt scanning & OCR' },
+          { text: 'SMS & email reminders' },
+          { text: 'Multi-user access (up to 5 users)', comingSoon: true },
+          { text: 'Basic analytics & insights' },
+          { text: 'Priority support' }
+        ]
+      }
+      // Big Business
+      return [
+        { text: 'Everything in Small Business' },
+        { text: 'Full corporate tax compliance' },
+        { text: 'Multi-user access (up to 10 users)', comingSoon: true },
+        { text: 'Advanced analytics & insights', comingSoon: true },
+        { text: 'Custom report templates' },
+        { text: 'Document storage (50GB total)' },
+        { text: 'API access', comingSoon: true },
+        { text: 'Dedicated account manager' },
+        { text: '24/7 priority support' },
+        { text: 'White-label options', comingSoon: true },
+        { text: 'Custom integrations', comingSoon: true }
+      ]
+    } else {
+      // Individuals
+      if (planType === 'PRO') {
+        return [
+          { text: 'Track up to 100 transactions/month' },
+          { text: 'Income & expense tracking' },
+          { text: 'Receipt scanning & OCR for automatic transaction tracking' },
+          { text: 'Automatic tax calculator with reliefs' },
+          { text: 'Self assessment and filing (IRS standard)' },
+          { text: 'Document storage (500MB total)' },
+          { text: 'Email reminders' },
+          { text: 'Email support' },
+          { text: 'Easy payment of tax directly using various government approved methods (e.g., Remita and Paystack)', comingSoon: true }
+        ]
+      }
+      if (planType === 'GOLD') {
+        return [
+          { text: 'Track up to 500 transactions/month' },
+          { text: 'All PRO features' },
+          { text: 'Multi-platform income tracking' },
+          { text: 'Sponsorship & brand deal management' },
+          { text: 'Simple invoice management' },
+          { text: 'Advanced tax calculations' },
+          { text: 'Document storage (2GB total)' },
+          { text: 'SMS & email reminders' },
+          { text: 'Priority support' },
+          { text: 'Expense categorization' },
+          { text: 'Receive local and international payments via invoicing', comingSoon: true }
+        ]
+      }
+      // PLATINUM
+      return [
+        { text: 'Everything in GOLD' },
+        { text: 'Multi-entity business management (ie operate multiple business account)' },
+        { text: 'Business analytics & insights' },
+        { text: 'Extensive Expense Management (expense focused tax calculation to reduce tax liability as a business)' },
+        { text: 'IRS/NRS filing (VAT filing, WHT filing, PIT filing etc)' },
+        { text: 'Document storage (10GB total)' },
+        { text: 'Multi-user access(up to 3 users)' },
+        { text: 'Dedicated tax advisor consultation' },
+        { text: 'Quarterly tax planning sessions' },
+        { text: '24/7 priority support' },
+        { text: 'API access for integrations', comingSoon: true }
+      ]
+    }
+  }
+
   const availablePlans = getAvailablePlans()
 
-  // Migration should happen ONLY after successful payment (in /api/subscription/verify).
-  // We still show an informational modal before payment when switching between
-  // Freelancer <-> Creator plan families.
   const needsMigration = (planType: SubscriptionType): boolean => {
     if (businessType === 'freelancer' && (planType === 'GOLD' || planType === 'PLATINUM')) {
       return true
@@ -93,12 +203,10 @@ export function SubscriptionRequiredModal({
 
     console.log('handleSubscribe called:', { planType, businessType, needsMigration: needsMigration(planType) })
 
-    // Check if migration is needed
     if (needsMigration(planType)) {
       console.log('Migration needed - showing migration modal')
       console.log('Setting selectedPlan to:', planType)
       setSelectedPlan(planType)
-      // Show appropriate migration modal based on direction
       setTimeout(() => {
         if (businessType === 'creator' && planType === 'PRO') {
           console.log('Setting showFreelancerMigrationModal to true')
@@ -111,17 +219,12 @@ export function SubscriptionRequiredModal({
       return
     }
 
-    // Proceed with subscription only if no migration needed
     console.log('No migration needed - proceeding with subscription')
     await proceedWithSubscription(planType)
   }
 
   const handleMigrateAndSubscribe = async () => {
     if (!selectedPlan) return
-    // Do NOT update businessType here. Proceed to payment; verify route will migrate on success.
-    setShowMigrationModal(false)
-    setShowFreelancerMigrationModal(false)
-    onOpenChange(false)
     setTimeout(() => {
       proceedWithSubscription(selectedPlan)
     }, 200)
@@ -132,7 +235,6 @@ export function SubscriptionRequiredModal({
 
     setProcessingSubscription(planType)
     try {
-      // Get auth token
       const currentUser = auth.currentUser
       if (!currentUser) {
         router.push("/login")
@@ -142,7 +244,6 @@ export function SubscriptionRequiredModal({
 
       const token = await currentUser.getIdToken()
 
-      // Initialize subscription payment
       const response = await fetch("/api/subscription/initialize", {
         method: "POST",
         headers: {
@@ -161,7 +262,6 @@ export function SubscriptionRequiredModal({
         throw new Error(data.error || "Failed to initialize subscription")
       }
 
-      // Redirect to Paystack payment page
       if (data.data?.authorizationUrl) {
         window.location.href = data.data.authorizationUrl
       } else {
@@ -183,7 +283,6 @@ export function SubscriptionRequiredModal({
   return (
     <>
     <Dialog open={open} onOpenChange={(isOpen) => {
-      // Don't allow closing if migration modal is showing
       if (!isOpen && (showMigrationModal || showFreelancerMigrationModal)) {
         return
       }
@@ -230,11 +329,12 @@ export function SubscriptionRequiredModal({
               <strong className="text-foreground">Why subscribe?</strong> Our subscription plans give you access to:
             </p>
             <ul className="list-disc list-inside space-y-0.5 sm:space-y-1 mt-1.5 sm:mt-2 text-xs sm:text-sm text-muted-foreground">
-              <li>Transaction tracking and management</li>
-              <li>Tax calculations and reports</li>
+              <li>Income & expense tracking with receipt scanning</li>
+              <li>Automatic tax calculations with reliefs</li>
+              <li>Self-assessment and filing (IRS/NRS standard)</li>
               <li>Document storage and management</li>
               <li>Email and SMS reminders</li>
-              <li>Priority support</li>
+              <li>Priority support and tax advisory</li>
             </ul>
           </div>
 
@@ -245,6 +345,10 @@ export function SubscriptionRequiredModal({
 
               const isProcessing = processingSubscription === planType
               const isBigBusiness = planType === 'Big Business' && businessType === 'sme'
+              const isExpanded = expandedPlans.has(planType)
+              const features = getPlanFeatures(planType)
+              const initialFeaturesCount = 5
+              const hasMoreFeatures = features.length > initialFeaturesCount
 
               return (
                 <Card 
@@ -278,15 +382,7 @@ export function SubscriptionRequiredModal({
                       )}
                     </div>
                     <CardDescription className="text-xs sm:text-sm mt-1 sm:mt-2">
-                      {businessType === 'sme' 
-                        ? planType === 'Small Business' 
-                          ? 'For businesses with annual turnover ≤ ₦50-100 million'
-                          : 'For businesses with turnover above small business threshold'
-                        : planType === 'PRO'
-                          ? 'Perfect for tech freelancers, VAs, copywriters, and independent professionals'
-                          : planType === 'GOLD'
-                          ? 'Ideal for content creators, influencers, and digital creators managing multiple income streams'
-                          : 'For established creators, individuals with complex tax situations, business owner (not Limited Liability Company), and team collaborations'}
+                      {getPlanDescription(planType)}
                     </CardDescription>
                     <div className="mt-3 sm:mt-4">
                       {billingInterval === 'monthly' ? (
@@ -317,15 +413,37 @@ export function SubscriptionRequiredModal({
                   </CardHeader>
                   <CardContent className="flex-1 p-3 sm:p-6 pt-0">
                     <ul className="space-y-1.5 sm:space-y-2">
-                      {plan.features.slice(0, 5).map((feature, idx) => (
+                      {(isExpanded ? features : features.slice(0, initialFeaturesCount)).map((feature, idx) => (
                         <li key={idx} className="flex items-start gap-1.5 sm:gap-2 text-xs sm:text-sm">
                           <Check className="w-3 h-3 sm:w-4 sm:h-4 text-primary shrink-0 mt-0.5" />
-                          <span>{feature}</span>
+                          <span className={feature.comingSoon ? 'opacity-70' : ''}>
+                            {feature.text}
+                            {feature.comingSoon && (
+                              <span className="ml-1.5 text-[10px] bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-1.5 py-0.5 rounded-full font-medium">
+                                Coming Soon
+                              </span>
+                            )}
+                          </span>
                         </li>
                       ))}
-                      {plan.features.length > 5 && (
-                        <li className="text-[10px] sm:text-xs text-muted-foreground">
-                          +{plan.features.length - 5} more features
+                      {hasMoreFeatures && (
+                        <li>
+                          <button
+                            onClick={() => togglePlanFeatures(planType)}
+                            className="text-[10px] sm:text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1 transition-colors mt-1"
+                          >
+                            {isExpanded ? (
+                              <>
+                                <ChevronUp className="w-3 h-3" />
+                                Show less
+                              </>
+                            ) : (
+                              <>
+                                <ChevronDown className="w-3 h-3" />
+                                +{features.length - initialFeaturesCount} more features
+                              </>
+                            )}
+                          </button>
                         </li>
                       )}
                     </ul>
@@ -377,8 +495,6 @@ export function SubscriptionRequiredModal({
           console.log('Migration modal onOpenChange:', isOpen, 'selectedPlan:', selectedPlan)
           setShowMigrationModal(isOpen)
           if (!isOpen) {
-            // If migration modal is cancelled, clear selected plan
-            // Subscription modal will reopen automatically because open prop is still true
             setSelectedPlan(null)
           }
         }}
@@ -395,8 +511,6 @@ export function SubscriptionRequiredModal({
           console.log('Freelancer migration modal onOpenChange:', isOpen, 'selectedPlan:', selectedPlan)
           setShowFreelancerMigrationModal(isOpen)
           if (!isOpen) {
-            // If migration modal is cancelled, clear selected plan
-            // Subscription modal will reopen automatically because open prop is still true
             setSelectedPlan(null)
           }
         }}

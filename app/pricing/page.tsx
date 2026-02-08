@@ -247,7 +247,7 @@ export default function PricingPage() {
                         </span>
                       </div>
                       <CardDescription className="text-xs sm:text-sm">
-                        Perfect for tech freelancers, VAs, copywriters, and independent professionals
+                        Perfect for tech freelancers, Virtual Assistants, copywriters, independent professionals and consultants who need to manage their taxes with ease
                       </CardDescription>
                 <div className="mt-3 sm:mt-4 space-y-1">
                   {billingInterval === 'monthly' ? (
@@ -286,13 +286,13 @@ export default function PricingPage() {
                 <ul className="space-y-2 sm:space-y-3">
                   <PricingFeature>Track up to 100 transactions/month</PricingFeature>
                   <PricingFeature>Income & expense tracking</PricingFeature>
-                  <PricingFeature>Tax calculator with reliefs</PricingFeature>
-                  <PricingFeature>Basic reports generation</PricingFeature>
+                  <PricingFeature>Receipt scanning & OCR for automatic transaction tracking</PricingFeature>
+                  <PricingFeature>Automatic tax calculator with reliefs</PricingFeature>
+                  <PricingFeature>Self assessment and filing (IRS standard)</PricingFeature>
                   <PricingFeature>Document storage (500MB total)</PricingFeature>
                   <PricingFeature>Email reminders</PricingFeature>
                   <PricingFeature>Email support</PricingFeature>
-                  <PricingFeature>Simple invoice management</PricingFeature>
-                  <PricingFeature>Easy payment of tax directly using various government approved methods (e.g., Remita and Paystack)</PricingFeature>
+                  <PricingFeature comingSoon>Easy payment of tax directly using various government approved methods (e.g., Remita and Paystack) - coming soon</PricingFeature>
                 </ul>
               </CardContent>
               <CardFooter className="p-4 sm:p-6 pt-0">
@@ -339,7 +339,7 @@ export default function PricingPage() {
                         </span>
                       </div>
                       <CardDescription className="text-xs sm:text-sm">
-                        Ideal for content creators, influencers, and digital creators managing multiple income streams
+                        Ideal for content creators, influencers, digital creators and independent proffesionals & contractors managing multiple income streams
                       </CardDescription>
                       <div className="mt-3 sm:mt-4">
                         <div className="mt-3 sm:mt-4 space-y-1">
@@ -382,12 +382,13 @@ export default function PricingPage() {
                         <PricingFeature>All PRO features</PricingFeature>
                         <PricingFeature>Multi-platform income tracking</PricingFeature>
                         <PricingFeature>Sponsorship & brand deal management</PricingFeature>
+                         <PricingFeature>Simple invoice management</PricingFeature>
                         <PricingFeature>Advanced tax calculations</PricingFeature>
                         <PricingFeature>Document storage (2GB total)</PricingFeature>
-                        <PricingFeature>Receipt scanning & OCR</PricingFeature>
                         <PricingFeature>SMS & email reminders</PricingFeature>
                         <PricingFeature>Priority support</PricingFeature>
                         <PricingFeature>Expense categorization</PricingFeature>
+                        <PricingFeature comingSoon>Receive local and international payments via invoicing</PricingFeature>
                       </ul>
                     </CardContent>
                     <CardFooter className="p-4 sm:p-6 pt-0">
@@ -429,7 +430,7 @@ export default function PricingPage() {
                         </span>
                       </div>
                       <CardDescription className="text-xs sm:text-sm">
-                        For established creators, individuals with complex tax situations, business owner (not Limited Liability Company), and team collaborations
+                        For individuals registered as <span className="font-bold">BUSINESS NAMES</span> with the Corporate Affairs Commission (CAC) in Nigeria.
                       </CardDescription>
                       <div className="mt-3 sm:mt-4">
                         <div className="mt-3 sm:mt-4 space-y-1">
@@ -469,12 +470,13 @@ export default function PricingPage() {
                     <CardContent className="flex-1 p-4 sm:p-6 pt-0">
                       <ul className="space-y-2 sm:space-y-3">
                         <PricingFeature>Everything in GOLD</PricingFeature>
-                        <PricingFeature>Multi-entity business management</PricingFeature>
-                        <PricingFeature comingSoon>Advanced analytics & insights</PricingFeature>
-                        <PricingFeature>IRS/NRS filing reports</PricingFeature>
+                        <PricingFeature>Multi-entity business management (ie operate multiple business account)</PricingFeature>
+                        <PricingFeature>Business analytics & insights</PricingFeature>
+                        <PricingFeature>Extensive Expense Management (expense focused tax calculation to reduce tax liabilty as a business)</PricingFeature>
+                        <PricingFeature>IRS/NRS filing (VAT filing, WHT filing, PIT filing etc)</PricingFeature>
                         <PricingFeature>Document storage (10GB total)</PricingFeature>
-                        <PricingFeature>Custom report templates</PricingFeature>
-                        <PricingFeature comingSoon>Team collaboration (up to 3 users)</PricingFeature>
+                        {/* <PricingFeature>Custom report templates</PricingFeature> */}
+                        <PricingFeature>Multi-user access(up to 3 users)</PricingFeature>
                         <PricingFeature>Dedicated tax advisor consultation</PricingFeature>
                         <PricingFeature>Quarterly tax planning sessions</PricingFeature>
                         <PricingFeature>24/7 priority support</PricingFeature>
@@ -555,7 +557,7 @@ export default function PricingPage() {
                 <CardTitle className="text-xl sm:text-2xl">{getPlanWithOverrides('Small Business')?.name || 'Small Business'}</CardTitle>
                       <CardDescription className="space-y-2 text-xs sm:text-sm">
                         <p>For businesses with annual turnover ≤ ₦50-100 million and fixed assets ≤ ₦250 million (excluding professional services).</p>
-                        <p className="text-xs font-medium text-primary">May qualify for tax exemptions under NTA 2025</p>
+                        <p className="text-xs font-medium text-primary">Qualifies for tax exemptions under NTA 2025</p>
                       </CardDescription>
                 <div className="mt-3 sm:mt-4 space-y-1">
                   {billingInterval === 'monthly' ? (
@@ -594,14 +596,19 @@ export default function PricingPage() {
                 <ul className="space-y-3">
                   <PricingFeature>Track up to 5,000 transactions/month</PricingFeature>
                   <PricingFeature>Advanced tax calculations</PricingFeature>
-                        <PricingFeature>Small business tax exemption tracking</PricingFeature>
-                  <PricingFeature>IRS/NRS filing reports</PricingFeature>
+                  <PricingFeature>Small business tax exemption tracking</PricingFeature>
+                   <PricingFeature>IRS/NRS filing (VAT filing, WHT filing, PIT filing etc)</PricingFeature>
+                    <PricingFeature>Business invoice management</PricingFeature>
+                    <PricingFeature>Proper book keeping and business accouting</PricingFeature>
+                  <PricingFeature>Employee management and simple payroll system</PricingFeature>
+                  <PricingFeature comingSoon>Manage PAYE and remit</PricingFeature>
                   <PricingFeature>Document storage (15GB total)</PricingFeature>
                   <PricingFeature>Receipt scanning & OCR</PricingFeature>
                   <PricingFeature>SMS & email reminders</PricingFeature>
-                        <PricingFeature comingSoon>Multi-user access (up to 3 users)</PricingFeature>
-                        <PricingFeature>Basic analytics & insights</PricingFeature>
+                  <PricingFeature comingSoon>Multi-user access (up to 5 users)</PricingFeature>
+                  <PricingFeature>Basic analytics & insights</PricingFeature>
                   <PricingFeature>Priority support</PricingFeature>
+
                 </ul>
               </CardContent>
               <CardFooter>

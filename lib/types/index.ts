@@ -112,6 +112,8 @@ export interface UserProfile {
   firstName: string
   lastName: string
   phone?: string
+  phoneNumber?: string // Legacy field - kept for backward compatibility
+  profilePicture?: string
   address?: {
     street: string
     city: string
@@ -148,6 +150,7 @@ export interface UserProfile {
     theme: 'light' | 'dark' | 'system'
     emailNotifications?: boolean // Email notifications for reminders
     smsNotifications?: boolean // SMS notifications for reminders
+    marketing?: boolean // Whether user has opted in for marketing emails
   }
   // Subscription fields
   isSubscribe?: boolean
@@ -190,6 +193,7 @@ export interface UserProfile {
     specializations?: string[] // Areas of specialization (e.g., ["CIT", "VAT", "PAYE"])
     location?: string // City/State location
     languages?: string[] // Languages spoken
+    businessName?: string // Optional business name for consultants (e.g., "John Doe Tax Consultancy")
     certifications?: Array<{
       name: string
       issuer: string
@@ -201,6 +205,9 @@ export interface UserProfile {
       description?: string
       year?: number
     }>
+    filingsCompleted?: number // Total number of tax filings completed
+    filingClients?: number // Number of unique clients served for tax filings
+    consultationClients?: number // Number of unique clients served for consultations
     clientCount?: number // Number of clients managed
     successRate?: number // Success rate percentage
     portfolioImages?: string[] // URLs to portfolio images/documents
@@ -607,6 +614,7 @@ export interface InvoiceClient {
   name: string
   email?: string
   phone?: string
+  phoneNumber?: string // Legacy field - kept for backward compatibility
   address?: {
     street?: string
     city?: string

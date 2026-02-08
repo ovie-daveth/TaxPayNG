@@ -2,7 +2,6 @@
 
 import type React from "react"
 import { Suspense } from "react"
-
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { Button } from "@/components/ui/button"
@@ -11,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Calculator, Eye, EyeOff, MapPin } from "lucide-react"
+import { Calculator, Eye, EyeOff, MapPin, CheckCircle2, AlertCircle } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
@@ -20,9 +19,9 @@ import Image from "next/image"
 import { toast } from "sonner"
 import { TokenInputDialog } from "@/components/waitlist/token-input-dialog"
 import { sendSignupVerification } from "@/lib/utils/emailVerification"
-import { Separator } from "@/components/ui/separator"
 import { BusinessType } from "@/lib/types"
 import { GoogleBusinessTypeDialog } from "@/components/auth/google-business-type-dialog"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 
 function LogoImage(): React.JSX.Element {
   const { theme, resolvedTheme } = useTheme()
@@ -77,6 +76,7 @@ type SignupPayload = {
   businessType: AllowedBusinessType
   consultantStates?: string[]
   phone?: string
+  invitationToken?: string
 }
 
 function SignupPageContent() {
@@ -90,6 +90,14 @@ function SignupPageContent() {
   const [signupSuccess, setSignupSuccess] = useState(false)
   const [pendingInvoiceId, setPendingInvoiceId] = useState<string | null>(null)
   const [showGoogleBusinessTypeDialog, setShowGoogleBusinessTypeDialog] = useState(false)
+  
+  // Agent invitation state
+  const [isAgentInvite, setIsAgentInvite] = useState(false)
+  const [invitationToken, setInvitationToken] = useState<string | null>(null)
+  const [invitationData, setInvitationData] = useState<any>(null)
+  const [validatingInvitation, setValidatingInvitation] = useState(false)
+  const [invitationValid, setInvitationValid] = useState(false)
+  
   const [formData, setFormData] = useState<{
     fullName: string
     email: string
@@ -114,8 +122,70 @@ function SignupPageContent() {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
+  // Check for agent invitation token in URL
+  useEffect(() => {
+    const token = searchParams?.get('token')
+    const email = searchParams?.get('email')
+    const role = searchParams?.get('role')
+    const invoiceId = searchParams?.get('invoiceId')
+    
+    if (invoiceId) {
+      setPendingInvoiceId(invoiceId)
+    }
+
+    // Check if this is an agent invitation
+    if (token && (role === 'agent' || email)) {
+      setInvitationToken(token)
+      setIsAgentInvite(true)
+      validateAgentInvitation(token)
+      
+      if (email) {
+        setFormData(prev => ({ 
+          ...prev, 
+          email: decodeURIComponent(email),
+          businessType: "consultant"
+        }))
+      }
+    } else if (email && !formData.email) {
+      setFormData(prev => ({ ...prev, email: decodeURIComponent(email) }))
+    }
+  }, [searchParams])
+
+  const validateAgentInvitation = async (token: string) => {
+    setValidatingInvitation(true)
+    try {
+      const response = await fetch(`/api/admin/agents/invitation?token=${token}`)
+      const data = await response.json()
+
+      if (data.success) {
+        setInvitationValid(true)
+        setInvitationData(data.invitation)
+        setFormData(prev => ({
+          ...prev,
+          email: data.invitation.email,
+          fullName: data.invitation.name,
+          businessType: 'consultant' // Pre-set business type for consultant invitations
+        }))
+        toast.success("Valid invitation! Please complete your registration.")
+      } else {
+        setInvitationValid(false)
+        toast.error(data.error || "Invalid or expired invitation")
+      }
+    } catch (error) {
+      console.error("Error validating invitation:", error)
+      setInvitationValid(false)
+      toast.error("Failed to validate invitation")
+    } finally {
+      setValidatingInvitation(false)
+    }
+  }
+
   const handleGoogleSignUp = async () => {
-    // Separate flow: Google signup uses popup to select business type
+    // Don't allow Google signup for agent invitations
+    if (isAgentInvite) {
+      toast.error("Please complete the registration form to accept your agent invitation")
+      return
+    }
     setShowGoogleBusinessTypeDialog(true)
   }
 
@@ -188,29 +258,20 @@ function SignupPageContent() {
 
     // If profile is null, wait a bit more and try to refetch
     if (!profile) {
-      console.log("Signup redirect - profile is null, refetching...")
       refetchProfile().catch(console.error)
       // Set a timeout to retry after a short delay
       const timeout = setTimeout(() => {
-        console.log("Signup redirect - profile still null after wait, refetching again...")
         refetchProfile().catch(console.error)
       }, 1000)
       return () => clearTimeout(timeout)
     }
 
-    console.log("Signup redirect - profile loaded, businessType:", profile.businessType, "taxId:", !!profile.taxId)
-
-    // Tax Consultant-specific redirects
-    if (profile.businessType === 'consultant') {
-      if (profile.consultantKycCompleted !== true) {
-        router.push("/consultant/kyc")
-        return
-      }
-      router.push("/consultant/dashboard")
+    // Agent-specific redirects
+    if (profile.businessType === "consultant") {
+      router.push("/agent/dashboard")
       return
     }
 
-    // Check if user needs to verify TIN or upload documents
     if (!profile.taxId) {
       router.push("/verify-tin")
       return
@@ -240,7 +301,15 @@ function SignupPageContent() {
   const isSME = formData.businessType === 'sme'
   const isCreator = formData.businessType === 'creator'
   const isConsultant = formData.businessType === 'consultant'
-  const businessNameLabel = isSME ? 'Company Name' : isCreator ? 'Creator or Brand Name' : isConsultant ? 'Full Name' : 'Full Name'
+  
+  const businessNameLabel = isSME 
+    ? 'Company Name' 
+    : isCreator 
+      ? 'Creator or Brand Name' 
+      : isConsultant 
+        ? 'Full Name'
+        : 'Full Name'
+  
   const businessNamePlaceholder = isSME
     ? 'Acme Corporation Ltd'
     : isCreator
@@ -260,20 +329,37 @@ function SignupPageContent() {
         ...(payload.businessType === 'consultant' && {
           phone: payload.phone,
           consultantStates: payload.consultantStates
+        }),
+        ...(payload.businessType === 'consultant' && payload.invitationToken && {
+          invitationToken: payload.invitationToken
         })
       })
 
       console.log("result now", result)
 
       if (result?.success) {
+        // Accept agent invitation if this is an agent signup
+        if (payload.businessType === 'consultant' && payload.invitationToken && 'userId' in result && result.userId) {
+          try {
+            await fetch('/api/agents/accept-invitation', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                invitationId: payload.invitationToken,
+                userId: result.userId
+              })
+            })
+          } catch (error) {
+            console.error('Error accepting invitation:', error)
+          }
+        }
+
         // Link invoice if invoiceId was in URL
         if (pendingInvoiceId && 'userId' in result && result.userId) {
           try {
             const linkResponse = await fetch('/api/invoices/link-to-user', {
               method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-              },
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 invoiceId: pendingInvoiceId,
                 userId: result.userId,
@@ -282,12 +368,10 @@ function SignupPageContent() {
             })
             
             if (linkResponse.ok) {
-              // Store invoiceId for redirect after login
               sessionStorage.setItem('pendingInvoiceId', pendingInvoiceId)
             }
           } catch (error) {
             console.error('Error linking invoice:', error)
-            // Don't fail signup if invoice linking fails
           }
         }
         
@@ -308,33 +392,33 @@ function SignupPageContent() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     
-    // Validate passwords match
     if (formData.password !== formData.confirmPassword) {
       toast.error('Passwords do not match')
       return
     }
 
-    // Validate business type is selected
     if (!formData.businessType) {
       toast.error('Please select a business type')
       return
     }
 
-    const phoneRegex = /^[0-9]{11,15}$/
-    // Validate phone number format
+    // For agent invitations, businessType is already set to 'agent'
+    if (isAgentInvite && !invitationValid) {
+      toast.error('Invalid or expired invitation')
+      return
+    }
 
-    if(!phoneRegex.test(formData.phone)){
+    const phoneRegex = /^[0-9]{11,15}$/
+    if (!phoneRegex.test(formData.phone)) {
       toast.error('Please enter a valid phone number')
       return
     }
 
-    // Validate supported business type
-    if (!['freelancer', 'creator', 'sme', 'consultant'].includes(formData.businessType)) {
+    if (!['freelancer', 'creator', 'sme', 'consultant', 'agent'].includes(formData.businessType)) {
       toast.error('Please select a supported business type')
       return
     }
 
-    // Validate consultant-specific fields
     if (formData.businessType === 'consultant') {
       if (!formData.phone || formData.phone.trim() === '') {
         toast.error('Phone number is required for tax consultants')
@@ -346,7 +430,6 @@ function SignupPageContent() {
       }
     }
 
-    // Split full name into first and last name
     const trimmedFullName = formData.fullName.trim()
     const nameParts = trimmedFullName.split(/\s+/)
     const firstName = nameParts[0] || ''
@@ -369,10 +452,18 @@ function SignupPageContent() {
       ...(formData.businessType === 'consultant' && {
         phone: formData.phone.trim(),
         consultantStates: formData.consultantStates
+      }),
+      ...(formData.businessType === 'consultant' && invitationToken && {
+        invitationToken
       })
     }
 
-    // If email already verified in this session for the same address, proceed directly
+    // Skip email verification for agent invitations (email already verified through invitation)
+    if (isAgentInvite && invitationValid) {
+      await completeSignup(payload)
+      return
+    }
+
     if (verifiedEmail && verifiedEmail === trimmedEmail) {
       pendingSignupDataRef.current = null
       await completeSignup(payload)
@@ -434,51 +525,86 @@ function SignupPageContent() {
     await completeSignup(payload)
   }
 
+  // Show loading state while validating invitation
+  if (isAgentInvite && validatingInvitation) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/20 to-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-sm text-muted-foreground">Validating invitation...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/20 to-background px-4 py-6 sm:px-6 sm:py-8">
-      <div className="w-full max-w-md">
+      <div className="w-full max-w-xl">
         <div className="bg-card/95 backdrop-blur-sm border border-border/50 rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-10 shadow-2xl shadow-primary/5">
-          {/* Logo */}
           <div className="flex items-center justify-center mb-8 sm:mb-10">
             <LogoImage />
           </div>
 
           <div className="text-center mb-8 sm:mb-10">
             <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-3 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-              Create your account
+              {isAgentInvite ? 'Complete Agent Registration' : 'Create your account'}
             </h1>
             <p className="text-sm sm:text-base text-muted-foreground">
-              Start managing your taxes in minutes
+              {isAgentInvite 
+                ? `Welcome, ${invitationData?.name || 'Agent'}! Complete your registration to get started.`
+                : 'Start managing your taxes in minutes'
+              }
             </p>
           </div>
 
+          {/* Agent Invitation Alert */}
+          {isAgentInvite && invitationValid && (
+            <Alert className="mb-6 border-green-500/50 bg-green-500/10">
+              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <AlertDescription className="text-sm">
+                You've been invited as a Tax Agent. Your email has been pre-verified.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {isAgentInvite && !invitationValid && !validatingInvitation && (
+            <Alert className="mb-6 border-destructive/50 bg-destructive/10">
+              <AlertCircle className="h-4 w-4 text-destructive" />
+              <AlertDescription className="text-sm">
+                This invitation link is invalid or has expired. Please contact the administrator.
+              </AlertDescription>
+            </Alert>
+          )}
+
           <form className="space-y-5 sm:space-y-6" onSubmit={handleSubmit}>
-            {/* Business Type - First Field */}
-            <div className="space-y-2">
-              <Label htmlFor="businessType" className="text-sm font-medium">Business Type</Label>
-              <Select 
-                value={formData.businessType}
-                onValueChange={(value) => {
-                  if (value === 'large_corporation') {
-                    setShowComingSoonModal(true)
-                    // Revert to small business
-                    setFormData(prev => ({ ...prev, businessType: 'sme' }))
-                    return
-                  }
-                  setFormData(prev => ({ ...prev, businessType: value as AllowedBusinessType }))
-                }}
-              >
-                <SelectTrigger id="businessType" className="h-11 sm:h-12 text-base border-2">
-                  <SelectValue placeholder="Select business type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="freelancer">Freelancer/Self-Employed</SelectItem>
-                  <SelectItem value="creator">Creator / Influencer</SelectItem>
-                  <SelectItem value="sme">Small Business</SelectItem>
-                  {/* <SelectItem value="consultant">Tax Consultant</SelectItem> */}
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Business Type - Hidden for agent invitations */}
+            {!isAgentInvite && (
+              <div className="space-y-2">
+                <Label htmlFor="businessType" className="text-sm font-medium">Business Type</Label>
+                <Select 
+                  value={formData.businessType}
+                  onValueChange={(value) => {
+                    if (value === 'large_corporation') {
+                      setShowComingSoonModal(true)
+                      setFormData(prev => ({ ...prev, businessType: 'sme' }))
+                      return
+                    }
+                    setFormData(prev => ({ ...prev, businessType: value as AllowedBusinessType }))
+                  }}
+                >
+                  <SelectTrigger id="businessType" className="h-11 sm:h-12 text-base border-2">
+                    <SelectValue placeholder="Select business type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="freelancer">Independent Professional (Freelancer / Self-Employed)</SelectItem>
+                      <SelectItem value="creator">Content Creator / Influencer</SelectItem>
+                      <SelectItem value="sme">Registered Business (Small / Medium Enterprise)</SelectItem>
+                      <SelectItem value="consultant">Professional Services (Tax Consultant)</SelectItem>
+
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="fullName" className="text-sm font-medium">
@@ -491,6 +617,7 @@ function SignupPageContent() {
                 value={formData.fullName}
                 onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
                 required 
+                disabled={isAgentInvite && !!invitationData?.name}
                 className="h-11 sm:h-12 text-base border-2 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
             </div>
@@ -504,11 +631,13 @@ function SignupPageContent() {
                 value={formData.email}
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                 required 
+                disabled={isAgentInvite}
                 className="h-11 sm:h-12 text-base border-2 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
               />
             </div>
-            <div>
-               <Label htmlFor="phone" className="text-sm font-medium">Phone</Label>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="text-sm font-medium">Phone</Label>
               <Input 
                 id="phone" 
                 type="tel" 
@@ -633,64 +762,75 @@ function SignupPageContent() {
               type="submit" 
               className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300" 
               size="lg" 
-              disabled={isLoading}
+              disabled={isLoading || (isAgentInvite && !invitationValid)}
             >
               {isLoading ? (
                 <span className="flex items-center gap-2">
                   <span className="animate-spin">⏳</span>
-                  Creating Account...
+                  {isAgentInvite ? 'Completing Registration...' : 'Creating Account...'}
                 </span>
               ) : (
-                "Create Account"
+                isAgentInvite ? 'Complete Registration' : 'Create Account'
               )}
             </Button>
           </form>
 
-          <div className="mt-6 sm:mt-8 text-center">
-            <div className="mt-4">
-              <Button
-                type="button"
-                variant="outline"
-                className="w-full h-11 sm:h-12 text-base sm:text-lg"
-                onClick={handleGoogleSignUp}
-                disabled={isLoading || isGoogleLoading}
-              >
-                {isGoogleLoading ? (
-                  <span className="flex items-center gap-2">
-                    <span className="animate-spin">⏳</span>
-                    Continuing...
-                  </span>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                      <path
-                        fill="currentColor"
-                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                      />
-                      <path
-                        fill="currentColor"
-                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                      />
-                      <path
-                        fill="currentColor"
-                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                      />
-                      <path
-                        fill="currentColor"
-                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                      />
-                    </svg>
-                    Continue with Google
-                  </>
-                )}
-              </Button>
-            </div>
+          {!isAgentInvite && (
+            <div className="mt-6 sm:mt-8 text-center">
+              <div className="mt-4">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-11 sm:h-12 text-base sm:text-lg"
+                  onClick={handleGoogleSignUp}
+                  disabled={isLoading || isGoogleLoading}
+                >
+                  {isGoogleLoading ? (
+                    <span className="flex items-center gap-2">
+                      <span className="animate-spin">⏳</span>
+                      Continuing...
+                    </span>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                        <path
+                          fill="currentColor"
+                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                        />
+                        <path
+                          fill="currentColor"
+                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                        />
+                        <path
+                          fill="currentColor"
+                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                        />
+                        <path
+                          fill="currentColor"
+                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                        />
+                      </svg>
+                      Continue with Google
+                    </>
+                  )}
+                </Button>
+              </div>
 
-            <span className="text-sm sm:text-base text-muted-foreground">Already have an account? </span>
-            <Link href="/login" className="text-sm sm:text-base text-primary font-semibold hover:underline transition-colors">
-              Log in
-            </Link>
-          </div>
+              <span className="text-sm sm:text-base text-muted-foreground">Already have an account? </span>
+              <Link href="/login" className="text-sm sm:text-base text-primary font-semibold hover:underline transition-colors">
+                Log in
+              </Link>
+            </div>
+          )}
+
+          {isAgentInvite && (
+            <div className="mt-6 text-center">
+              <span className="text-sm sm:text-base text-muted-foreground">Already have an account? </span>
+              <Link href="/login" className="text-sm sm:text-base text-primary font-semibold hover:underline transition-colors">
+                Log in
+              </Link>
+            </div>
+          )}
         </div>
 
         <p className="text-center text-xs sm:text-sm text-muted-foreground mt-6 sm:mt-8 px-4">
@@ -701,20 +841,20 @@ function SignupPageContent() {
         </p>
       </div>
 
-    <TokenInputDialog
-      open={showVerificationDialog}
-      onOpenChange={setShowVerificationDialog}
-      email={pendingEmail || formData.email.trim()}
-      verifyEndpoint="/api/verify-signup-token"
-      resendEndpoint="/api/send-signup-verification"
-      resendBody={() => ({
-        email: (pendingEmail || formData.email).trim(),
-        name: (formData.fullName.trim() || "there"),
-        businessType: formData.businessType || "freelancer",
-      })}
-      successMessage="Email verified! Completing your signup..."
-      onVerified={handleTokenVerified}
-    />
+      <TokenInputDialog
+        open={showVerificationDialog}
+        onOpenChange={setShowVerificationDialog}
+        email={pendingEmail || formData.email.trim()}
+        verifyEndpoint="/api/verify-signup-token"
+        resendEndpoint="/api/send-signup-verification"
+        resendBody={() => ({
+          email: (pendingEmail || formData.email).trim(),
+          name: (formData.fullName.trim() || "there"),
+          businessType: formData.businessType || "freelancer",
+        })}
+        successMessage="Email verified! Completing your signup..."
+        onVerified={handleTokenVerified}
+      />
 
       <GoogleBusinessTypeDialog
         open={showGoogleBusinessTypeDialog}
@@ -722,7 +862,6 @@ function SignupPageContent() {
         onSelect={handleGoogleBusinessTypeSelected}
       />
 
-      {/* Coming Soon Modal */}
       <Dialog open={showComingSoonModal} onOpenChange={setShowComingSoonModal}>
         <DialogContent className="w-[calc(100vw-2rem)] sm:w-full p-6 sm:p-8">
           <DialogHeader>

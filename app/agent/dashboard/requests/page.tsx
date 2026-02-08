@@ -107,14 +107,6 @@ export default function AgentRequestsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Filing Requests</h1>
-        <p className="text-sm sm:text-base text-muted-foreground">
-          Manage all your assigned filing requests
-        </p>
-      </div>
-
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
@@ -123,7 +115,7 @@ export default function AgentRequestsPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
-                  placeholder="Search by request ID, state, or RRR..."
+                  placeholder="Search by request ID, or state..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
