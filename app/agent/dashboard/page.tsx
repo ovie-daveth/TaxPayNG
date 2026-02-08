@@ -156,13 +156,6 @@ export default function AgentDashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Tax Consultant Dashboard</h1>
-        <p className="text-sm sm:text-base text-muted-foreground">
-          Welcome back, {profile?.firstName} {profile?.lastName}. Manage your clients and their tax filings.
-        </p>
-      </div>
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <Card>
