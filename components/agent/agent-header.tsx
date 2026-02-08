@@ -3,11 +3,23 @@
 import { usePathname } from "next/navigation"
 import { NotificationBell } from "../notifications/notification-bell"
 import { ThemeToggle } from "../theme-toggle"
+import { useUserProfile } from "@/lib/contexts/user-profile-context"
+import { useEffect } from "react"
 
+export function AgentHeader({sidebarCollapsed}: {sidebarCollapsed: boolean}) {
+  const pathname = usePathname()
+  const { profile, loading: profileLoading } = useUserProfile()
+  
+  useEffect(() => {
+    if (!profileLoading && profile?.businessType !== 'consultant') {
+      console.warn("User profile indicates business type is not consultant. This header is intended for consultants.")
+    }
+  }, [profile, profileLoading])
+  
 const AgentHeaderTitleMap: Record<string, { title: string; description: string }> = {
   "/agent/dashboard": {
     title: "Dashboard",
-    description: "Overview of your consultant activities"
+    description: `Welcome back, ${profile?.firstName} {profile?.lastName}. Manage your clients and their tax filings.`
   },
   "/agent/dashboard/portfolio": {
     title: "Portfolio",
@@ -34,9 +46,6 @@ const AgentHeaderTitleMap: Record<string, { title: string; description: string }
   description: "Manage consultation requests from clients"
 },
 }
-
-export function AgentHeader({sidebarCollapsed}: {sidebarCollapsed: boolean}) {
-  const pathname = usePathname()
   
   // Get the header data, checking for exact match or finding the closest match
   const getHeaderData = () => {
