@@ -142,6 +142,22 @@ export default function SettingsPage() {
       yearlyPriceDisplay: formatKobo(yearlyPrice)
     }
   }
+  const getPlanDescription = (planType: SubscriptionType): string => {
+    if (profile?.businessType === 'sme') {
+      if (planType === 'Small Business') {
+        return 'For businesses with annual turnover ≤ ₦50-100 million and fixed assets ≤ ₦250 million (excluding professional services). Qualifies for tax exemptions under NTA 2025.'
+      }
+      return 'For businesses with turnover above small business threshold, fixed assets exceeding ₦250 million, or providing professional services. Subject to full corporate tax regime.'
+    } else {
+      if (planType === 'PRO') {
+        return 'Perfect for tech freelancers, Virtual Assistants, copywriters, independent professionals and consultants who need to manage their taxes with ease'
+      }
+      if (planType === 'GOLD') {
+        return 'Ideal for content creators, influencers, digital creators and independent professionals & contractors managing multiple income streams'
+      }
+      return 'For individuals registered as BUSINESS NAMES with the Corporate Affairs Commission (CAC) in Nigeria'
+    }
+  }
 
   useEffect(() => {
     if (profileLoading || !profile) {
@@ -1064,10 +1080,7 @@ export default function SettingsPage() {
                                             })
                                             await fetch('/api/user/update-storage', {
                                               method: 'POST',
-                                              headers: {
-                                                'Content-Type': 'application/json',
-                                                'Authorization': `Bearer ${token}`
-                                              },
+                                              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
                                               body: JSON.stringify({ additionalBytes: -oldSize })
                                             })
                                           }
@@ -1334,7 +1347,7 @@ export default function SettingsPage() {
               </TabsContent>
 
               {/* Business Tab - Only show if not freelancer */}
-              {profile?.businessType !== 'freelancer' && (
+              {/* {profile?.businessType !== 'freelancer' && (
                 <TabsContent value="business" className="mt-0">
                   <Card className="p-4 sm:p-6 md:p-8">
                     <div className="mb-4 sm:mb-6">
@@ -1372,7 +1385,7 @@ export default function SettingsPage() {
               </div>
             </Card>
                 </TabsContent>
-              )}
+              )} */}
 
               {/* Subscription Tab */}
               <TabsContent value="subscription" className="mt-0">
@@ -1506,130 +1519,7 @@ export default function SettingsPage() {
                       </div>
                     )}
                     {(!isSubscribed || isExpired) ? (
-                      <div className="space-y-3 sm:space-y-4">
-                        <div className="p-4 sm:p-5 md:p-6 border rounded-lg bg-muted/50">
-                          <div className="mb-4 sm:mb-6">
-                            <h3 className="text-base sm:text-lg font-semibold mb-2">Choose a Subscription Plan</h3>
-                            <p className="text-xs sm:text-sm text-muted-foreground mb-4">
-                              Select a plan to unlock all features and start managing your taxes efficiently.
-                            </p>
-
-                            {/* Billing Interval Toggle */}
-                            <div className="flex items-center justify-center gap-3 mb-4 sm:mb-6 p-3 sm:p-4 bg-background rounded-lg border">
-                              <Label htmlFor="billing-toggle" className={`text-sm cursor-pointer ${billingInterval === 'monthly' ? 'font-semibold' : 'text-muted-foreground'}`}>
-                                Monthly
-                              </Label>
-                              <Switch
-                                id="billing-toggle"
-                                checked={billingInterval === 'yearly'}
-                                onCheckedChange={(checked) => setBillingInterval(checked ? 'yearly' : 'monthly')}
-                              />
-                              <Label htmlFor="billing-toggle" className={`text-sm cursor-pointer ${billingInterval === 'yearly' ? 'font-semibold' : 'text-muted-foreground'}`}>
-                                Yearly
-                              </Label>
-                              {billingInterval === 'yearly' && (
-                                <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-2 py-0.5 text-xs font-semibold ml-2">
-                                  Save {yearlyDiscountPercent}%
-                                </Badge>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className={`grid gap-3 sm:gap-4 ${!sidebarCollapsed ? 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'}`}>
-                            {(() => {
-                              const availablePlans = (['PRO', 'GOLD', 'PLATINUM'] as const)
-                              return availablePlans.map((planType) => {
-                                const plan = getPlanWithOverrides(planType)
-                                if (!plan) return null
-
-                                const isProcessing = processingSubscription === planType
-                                return (
-                                  <Card key={planType} className="p-4 sm:p-6 transition-all hover:border-primary">
-                                    <div className="space-y-3 sm:space-y-4">
-                                      <div className="flex items-start justify-between gap-3">
-                                        <div className="min-w-0">
-                                          <h4 className="text-base sm:text-lg font-semibold mb-1">{plan.name}</h4>
-                                          <div className="flex flex-wrap items-center gap-2">
-                                            {planType === 'PRO' && (
-                                              <Badge variant="secondary" className="text-xs">Basic</Badge>
-                                            )}
-                                            {planType === 'GOLD' && (
-                                              <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 text-xs">
-                                                Advanced
-                                              </Badge>
-                                            )}
-                                            {planType === 'PLATINUM' && (
-                                              <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200 text-xs">
-                                                Premium
-                                              </Badge>
-                                            )}
-                                          </div>
-                                        </div>
-                                      </div>
-
-                                      <div className="space-y-2">
-                                        {billingInterval === 'monthly' ? (
-                                          <>
-                                            <div className="flex items-baseline gap-2">
-                                              <span className="text-2xl sm:text-3xl font-bold">{plan.monthlyPriceDisplay}</span>
-                                            </div>
-                                            <span className="text-xs sm:text-sm text-muted-foreground">per month</span>
-                                          </>
-                                        ) : (
-                                          <>
-                                            <span className="text-xs font-medium text-muted-foreground line-through">
-                                              {(() => {
-                                                const grossYearly = (plan.monthlyPrice * 12) / 100
-                                                return `₦${grossYearly.toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
-                                              })()}
-                                            </span>
-                                            <div className="flex items-baseline gap-2">
-                                              <span className="text-2xl sm:text-3xl font-bold">{plan.yearlyPriceDisplay}</span>
-                                              <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 px-1.5 py-0.5 text-xs font-semibold">
-                                                {yearlyDiscountPercent}% OFF
-                                              </Badge>
-                                            </div>
-                                            <span className="text-xs sm:text-sm text-muted-foreground">per year</span>
-                                          </>
-                                        )}
-                                      </div>
-
-                                      <ul className="space-y-2 text-xs sm:text-sm">
-                                        {plan.features.slice(0, 4).map((feature, idx) => (
-                                          <li key={idx} className="flex items-start gap-2">
-                                            <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                                            <span className="text-muted-foreground">{feature}</span>
-                                          </li>
-                                        ))}
-                                        {plan.features.length > 4 && (
-                                          <li className="text-xs text-muted-foreground">
-                                            +{plan.features.length - 4} more features
-                                          </li>
-                                        )}
-                                      </ul>
-
-                                      <Button
-                                        className="w-full mt-4 sm:mt-6 text-xs sm:text-sm h-9 sm:h-10"
-                                        onClick={() => handleSubscribe(planType, billingInterval)}
-                                        disabled={isProcessing}
-                                      >
-                                        {isProcessing ? (
-                                          <>
-                                            <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-2 animate-spin" />
-                                            Processing...
-                                          </>
-                                        ) : (
-                                          "Subscribe"
-                                        )}
-                                      </Button>
-                                    </div>
-                                  </Card>
-                                )
-                              })
-                            })()}
-                          </div>
-                        </div>
-                      </div>
+                      <></>
                     ) : (
                       <div className="space-y-3 sm:space-y-4">
                         <div className="p-4 sm:p-5 md:p-6 border rounded-lg bg-muted/50">

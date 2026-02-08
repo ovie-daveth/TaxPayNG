@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Check, Loader2 } from "lucide-react"
+import { Check, Loader2, ChevronDown, ChevronUp } from "lucide-react"
 import { subscriptionService } from "@/lib/services/subscriptionService"
 import { SubscriptionType, BusinessType } from "@/lib/types"
 import { toast } from "sonner"
@@ -40,27 +40,19 @@ export function ChangePlanModal({
   const router = useRouter()
   const { pricingConfig } = usePricingConfig()
   const [internalBillingInterval, setInternalBillingInterval] = useState<'monthly' | 'yearly'>('monthly')
+  const [expandedPlans, setExpandedPlans] = useState<Set<SubscriptionType>>(new Set())
   
   // Use external billing interval if provided, otherwise use internal state
   const billingInterval = externalBillingInterval ?? internalBillingInterval
   const setBillingInterval = onBillingIntervalChange ?? setInternalBillingInterval
 
-  // Get plans based on business type
-  const getAvailablePlans = (): SubscriptionType[] => {
-    if (businessType === 'sme') {
-      return ['Small Business', 'Big Business']
-    } else {
-      // For freelancers, creators, and individuals
-      return ['PRO', 'GOLD', 'PLATINUM']
-    }
-  }
-
-  const availablePlans = getAvailablePlans()
   const yearlyDiscountPercent = pricingConfig?.yearlyDiscountPercent ?? DEFAULT_YEARLY_DISCOUNT_PERCENT
+  
   const format = (priceInKobo: number) => {
     const priceInNaira = priceInKobo / 100
     return `₦${priceInNaira.toLocaleString("en-NG", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`
   }
+
   const getPlanWithOverrides = (planType: SubscriptionType) => {
     const base = subscriptionService.getPlan(planType)
     if (!base) return null
@@ -78,6 +70,116 @@ export function ChangePlanModal({
       yearlyPriceDisplay: format(yearlyPrice)
     }
   }
+
+  // Get plans based on business type
+  const getAvailablePlans = (): SubscriptionType[] => {
+    if (businessType === 'sme') {
+      return ['Small Business', 'Big Business']
+    } else {
+      // For freelancers, creators, and individuals
+      return ['PRO', 'GOLD', 'PLATINUM']
+    }
+  }
+
+  const getPlanDescription = (planType: SubscriptionType): string => {
+    if (businessType === 'sme') {
+      if (planType === 'Small Business') {
+        return 'For businesses with annual turnover ≤ ₦50-100 million and fixed assets ≤ ₦250 million (excluding professional services). Qualifies for tax exemptions under NTA 2025.'
+      }
+      return 'For businesses with turnover above small business threshold, fixed assets exceeding ₦250 million, or providing professional services. Subject to full corporate tax regime.'
+    } else {
+      if (planType === 'PRO') {
+        return 'Perfect for tech freelancers, Virtual Assistants, copywriters, independent professionals and consultants who need to manage their taxes with ease'
+      }
+      if (planType === 'GOLD') {
+        return 'Ideal for content creators, influencers, digital creators and independent professionals & contractors managing multiple income streams'
+      }
+      return 'For individuals registered as BUSINESS NAMES with the Corporate Affairs Commission (CAC) in Nigeria'
+    }
+  }
+
+  const getPlanFeatures = (planType: SubscriptionType): Array<{ text: string; comingSoon?: boolean }> => {
+    if (businessType === 'sme') {
+      if (planType === 'Small Business') {
+        return [
+          { text: 'Track up to 5,000 transactions/month' },
+          { text: 'Advanced tax calculations' },
+          { text: 'Small business tax exemption tracking' },
+          { text: 'IRS/NRS filing (VAT filing, WHT filing, PIT filing etc)' },
+          { text: 'Business invoice management' },
+          { text: 'Proper book keeping and business accounting' },
+          { text: 'Employee management and simple payroll system' },
+          { text: 'Manage PAYE and remit', comingSoon: true },
+          { text: 'Document storage (15GB total)' },
+          { text: 'Receipt scanning & OCR' },
+          { text: 'SMS & email reminders' },
+          { text: 'Multi-user access (up to 5 users)', comingSoon: true },
+          { text: 'Basic analytics & insights' },
+          { text: 'Priority support' }
+        ]
+      }
+      // Big Business
+      return [
+        { text: 'Everything in Small Business' },
+        { text: 'Full corporate tax compliance' },
+        { text: 'Multi-user access (up to 10 users)', comingSoon: true },
+        { text: 'Advanced analytics & insights', comingSoon: true },
+        { text: 'Custom report templates' },
+        { text: 'Document storage (50GB total)' },
+        { text: 'API access', comingSoon: true },
+        { text: 'Dedicated account manager' },
+        { text: '24/7 priority support' },
+        { text: 'White-label options', comingSoon: true },
+        { text: 'Custom integrations', comingSoon: true }
+      ]
+    } else {
+      // Individuals
+      if (planType === 'PRO') {
+        return [
+          { text: 'Track up to 100 transactions/month' },
+          { text: 'Income & expense tracking' },
+          { text: 'Receipt scanning & OCR for automatic transaction tracking' },
+          { text: 'Automatic tax calculator with reliefs' },
+          { text: 'Self assessment and filing (IRS standard)' },
+          { text: 'Document storage (500MB total)' },
+          { text: 'Email reminders' },
+          { text: 'Email support' },
+          { text: 'Easy payment of tax directly using various government approved methods (e.g., Remita and Paystack)', comingSoon: true }
+        ]
+      }
+      if (planType === 'GOLD') {
+        return [
+          { text: 'Track up to 500 transactions/month' },
+          { text: 'All PRO features' },
+          { text: 'Multi-platform income tracking' },
+          { text: 'Sponsorship & brand deal management' },
+          { text: 'Simple invoice management' },
+          { text: 'Advanced tax calculations' },
+          { text: 'Document storage (2GB total)' },
+          { text: 'SMS & email reminders' },
+          { text: 'Priority support' },
+          { text: 'Expense categorization' },
+          { text: 'Receive local and international payments via invoicing', comingSoon: true }
+        ]
+      }
+      // PLATINUM
+      return [
+        { text: 'Everything in GOLD' },
+        { text: 'Multi-entity business management (ie operate multiple business account)' },
+        { text: 'Business analytics & insights' },
+        { text: 'Extensive Expense Management (expense focused tax calculation to reduce tax liability as a business)' },
+        { text: 'IRS/NRS filing (VAT filing, WHT filing, PIT filing etc)' },
+        { text: 'Document storage (10GB total)' },
+        { text: 'Multi-user access(up to 3 users)' },
+        { text: 'Dedicated tax advisor consultation' },
+        { text: 'Quarterly tax planning sessions' },
+        { text: '24/7 priority support' },
+        { text: 'API access for integrations', comingSoon: true }
+      ]
+    }
+  }
+
+  const availablePlans = getAvailablePlans()
 
   const handlePlanSelect = async (planType: SubscriptionType) => {
     // Migration (if needed) is handled by the parent settings page to avoid double-modals.
@@ -105,8 +207,19 @@ export function ChangePlanModal({
     return getPlanHierarchy(planType) > getPlanHierarchy(currentPlan)
   }
 
+  const togglePlanFeatures = (planType: SubscriptionType) => {
+    setExpandedPlans(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(planType)) {
+        newSet.delete(planType)
+      } else {
+        newSet.add(planType)
+      }
+      return newSet
+    })
+  }
+
   return (
-    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -149,6 +262,10 @@ export function ChangePlanModal({
             const upgrade = isUpgrade(planType)
             const isProcessing = processingPlan === planType
             const isBigBusiness = planType === 'Big Business' && businessType === 'sme'
+            const isExpanded = expandedPlans.has(planType)
+            const features = getPlanFeatures(planType)
+            const initialFeaturesCount = 5
+            const hasMoreFeatures = features.length > initialFeaturesCount
 
             return (
               <Card 
@@ -193,15 +310,7 @@ export function ChangePlanModal({
                     )}
                   </div>
                   <CardDescription>
-                    {businessType === 'sme' 
-                      ? planType === 'Small Business' 
-                        ? 'For businesses with annual turnover ≤ ₦50-100 million'
-                        : 'For businesses with turnover above small business threshold'
-                      : planType === 'PRO'
-                        ? 'Perfect for tech freelancers, VAs, copywriters, and independent professionals'
-                        : planType === 'GOLD'
-                        ? 'Ideal for content creators, influencers, and digital creators managing multiple income streams'
-                        : 'For established creators, individuals with complex tax situations, business owner (not Limited Liability Company), and team collaborations'}
+                    {getPlanDescription(planType)}
                   </CardDescription>
                   <div className="mt-4">
                     {billingInterval === 'monthly' ? (
@@ -232,19 +341,42 @@ export function ChangePlanModal({
                 </CardHeader>
                 <CardContent className="flex-1">
                   <ul className="space-y-2">
-                    {plan.features.slice(0, 5).map((feature, idx) => (
+                    {(isExpanded ? features : features.slice(0, initialFeaturesCount)).map((feature, idx) => (
                       <li key={idx} className="flex items-start gap-2 text-sm">
                         <Check className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                        <span>{feature}</span>
+                        <span className={feature.comingSoon ? 'opacity-70' : ''}>
+                          {feature.text}
+                          {feature.comingSoon && (
+                            <span className="ml-1.5 text-[10px] bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400 px-1.5 py-0.5 rounded-full font-medium">
+                              Coming Soon
+                            </span>
+                          )}
+                        </span>
                       </li>
                     ))}
-                    {plan.features.length > 5 && (
-                      <li className="text-xs text-muted-foreground">
-                        +{plan.features.length - 5} more features
+                    {hasMoreFeatures && (
+                      <li>
+                        <button
+                          onClick={() => togglePlanFeatures(planType)}
+                          className="text-xs text-primary hover:text-primary/80 font-medium flex items-center gap-1 transition-colors mt-1"
+                        >
+                          {isExpanded ? (
+                            <>
+                              <ChevronUp className="w-3 h-3" />
+                              Show less
+                            </>
+                          ) : (
+                            <>
+                              <ChevronDown className="w-3 h-3" />
+                              +{features.length - initialFeaturesCount} more features
+                            </>
+                          )}
+                        </button>
                       </li>
                     )}
                   </ul>
                 </CardContent>
+
                 <CardFooter>
                   <Button
                     className="w-full"
@@ -285,7 +417,6 @@ export function ChangePlanModal({
         </div>
       </DialogContent>
     </Dialog>
-    </>
   )
 }
 

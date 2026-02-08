@@ -27,7 +27,7 @@ export function MigrateToCreatorModal({
     try {
       await onConfirm()
       // Close modal silently - migration happens in background
-      onOpenChange(false)
+      // onOpenChange(false)
     } catch (error) {
       console.error("Migration error:", error)
       toast.error(error instanceof Error ? error.message : "Failed to migrate account")
@@ -45,13 +45,13 @@ export function MigrateToCreatorModal({
         <DialogHeader className="p-0">
           <div className="flex flex-col items-center text-center">
             <DialogTitle className="text-base sm:text-lg md:text-xl flex items-center gap-2 justify-center">
-              Migrate to Creator Account
+              Migrate to an Advanced Account
               <div className="w-6 h-6 sm:w-8 sm:h-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
                 <Sparkles className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
               </div>
             </DialogTitle>
             <DialogDescription className="text-xs sm:text-sm mt-0.5 sm:mt-1">
-              Upgrade your account type to access creator plans
+              Upgrade your account type to access Advanced plans
             </DialogDescription>
           </div>
         </DialogHeader>
@@ -62,10 +62,10 @@ export function MigrateToCreatorModal({
               <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500 shrink-0 mt-0.5" />
               <div className="space-y-1.5 sm:space-y-2 min-w-0 flex-1">
                 <p className="text-xs sm:text-sm font-medium">
-                  You're about to migrate from a <strong>Freelancer</strong> account to a <strong>Creator</strong> account.
+                  You're about to migrate your account to a <strong>{planName}</strong> Plan.
                 </p>
                 <p className="text-[10px] sm:text-xs text-muted-foreground">
-                  The {planName} plan is designed for content creators and influencers. By continuing, you'll proceed to payment. Your account type will be changed to "Creator" <strong>only after successful payment</strong>, and you'll be redirected to the Creator Dashboard.
+                  The {planName} plan is designed for {planName === 'GOLD' ? 'content creators, influencers, digital creators and independent professionals & contractors managing multiple income streams' : 'individuals registered as BUSINESS NAMES with the Corporate Affairs Commission (CAC) in Nigeria'}. It offers features tailored to your needs, such as advanced tax tracking, business expense management, and priority support.
                 </p>
               </div>
             </div>
@@ -74,9 +74,9 @@ export function MigrateToCreatorModal({
           <div className="space-y-1.5 sm:space-y-2">
             <p className="text-xs sm:text-sm font-medium">What this means:</p>
             <ul className="space-y-1 sm:space-y-1.5 text-[10px] sm:text-xs text-muted-foreground list-disc list-inside">
-              <li>Your dashboard will switch to the Creator Dashboard</li>
-              <li>You'll have access to creator-specific features</li>
-              <li>Your account type will be changed to "Creator" after successful payment</li>
+              <li>Your dashboard will switch to the {planName} Dashboard</li>
+              <li>You'll have access to {planName}-specific features</li>
+              {/* <li>Your account type will be changed to "{planName === 'GOLD' ? 'advanced' : 'Business'}" after successful payment</li> */}
               <li>You can still access all your existing data</li>
             </ul>
           </div>
