@@ -80,7 +80,7 @@ export default function AgentRequestsPage() {
     const Icon = config.icon
     
     return (
-      <Badge variant={config.variant} className="flex items-center gap-1">
+      <Badge variant={config.variant} className="flex items-center gap-1 h-8 p-3 w-fit">
         <Icon className="w-3 h-3" />
         {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
       </Badge>
@@ -110,30 +110,32 @@ export default function AgentRequestsPage() {
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1">
+          <div className="flex flex-row gap-4">
+            <div className="md:flex-1 w-1/2">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
                   placeholder="Search by request ID, or state..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 text-xs sm:text-sm"
                 />
               </div>
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <div className="w-1/2 md:w-auto"> 
+              <Select  value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full md:w-[200px]">
-                <SelectValue placeholder="Filter by status" />
+                <SelectValue  className="text-xs sm:text-sm" placeholder="Filter by status" />
               </SelectTrigger>
-              <SelectContent>
+              <SelectContent className="text-xs sm:text-sm">
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="assigned">Assigned</SelectItem>
                 <SelectItem value="in_progress">In Progress</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
               </SelectContent>
-            </Select>
+            </Select> 
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -161,9 +163,9 @@ export default function AgentRequestsPage() {
                     <tr className="border-b">
                       <th className="text-left p-4 font-semibold text-sm">Request ID</th>
                       <th className="text-left p-4 font-semibold text-sm">State</th>
-                      <th className="text-left p-4 font-semibold text-sm">RRR</th>
+                      {/* <th className="text-left p-4 font-semibold text-sm">RRR</th> */}
                       <th className="text-left p-4 font-semibold text-sm">Status</th>
-                      <th className="text-left p-4 font-semibold text-sm">Documents</th>
+                      {/* <th className="text-left p-4 font-semibold text-sm">Documents</th> */}
                       <th className="text-left p-4 font-semibold text-sm">Created</th>
                       <th className="text-left p-4 font-semibold text-sm">Actions</th>
                     </tr>
@@ -180,15 +182,15 @@ export default function AgentRequestsPage() {
                             <span className="text-sm">{request.state}</span>
                           </div>
                         </td>
-                        <td className="p-4">
+                        {/* <td className="p-4">
                           <code className="text-xs font-mono">{request.rrr}</code>
-                        </td>
+                        </td> */}
                         <td className="p-4">
                           {getStatusBadge(request.status)}
                         </td>
-                        <td className="p-4">
+                        {/* <td className="p-4">
                           <span className="text-sm">{request.supportingDocuments?.length || 0} doc(s)</span>
-                        </td>
+                        </td> */}
                         <td className="p-4">
                           <div className="flex items-center gap-2 text-sm text-muted-foreground">
                             <Calendar className="w-4 h-4" />
@@ -231,9 +233,9 @@ export default function AgentRequestsPage() {
                               <MapPin className="w-4 h-4" />
                               <span>{request.state}</span>
                             </div>
-                            <div className="text-xs text-muted-foreground">
+                            {/* <div className="text-xs text-muted-foreground">
                               <code>RRR: {request.rrr}</code>
-                            </div>
+                            </div> */}
                           </div>
                         </div>
                         

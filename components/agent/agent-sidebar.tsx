@@ -156,7 +156,7 @@ export function AgentSidebar() {
         </div>
       </aside>
 
-      {/* Mobile Menu Button */}
+      {/* Mobile Menu Button
       <div className="md:hidden fixed top-4 left-4 z-50">
         <Button
           variant="outline"
@@ -166,7 +166,7 @@ export function AgentSidebar() {
         >
           {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </Button>
-      </div>
+      </div> */}
 
       {/* Mobile Sidebar */}
       {mobileMenuOpen && (

@@ -113,24 +113,6 @@ export default function FilingRequestsPage() {
         <main className="px-3 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
           <div className="space-y-4 sm:space-y-6">
         
-      {/* Header with File Tax Button */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-start sm:items-center justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold">Filing Requests</h1>
-          <p className="text-xs sm:text-sm text-muted-foreground mt-1">
-            Track your tax filing requests and their status
-          </p>
-        </div>
-        <Button
-          size="lg"
-          onClick={() => setShowOneTimeFilingModal(true)}
-          className="w-full sm:w-auto"
-        >
-          <FileText className="w-4 h-4 mr-2" />
-          File Tax Return
-        </Button>
-      </div>
-        
       {/* Search */}
       <Card className="p-3 sm:p-4 md:p-5 lg:p-6">
         <div className="relative">

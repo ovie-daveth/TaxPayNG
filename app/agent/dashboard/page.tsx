@@ -116,7 +116,7 @@ export default function AgentDashboardPage() {
     const Icon = config.icon
     
     return (
-      <Badge variant={config.variant} className="flex items-center gap-1">
+      <Badge variant={config.variant} className="flex items-center gap-1 h-6 px-2">
         <Icon className="w-3 h-3" />
         {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
       </Badge>
@@ -157,7 +157,7 @@ export default function AgentDashboardPage() {
   return (
     <div className="space-y-6">
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -228,68 +228,120 @@ export default function AgentDashboardPage() {
             </div>
           </CardHeader>
           <CardContent>
-            {filteredRequests.length === 0 ? (
-              <div className="text-center py-12 text-muted-foreground">
-                <ClipboardList className="w-12 h-12 mx-auto mb-4 opacity-50" />
-                <p>No filing requests assigned to you yet</p>
-                <p className="text-sm mt-2">New requests will appear here once assigned</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredRequests.slice(0, 5).map((request) => (
-                  <div
-                    key={request.id}
-                    className="border rounded-lg p-3 sm:p-4 hover:bg-muted/50 transition-colors cursor-pointer"
-                        onClick={() => router.push(`/consultant/dashboard/requests/${request.id}`)}
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-2">
+            <div className="space-y-3">
+              {filteredRequests.slice(0, 5).map((request) => (
+                <Card
+                  key={request.id}
+                  className="group hover:shadow-md transition-all duration-200 cursor-pointer border-l-4 border-l-transparent hover:border-l-primary"
+                  onClick={() => router.push(`/consultant/dashboard/requests/${request.id}`)}
+                >
+                  <CardContent className="p-4">
+                    {/* Header Section */}
+                    <div className="flex items-start justify-between gap-3 mb-3">
+                      <div className="flex-1 min-w-0 space-y-2">
+                        {/* Status and ID */}
+                        <div className="flex flex-wrap items-center gap-2">
                           {getStatusBadge(request.status)}
-                          <code className="text-xs font-mono text-muted-foreground truncate">
-                            {request.id.substring(0, 12)}...
-                          </code>
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <span className="hidden sm:inline">ID:</span>
+                            <code className="font-mono bg-muted px-2 py-0.5 rounded">
+                              {request.id.substring(0, 8)}
+                            </code>
+                          </div>
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3 sm:w-4 sm:h-4" />
-                            <span className="truncate">{request.state}</span>
+
+                        {/* Request Details */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                          {/* Location */}
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-muted/50">
+                              <MapPin className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-muted-foreground/70 uppercase tracking-wide">State</p>
+                              <p className="font-medium text-foreground truncate">{request.state}</p>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <Calendar className="w-3 h-3 sm:w-4 sm:h-4" />
-                            <span className="whitespace-nowrap">{format(new Date(request.createdAt), 'MMM dd, yyyy')}</span>
+
+                          {/* Date */}
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-muted/50">
+                              <Calendar className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-muted-foreground/70 uppercase tracking-wide">Submitted</p>
+                              <p className="font-medium text-foreground whitespace-nowrap">
+                                {format(new Date(request.createdAt), 'MMM dd, yyyy')}
+                              </p>
+                            </div>
                           </div>
-                          <span className="whitespace-nowrap">{request.supportingDocuments?.length || 0} document(s)</span>
+
+                          {/* Documents Count */}
+                          <div className="flex items-center gap-2 text-muted-foreground sm:col-span-2">
+                            <div className="flex items-center justify-center w-7 h-7 rounded-full bg-muted/50">
+                              <FileText className="w-3.5 h-3.5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-muted-foreground/70 uppercase tracking-wide">Documents</p>
+                              <p className="font-medium text-foreground">
+                                {request.supportingDocuments?.length || 0} file{request.supportingDocuments?.length !== 1 ? 's' : ''}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       </div>
+
+                      {/* Action Button - Desktop */}
                       <Button
                         size="sm"
                         variant="ghost"
-                        className="w-full sm:w-auto"
+                        className="hidden sm:flex items-center gap-2 group-hover:bg-primary group-hover:text-primary-foreground transition-colors shrink-0"
                         onClick={(e) => {
                           e.stopPropagation()
                           router.push(`/consultant/dashboard/requests/${request.id}`)
                         }}
                       >
-                        <FileText className="w-4 h-4 sm:mr-2" />
-                        <span className="hidden sm:inline">View</span>
+                        <span>View Details</span>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
                       </Button>
                     </div>
-                  </div>
-                ))}
-                {filteredRequests.length > 5 && (
-                  <div className="text-center pt-4">
+
+                    {/* Action Button - Mobile (Full Width) */}
                     <Button
-                      variant="outline"
                       size="sm"
-                      onClick={() => router.push('/consultant/dashboard/requests')}
+                      variant="outline"
+                      className="w-full sm:hidden mt-3 group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-colors"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        router.push(`/consultant/dashboard/requests/${request.id}`)
+                      }}
                     >
-                      View All {filteredRequests.length} Requests
+                      <FileText className="w-4 h-4 mr-2" />
+                      View Request Details
                     </Button>
-                  </div>
-                )}
-              </div>
-            )}
+                  </CardContent>
+                </Card>
+              ))}
+
+              {/* View All Button */}
+              {filteredRequests.length > 5 && (
+                <div className="pt-2">
+                  <Button
+                    variant="outline"
+                    className="w-full sm:w-auto sm:mx-auto sm:block hover:bg-primary hover:text-primary-foreground transition-colors"
+                    onClick={() => router.push('/consultant/dashboard/requests')}
+                  >
+                    <ClipboardList className="w-4 h-4 mr-2" />
+                    View All {filteredRequests.length} Requests
+                    <svg className="w-4 h-4 ml-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Button>
+                </div>
+              )}
+            </div>
           </CardContent>
         </Card>
     </div>

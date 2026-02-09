@@ -261,7 +261,7 @@ export default function ConsultantClientsPage() {
           placeholder="Search clients by name, email, or TIN..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
+          className="pl-10 text-xs sm:text-sm"
         />
       </div>
 
