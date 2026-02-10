@@ -30,10 +30,10 @@ import { reportService } from "@/lib/services"
 import { documentService } from "@/lib/services"
 import { SelfAssessmentPreview } from "@/components/reports/self-assessment-preview"
 import { StatusUpdateDialog } from "@/components/agent/status-update-dialog"
-import { MessagePanel } from "@/components/agent/message-panel"
 import { uploadToImageKit, ImageUploadResult } from "@/lib/utils/imagekit"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { MessageModal } from "@/components/agent/message-panel"
 
 export default function AgentRequestDetailPage() {
   const router = useRouter()
@@ -53,6 +53,10 @@ export default function AgentRequestDetailPage() {
     if (!authLoading && !profileLoading) {
       if (!user) {
         router.push('/login')
+        return
+      }
+      if(!profile) {
+        router.refresh()
         return
       }
       if (profile?.businessType !== 'consultant') {
@@ -175,24 +179,61 @@ export default function AgentRequestDetailPage() {
         }
       }
 
-      // Fetch supporting documents
+      // Fetch supporting documents - UPDATED LOGIC
       if (filingRequest.supportingDocuments && filingRequest.supportingDocuments.length > 0) {
         try {
-          const docPromises = filingRequest.supportingDocuments.map(async (docId) => {
-            try {
-              return await documentService.getById(docId)
-            } catch (error) {
-              console.error(`Error loading document ${docId}:`, error)
-              return null
-            }
-          })
+          console.log("Loading supporting documents:", filingRequest.supportingDocuments)
           
-          const loadedDocs = await Promise.all(docPromises)
-          setDocuments(loadedDocs.filter((doc): doc is Document => doc !== null))
+          // Check if supportingDocuments contains document objects or just IDs/URLs
+          const firstDoc = filingRequest.supportingDocuments[0]
+          
+          if (typeof firstDoc === 'object' && firstDoc !== null && 'url' in firstDoc) {
+            // Documents are already objects with url, name, type
+            const formattedDocs = filingRequest.supportingDocuments.map((doc: any) => ({
+              id: doc.id || doc.url, // Use URL as fallback ID
+              name: doc.name || 'Document',
+              originalName: doc.name || 'Document',
+              type: doc.type || 'Document',
+              url: doc.url,
+              size: doc.size,
+              createdAt: filingRequest.createdAt,
+              userId: filingRequest.userId,
+              fileType: doc.type || 'Document',
+              mimeType: doc.mimeType || 'application/octet-stream',
+              uploadedAt: filingRequest.createdAt,
+              updatedAt: filingRequest.createdAt
+            }))
+            setDocuments(formattedDocs)
+          } else if (typeof firstDoc === 'string') {
+            // Documents are IDs - try to fetch them
+            const docPromises = filingRequest.supportingDocuments.map(async (docId: string) => {
+              try {
+                return await documentService.getById(docId)
+              } catch (error) {
+                console.error(`Error loading document ${docId}:`, error)
+                // If document fetch fails, create a basic document object with the ID as URL
+                return {
+                  id: docId,
+                  name: 'Document',
+                  originalName: 'Document',
+                  type: 'Document',
+                  url: docId, // Use docId as URL (might be a URL string)
+                  userId: filingRequest.userId,
+                  createdAt: filingRequest.createdAt
+                } as unknown as Document
+              }
+            })
+            
+            const loadedDocs = await Promise.all(docPromises)
+            setDocuments(loadedDocs.filter((doc): doc is Document => doc !== null))
+          }
         } catch (error) {
           console.error("Error loading documents:", error)
           toast.error("Failed to load some documents")
         }
+      } else {
+        // Clear documents if none exist
+        setDocuments([])
       }
     } catch (error) {
       console.error("Error loading request details:", error)
@@ -310,7 +351,7 @@ export default function AgentRequestDetailPage() {
     const Icon = config.icon
     
     return (
-      <Badge variant={config.variant} className="flex items-center gap-1">
+      <Badge variant={config.variant} className="flex items-center gap-1 h-8 p-3 w-fit">
         <Icon className="w-3 h-3" />
         {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
       </Badge>
@@ -375,7 +416,7 @@ export default function AgentRequestDetailPage() {
   return (
     <div className="space-y-6">
       {/* Header - Hidden when printing */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 print:hidden">
+      <div className="flex flex-row items-center justify-between gap-3 sm:gap-4 print:hidden">
         <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
           <Button
             variant="ghost"
@@ -391,10 +432,10 @@ export default function AgentRequestDetailPage() {
             </p>
           </div>
         </div>
-        <Button onClick={handlePrint} size="sm" className="w-full sm:w-auto print:hidden">
+        {/* <Button onClick={handlePrint} size="sm" className="w-28 print:hidden">
           <Printer className="w-4 h-4 mr-2" />
           Print All
-        </Button>
+        </Button> */}
       </div>
 
       {/* Request Summary - Hidden when printing */}
@@ -434,14 +475,14 @@ export default function AgentRequestDetailPage() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        {/* <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">RRR</CardTitle>
           </CardHeader>
           <CardContent>
             <code className="text-sm font-mono">{request.rrr}</code>
           </CardContent>
-        </Card>
+        </Card> */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">Created</CardTitle>
@@ -457,7 +498,7 @@ export default function AgentRequestDetailPage() {
 
       {/* Self-Assessment Report */}
       {report && report.reportData && (
-        <Card className="mb-6">
+        <Card className="mb-6 relative">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="w-5 h-5" />
@@ -468,7 +509,7 @@ export default function AgentRequestDetailPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="border rounded-lg p-4 bg-muted/30">
+            <div className="">
               <SelfAssessmentPreview
                 reportData={report.reportData}
                 showFileButton={false}
@@ -511,30 +552,27 @@ export default function AgentRequestDetailPage() {
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
-                      size="sm"
-                      className="flex-1 sm:flex-none"
+                      size="icon"
+                      className="h-9 w-9 flex-shrink-0"
                       onClick={() => window.open(request.completedDocumentUrl, '_blank')}
+                      title="View document"
                     >
-                      <ExternalLink className="w-4 h-4 sm:mr-2" />
-                      <span className="hidden sm:inline">View</span>
+                      <ExternalLink className="w-4 h-4" />
                     </Button>
                     <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 sm:flex-none"
+                      variant="default"
+                      size="icon"
+                      className="h-9 w-9 flex-shrink-0"
                       onClick={async () => {
                         try {
-                          // Fetch the file as a blob
                           const response = await fetch(request.completedDocumentUrl!)
                           if (!response.ok) {
                             throw new Error('Failed to fetch document')
                           }
                           const blob = await response.blob()
-                          
-                          // Create a blob URL and trigger download
                           const blobUrl = window.URL.createObjectURL(blob)
                           const link = document.createElement('a')
                           link.href = blobUrl
@@ -542,8 +580,6 @@ export default function AgentRequestDetailPage() {
                           document.body.appendChild(link)
                           link.click()
                           document.body.removeChild(link)
-                          
-                          // Clean up the blob URL
                           window.URL.revokeObjectURL(blobUrl)
                           toast.success('Download started')
                         } catch (error) {
@@ -551,9 +587,9 @@ export default function AgentRequestDetailPage() {
                           toast.error('Failed to download document. Please try viewing it instead.')
                         }
                       }}
+                      title="Download document"
                     >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download
+                      <Download className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>
@@ -588,67 +624,83 @@ export default function AgentRequestDetailPage() {
 
       {/* Supporting Documents */}
       <Card className="mb-6">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="w-5 h-5" />
-            Supporting Documents
-          </CardTitle>
-          <CardDescription>
-            {documents.length} document{documents.length !== 1 ? 's' : ''} attached
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-base sm:text-lg flex items-center gap-2">
+              <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+              Supporting Documents
+            </CardTitle>
+            <Badge variant="secondary" className="text-xs">
+              {documents.length}
+            </Badge>
+          </div>
+          <CardDescription className="text-xs sm:text-sm">
+            Documents provided by client
           </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-3 sm:px-6">
           {documents.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <FileText className="w-12 h-12 mx-auto mb-4 opacity-50" />
-              <p>No documents attached</p>
+            <div className="text-center py-8 sm:py-12 text-muted-foreground">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-3 sm:mb-4 rounded-full bg-muted/50 flex items-center justify-center">
+                <FileText className="w-8 h-8 sm:w-10 sm:h-10 opacity-50" />
+              </div>
+              <p className="text-sm sm:text-base font-medium">No documents attached</p>
+              <p className="text-xs sm:text-sm mt-1">Client hasn't uploaded any supporting documents</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {documents.map((doc) => (
+            <div className="space-y-2 sm:space-y-3">
+              {documents.map((doc, index) => (
                 <div
                   key={doc.id}
-                  className="border rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 hover:bg-muted/50 transition-colors"
+                  className="group border rounded-lg overflow-hidden hover:shadow-md transition-all bg-card"
                 >
-                  <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 w-full sm:w-auto">
-                    <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <FileText className="w-5 h-5 text-primary" />
+                  {/* Document Header */}
+                  <div className="p-3 sm:p-4 flex items-start gap-3">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm sm:text-base truncate">{doc.name || doc.originalName || 'Document'}</h4>
-                      <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs sm:text-sm text-muted-foreground mt-1">
-                        <span>{doc.type}</span>
-                        {doc.size && <span>{formatFileSize(doc.size)}</span>}
+                      <h4 className="font-medium text-sm sm:text-base line-clamp-2 mb-1">
+                        {(doc.name || doc.originalName).slice(0, 20) + "..." || 'Document'}
+                      </h4>
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <span className="inline-flex items-center gap-1 bg-muted/50 px-2 py-0.5 rounded-full">
+                          {doc.type}
+                        </span>
+                        {doc.size && (
+                          <span className="inline-flex items-center gap-1">
+                            • {formatFileSize(doc.size)}
+                          </span>
+                        )}
                         {doc.createdAt && (
-                          <span>{format(new Date(doc.createdAt), 'MMM dd, yyyy')}</span>
+                          <span className="inline-flex items-center gap-1">
+                            • {format(new Date(doc.createdAt), 'MMM dd')}
+                          </span>
                         )}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
+
+                  {/* Action Buttons */}
+                  <div className="px-3 pb-3 sm:px-4 sm:pb-4 flex gap-2">
                     <Button
                       variant="outline"
-                      size="sm"
-                      className="flex-1 sm:flex-none"
+                      size="icon"
+                      className="h-6 w-6 flex-shrink-0"
                       onClick={() => window.open(doc.url, '_blank')}
+                      title="View document"
                     >
-                      <ExternalLink className="w-4 h-4 sm:mr-2" />
-                      <span className="hidden sm:inline">View</span>
+                      <ExternalLink className="w-3 h-3" />
                     </Button>
                     <Button
-                      variant="outline"
-                      size="sm"
-                      className="flex-1 sm:flex-none"
+                      variant="default"
+                      size="icon"
+                      className="h-6 w-6 flex-shrink-0"
                       onClick={async () => {
                         try {
-                          // Fetch the file as a blob
                           const response = await fetch(doc.url)
-                          if (!response.ok) {
-                            throw new Error('Failed to fetch document')
-                          }
+                          if (!response.ok) throw new Error('Failed to fetch document')
                           const blob = await response.blob()
-                          
-                          // Create a blob URL and trigger download
                           const blobUrl = window.URL.createObjectURL(blob)
                           const link = document.createElement('a')
                           link.href = blobUrl
@@ -656,18 +708,16 @@ export default function AgentRequestDetailPage() {
                           document.body.appendChild(link)
                           link.click()
                           document.body.removeChild(link)
-                          
-                          // Clean up the blob URL
                           window.URL.revokeObjectURL(blobUrl)
                           toast.success('Download started')
                         } catch (error) {
                           console.error('Error downloading document:', error)
-                          toast.error('Failed to download document. Please try viewing it instead.')
+                          toast.error('Failed to download document')
                         }
                       }}
+                      title="Download document"
                     >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download
+                      <Download className="w-3 h-3" />
                     </Button>
                   </div>
                 </div>
@@ -689,7 +739,7 @@ export default function AgentRequestDetailPage() {
 
       {/* Messages Panel */}
       <div id="messages">
-        <MessagePanel requestId={requestId} userType="agent" />
+        <MessageModal requestId={requestId} userType="agent" />
       </div>
 
       {/* Print Footer - Only visible when printing */}

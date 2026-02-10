@@ -234,7 +234,7 @@ export default function AgentPaymentsPage() {
   return (
     <div className="space-y-6">
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Earnings</CardTitle>
@@ -311,7 +311,8 @@ export default function AgentPaymentsPage() {
                 />
               </div>
             </div>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <div className="flex items-center gap-4">
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger className="w-full md:w-[180px]">
                 <SelectValue placeholder="Filter by type" />
               </SelectTrigger>
@@ -332,6 +333,7 @@ export default function AgentPaymentsPage() {
                 <SelectItem value="failed">Failed</SelectItem>
               </SelectContent>
             </Select>
+            </div>
           </div>
         </CardContent>
       </Card>

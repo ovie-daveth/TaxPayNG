@@ -1,6 +1,6 @@
 "use client"
 
-import { use, useState, useEffect } from "react"
+import { use, useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -25,14 +25,17 @@ import {
   CheckCircle
 } from "lucide-react"
 import { FilingRequest } from "@/lib/types"
+import { MessageModal } from "@/components/agent/message-panel"
 
 export default function FilingRequestDetailPage({ params }: { params: Promise<{ requestId: string }> }) {
   const { requestId } = use(params)
   const router = useRouter()
   const { user } = useAuth()
   const [request, setRequest] = useState<FilingRequest | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [initialLoad, setInitialLoad] = useState(false)
   const [previewDocument, setPreviewDocument] = useState<{ url: string; name: string } | null>(null)
+  const previousStatusRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (user?.uid) {
@@ -40,16 +43,55 @@ export default function FilingRequestDetailPage({ params }: { params: Promise<{ 
     }
   }, [user?.uid, requestId])
 
-  const loadFilingRequest = async () => {
+  // Scroll to messages section if hash is present
+  useEffect(() => {
+    if (!initialLoad && window.location.hash === '#messages') {
+      const messagesSection = document.getElementById('messages')
+      if (messagesSection) {
+        messagesSection.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      }
+    }
+  }, [requestId, initialLoad])
+
+  const loadFilingRequest = async (showLoading = false) => {
     if (!user?.uid) return
 
     try {
-      setLoading(true)
+      // if (showLoading) {
+      //   setLoading(true)
+      // }
       const response = await fetch(`/api/filing-requests/${requestId}?userId=${user.uid}`)
       const result = await response.json()
 
       if (result.success) {
+        const previousStatus = previousStatusRef.current
+        const newStatus = result.data.status
+
+        // Show toast notification if status changed (and it's not the initial load)
+        if (!initialLoad && previousStatus && previousStatus !== newStatus) {
+          let message = ''
+          switch (newStatus) {
+            case 'assigned':
+              message = 'An agent has been assigned to your request!'
+              break
+            case 'in_progress':
+              message = 'Your filing request is now in progress'
+              break
+            case 'completed':
+              message = 'Your filing request has been completed!'
+              break
+            case 'cancelled':
+              message = 'Your filing request has been cancelled'
+              break
+          }
+          if (message) {
+            toast.success(message)
+          }
+        }
+
+        previousStatusRef.current = newStatus
         setRequest(result.data)
+        setInitialLoad(false)
       } else {
         toast.error(result.error || "Failed to load filing request")
       }
@@ -57,7 +99,9 @@ export default function FilingRequestDetailPage({ params }: { params: Promise<{ 
       console.error("Error loading filing request:", error)
       toast.error("Failed to load filing request")
     } finally {
-      setLoading(false)
+      if (showLoading) {
+        setLoading(false)
+      }
     }
   }
 
@@ -79,6 +123,23 @@ export default function FilingRequestDetailPage({ params }: { params: Promise<{ 
         {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
       </Badge>
     )
+  }
+
+  const getStatusMessage = (status: FilingRequest['status']) => {
+    switch (status) {
+      case 'pending':
+        return 'Your filing request has been submitted and is awaiting assignment to an agent.'
+      case 'assigned':
+        return 'An agent has been assigned to your request and will begin processing soon.'
+      case 'in_progress':
+        return 'Your filing is currently being processed by our team.'
+      case 'completed':
+        return 'Your filing has been completed successfully!'
+      case 'cancelled':
+        return 'This filing request has been cancelled.'
+      default:
+        return ''
+    }
   }
 
   if (loading) {
@@ -130,6 +191,27 @@ export default function FilingRequestDetailPage({ params }: { params: Promise<{ 
               Back
             </Button>
           </div>
+
+          {/* Status Alert */}
+          <Card className="bg-muted/50">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-3">
+                {request.status === 'pending' && <Clock className="w-5 h-5 text-yellow-600 mt-0.5" />}
+                {request.status === 'assigned' && <User className="w-5 h-5 text-blue-600 mt-0.5" />}
+                {request.status === 'in_progress' && <Loader2 className="w-5 h-5 text-blue-600 mt-0.5 animate-spin" />}
+                {request.status === 'completed' && <CheckCircle2 className="w-5 h-5 text-green-600 mt-0.5" />}
+                {request.status === 'cancelled' && <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />}
+                <div>
+                  <p className="font-medium">{getStatusMessage(request.status)}</p>
+                  {request.status === 'pending' && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      We'll notify you once an agent is assigned.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Status Card */}
           <Card>
@@ -229,7 +311,7 @@ export default function FilingRequestDetailPage({ params }: { params: Promise<{ 
                   <div className="space-y-3">
                     <h3 className="font-semibold flex items-center gap-2">
                       <MessageSquare className="w-4 h-4" />
-                      Notes / Messages
+                      Initial Notes
                     </h3>
                     <Card className="bg-muted/50">
                       <CardContent className="p-4">
@@ -295,6 +377,13 @@ export default function FilingRequestDetailPage({ params }: { params: Promise<{ 
               )}
             </CardContent>
           </Card>
+
+          {/* Messages Panel - Only show if agent is assigned */}
+          {request.assignedAgentId && (
+            <div id="messages">
+              <MessageModal requestId={requestId} userType="client" />
+            </div>
+          )}
 
           {/* Status Timeline */}
           <Card>
