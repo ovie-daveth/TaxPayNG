@@ -9,6 +9,7 @@ import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { toast } from "sonner"
 import { format } from "date-fns"
+import { Separator } from "@/components/ui/separator"
 import { 
   Loader2, 
   ArrowLeft, 
@@ -23,11 +24,17 @@ import {
   ExternalLink,
   MessageSquare,
   Edit,
-  Upload
+  Upload,
+  Mail,
+  Phone,
+  Building2,
+  Hash,
+  Info
 } from "lucide-react"
 import { FilingRequest, SavedReport, Document, FilingRequestStatus } from "@/lib/types"
-import { reportService } from "@/lib/services"
+import { reportService, userService } from "@/lib/services"
 import { documentService } from "@/lib/services"
+
 import { SelfAssessmentPreview } from "@/components/reports/self-assessment-preview"
 import { StatusUpdateDialog } from "@/components/agent/status-update-dialog"
 import { uploadToImageKit, ImageUploadResult } from "@/lib/utils/imagekit"
@@ -44,7 +51,9 @@ export default function AgentRequestDetailPage() {
   const [request, setRequest] = useState<FilingRequest | null>(null)
   const [report, setReport] = useState<SavedReport | null>(null)
   const [documents, setDocuments] = useState<Document[]>([])
+  const [clientProfile, setClientProfile] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [loadingClient, setLoadingClient] = useState(false)
   const [showStatusDialog, setShowStatusDialog] = useState(false)
   const [uploadingCompletedDoc, setUploadingCompletedDoc] = useState(false)
   const [completedDocFile, setCompletedDocFile] = useState<File | null>(null)
@@ -60,7 +69,7 @@ export default function AgentRequestDetailPage() {
         return
       }
       if (profile?.businessType !== 'consultant') {
-        router.push('/dashboard')
+        router.refresh()
         return
       }
       if (!profile?.consultantKycCompleted) {
@@ -166,12 +175,17 @@ export default function AgentRequestDetailPage() {
 
       setRequest(filingRequest)
 
-      // Fetch self-assessment report
+      // Fetch self-assessment report first (contains userId for client profile)
       if (filingRequest.reportId) {
         try {
           const loadedReport = await reportService.getReportById(filingRequest.reportId, 'Self-Assessment')
           if (loadedReport) {
             setReport(loadedReport)
+            
+            // Fetch client profile using userId from the report
+            if (loadedReport.userId) {
+              loadClientProfile(loadedReport.userId)
+            }
           }
         } catch (error) {
           console.error("Error loading report:", error)
@@ -244,9 +258,27 @@ export default function AgentRequestDetailPage() {
     }
   }
 
-  const handlePrint = () => {
-    window.print()
+  const loadClientProfile = async (userId: string) => {
+    try {
+      setLoadingClient(true)
+      const profile = await userService.getProfile(userId)
+
+      console.log("Client profile response:", profile)
+      
+      if (profile) {
+        setClientProfile(profile)
+      }
+    } catch (error) {
+      console.error("Error loading client profile:", error)
+      // Don't show error toast as client info is supplementary
+    } finally {
+      setLoadingClient(false)
+    }
   }
+
+  // const handlePrint = () => {
+  //   window.print()
+  // }
 
   const handleStatusUpdate = async (newStatus: FilingRequestStatus, notes?: string) => {
     if (!requestId) return
@@ -414,91 +446,185 @@ export default function AgentRequestDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header - Hidden when printing */}
-      <div className="flex flex-row items-center justify-between gap-3 sm:gap-4 print:hidden">
-        <div className="flex items-center gap-2 sm:gap-4 w-full sm:w-auto">
+    <div className="space-y-6 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:hidden">
+        <div className="flex items-center gap-4">
           <Button
             variant="ghost"
             size="sm"
             onClick={() => router.push('/consultant/dashboard/requests')}
           >
-            <ArrowLeft className="w-4 h-4 sm:mr-2" />
-            <span className="hidden sm:inline">Back</span>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Requests
           </Button>
-          <div className="min-w-0 flex-1 sm:flex-none">
-            <p className="text-xs sm:text-sm text-muted-foreground truncate">
-              Request ID: {request.id.substring(0, 12)}...
+          <Separator orientation="vertical" className="h-6 hidden sm:block" />
+          <div>
+            <h1 className="text-xl sm:text-2xl font-bold">Filing Request Details</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              ID: {request.id.substring(0, 12)}... • Created {format(new Date(request.createdAt), 'MMM dd, yyyy')}
             </p>
           </div>
         </div>
-        {/* <Button onClick={handlePrint} size="sm" className="w-28 print:hidden">
-          <Printer className="w-4 h-4 mr-2" />
-          Print All
-        </Button> */}
+        <div className="flex items-center gap-2">
+          {getStatusBadge(request.status)}
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowStatusDialog(true)}
+          >
+            <Edit className="w-4 h-4 mr-2" />
+            Update Status
+          </Button>
+        </div>
       </div>
 
-      {/* Request Summary - Hidden when printing */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 print:hidden">
-        <Card>
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Status</CardTitle>
-              <Button
-                variant="ghost"
-                size="sm"
-                type="button"
-                onClick={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  setShowStatusDialog(true)
-                }}
-                className="h-6 w-6 p-0 hover:bg-muted"
-                title="Update status"
-              >
-                <Edit className="w-3 h-3" />
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {getStatusBadge(request.status)}
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">State</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-muted-foreground" />
-              {request.state}
-            </div>
-          </CardContent>
-        </Card>
-        {/* <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">RRR</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <code className="text-sm font-mono">{request.rrr}</code>
-          </CardContent>
-        </Card> */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Created</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-2 text-sm">
-              <Calendar className="w-4 h-4 text-muted-foreground" />
-              {format(new Date(request.createdAt), 'MMM dd, yyyy')}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Main Content Grid */}
+      <div className="grid lg:grid-cols-3 gap-6">
+        {/* Left Column - Client & Request Info */}
+        <div className="lg:col-span-1 space-y-6">
+          {/* Client Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <User className="w-5 h-5" />
+                Client Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {loadingClient ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                </div>
+              ) : clientProfile ? (
+                <>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                        <User className="w-5 h-5 text-primary" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-muted-foreground">Full Name</p>
+                        <p className="font-medium">
+                          {clientProfile.firstName} {clientProfile.lastName}
+                        </p>
+                      </div>
+                    </div>
 
+                    {clientProfile.email && (
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                          <Mail className="w-5 h-5 text-blue-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-muted-foreground">Email</p>
+                          <p className="font-medium text-sm truncate">{clientProfile.email}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {clientProfile.phoneNumber && (
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                          <Phone className="w-5 h-5 text-green-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-muted-foreground">Phone</p>
+                          <p className="font-medium">{clientProfile.phoneNumber}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {clientProfile.businessType && (
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-full bg-purple-500/10 flex items-center justify-center flex-shrink-0">
+                          <Building2 className="w-5 h-5 text-purple-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-muted-foreground">Business Type</p>
+                          <p className="font-medium capitalize">{clientProfile.businessType}</p>
+                        </div>
+                      </div>
+                    )}
+
+                    {clientProfile.tin && (
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-full bg-orange-500/10 flex items-center justify-center flex-shrink-0">
+                          <Hash className="w-5 h-5 text-orange-500" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs text-muted-foreground">TIN</p>
+                          <p className="font-medium font-mono">{clientProfile.tin}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Info className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">Client information unavailable</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Request Summary */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <FileText className="w-5 h-5" />
+                Request Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between py-2 border-b">
+                  <span className="text-sm text-muted-foreground">State</span>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-muted-foreground" />
+                    <span className="font-medium">{request.state}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between py-2 border-b">
+                  <span className="text-sm text-muted-foreground">Tax Year</span>
+                  <span className="font-medium">{report?.reportData?.period?.year || 'N/A'}</span>
+                </div>
+
+                <div className="flex items-center justify-between py-2 border-b">
+                  <span className="text-sm text-muted-foreground">Created</span>
+                  <div className="flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-muted-foreground" />
+                    <span className="font-medium text-sm">
+                      {format(new Date(request.createdAt), 'MMM dd, yyyy')}
+                    </span>
+                  </div>
+                </div>
+
+                {request.assignedAgentName && (
+                  <div className="flex items-center justify-between py-2 border-b">
+                    <span className="text-sm text-muted-foreground">Assigned To</span>
+                    <span className="font-medium text-sm">{request.assignedAgentName}</span>
+                  </div>
+                )}
+
+                {request.notes && (
+                  <div className="py-2">
+                    <p className="text-sm text-muted-foreground mb-2">Notes</p>
+                    <p className="text-sm bg-muted/50 p-3 rounded-lg">{request.notes}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column - Main Content */}
+        <div className="lg:col-span-2 space-y-6">
       {/* Self-Assessment Report */}
       {report && report.reportData && (
-        <Card className="mb-6 relative">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <FileText className="w-5 h-5" />
@@ -509,121 +635,18 @@ export default function AgentRequestDetailPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="">
-              <SelfAssessmentPreview
-                reportData={report.reportData}
-                showFileButton={false}
-                filingStatus={report.filingStatus}
-                filingMethod={report.filingMethod}
-              />
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Upload Completed Document - Show when status is completed or in_progress */}
-      {(request.status === 'completed' || request.status === 'in_progress') && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="w-5 h-5" />
-              {request.status === 'completed' && request.completedDocumentUrl 
-                ? 'Completed Document' 
-                : 'Upload Completed Document'}
-            </CardTitle>
-            <CardDescription>
-              {request.status === 'completed' && request.completedDocumentUrl
-                ? 'The signed and stamped document has been uploaded'
-                : 'Upload the signed and stamped document from the tax authorities'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {request.completedDocumentUrl ? (
-              <div className="space-y-4">
-                <div className="border rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-4 bg-muted/30">
-                  <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-                    <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <FileText className="w-5 h-5 text-primary" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm sm:text-base truncate">{request.completedDocumentName || 'Completed Document'}</h4>
-                      <p className="text-xs sm:text-sm text-muted-foreground">
-                        Uploaded on {request.completedAt ? format(new Date(request.completedAt), 'MMM dd, yyyy hh:mm a') : 'N/A'}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-9 w-9 flex-shrink-0"
-                      onClick={() => window.open(request.completedDocumentUrl, '_blank')}
-                      title="View document"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="default"
-                      size="icon"
-                      className="h-9 w-9 flex-shrink-0"
-                      onClick={async () => {
-                        try {
-                          const response = await fetch(request.completedDocumentUrl!)
-                          if (!response.ok) {
-                            throw new Error('Failed to fetch document')
-                          }
-                          const blob = await response.blob()
-                          const blobUrl = window.URL.createObjectURL(blob)
-                          const link = document.createElement('a')
-                          link.href = blobUrl
-                          link.download = request.completedDocumentName || 'completed-document'
-                          document.body.appendChild(link)
-                          link.click()
-                          document.body.removeChild(link)
-                          window.URL.revokeObjectURL(blobUrl)
-                          toast.success('Download started')
-                        } catch (error) {
-                          console.error('Error downloading document:', error)
-                          toast.error('Failed to download document. Please try viewing it instead.')
-                        }
-                      }}
-                      title="Download document"
-                    >
-                      <Download className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="completed-doc-upload">Upload Signed & Stamped Document</Label>
-                  <Input
-                    id="completed-doc-upload"
-                    type="file"
-                    accept=".pdf,image/*"
-                    onChange={handleCompletedDocUpload}
-                    disabled={uploadingCompletedDoc}
-                    className="mt-2"
-                  />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Upload the document that has been signed and stamped by the tax authorities (PDF or Image)
-                  </p>
-                </div>
-                {uploadingCompletedDoc && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Uploading document...
-                  </div>
-                )}
-              </div>
-            )}
+            <SelfAssessmentPreview
+              reportData={report.reportData}
+              showFileButton={false}
+              filingStatus={report.filingStatus}
+              filingMethod={report.filingMethod}
+            />
           </CardContent>
         </Card>
       )}
 
       {/* Supporting Documents */}
-      <Card className="mb-6">
+      <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base sm:text-lg flex items-center gap-2">
@@ -654,71 +677,64 @@ export default function AgentRequestDetailPage() {
                   key={doc.id}
                   className="group border rounded-lg overflow-hidden hover:shadow-md transition-all bg-card"
                 >
-                  {/* Document Header */}
-                  <div className="p-3 sm:p-4 flex items-start gap-3">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <FileText className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+                  <div className="p-4 flex items-start gap-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-primary/20 to-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <FileText className="w-6 h-6 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm sm:text-base line-clamp-2 mb-1">
-                        {(doc.name || doc.originalName).slice(0, 20) + "..." || 'Document'}
+                      <h4 className="font-medium text-sm line-clamp-1 mb-1">
+                        {(doc.name || doc.originalName) || 'Document'}
                       </h4>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mb-3">
                         <span className="inline-flex items-center gap-1 bg-muted/50 px-2 py-0.5 rounded-full">
                           {doc.type}
                         </span>
                         {doc.size && (
-                          <span className="inline-flex items-center gap-1">
-                            • {formatFileSize(doc.size)}
-                          </span>
+                          <span>• {formatFileSize(doc.size)}</span>
                         )}
                         {doc.createdAt && (
-                          <span className="inline-flex items-center gap-1">
-                            • {format(new Date(doc.createdAt), 'MMM dd')}
-                          </span>
+                          <span>• {format(new Date(doc.createdAt), 'MMM dd')}</span>
                         )}
                       </div>
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8"
+                          onClick={() => window.open(doc.url, '_blank')}
+                        >
+                          <ExternalLink className="w-3 h-3 mr-1" />
+                          View
+                        </Button>
+                        <Button
+                          variant="default"
+                          size="sm"
+                          className="h-8"
+                          onClick={async () => {
+                            try {
+                              const response = await fetch(doc.url)
+                              if (!response.ok) throw new Error('Failed to fetch document')
+                              const blob = await response.blob()
+                              const blobUrl = window.URL.createObjectURL(blob)
+                              const link = document.createElement('a')
+                              link.href = blobUrl
+                              link.download = doc.name || doc.originalName || 'document'
+                              document.body.appendChild(link)
+                              link.click()
+                              document.body.removeChild(link)
+                              window.URL.revokeObjectURL(blobUrl)
+                              toast.success('Download started')
+                            } catch (error) {
+                              console.error('Error downloading document:', error)
+                              toast.error('Failed to download document')
+                            }
+                          }}
+                        >
+                          <Download className="w-3 h-3 mr-1" />
+                          Download
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="px-3 pb-3 sm:px-4 sm:pb-4 flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-6 w-6 flex-shrink-0"
-                      onClick={() => window.open(doc.url, '_blank')}
-                      title="View document"
-                    >
-                      <ExternalLink className="w-3 h-3" />
-                    </Button>
-                    <Button
-                      variant="default"
-                      size="icon"
-                      className="h-6 w-6 flex-shrink-0"
-                      onClick={async () => {
-                        try {
-                          const response = await fetch(doc.url)
-                          if (!response.ok) throw new Error('Failed to fetch document')
-                          const blob = await response.blob()
-                          const blobUrl = window.URL.createObjectURL(blob)
-                          const link = document.createElement('a')
-                          link.href = blobUrl
-                          link.download = doc.name || doc.originalName || 'document'
-                          document.body.appendChild(link)
-                          link.click()
-                          document.body.removeChild(link)
-                          window.URL.revokeObjectURL(blobUrl)
-                          toast.success('Download started')
-                        } catch (error) {
-                          console.error('Error downloading document:', error)
-                          toast.error('Failed to download document')
-                        }
-                      }}
-                      title="Download document"
-                    >
-                      <Download className="w-3 h-3" />
-                    </Button>
                   </div>
                 </div>
               ))}
@@ -726,6 +742,108 @@ export default function AgentRequestDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Upload Completed Document */}
+      {(request.status === 'completed' || request.status === 'in_progress') && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5" />
+              {request.status === 'completed' && request.completedDocumentUrl 
+                ? 'Completed Document' 
+                : 'Upload Completed Document'}
+            </CardTitle>
+            <CardDescription>
+              {request.status === 'completed' && request.completedDocumentUrl
+                ? 'The signed and stamped document has been uploaded'
+                : 'Upload the signed and stamped document from the tax authorities'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {request.completedDocumentUrl ? (
+              <div className="border rounded-lg p-4 flex items-center justify-between bg-muted/30">
+                <div className="flex items-center gap-4 flex-1 min-w-0">
+                  <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <FileText className="w-6 h-6 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="font-medium truncate">{request.completedDocumentName || 'Completed Document'}</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Uploaded on {request.completedAt ? format(new Date(request.completedAt), 'MMM dd, yyyy hh:mm a') : 'N/A'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open(request.completedDocumentUrl, '_blank')}
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    View
+                  </Button>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        const response = await fetch(request.completedDocumentUrl!)
+                        if (!response.ok) throw new Error('Failed to fetch document')
+                        const blob = await response.blob()
+                        const blobUrl = window.URL.createObjectURL(blob)
+                        const link = document.createElement('a')
+                        link.href = blobUrl
+                        link.download = request.completedDocumentName || 'completed-document'
+                        document.body.appendChild(link)
+                        link.click()
+                        document.body.removeChild(link)
+                        window.URL.revokeObjectURL(blobUrl)
+                        toast.success('Download started')
+                      } catch (error) {
+                        console.error('Error downloading document:', error)
+                        toast.error('Failed to download document')
+                      }
+                    }}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="completed-doc-upload">Upload Signed & Stamped Document</Label>
+                  <Input
+                    id="completed-doc-upload"
+                    type="file"
+                    accept=".pdf,image/*"
+                    onChange={handleCompletedDocUpload}
+                    disabled={uploadingCompletedDoc}
+                    className="mt-2"
+                  />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Upload the document that has been signed and stamped by the tax authorities (PDF or Image)
+                  </p>
+                </div>
+                {uploadingCompletedDoc && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Uploading document...
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Messages Panel */}
+      <div id="messages">
+        <MessageModal requestId={requestId} userType="agent" />
+      </div>
+        </div>
+      </div>
 
       {/* Status Update Dialog */}
       {request && (
@@ -736,11 +854,6 @@ export default function AgentRequestDetailPage() {
           onUpdate={handleStatusUpdate}
         />
       )}
-
-      {/* Messages Panel */}
-      <div id="messages">
-        <MessageModal requestId={requestId} userType="agent" />
-      </div>
 
       {/* Print Footer - Only visible when printing */}
       <div className="hidden print:block mt-8 pt-8 border-t">
