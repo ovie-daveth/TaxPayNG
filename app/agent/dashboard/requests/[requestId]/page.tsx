@@ -80,7 +80,7 @@ export default function AgentRequestDetailPage() {
   }, [user, profile, authLoading, profileLoading, router])
 
   useEffect(() => {
-    if (requestId && user && profile && profile.businessType === 'consultant') {
+    if (requestId && user && profile?.businessType === 'consultant') {
       loadRequestDetails()
     }
   }, [requestId, user, profile])
@@ -446,39 +446,15 @@ export default function AgentRequestDetailPage() {
   }
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:hidden">
-        <div className="flex items-center gap-4">
-          <Button
+    <div className="space-y-6 max-w-7xl mx-auto -mt-20 md:-mt-7">
+       <Button
             variant="ghost"
             size="sm"
             onClick={() => router.push('/consultant/dashboard/requests')}
           >
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Requests
+            Back
           </Button>
-          <Separator orientation="vertical" className="h-6 hidden sm:block" />
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold">Filing Request Details</h1>
-            <p className="text-sm text-muted-foreground mt-1">
-              ID: {request.id.substring(0, 12)}... • Created {format(new Date(request.createdAt), 'MMM dd, yyyy')}
-            </p>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          {getStatusBadge(request.status)}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowStatusDialog(true)}
-          >
-            <Edit className="w-4 h-4 mr-2" />
-            Update Status
-          </Button>
-        </div>
-      </div>
-
       {/* Main Content Grid */}
       <div className="grid lg:grid-cols-3 gap-6">
         {/* Left Column - Client & Request Info */}

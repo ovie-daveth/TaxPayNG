@@ -35,19 +35,18 @@ export default function VerifyTaxIdPage() {
   const [showTaxIdPortalModal, setShowTaxIdPortalModal] = useState(false)
   const [portalUrl, setPortalUrl] = useState("")
 
-  useEffect(() => {
-    console.log("Verify Tax ID page mounted - user:", user ? "logged in" : "not logged in")
-    console.log("Current path:", window.location.pathname)
-  }, [user])
+  // useEffect(() => {
+  //   console.log("Verify Tax ID page mounted - user:", user ? "logged in" : "not logged in")
+  //   console.log("Current path:", window.location.pathname)
+  // }, [user])
 
   useEffect(() => {
     if (!user && !authLoading) {
-      console.log("No user after auth loaded, redirecting to login")
+      // console.log("No user after auth loaded, redirecting to login")
       router.push("/login")
     }
   }, [user, authLoading, router])
 
-  // Check if user already has Tax ID and redirect if complete
   useEffect(() => {
     if (!profile || loading) return
 
@@ -65,7 +64,6 @@ export default function VerifyTaxIdPage() {
         return
       } else {
         // TIN exists but no documents - show document upload
-        console.log("Tax ID saved but no business documents, showing document upload")
         setTinVerified(true)
         setShowDocumentUpload(true)
         return
@@ -74,7 +72,6 @@ export default function VerifyTaxIdPage() {
 
     // If user has TIN and is not SME, redirect to appropriate dashboard
     if (profile.taxId && profile.businessType !== 'sme') {
-      console.log("TIN exists for non-SME, redirecting to dashboard")
       if (profile.businessType === 'creator') {
         router.push("/dashboard-creator")
       } else {

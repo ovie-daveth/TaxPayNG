@@ -48,8 +48,6 @@ export default function LoginPage() {
   const [showGoogleBusinessTypeDialog, setShowGoogleBusinessTypeDialog] = useState(false)
 
   useEffect(() => {
-    console.log("Login redirect effect - user:", !!user, "loading:", loading, "profileLoading:", profileLoading, "profile:", !!profile)
-    
     // Wait for loading to complete
     if (loading || profileLoading) {
       console.log("Login redirect - still loading, waiting...")
@@ -76,22 +74,14 @@ export default function LoginPage() {
       return () => clearTimeout(timeout)
     }
 
-    // If profile is still null after user is logged in, something might be wrong
-    // But don't redirect in a loop - just return
     if (!profile) {
       console.log("Login redirect - profile is null, cannot redirect")
       return
     }
 
-    console.log("Login redirect - profile loaded, businessType:", profile.businessType, "taxId:", !!profile.taxId, "createdAt:", profile.createdAt, "updatedAt:", profile.updatedAt)
-
-    // Google signup is disabled; we never redirect to a business-type selection page.
-
     // Tax Consultant-specific redirects
-    if (profile.businessType === 'consultant') {
-      // Only redirect if consultantKycCompleted is explicitly true
-      // undefined or false means they need to complete KYC
-      console.log("Consultant KYC completed:", profile.consultantKycCompleted)
+    if (profile?.businessType === 'consultant') {
+
       if (profile.consultantKycCompleted !== true) {
         router.push("/consultant/kyc")
         return
@@ -101,17 +91,17 @@ export default function LoginPage() {
     }
 
     // Check if user needs to verify TIN or upload documents
-    if (!profile.taxId) {
+    if (!profile.taxId ||!profile.businessDocuments) {
       console.log("Login redirect - no taxId, redirecting to verify-tin")
       router.push("/verify-tin")
       return
     }
 
-    if (profile.businessType === 'sme' && !profile.businessDocuments) {
-      console.log("Login redirect - SME without documents, redirecting to verify-tin")
-      router.push("/verify-tin")
-      return
-    }
+    // if (profile.businessType === 'sme' && !profile.businessDocuments) {
+    //   // console.log("Login redirect - SME without documents, redirecting to verify-tin")
+    //   router.push("/verify-tin")
+    //   return
+    // }
 
     if (profile.businessType === 'creator') {
       console.log("Login redirect - creator, redirecting to dashboard-creator")
@@ -124,9 +114,7 @@ export default function LoginPage() {
       router.push("/dashboard-sme")
       return
     }
-
-    console.log("Login redirect - default, redirecting to dashboard")
-    router.push("/dashboard")
+    // router.push("/dashboard")
   }, [user, loading, profile, profileLoading, router, refetchProfile])
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -146,22 +134,12 @@ export default function LoginPage() {
       toast.success('Logged in successfully!')
       // Refetch profile to ensure it's loaded for redirect
       await refetchProfile()
-      // Don't redirect here - useEffect will handle it based on TIN verification status
     } else {
-      // Check if this is a Google-only user FIRST, before any toast
-      console.log('Login error:', result.error, 'isGoogleOnlyUser:', result.isGoogleOnlyUser)
       const isGoogleOnly = result.error === 'GOOGLE_ONLY_USER' || result.isGoogleOnlyUser === true
-      console.log('isGoogleOnly check:', isGoogleOnly)
-      
       if (isGoogleOnly) {
-        console.log('Detected Google-only user, showing form message, NOT toast')
         setIsGoogleOnlyUser(true)
-        // Don't show toast, show message in form instead
-        return // Exit early to prevent any toast
+        return 
       }
-      
-      // Only show toast for non-Google-only errors
-      console.log('Not Google-only user, showing toast')
       setIsGoogleOnlyUser(false)
       toast.error(result.error || 'Failed to log in')
     }
@@ -172,18 +150,14 @@ export default function LoginPage() {
     try {
       const result = await signInWithGoogle()
       if (result.success) {
-        // Refetch profile to ensure it's loaded for redirect
         await refetchProfile()
-        
-        // Wait a moment for the profile state to update in the context
-        // The useEffect will trigger when profile changes and handle the redirect
+
         setTimeout(() => {
           // Force another refetch to ensure profile is loaded
           refetchProfile().catch(console.error)
-        }, 300)
-        
+        }, 300) 
         toast.success('Signed in with Google successfully!')
-        // Redirect will be handled by useEffect after profile loads
+
       } else if (result.error === 'MISSING_PROFILE') {
         // Auth user exists but profile doesn't. Complete onboarding via modal.
         setShowGoogleBusinessTypeDialog(true)

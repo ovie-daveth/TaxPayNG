@@ -5,25 +5,18 @@ import { cloneElement, isValidElement, useState } from "react"
 import Link from "next/link"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowRight, BarChart3, Calculator, FileText, Bell, CheckCircle2, Loader2, Sparkles, Shield, TrendingUp, Clock, Users, Zap, Award, DollarSign, ScanLine, FolderArchive, CreditCard, Layers, Receipt, FileCheck, Smartphone, Building2, LogIn } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { toast } from "sonner"
-import { db } from "@/firebase/firebase"
-import { collection, addDoc, query, where, getDocs, setDoc, doc } from "firebase/firestore"
 import { useEffect } from "react"
 import Footer from "@/components/footer"
 import { SiteHeader } from "@/components/site-header"
 import { useRouter } from "next/navigation"
-import { sendWaitlistVerification } from "@/lib/utils/emailVerification"
 import { TokenInputDialog } from "@/components/waitlist/token-input-dialog"
 import { CAC_REGISTRATION_TYPES, formatNaira } from "@/lib/constants/cac"
 
 export default function HomePage() {
-  const { user, logout, loading } = useAuth()
+  const { logout } = useAuth()
   const router = useRouter()
 
   const [waitlistData, setWaitlistData] = useState({
@@ -33,16 +26,8 @@ export default function HomePage() {
     userType: "",
     platformExpectations: ""
   })
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [isSubmitted, setIsSubmitted] = useState(false)
   const [showTokenDialog, setShowTokenDialog] = useState(false)
   const [pendingEmail, setPendingEmail] = useState("")
-
-  const isSmeSelection = waitlistData.userType === "sme"
-  const waitlistNameLabel = isSmeSelection ? "Business Name" : "Full Name"
-  const waitlistEmailLabel = isSmeSelection ? "Business Email" : "Email Address"
-  const waitlistNamePlaceholder = isSmeSelection ? "Enter your business name" : "Enter your full name"
-  const waitlistEmailPlaceholder = isSmeSelection ? "business@example.com" : "you@example.com"
 
   // Check for verification status in URL
   useEffect(() => {
@@ -65,82 +50,6 @@ export default function HomePage() {
     }
   }, [])
 
-  const handleLogout = async () => {
-    const result = await logout()
-    if (result.success) {
-      toast.success('Logged out successfully!')
-      router.push('/')
-    } else {
-      toast.error(result.error || 'Failed to log out')
-    }
-  }
-
-
-  const handleWaitlistSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-
-    try {
-      // Validate inputs (name and email are required, phone is optional)
-      if (!waitlistData.name || !waitlistData.email) {
-        toast.error("Please fill in your name and email")
-        setIsSubmitting(false)
-        return
-      }
-
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!emailRegex.test(waitlistData.email)) {
-        toast.error("Please enter a valid email address")
-        setIsSubmitting(false)
-        return
-      }
-
-      // Validate phone format only if provided (Nigerian phone numbers)
-      if (waitlistData.phone && waitlistData.phone.trim() !== "") {
-        const phoneRegex = /^(\+234|0)?[789][01]\d{8}$/
-        if (!phoneRegex.test(waitlistData.phone.replace(/\s/g, ""))) {
-          toast.error("Please enter a valid Nigerian phone number")
-          setIsSubmitting(false)
-          return
-        }
-      }
-
-      if (!waitlistData.userType) {
-        toast.error("Please tell us whether you're a freelancer, creator, or SME")
-        setIsSubmitting(false)
-        return
-      }
-
-      // Send verification token via email
-      const verificationToast = toast.loading("Sending verification code...")
-      const verificationResult = await sendWaitlistVerification(
-        waitlistData.email.trim(),
-        waitlistData.name.trim(),
-        waitlistData.phone,
-        waitlistData.userType,
-        waitlistData.platformExpectations.trim()
-      )
-      
-      toast.dismiss(verificationToast)
-
-      if (!verificationResult.success) {
-        toast.error(verificationResult.error || "Failed to send verification code")
-        setIsSubmitting(false)
-        return
-      }
-
-      // Show token input dialog
-      setPendingEmail(verificationResult.email || waitlistData.email.trim())
-      setShowTokenDialog(true)
-      setIsSubmitting(false)
-    } catch (error) {
-      console.error("Error submitting waitlist:", error)
-      toast.error("Oops! Something went wrong. Please try again.")
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -769,7 +678,6 @@ export default function HomePage() {
           platformExpectations: waitlistData.platformExpectations || undefined,
         })}
         onVerified={() => {
-          setIsSubmitted(true)
           setWaitlistData({ name: "", email: "", phone: "", userType: "", platformExpectations: "" })
           setShowTokenDialog(false)
         }}
