@@ -194,14 +194,6 @@ export default function ConsultantClientsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Clients Management</h1>
-        <p className="text-sm sm:text-base text-muted-foreground">
-          Manage clients who have selected you as their tax consultant
-        </p>
-      </div>
-
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <Card>
@@ -269,7 +261,7 @@ export default function ConsultantClientsPage() {
           placeholder="Search clients by name, email, or TIN..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-10"
+          className="pl-10 text-xs sm:text-sm"
         />
       </div>
 

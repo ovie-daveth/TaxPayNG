@@ -23,6 +23,7 @@ import {
   ArrowRight
 } from "lucide-react"
 import { FilingRequest } from "@/lib/types"
+import { OneTimeFilingModal } from "@/components/filing/one-time-filing-modal"
 
 export default function FilingRequestsPage() {
   const router = useRouter()
@@ -32,6 +33,7 @@ export default function FilingRequestsPage() {
   const [requests, setRequests] = useState<FilingRequest[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
+  const [showOneTimeFilingModal, setShowOneTimeFilingModal] = useState(false)
 
   useEffect(() => {
     if (user?.uid) {
@@ -263,6 +265,11 @@ export default function FilingRequestsPage() {
       )}
           </div>
         </main>
+        
+        <OneTimeFilingModal 
+          open={showOneTimeFilingModal} 
+          onOpenChange={setShowOneTimeFilingModal}
+        />
     </div>
   )
 }

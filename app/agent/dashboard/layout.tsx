@@ -56,8 +56,8 @@ function LayoutContent({
         "flex-1 transition-all duration-300 ease-in-out",
         sidebarCollapsed ? "md:ml-16" : "md:ml-64"
       )}>
-        <AgentHeader />
-        <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
+        <AgentHeader sidebarCollapsed={sidebarCollapsed} />
+        <main className={`container mx-auto px-3 sm:px-4 py-4 sm:pb-6 -mt-16 sm:-mt-0 ${sidebarCollapsed ? "md:px-6 lg:px-8" : "md:px-8 lg:px-12"}`}>
           {children}
         </main>
       </div>

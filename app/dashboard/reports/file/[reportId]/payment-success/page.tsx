@@ -22,6 +22,7 @@ import { uploadToImageKit } from "@/lib/utils/imagekit"
 import { DocumentSelectionModal } from "@/components/filing/document-selection-modal"
 import { PaymentPortalSelectorModal } from "@/components/payment/payment-portal-selector-modal"
 import { AgentPaymentModal } from "@/components/filing/agent-payment-modal"
+import { profile } from "console"
 
 interface PaymentData {
   rrr: string
@@ -422,7 +423,7 @@ export default function PaymentSuccessPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.uid,
-          state: "NRS",
+          state: profile?.address?.state || stateForPrint,
           reportId: report.id,
           rrr: paymentData.rrr || "",
           supportingDocuments: validDocuments,

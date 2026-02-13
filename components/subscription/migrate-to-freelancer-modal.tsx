@@ -43,13 +43,13 @@ export function MigrateToFreelancerModal({
         <DialogHeader className="p-0">
           <div className="flex flex-col items-center text-center">
             <DialogTitle className="text-base sm:text-lg md:text-xl flex items-center gap-2 justify-center">
-              Migrate to Freelancer Account
+              Migrate to Basic Account
               <div className="w-6 h-6 sm:w-8 sm:h-8 bg-primary/10 rounded-full flex items-center justify-center shrink-0">
                 <Briefcase className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
               </div>
             </DialogTitle>
             <DialogDescription className="text-xs sm:text-sm mt-0.5 sm:mt-1">
-              Change your account type to access freelancer plans
+              Change your account type to access Basic plans
             </DialogDescription>
           </div>
         </DialogHeader>
@@ -60,10 +60,10 @@ export function MigrateToFreelancerModal({
               <AlertCircle className="w-4 h-4 sm:w-5 sm:h-5 text-amber-500 shrink-0 mt-0.5" />
               <div className="space-y-1.5 sm:space-y-2 min-w-0 flex-1">
                 <p className="text-xs sm:text-sm font-medium">
-                  You're about to migrate from a <strong>Creator</strong> account to a <strong>Freelancer / Self-Employed</strong> account.
+                  You're about to migrate your account to a <strong>{planType}</strong> account.
                 </p>
                 <p className="text-[10px] sm:text-xs text-muted-foreground">
-                  The {planType} plan is designed for freelancers and self-employed professionals. By continuing, your account type will be changed to "Freelancer" and you'll be redirected to the Freelancer Dashboard after payment.
+                  The {planType} plan is designed for freelancers, Virtual Assistants, copywriters, independent professionals and consultants who need to manage their taxes with ease. By continuing, your account type will be changed to {planType} and you'll be redirected to the {planType} Dashboard after payment.
                 </p>
               </div>
             </div>
@@ -72,10 +72,10 @@ export function MigrateToFreelancerModal({
           <div className="space-y-1.5 sm:space-y-2">
             <p className="text-xs sm:text-sm font-medium">What this means:</p>
             <ul className="space-y-1 sm:space-y-1.5 text-[10px] sm:text-xs text-muted-foreground list-disc list-inside">
-              <li>Your dashboard will switch to the Freelancer Dashboard</li>
-              <li>You'll have access to freelancer-specific features</li>
-              <li>Your account type will be permanently changed to "Freelancer"</li>
-              <li>You can still access all your existing data</li>
+              <li>Your dashboard will switch to the {planType} Dashboard</li>
+              <li>You'll have access to {planType}-specific features</li>
+              <li>Your account type will be permanently changed to "{planType}"</li>
+              <li>You can still access all your existing data (except features exclusive to your previous plan)</li>
             </ul>
           </div>
 

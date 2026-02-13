@@ -22,8 +22,9 @@ export function FreeTrialBanner() {
   const { daysRemaining } = freeTrialStatus
 
   // Determine banner variant based on days remaining
-  const isExpiringSoon = daysRemaining <= 2
-  const variant = isExpiringSoon ? "warning" : "info"
+  const hasEnded = daysRemaining <= 0
+  const isExpiringSoon = daysRemaining > 0 && daysRemaining <= 2
+  const variant = hasEnded || isExpiringSoon ? "warning" : "info"
 
   const handleBringUpSubScriptionModal = () => {
     setOpenSubscriptionModal(true)
@@ -33,7 +34,7 @@ export function FreeTrialBanner() {
     <Alert
       className={cn(
         "rounded-none border-x-0 border-t-0 border-b",
-        isExpiringSoon
+        hasEnded || isExpiringSoon
           ? "bg-yellow-50 dark:bg-yellow-950/20 border-yellow-200 dark:border-yellow-900"
           : "bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900"
       )}
@@ -44,7 +45,7 @@ export function FreeTrialBanner() {
             <div
               className={cn(
                 "flex-shrink-0 p-1.5 sm:p-2 rounded-full",
-                isExpiringSoon
+                hasEnded || isExpiringSoon
                   ? "bg-yellow-100 dark:bg-yellow-900/40"
                   : "bg-blue-100 dark:bg-blue-900/40"
               )}
@@ -52,7 +53,7 @@ export function FreeTrialBanner() {
               <Sparkles
                 className={cn(
                   "h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5",
-                  isExpiringSoon
+                  hasEnded || isExpiringSoon
                     ? "text-yellow-600 dark:text-yellow-500"
                     : "text-blue-600 dark:text-blue-500"
                 )}
@@ -60,7 +61,12 @@ export function FreeTrialBanner() {
             </div>
             <div className="flex-1 min-w-0 overflow-hidden">
               <AlertDescription className="text-xs sm:text-sm md:text-base font-medium text-foreground m-0 break-words leading-tight sm:leading-normal">
-                {isExpiringSoon ? (
+                {hasEnded ? (
+                  <>
+                    <span className="font-semibold">Free Trial Has Ended!</span>{" "}
+                    Your free trial has expired. Subscribe now to continue using OTax.
+                  </>
+                ) : isExpiringSoon ? (
                   <>
                     <span className="font-semibold">Free Trial Ending Soon!</span>{" "}
                     {daysRemaining === 1
@@ -81,7 +87,7 @@ export function FreeTrialBanner() {
                 size="sm"
                 className={cn(
                   "h-8 sm:h-9 text-xs sm:text-sm whitespace-nowrap px-3 sm:px-4",
-                  isExpiringSoon
+                  hasEnded || isExpiringSoon
                     ? "bg-yellow-600 hover:bg-yellow-700 text-white"
                     : "bg-blue-600 hover:bg-blue-700 text-white"
                 )}

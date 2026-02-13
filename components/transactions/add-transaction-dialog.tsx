@@ -267,7 +267,7 @@ export function AddTransactionDialog({
   
   // Check if user has access to OCR (GOLD and above plans only)
   // OCR is enabled for the first upload box, but disabled when manual entry is selected
-  const hasOcrAccess = hasAccess('GOLD')
+  const hasOcrAccess = hasAccess('PRO')
   const isOcrEnabled = hasOcrAccess && !isManualEntryMode
   
   // Check if user has access to Tax Classification (GOLD and above plans only)

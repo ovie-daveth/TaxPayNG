@@ -21,19 +21,24 @@ import {
   Clock,
   XCircle,
   Download,
-  Copy
+  FileText,
+  Users
 } from "lucide-react"
 import { formatCurrency } from "@/lib/utils"
+import { db } from "@/firebase/firebase"
+import { collection, query, where, getDocs } from "firebase/firestore"
 
 interface AgentPayment {
   id: string
-  requestId: string
+  type: 'filing' | 'consultation'
+  requestId?: string
+  clientId: string
+  clientName: string
   amount: number
   commission: number
   status: 'pending' | 'paid' | 'failed'
   paymentDate?: string
   createdAt: string
-  clientName?: string
   state?: string
 }
 
@@ -44,6 +49,7 @@ export default function AgentPaymentsPage() {
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [typeFilter, setTypeFilter] = useState<string>("all")
 
   useEffect(() => {
     if (user && profile?.businessType === 'consultant') {
@@ -54,46 +60,110 @@ export default function AgentPaymentsPage() {
   const loadPayments = async () => {
     try {
       setLoading(true)
-      // TODO: Replace with actual API endpoint for agent payments
-      // For now, we'll calculate from completed filing requests
-      const response = await fetch('/api/admin/filing-requests?status=completed')
-      const result = await response.json()
+      const allPayments: AgentPayment[] = []
+
+      // 1. Load Filing Request Payments
+      const filingResponse = await fetch('/api/admin/filing-requests?status=completed')
+      const filingResult = await filingResponse.json()
       
-      if (result.success) {
-        // Filter requests assigned to this agent
-        const myCompletedRequests = (result.data || []).filter((req: any) => 
+      if (filingResult.success) {
+        const myCompletedRequests = (filingResult.data || []).filter((req: any) => 
           req.assignedAgentId === user?.uid || 
           req.assignedAgentName === `${profile?.firstName} ${profile?.lastName}`
         )
 
-        // Calculate payments (assuming 5% commission on filing fee)
-        // In production, this would come from a separate payments collection
-        const agentPayments: AgentPayment[] = myCompletedRequests.map((req: any) => {
-          // Mock commission calculation - replace with actual logic
-          const filingFee = 5000 // Base filing fee
+        const filingPayments: AgentPayment[] = myCompletedRequests.map((req: any) => {
+          const filingFee = 5000 // Base filing fee - should come from request
           const commission = filingFee * 0.05 // 5% commission
           
           return {
-            id: `payment-${req.id}`,
+            id: `filing-${req.id}`,
+            type: 'filing' as const,
             requestId: req.id,
+            clientId: req.userId,
+            clientName: req.userId, // TODO: Fetch actual client name
             amount: filingFee,
             commission: commission,
             status: req.completedAt ? 'paid' : 'pending',
             paymentDate: req.completedAt,
             createdAt: req.createdAt,
-            clientName: req.userId, // Would be fetched from user profile
             state: req.state
           }
         })
 
-        setPayments(agentPayments)
+        allPayments.push(...filingPayments)
       }
+
+      // 2. Load Consultation Payments (from userProfiles where assignedConsultantId matches)
+      if (user?.uid) {
+        const consultationQuery = query(
+          collection(db, 'userProfiles'),
+          where('assignedConsultantId', '==', user.uid)
+        )
+
+        const consultationSnapshot = await getDocs(consultationQuery)
+        
+        const consultationPayments: AgentPayment[] = consultationSnapshot.docs.map((doc) => {
+          const data = doc.data()
+          const consultationFee = 10000 // Base consultation fee - should be configurable
+          const commission = consultationFee * 0.10 // 10% commission for consultation
+          
+          // Check if payment was made (you might want to add a consultationPaymentDate field)
+          const isPaid = !!data.consultationPaidAt
+          
+          return {
+            id: `consultation-${doc.id}`,
+            type: 'consultation' as const,
+            clientId: data.userId,
+            clientName: `${data.firstName || ''} ${data.lastName || ''}`.trim() || data.email || 'Unknown Client',
+            amount: consultationFee,
+            commission: commission,
+            status: isPaid ? 'paid' : 'pending',
+            paymentDate: data.consultationPaidAt,
+            createdAt: data.consultantAssignedAt || data.createdAt || new Date().toISOString(),
+          }
+        })
+
+        allPayments.push(...consultationPayments)
+      }
+
+      // Sort by date (most recent first)
+      allPayments.sort((a, b) => 
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
+
+      setPayments(allPayments)
     } catch (error) {
       console.error("Error loading payments:", error)
       toast.error("Failed to load payments")
     } finally {
       setLoading(false)
     }
+  }
+
+  const getTypeBadge = (type: AgentPayment['type']) => {
+    const config = {
+      filing: { 
+        label: 'Filing', 
+        className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+        icon: FileText
+      },
+      consultation: { 
+        label: 'Consultation', 
+        className: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
+        icon: Users
+      }
+    }
+    
+    const typeConfig = config[type]
+    const Icon = typeConfig.icon
+    
+    return (
+      <Badge variant="outline" className={typeConfig.className}>
+        <Icon className="w-3 h-3 mr-1" />
+        {typeConfig.label}
+      </Badge>
+    )
   }
 
   const getStatusBadge = (status: AgentPayment['status']) => {
@@ -114,18 +184,25 @@ export default function AgentPaymentsPage() {
     )
   }
 
-  const filteredPayments = payments.filter(payment => {
-    if (!searchTerm) return true
-    const search = searchTerm.toLowerCase()
-    return (
-      payment.requestId.toLowerCase().includes(search) ||
-      payment.state?.toLowerCase().includes(search) ||
-      payment.clientName?.toLowerCase().includes(search)
-    )
-  }).filter(payment => {
-    if (statusFilter === 'all') return true
-    return payment.status === statusFilter
-  })
+  const filteredPayments = payments
+    .filter(payment => {
+      if (!searchTerm) return true
+      const search = searchTerm.toLowerCase()
+      return (
+        payment.requestId?.toLowerCase().includes(search) ||
+        payment.state?.toLowerCase().includes(search) ||
+        payment.clientName?.toLowerCase().includes(search) ||
+        payment.type.toLowerCase().includes(search)
+      )
+    })
+    .filter(payment => {
+      if (statusFilter === 'all') return true
+      return payment.status === statusFilter
+    })
+    .filter(payment => {
+      if (typeFilter === 'all') return true
+      return payment.type === typeFilter
+    })
 
   const totalEarnings = payments
     .filter(p => p.status === 'paid')
@@ -138,6 +215,14 @@ export default function AgentPaymentsPage() {
   const totalCompleted = payments.filter(p => p.status === 'paid').length
   const totalPending = payments.filter(p => p.status === 'pending').length
 
+  const filingEarnings = payments
+    .filter(p => p.type === 'filing' && p.status === 'paid')
+    .reduce((sum, p) => sum + p.commission, 0)
+  
+  const consultationEarnings = payments
+    .filter(p => p.type === 'consultation' && p.status === 'paid')
+    .reduce((sum, p) => sum + p.commission, 0)
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -148,17 +233,9 @@ export default function AgentPaymentsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Payment History</h1>
-        <p className="text-sm sm:text-base text-muted-foreground">
-          View your earnings and payment history
-        </p>
-      </div>
-
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Earnings</CardTitle>
           </CardHeader>
@@ -168,7 +245,7 @@ export default function AgentPaymentsPage() {
               <div className="text-2xl font-bold">{formatCurrency(totalEarnings)}</div>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {totalCompleted} completed filing{totalCompleted !== 1 ? 's' : ''}
+              {totalCompleted} completed payment{totalCompleted !== 1 ? 's' : ''}
             </p>
           </CardContent>
         </Card>
@@ -188,33 +265,32 @@ export default function AgentPaymentsPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-blue-500/5 to-transparent">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Filings</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Filing Earnings</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{payments.length}</div>
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-blue-500" />
+              <div className="text-2xl font-bold">{formatCurrency(filingEarnings)}</div>
+            </div>
             <p className="text-xs text-muted-foreground mt-1">
-              All time
+              From tax filing services
             </p>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-gradient-to-br from-purple-500/5 to-transparent">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Success Rate</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Consultation Earnings</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-blue-500" />
-              <div className="text-2xl font-bold">
-                {payments.length > 0 
-                  ? Math.round((totalCompleted / payments.length) * 100) 
-                  : 0}%
-              </div>
+              <Users className="w-5 h-5 text-purple-500" />
+              <div className="text-2xl font-bold">{formatCurrency(consultationEarnings)}</div>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              Completion rate
+              From consultation services
             </p>
           </CardContent>
         </Card>
@@ -228,15 +304,26 @@ export default function AgentPaymentsPage() {
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                 <Input
-                  placeholder="Search by request ID, state, or client..."
+                  placeholder="Search by client name, request ID, or state..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
               </div>
             </div>
+            <div className="flex items-center gap-4">
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-full md:w-[180px]">
+                <SelectValue placeholder="Filter by type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="filing">Filing</SelectItem>
+                <SelectItem value="consultation">Consultation</SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full md:w-[200px]">
+              <SelectTrigger className="w-full md:w-[180px]">
                 <SelectValue placeholder="Filter by status" />
               </SelectTrigger>
               <SelectContent>
@@ -246,6 +333,7 @@ export default function AgentPaymentsPage() {
                 <SelectItem value="failed">Failed</SelectItem>
               </SelectContent>
             </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -271,12 +359,13 @@ export default function AgentPaymentsPage() {
                 <table className="w-full">
                   <thead>
                     <tr className="border-b">
-                      <th className="text-left p-4 font-semibold text-sm">Request ID</th>
+                      <th className="text-left p-4 font-semibold text-sm">Type</th>
+                      <th className="text-left p-4 font-semibold text-sm">Client</th>
                       <th className="text-left p-4 font-semibold text-sm">State</th>
-                      <th className="text-left p-4 font-semibold text-sm">Filing Fee</th>
+                      <th className="text-left p-4 font-semibold text-sm">Amount</th>
                       <th className="text-left p-4 font-semibold text-sm">Commission</th>
                       <th className="text-left p-4 font-semibold text-sm">Status</th>
-                      <th className="text-left p-4 font-semibold text-sm">Payment Date</th>
+                      <th className="text-left p-4 font-semibold text-sm">Date</th>
                       <th className="text-left p-4 font-semibold text-sm">Actions</th>
                     </tr>
                   </thead>
@@ -284,7 +373,10 @@ export default function AgentPaymentsPage() {
                     {filteredPayments.map((payment) => (
                       <tr key={payment.id} className="border-b hover:bg-muted/50">
                         <td className="p-4">
-                          <code className="text-xs font-mono">{payment.requestId.substring(0, 12)}...</code>
+                          {getTypeBadge(payment.type)}
+                        </td>
+                        <td className="p-4 text-sm">
+                          {payment.clientName}
                         </td>
                         <td className="p-4 text-sm">
                           {payment.state || 'N/A'}
@@ -334,21 +426,20 @@ export default function AgentPaymentsPage() {
                       <div className="space-y-3">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-2">
+                            <div className="flex items-center gap-2 mb-2 flex-wrap">
+                              {getTypeBadge(payment.type)}
                               {getStatusBadge(payment.status)}
-                              <code className="text-xs font-mono text-muted-foreground truncate">
-                                {payment.requestId.substring(0, 12)}...
-                              </code>
                             </div>
-                            <p className="text-sm text-muted-foreground mb-1">
-                              State: {payment.state || 'N/A'}
+                            <p className="font-medium text-sm mb-1">{payment.clientName}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {payment.state || 'N/A'}
                             </p>
                           </div>
                         </div>
                         
                         <div className="grid grid-cols-2 gap-3 pt-2 border-t">
                           <div>
-                            <p className="text-xs text-muted-foreground mb-1">Filing Fee</p>
+                            <p className="text-xs text-muted-foreground mb-1">Amount</p>
                             <p className="font-medium text-sm">{formatCurrency(payment.amount)}</p>
                           </div>
                           <div>

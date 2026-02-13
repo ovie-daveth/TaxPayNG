@@ -16,7 +16,8 @@ import {
   ChevronRight,
   FileText,
   User,
-  Briefcase
+  Briefcase,
+  Users
 } from "lucide-react"
 import { useState } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
@@ -29,9 +30,14 @@ const navItems = [
   { href: "/consultant/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/consultant/dashboard/clients", label: "Clients", icon: User },
   { href: "/consultant/dashboard/requests", label: "Filing Requests", icon: ClipboardList },
+    {
+  label: "Consultations",
+  href: "/agent/dashboard/consultations",
+  icon: Users,
+},
   { href: "/consultant/dashboard/payments", label: "Payments", icon: Wallet },
   { href: "/agent/dashboard/portfolio", label: "Portfolio", icon: Briefcase },
-  { href: "/consultant/dashboard/settings", label: "Settings", icon: Settings },
+  { href: "/consultant/dashboard/settings", label: "Settings", icon: Settings }
 ]
 
 export function AgentSidebar() {
@@ -59,7 +65,7 @@ export function AgentSidebar() {
         "hidden md:flex fixed left-0 top-0 h-screen flex-col border-r border-border bg-card transition-all duration-300 ease-in-out z-50",
         sidebarCollapsed ? "w-16" : "w-64"
       )}>
-        <div className="p-6 border-b border-border flex items-center justify-between">
+        <div className="p-5 border-b border-border flex items-center justify-between">
           <Link href="/consultant/dashboard" className={cn(
             "flex items-center gap-2 transition-all duration-300",
             sidebarCollapsed && "justify-center"
@@ -150,7 +156,7 @@ export function AgentSidebar() {
         </div>
       </aside>
 
-      {/* Mobile Menu Button */}
+      {/* Mobile Menu Button
       <div className="md:hidden fixed top-4 left-4 z-50">
         <Button
           variant="outline"
@@ -160,7 +166,7 @@ export function AgentSidebar() {
         >
           {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
         </Button>
-      </div>
+      </div> */}
 
       {/* Mobile Sidebar */}
       {mobileMenuOpen && (

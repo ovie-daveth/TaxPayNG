@@ -25,7 +25,7 @@ import {
   Eye
 } from "lucide-react"
 import { FilingRequest } from "@/lib/types"
-import { MessagePanel } from "@/components/agent/message-panel"
+import { MessageModal } from "@/components/agent/message-panel"
 
 export default function ClientFilingRequestPage() {
   const router = useRouter()
@@ -384,14 +384,14 @@ export default function ClientFilingRequestPage() {
             </div>
           </CardContent>
         </Card>
-        <Card>
+        {/* <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">RRR</CardTitle>
           </CardHeader>
           <CardContent>
             <code className="text-sm font-mono">{request.rrr}</code>
           </CardContent>
-        </Card>
+        </Card> */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="text-sm font-medium text-muted-foreground">Created</CardTitle>
@@ -406,9 +406,11 @@ export default function ClientFilingRequestPage() {
       </div>
 
       {/* Messages Panel */}
+      {request.assignedAgentId && (
       <div id="messages">
-        <MessagePanel requestId={requestId} userType="client" />
+        <MessageModal requestId={requestId} userType="client" />
       </div>
+      )}
           </div>
         </main>
 
