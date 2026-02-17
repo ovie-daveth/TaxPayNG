@@ -21,6 +21,8 @@ import { TokenInputDialog } from "@/components/waitlist/token-input-dialog"
 import { sendSignupVerification } from "@/lib/utils/emailVerification"
 import { BusinessType } from "@/lib/types"
 import { GoogleBusinessTypeDialog } from "@/components/auth/google-business-type-dialog"
+import { AuthLayoutSide } from "@/components/auth/auth-layout-side"
+import { LandingReveal } from "@/components/landing-reveal"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
 function LogoImage(): React.JSX.Element {
@@ -538,24 +540,31 @@ function SignupPageContent() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-muted/20 to-background px-4 py-6 sm:px-6 sm:py-8">
-      <div className="w-full max-w-xl">
-        <div className="bg-card/95 backdrop-blur-sm border border-border/50 rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-10 shadow-2xl shadow-primary/5">
-          <div className="flex items-center justify-center mb-8 sm:mb-10">
-            <LogoImage />
-          </div>
+    <div className="min-h-screen flex flex-col lg:flex-row bg-background">
+      <AuthLayoutSide />
 
-          <div className="text-center mb-8 sm:mb-10">
-            <h1 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-2 sm:mb-3 bg-gradient-to-r from-foreground to-foreground/80 bg-clip-text text-transparent">
-              {isAgentInvite ? 'Complete Agent Registration' : 'Create your account'}
-            </h1>
-            <p className="text-sm sm:text-base text-muted-foreground">
-              {isAgentInvite 
-                ? `Welcome, ${invitationData?.name || 'Agent'}! Complete your registration to get started.`
-                : 'Start managing your taxes in minutes'
-              }
-            </p>
-          </div>
+      <div className="flex flex-1 flex-col items-center justify-center px-4 py-8 sm:px-6 sm:py-10 lg:py-12 overflow-y-auto">
+      <div className="lg:hidden text-center absolute top-10 md:top-8 left-8 z-50">
+          <Link href="/" className="text-sm text-muted-foreground hover:text-primary transition-colors duration-300">
+            ← <span className="hidden md:inline">Back to home</span>
+          </Link>
+        </div>
+        <div className="w-full max-w-xl">
+          <LandingReveal className="bg-card border border-border rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-10 shadow-lg">
+            <div className="lg:hidden flex justify-center mb-6">
+              <LogoImage />
+            </div>
+
+            <div className="mb-8 sm:mb-10">
+              <h1 className="landing-hero-line text-2xl sm:text-3xl md:text-4xl font-bold mb-2 text-foreground">
+                {isAgentInvite ? "Complete Agent Registration" : "Create your account"}
+              </h1>
+              <p className="landing-hero-line text-sm sm:text-base text-muted-foreground">
+                {isAgentInvite
+                  ? `Welcome, ${invitationData?.name || "Agent"}! Complete your registration to get started.`
+                  : "Start managing your taxes in minutes"}
+              </p>
+            </div>
 
           {/* Agent Invitation Alert */}
           {isAgentInvite && invitationValid && (
@@ -618,7 +627,7 @@ function SignupPageContent() {
                 onChange={(e) => setFormData(prev => ({ ...prev, fullName: e.target.value }))}
                 required 
                 disabled={isAgentInvite && !!invitationData?.name}
-                className="h-11 sm:h-12 text-base border-2 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                className="h-11 sm:h-12 text-base border-2 transition-all duration-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg"
               />
             </div>
 
@@ -632,7 +641,7 @@ function SignupPageContent() {
                 onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
                 required 
                 disabled={isAgentInvite}
-                className="h-11 sm:h-12 text-base border-2 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                className="h-11 sm:h-12 text-base border-2 transition-all duration-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg"
               />
             </div>
 
@@ -645,7 +654,7 @@ function SignupPageContent() {
                 value={formData.phone}
                 onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                 required 
-                className="h-11 sm:h-12 text-base border-2 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                className="h-11 sm:h-12 text-base border-2 transition-all duration-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg"
               />
             </div>
 
@@ -661,7 +670,7 @@ function SignupPageContent() {
                     value={formData.phone}
                     onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
                     required 
-                    className="h-11 sm:h-12 text-base border-2 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                    className="h-11 sm:h-12 text-base border-2 transition-all duration-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg"
                   />
                   <p className="text-xs text-muted-foreground">
                     Required for tax consultant registration
@@ -722,12 +731,12 @@ function SignupPageContent() {
                   value={formData.password}
                   onChange={(e) => setFormData(prev => ({ ...prev, password: e.target.value }))}
                   required 
-                  className="h-11 sm:h-12 text-base border-2 pr-12 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  className="h-11 sm:h-12 text-base border-2 pr-12 transition-all duration-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(prev => !prev)}
-                  className="absolute inset-y-0 right-0 flex items-center px-4 text-muted-foreground hover:text-primary transition-colors"
+                  className="absolute inset-y-0 right-0 flex items-center px-4 text-muted-foreground hover:text-primary transition-colors duration-300"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -738,14 +747,14 @@ function SignupPageContent() {
             <div className="space-y-2">
               <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password</Label>
               <div className="relative group">
-                <Input 
-                  id="confirmPassword" 
-                  type={showConfirmPassword ? "text" : "password"} 
-                  placeholder="••••••••" 
+                <Input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="••••••••"
                   value={formData.confirmPassword}
                   onChange={(e) => setFormData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                  required 
-                  className="h-11 sm:h-12 text-base border-2 pr-12 transition-all focus:border-primary focus:ring-2 focus:ring-primary/20"
+                  required
+                  className="h-11 sm:h-12 text-base border-2 pr-12 transition-all duration-300 focus:border-primary focus:ring-2 focus:ring-primary/20 rounded-lg"
                 />
                 <button
                   type="button"
@@ -758,10 +767,17 @@ function SignupPageContent() {
               </div>
             </div>
 
-            <Button 
-              type="submit" 
-              className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold shadow-lg shadow-primary/25 hover:shadow-xl hover:shadow-primary/30 transition-all duration-300" 
-              size="lg" 
+            <p className="text-center text-xs sm:text-sm text-muted-foreground mt-6 sm:mt-8 px-4">
+          By continuing, you agree to our{" "}
+          <Link href="/terms" className="underline hover:text-foreground transition-colors">Terms of Service</Link>
+          {" "}and{" "}
+          <Link href="/privacy" className="underline hover:text-foreground transition-colors">Privacy Policy</Link>
+        </p>
+
+            <Button
+              type="submit"
+              className="w-full h-12 sm:h-14 text-base sm:text-lg font-semibold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] rounded-lg"
+              size="lg"
               disabled={isLoading || (isAgentInvite && !invitationValid)}
             >
               {isLoading ? (
@@ -781,7 +797,7 @@ function SignupPageContent() {
                 <Button
                   type="button"
                   variant="outline"
-                  className="w-full h-11 sm:h-12 text-base sm:text-lg"
+                  className="w-full h-11 sm:h-12 text-base sm:text-lg rounded-lg transition-all duration-300 hover:border-primary/50"
                   onClick={handleGoogleSignUp}
                   disabled={isLoading || isGoogleLoading}
                 >
@@ -826,19 +842,13 @@ function SignupPageContent() {
           {isAgentInvite && (
             <div className="mt-6 text-center">
               <span className="text-sm sm:text-base text-muted-foreground">Already have an account? </span>
-              <Link href="/login" className="text-sm sm:text-base text-primary font-semibold hover:underline transition-colors">
+              <Link href="/login" className="text-sm sm:text-base text-primary font-semibold hover:underline transition-colors duration-300">
                 Log in
               </Link>
             </div>
           )}
+          </LandingReveal>
         </div>
-
-        <p className="text-center text-xs sm:text-sm text-muted-foreground mt-6 sm:mt-8 px-4">
-          By continuing, you agree to our{" "}
-          <Link href="/terms" className="underline hover:text-foreground transition-colors">Terms of Service</Link>
-          {" "}and{" "}
-          <Link href="/privacy" className="underline hover:text-foreground transition-colors">Privacy Policy</Link>
-        </p>
       </div>
 
       <TokenInputDialog

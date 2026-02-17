@@ -1,11 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Card } from "@/components/ui/card"
 import { FileText, ExternalLink, CheckCircle, Upload, Building2, Loader2, Info } from "lucide-react"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useAuth } from "@/lib/hooks/useAuth"
@@ -13,6 +13,9 @@ import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { userService, documentService } from "@/lib/services"
 import { toast } from "sonner"
 import { uploadToImageKit } from "@/lib/utils/imagekit"
+import { AuthLayoutSide } from "@/components/auth/auth-layout-side"
+import { LandingReveal } from "@/components/landing-reveal"
+import { Separator } from "@/components/ui/separator"
 
 export default function VerifyTaxIdPage() {
   const router = useRouter()
@@ -279,34 +282,34 @@ export default function VerifyTaxIdPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 px-4 py-6 sm:py-12">
-      <div className="w-full max-w-2xl">
-        <Card className="p-4 sm:p-6 md:p-8">
-          {/* Header - Different for document upload */}
-          <div className="text-center mb-6 sm:mb-8">
-            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-              {showDocumentUpload ? (
-                <Building2 className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
-              ) : (
-                <FileText className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
-              )}
+    <div className="min-h-screen flex flex-col lg:flex-row bg-background">
+      <AuthLayoutSide />
+
+      <div className="flex flex-1 items-center justify-center px-4 py-8 sm:px-6 sm:py-10 lg:py-12 overflow-y-auto">
+        <div className="w-full max-w-2xl">
+          <LandingReveal className="bg-card border border-border rounded-2xl sm:rounded-3xl p-6 sm:p-8 md:p-10 shadow-lg">
+            {/* Header */}
+            <div className="mb-6 sm:mb-8">
+              <div className="landing-hero-line w-12 h-12 sm:w-14 sm:h-14 bg-primary/10 rounded-xl flex items-center justify-center mb-4 text-primary">
+                {showDocumentUpload ? (
+                  <Building2 className="w-6 h-6 sm:w-7 sm:h-7" />
+                ) : (
+                  <FileText className="w-6 h-6 sm:w-7 sm:h-7" />
+                )}
+              </div>
+              <h1 className="landing-hero-line text-2xl sm:text-3xl font-bold mb-2 text-foreground">
+                {showDocumentUpload ? "Verify Your Business" : "Add Your Tax ID"}
+              </h1>
+              <p className="landing-hero-line text-sm sm:text-base text-muted-foreground">
+                {showDocumentUpload
+                  ? "Upload business documents to verify your company"
+                  : "Your Tax ID helps us personalize tax tracking, reporting, and compliance features."}
+              </p>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-bold mb-2">
-              {showDocumentUpload ? "Verify Your Business" : "Add Your Tax ID"}
-            </h1>
-            <p className="text-sm sm:text-base text-muted-foreground">
-              {showDocumentUpload 
-                ? "Upload business documents to verify your company"
-                : "Your Tax ID helps us personalize tax tracking, reporting, and compliance features."
-              }
-            </p>
-          </div>
 
           {showDocumentUpload ? (
-            /* Document Upload Section */
             <div className="space-y-4 sm:space-y-6">
-              {/* Success Message */}
-              <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 sm:p-4 flex items-start gap-2 sm:gap-3">
+              <div className="bg-primary/10 border border-primary/20 rounded-xl p-3 sm:p-4 flex items-start gap-2 sm:gap-3">
                 <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0 mt-0.5" />
                 <div>
                   <p className="text-xs sm:text-sm font-medium text-primary">Tax ID Saved Successfully!</p>
@@ -316,9 +319,7 @@ export default function VerifyTaxIdPage() {
                 </div>
               </div>
 
-              {/* Document Upload Fields */}
               <div className="space-y-3 sm:space-y-4">
-                {/* CAC Certificate */}
                 <div className="space-y-2">
                   <Label htmlFor="cac" className="text-sm sm:text-base">CAC Certificate (Company Registration)</Label>
                   <div className="flex items-center gap-2">
@@ -326,9 +327,9 @@ export default function VerifyTaxIdPage() {
                       id="cac"
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => handleFileChange('cac', e.target.files?.[0] || null)}
+                      onChange={(e) => handleFileChange("cac", e.target.files?.[0] || null)}
                       disabled={uploadingDocuments}
-                      className="flex-1 text-xs sm:text-sm"
+                      className="flex-1 text-xs sm:text-sm rounded-lg border-2 transition-all duration-300"
                     />
                     {businessDocuments.cac && (
                       <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
@@ -339,7 +340,6 @@ export default function VerifyTaxIdPage() {
                   </p>
                 </div>
 
-                {/* Memorandum & Articles of Association */}
                 <div className="space-y-2">
                   <Label htmlFor="memorandum" className="text-sm sm:text-base">Memorandum & Articles of Association</Label>
                   <div className="flex items-center gap-2">
@@ -347,9 +347,9 @@ export default function VerifyTaxIdPage() {
                       id="memorandum"
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => handleFileChange('memorandum', e.target.files?.[0] || null)}
+                      onChange={(e) => handleFileChange("memorandum", e.target.files?.[0] || null)}
                       disabled={uploadingDocuments}
-                      className="flex-1 text-xs sm:text-sm"
+                      className="flex-1 text-xs sm:text-sm rounded-lg border-2 transition-all duration-300"
                     />
                     {businessDocuments.memorandum && (
                       <CheckCircle className="w-4 h-4 sm:w-5 sm:h-5 text-primary flex-shrink-0" />
@@ -361,11 +361,10 @@ export default function VerifyTaxIdPage() {
                 </div>
               </div>
 
-              {/* Upload Button */}
               <Button
                 type="button"
                 onClick={handleUploadDocuments}
-                className="w-full"
+                className="w-full h-11 sm:h-12 rounded-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
                 size="lg"
                 disabled={uploadingDocuments || !Object.values(businessDocuments).some(Boolean)}
               >
@@ -382,27 +381,21 @@ export default function VerifyTaxIdPage() {
                 )}
               </Button>
 
-              {/* Note */}
               <p className="text-xs text-center text-muted-foreground">
                 You can upload additional documents later in your dashboard
               </p>
 
-              {/* Skip Option */}
               <div className="text-center">
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   type="button"
                   onClick={() => {
-                    if (profile?.businessType === 'sme') {
-                      router.push("/dashboard-sme")
-                    } else if (profile?.businessType === 'creator') {
-                      router.push("/dashboard-creator")
-                    } else {
-                      router.push("/dashboard")
-                    }
+                    if (profile?.businessType === "sme") router.push("/dashboard-sme")
+                    else if (profile?.businessType === "creator") router.push("/dashboard-creator")
+                    else router.push("/dashboard")
                   }}
                   disabled={uploadingDocuments}
-                  className="text-sm sm:text-base"
+                  className="text-sm sm:text-base transition-colors duration-300"
                 >
                   Skip for now
                 </Button>
@@ -412,136 +405,130 @@ export default function VerifyTaxIdPage() {
               </div>
             </div>
           ) : (
-            /* Tax ID Section */
             <>
-            <form onSubmit={handleSaveTaxId} className="space-y-4 sm:space-y-6">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="taxId" className="text-sm sm:text-base">Tax Identification Number (Tax ID)</Label>
-                  <button
-                    type="button"
-                    onClick={() => setShowTaxIdInfoModal(true)}
-                    className="text-muted-foreground hover:text-primary transition-colors"
-                    aria-label="Learn about Tax ID"
-                  >
-                    <Info className="w-4 h-4 sm:w-5 sm:h-5" />
-                  </button>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Input 
-                    id="taxId" 
-                    type="text" 
-                    placeholder="Enter your 13-digit Tax ID" 
+              <form onSubmit={handleSaveTaxId} className="space-y-4 sm:space-y-6">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="taxId" className="text-sm sm:text-base">Tax Identification Number (Tax ID)</Label>
+                    <button
+                      type="button"
+                      onClick={() => setShowTaxIdInfoModal(true)}
+                      className="text-muted-foreground hover:text-primary transition-colors duration-300"
+                      aria-label="Learn about Tax ID"
+                    >
+                      <Info className="w-4 h-4 sm:w-5 sm:h-5" />
+                    </button>
+                  </div>
+                  <Input
+                    id="taxId"
+                    type="text"
+                    placeholder="Enter your 13-digit Tax ID"
                     value={taxId}
-                    onChange={(e) => setTaxId(e.target.value.replace(/\D/g, ''))}
+                    onChange={(e) => setTaxId(e.target.value.replace(/\D/g, ""))}
                     maxLength={13}
-                    required 
+                    required
                     disabled={isVerifying || isLoading}
-                    className="h-10 sm:h-11 text-xs sm:text-sm placeholder:text-xs sm:placeholder:text-sm flex-1"
+                    className="h-11 sm:h-12 text-base border-2 rounded-lg transition-all duration-300 focus:border-primary focus:ring-2 focus:ring-primary/20"
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Tax ID is typically a 13-digit number used for tax identification in Nigeria.
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Tax ID is typically an 13-digit number used for tax identification in Nigeria.
+
+                <Button
+                  type="submit"
+                  className="w-full h-11 sm:h-12 text-sm sm:text-base font-semibold rounded-lg transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+                  size="lg"
+                  disabled={isVerifying || isLoading || !taxId}
+                >
+                  {isLoading || isVerifying ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    "Save Tax ID"
+                  )}
+                </Button>
+              </form>
+
+              <div className="relative my-6 sm:my-8">
+                <div className="absolute inset-0 flex items-center">
+                  <Separator className="w-full" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-card px-2 text-muted-foreground">or</span>
+                </div>
+              </div>
+
+              <div className="bg-muted/30 border border-border rounded-xl p-4 sm:p-6 transition-shadow duration-300 hover:border-primary/20">
+                <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
+                  <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0 text-primary">
+                    <ExternalLink className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 w-full">
+                    <h3 className="font-semibold mb-2 text-sm sm:text-base">Don&apos;t know your Tax ID?</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground mb-4">
+                      You can retrieve your Tax ID using the official NRS Tax ID portal.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={handleVerifyTaxIdPortal}
+                      disabled={isVerifying || isLoading}
+                      className="w-full sm:w-auto text-xs sm:text-sm font-semibold border-2 border-border rounded-lg p-2.5 sm:p-3 flex items-center justify-center gap-2 cursor-pointer hover:border-primary/50 transition-all duration-300"
+                      aria-label="Open Tax ID portal"
+                      title="Open Tax ID portal"
+                    >
+                      Retrieve Tax ID (NRS Portal)
+                      <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
+                    </button>
+                    <p className="text-xs text-muted-foreground mt-3 sm:hidden">
+                      On mobile, the portal may open in this page. Allow pop-ups if you prefer a new window.
+                    </p>
+                    {popupBlocked && (
+                      <p className="text-xs text-destructive mt-2">
+                        Pop-up blocked. Please enable pop-ups for OTax and try again.{" "}
+                        <button
+                          type="button"
+                          onClick={() => setShowPopupInstructions(true)}
+                          className="underline underline-offset-2 text-destructive"
+                        >
+                          Learn how
+                        </button>
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="text-center">
+                <Button
+                  variant="ghost"
+                  type="button"
+                  onClick={() => {
+                    if (profile?.businessType === "sme") router.push("/dashboard-sme")
+                    else if (profile?.businessType === "creator") router.push("/dashboard-creator")
+                    else router.push("/dashboard")
+                  }}
+                  disabled={isVerifying || isLoading}
+                  className="text-sm sm:text-base transition-colors duration-300"
+                >
+                  Skip for now
+                </Button>
+                <p className="text-xs text-muted-foreground mt-2">
+                  You can add your Tax ID and business documents later in settings
                 </p>
               </div>
-
-              <Button 
-                type="submit" 
-                className="w-full h-11 sm:h-12 text-sm sm:text-base font-semibold" 
-                size="lg" 
-                disabled={isVerifying || isLoading || !taxId}
-              >
-               
-              {
-                 isLoading || isVerifying ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Saving...
-                  </>
-                ) : (
-                  "Save Tax ID"
-                )
-              }
-              </Button>
-            </form>
-
-            {/* Divider */}
-            <div className="relative my-6 sm:my-8">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">or</span>
-              </div>
-            </div>
-
-            {/* Get Tax ID Section */}
-            <div className="bg-muted/50 border border-border rounded-lg p-4 sm:p-6">
-              <div className="flex flex-col sm:flex-row items-start gap-3 sm:gap-4">
-                <div className="w-10 h-10 bg-accent/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <ExternalLink className="w-5 h-5 text-accent" />
-                </div>
-                <div className="flex-1 w-full">
-                  <h3 className="font-semibold mb-2 text-sm sm:text-base">Don't know your Tax ID?</h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground mb-4">
-                    You can retrieve your Tax ID using the official FIRS Tax ID portal.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleVerifyTaxIdPortal}
-                    disabled={isVerifying || isLoading}
-                    className="w-full sm:w-auto text-xs sm:text-sm font-semibold border border-border rounded-lg p-2 sm:p-3 flex items-center justify-center gap-2 cursor-pointer"
-                    aria-label="Open FIRS Tax ID portal"
-                    title="Open FIRS Tax ID portal"
-                  >
-                    Retrieve Tax ID (FIRS Portal)
-                    <ExternalLink className="w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground hover:text-primary transition-colors" />
-                  </button>
-                  <p className="text-xs text-muted-foreground mt-3 sm:hidden">
-                    Having trouble on mobile? Allow pop-ups for OTax so the portal can open in a new window.
-                  </p>
-                  {(popupBlocked) && (
-                    <p className="text-xs text-destructive mt-2">
-                      Pop-up blocked. Please enable pop-ups for OTax and try again.{" "}
-                      <button
-                        type="button"
-                        onClick={() => setShowPopupInstructions(true)}
-                        className="underline underline-offset-2 text-destructive"
-                      >
-                        Learn how
-                      </button>
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Skip Option - Show for all business types */}
-            <div className="text-center">
-              <Button 
-                variant="ghost" 
-                type="button"
-                onClick={() => {
-                  if (profile?.businessType === 'sme') {
-                    router.push("/dashboard-sme")
-                  } else if (profile?.businessType === 'creator') {
-                    router.push("/dashboard-creator")
-                  } else {
-                    router.push("/dashboard")
-                  }
-                }}
-                disabled={isVerifying || isLoading}
-                className="text-sm sm:text-base"
-              >
-                Skip for now
-              </Button>
-              <p className="text-xs text-muted-foreground mt-2">
-                You can add your Tax ID and business documents later in settings
-              </p>
-            </div>
             </>
           )}
-        </Card>
+          </LandingReveal>
+        </div>
+
+        <div className="lg:hidden mt-6 text-center">
+          <Link href="/" className="text-sm text-muted-foreground hover:text-primary transition-colors duration-300">
+            ← Back to home
+          </Link>
+        </div>
       </div>
       {/* Tax ID Info Modal */}
       <Dialog open={showTaxIdInfoModal} onOpenChange={setShowTaxIdInfoModal}>
