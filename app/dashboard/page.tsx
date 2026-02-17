@@ -93,10 +93,7 @@ export default function DashboardPage() {
           {/* Analytics Insights */}
           <AnalyticsInsights 
             businessType="freelancer"
-            periodType={periodType}
-            selectedYear={selectedYear}
-            selectedQuarter={selectedQuarter}
-            sidebarCollapsed={false}
+           
           />
 
           {/* Recent Activity */}

@@ -143,6 +143,7 @@
 
   html {
     overflow-x: hidden;
+    scroll-behavior: smooth;
   }
 
   /* Custom Thin & Fancy Scrollbar Styles */
@@ -227,6 +228,64 @@
 
   .dark * {
     scrollbar-color: oklch(0.65 0.13 137) transparent;
+  }
+}
+
+/* Landing page scroll-triggered animations */
+.landing-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.landing-reveal.in-view {
+  opacity: 1;
+  transform: translateY(0);
+}
+.landing-reveal.in-view .landing-reveal-item {
+  opacity: 1;
+  transform: translateY(0);
+}
+.landing-reveal-item {
+  opacity: 0;
+  transform: translateY(20px);
+  transition:
+    opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.landing-reveal.in-view .landing-reveal-item:nth-child(1) { transition-delay: 0ms; }
+.landing-reveal.in-view .landing-reveal-item:nth-child(2) { transition-delay: 70ms; }
+.landing-reveal.in-view .landing-reveal-item:nth-child(3) { transition-delay: 140ms; }
+.landing-reveal.in-view .landing-reveal-item:nth-child(4) { transition-delay: 210ms; }
+.landing-reveal.in-view .landing-reveal-item:nth-child(5) { transition-delay: 280ms; }
+.landing-reveal.in-view .landing-reveal-item:nth-child(6) { transition-delay: 350ms; }
+.landing-reveal.in-view .landing-reveal-item:nth-child(7) { transition-delay: 420ms; }
+.landing-reveal.in-view .landing-reveal-item:nth-child(8) { transition-delay: 490ms; }
+.landing-reveal.in-view .landing-reveal-item:nth-child(9) { transition-delay: 560ms; }
+.landing-reveal.in-view .landing-reveal-item:nth-child(10) { transition-delay: 630ms; }
+.landing-reveal.in-view .landing-reveal-item:nth-child(11) { transition-delay: 700ms; }
+.landing-reveal.in-view .landing-reveal-item:nth-child(12) { transition-delay: 770ms; }
+
+/* Hero entrance (run once on load) */
+.landing-hero-line {
+  opacity: 0;
+  transform: translateY(16px);
+  animation: landing-hero-in 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.landing-hero-line:nth-child(1) { animation-delay: 0ms; }
+.landing-hero-line:nth-child(2) { animation-delay: 80ms; }
+.landing-hero-line:nth-child(3) { animation-delay: 160ms; }
+.landing-hero-line:nth-child(4) { animation-delay: 240ms; }
+.landing-hero-line:nth-child(5) { animation-delay: 320ms; }
+.landing-hero-line:nth-child(6) { animation-delay: 400ms; }
+.landing-hero-line:nth-child(7) { animation-delay: 480ms; }
+.landing-hero-line:nth-child(8) { animation-delay: 560ms; }
+.landing-hero-line:nth-child(9) { animation-delay: 640ms; }
+@keyframes landing-hero-in {
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
