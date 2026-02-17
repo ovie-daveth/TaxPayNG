@@ -17,25 +17,14 @@ function LayoutContent({
 }>) {
   const { sidebarCollapsed } = useSidebar()
   const { user, loading } = useAuth()
-  const { profile, loading: profileLoading } = useUserProfile()
+  const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
   const router = useRouter()
 
-  useEffect(() => {
-    if (!loading && !profileLoading) {
-      if (!user) {
-        router.push("/login")
-        return
-      }
-      if (profile?.businessType !== 'consultant') {
-        router.push('/dashboard')
-        return
-      }
-      if (profile?.consultantKycCompleted !== true) {
-        router.push('/consultant/kyc')
-        return
-      }
+ useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login")
     }
-  }, [user, profile, loading, profileLoading, router])
+  }, [user, loading, router])
 
   if (loading || profileLoading) {
     return (

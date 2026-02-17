@@ -15,7 +15,6 @@ import { FreeTrialBanner } from "@/components/subscription/free-trial-banner"
 import { SubscriptionRequiredModal } from "@/components/subscription/subscription-required-modal"
 import { cn } from "@/lib/utils"
 import { FloatingSupportButton } from "@/components/support/floating-support-button"
-import { isConsultant } from "@/lib/utils/businessTypeHelpers"
 
 function LayoutContent({
   children,
@@ -24,19 +23,32 @@ function LayoutContent({
 }>) {
   const { sidebarCollapsed } = useSidebar()
   const { user, loading } = useAuth()
-  const { profile, loading: profileLoading } = useUserProfile()
+  const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
   const { freeTrialStatus, isBlocked, loading: subscriptionLoading } = useSubscription()
   const router = useRouter()
   const [showWarningModal, setShowWarningModal] = useState(false)
   const [hasShownWarning, setHasShownWarning] = useState(false)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
 
-  useEffect(() => {
+ useEffect(() => {
     if (!loading && !user) {
       router.push("/login")
     }
-  }, [user, loading, router])
 
+    if (!loading && profile) {
+      refetchProfile().catch((error) => {
+        console.error("Error refetching profile:", error)
+      })
+
+      setTimeout(() => {
+        refetchProfile().catch((error) => {
+        router.push("/login")
+        console.error("Error refetching profile on timeout:", error)
+      })
+      }, 300)
+    }
+  }, [user, loading, router, profile])
+  
   // Check free trial status and show modals
   useEffect(() => {
     if (subscriptionLoading || profileLoading || !profile) {
@@ -67,73 +79,6 @@ function LayoutContent({
       return
     }
     
-    const currentPath = window.location.pathname
-    // Preserve query parameters (especially invoiceId for invoice notifications)
-    const searchParams = new URLSearchParams(window.location.search)
-    const queryString = searchParams.toString()
-    const querySuffix = queryString ? `?${queryString}` : ''
-    
-    // Tax Consultant redirects - consultants have their own pages, redirect them away from dashboard
-    // Check for both 'consultant' and legacy 'agent' for backward compatibility
-    if (isConsultant(profile.businessType)) {
-      // Only redirect if we're in the dashboard area (not already on consultant pages)
-      if (!currentPath.startsWith('/consultant')) {
-        // If KYC not completed, go to KYC page
-        console.log("Consultant KYC completed:", profile.consultantKycCompleted)
-        if (profile.consultantKycCompleted !== true) {
-          router.push('/consultant/kyc' + querySuffix)
-          return
-        }
-        // If KYC completed, go to consultant dashboard
-        router.push('/consultant/dashboard' + querySuffix)
-        return
-      }
-      // Already on agent pages, don't interfere
-      return
-    }
-    
-    if (profile.businessType === 'sme' && !currentPath.startsWith('/dashboard-sme')) {
-      console.log("Redirecting SME to /dashboard-sme")
-      // Preserve the path and query params when redirecting
-      const targetPath = currentPath.replace('/dashboard', '/dashboard-sme')
-      router.push(targetPath + querySuffix)
-      return
-    }
-
-    // Creator redirects - check first before freelancer checks
-    if (profile.businessType === 'creator') {
-      if (currentPath === '/dashboard' || currentPath === '/dashboard/') {
-        console.log("Redirecting creator from /dashboard to /dashboard-creator")
-        router.push('/dashboard-creator' + querySuffix)
-        return
-      }
-      if (currentPath.startsWith('/dashboard-sme')) {
-        console.log("Redirecting creator from /dashboard-sme to /dashboard-creator")
-        const targetPath = currentPath.replace('/dashboard-sme', '/dashboard-creator')
-        router.push(targetPath + querySuffix)
-        return
-      }
-      if (!currentPath.startsWith('/dashboard-creator')) {
-        console.log("Redirecting creator to /dashboard-creator")
-        const targetPath = currentPath.replace('/dashboard', '/dashboard-creator')
-        router.push(targetPath + querySuffix)
-        return
-      }
-    }
-
-    if (profile.businessType === 'freelancer' && currentPath.startsWith('/dashboard-sme')) {
-      console.log("Redirecting freelancer from /dashboard-sme to /dashboard")
-      const targetPath = currentPath.replace('/dashboard-sme', '/dashboard')
-      router.push(targetPath + querySuffix)
-      return
-    }
-
-    if (profile.businessType === 'freelancer' && currentPath.startsWith('/dashboard-creator')) {
-      console.log("Redirecting freelancer from /dashboard-creator to /dashboard")
-      const targetPath = currentPath.replace('/dashboard-creator', '/dashboard')
-      router.push(targetPath + querySuffix)
-      return
-    }
   }, [profile, router])
 
   if (loading) {

@@ -23,7 +23,7 @@ function LayoutContent({
 }>) {
   const { sidebarCollapsed } = useSidebar()
   const { user, loading } = useAuth()
-  const { profile, loading: profileLoading } = useUserProfile()
+  const { profile, loading: profileLoading, refetchProfile } = useUserProfile()
   const { freeTrialStatus, isBlocked, loading: subscriptionLoading } = useSubscription()
   const router = useRouter()
   const [showWarningModal, setShowWarningModal] = useState(false)
@@ -34,7 +34,20 @@ function LayoutContent({
     if (!loading && !user) {
       router.push("/login")
     }
-  }, [user, loading, router])
+
+    if (!loading && profile) {
+      refetchProfile().catch((error) => {
+        console.error("Error refetching profile:", error)
+      })
+
+      setTimeout(() => {
+        refetchProfile().catch((error) => {
+        router.push("/login")
+        console.error("Error refetching profile on timeout:", error)
+      })
+      }, 300)
+    }
+  }, [user, loading, router, profile])
 
   // Check free trial status and show modals
   useEffect(() => {
@@ -54,31 +67,6 @@ function LayoutContent({
     }
   }, [freeTrialStatus, isBlocked, subscriptionLoading, profileLoading, profile, hasShownWarning])
 
-
-  useEffect(() => {
-    if (!profile || profileLoading) return
-    
-    // Preserve query parameters (especially invoiceId for invoice notifications)
-    const searchParams = new URLSearchParams(window.location.search)
-    const queryString = searchParams.toString()
-    const querySuffix = queryString ? `?${queryString}` : ''
-    
-    // Redirect freelancers to their dashboard if they somehow access SME dashboard
-    if (profile.businessType === 'freelancer' && window.location.pathname.startsWith('/dashboard-sme')) {
-      const targetPath = window.location.pathname.replace('/dashboard-sme', '/dashboard')
-      router.push(targetPath + querySuffix)
-      return
-    }
-
-    if (profile.businessType === 'creator') {
-      const targetPath = window.location.pathname.replace('/dashboard-sme', '/dashboard-creator')
-      router.push(targetPath + querySuffix)
-      return
-    }
-    
-    // TIN verification and business documents are optional - users can skip and add them later in settings
-    // Removed the redirect to /verify-tin to allow users to use the dashboard without TIN
-  }, [profile, profileLoading, router])
 
   if (loading || profileLoading) {
     return (
