@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Calculator, LayoutDashboard, Users, DollarSign, FileText, Settings, LogOut, ChevronLeft, ChevronRight, TrendingUp, Menu, Bell, User, Receipt, FileCheck, IdCardIcon, MessageSquare, Plus, X, Store } from "lucide-react"
+import { Calculator, LayoutDashboard, Users, DollarSign, FileText, Settings, LogOut, ChevronLeft, ChevronRight, TrendingUp, Menu, Bell, User, Receipt, FileCheck, IdCardIcon, MessageSquare, Plus, X, Store, BookOpen, ScrollText } from "lucide-react"
 import OtaxLogo from "../OtaxLogo"
 import { useState, useEffect } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
@@ -14,8 +14,9 @@ import { NotificationBell } from "../notifications/notification-bell"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useUserProfile } from "@/lib/contexts/user-profile-context"
 import { BusinessSwitcher } from "@/components/business/business-switcher"
+import { useCanUseGeneralLedger } from "@/lib/hooks/useCanUseGeneralLedger"
 
-const navItems = [
+const baseNavItems = [
   { href: "/dashboard-sme", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard-sme/transactions", label: "Transactions", icon: Receipt },
   { href: "/dashboard-sme/invoices", label: "Invoices", icon: FileCheck },
@@ -31,15 +32,26 @@ const navItems = [
   { href: "/dashboard-sme/settings", label: "Settings", icon: Settings },
 ]
 
+const glNavItems = [
+  { href: "/dashboard-sme/chart-of-accounts", label: "Chart of Accounts", icon: BookOpen },
+  { href: "/dashboard-sme/ledger", label: "General Ledger", icon: ScrollText },
+]
+
 export function DashboardNavSME() {
   const pathname = usePathname()
   const router = useRouter()
   const { sidebarCollapsed, toggleSidebar } = useSidebar()
   const { logout, user } = useAuth()
   const { profile } = useUserProfile()
+  const canUseGL = useCanUseGeneralLedger()
+  const taxCalcIndex = baseNavItems.findIndex((item) => item.href.includes("tax-calculator"))
+  const navItems =
+    canUseGL && taxCalcIndex >= 0
+      ? [...baseNavItems.slice(0, taxCalcIndex + 1), ...glNavItems, ...baseNavItems.slice(taxCalcIndex + 1)]
+      : baseNavItems
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const [hasFilingRequests, setHasFilingRequests] = useState(false)
-  
+
   // Close the mobile menu whenever navigation occurs (e.g., when BusinessSwitcher "Manage" navigates)
   useEffect(() => {
     setIsMobileMenuOpen(false)
@@ -102,7 +114,6 @@ export function DashboardNavSME() {
     }
   }
 
-  // Filter nav items - filing requests is always visible
   const filteredNavItems = navItems
 
   // Items shown in bottom nav - we keep high-frequency modules for SMEs

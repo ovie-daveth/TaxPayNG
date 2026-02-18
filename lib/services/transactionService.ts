@@ -3,6 +3,7 @@ import { Transaction, TransactionFilters, ApiResponse, PaginatedResponse, Docume
 import { documentService } from './documentService'
 import { userService } from './userService'
 import { capitalAssetService } from './capitalAssetService'
+import { postExpenseToLedger, postIncomeToLedger } from './postTransactionToLedger'
 
 export class TransactionService extends BaseService {
   constructor() {
@@ -244,6 +245,20 @@ export class TransactionService extends BaseService {
             transactionData.date,
             transactionType
           )
+        }
+      }
+
+      // Post to General Ledger (SME + PLATINUM only): expense → Dr Expense Cr Cash, income → Dr Cash Cr Revenue
+      const profileForLedger = await userService.getProfile(userId)
+      if (profileForLedger) {
+        try {
+          if (createdTransaction.type === 'expense') {
+            await postExpenseToLedger(userId, createdTransaction, profileForLedger)
+          } else if (createdTransaction.type === 'income') {
+            await postIncomeToLedger(userId, createdTransaction, profileForLedger)
+          }
+        } catch (ledgerError) {
+          console.error('Post to General Ledger failed (transaction still saved):', ledgerError)
         }
       }
 

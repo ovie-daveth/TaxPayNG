@@ -19,6 +19,8 @@ const path = require('path');
 const args = process.argv.slice(2);
 const rulesOnly = args.includes('--rules-only');
 const indexesOnly = args.includes('--indexes-only');
+const projectArg = args.find(a => a.startsWith('--project='));
+const projectFromCli = projectArg ? projectArg.split('=')[1] : null;
 
 console.log('🔥 Starting Firestore rules deployment...');
 
@@ -80,8 +82,10 @@ try {
     firebaseProject = 'athena-bb111'; // Test/Preview/Development project
   }
   
-  // Allow override via environment variable
-  if (process.env.FIREBASE_PROJECT_ID) {
+  // Override: 1) --project=id on CLI, 2) FIREBASE_PROJECT_ID env
+  if (projectFromCli) {
+    firebaseProject = projectFromCli;
+  } else if (process.env.FIREBASE_PROJECT_ID) {
     firebaseProject = process.env.FIREBASE_PROJECT_ID;
   }
 

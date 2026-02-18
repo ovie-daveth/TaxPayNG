@@ -220,6 +220,16 @@ service cloud.firestore {
       allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAuthenticatedUser());
     }
+
+    // General Ledger: Chart of Accounts (entity-scoped; app enforces entity ownership via businessEntities)
+    match /accounts/{accountId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // General Ledger: Journal Entries (entity-scoped; app enforces entity ownership via businessEntities)
+    match /journal_entries/{entryId} {
+      allow read, write: if isAuthenticated();
+    }
     
     // Waitlist Verifications Collection (temporary, server-side only)
     match /waitlistVerifications/{emailId} {

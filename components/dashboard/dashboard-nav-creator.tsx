@@ -4,7 +4,7 @@ import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Calculator, LayoutDashboard, Settings, LogOut, ChevronLeft, ChevronRight, Receipt, FileText, Bell, IdCardIcon, FileCheck, BarChart3, MessageSquare, Plus, Menu, Handshake, X, Store } from "lucide-react"
+import { Calculator, LayoutDashboard, Settings, LogOut, ChevronLeft, ChevronRight, Receipt, FileText, Bell, IdCardIcon, FileCheck, BarChart3, MessageSquare, Plus, Menu, Handshake, X, Store, BookOpen, ScrollText } from "lucide-react"
 import OtaxLogo from "../OtaxLogo"
 import { useState, useEffect } from "react"
 import { useSidebar } from "@/lib/contexts/sidebar-context"
@@ -22,8 +22,9 @@ import { useSubscription } from "@/lib/hooks/useSubscription"
 import { SubscriptionRequiredModal } from "../subscription/subscription-required-modal"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { BusinessSwitcher } from "@/components/business/business-switcher"
+import { useCanUseGeneralLedger } from "@/lib/hooks/useCanUseGeneralLedger"
 
-const navItems = [
+const baseNavItems = [
   { href: "/dashboard-creator", label: "Dashboard", icon: LayoutDashboard },
   { href: "/dashboard-creator/transactions", label: "Transactions", icon: Receipt },
   { href: "/dashboard-creator/invoices", label: "Invoices", icon: FileCheck },
@@ -37,12 +38,23 @@ const navItems = [
   { href: "/dashboard-creator/settings", label: "Settings", icon: Settings },
 ]
 
+const glNavItems = [
+  { href: "/dashboard-sme/chart-of-accounts", label: "Chart of Accounts", icon: BookOpen },
+  { href: "/dashboard-sme/ledger", label: "General Ledger", icon: ScrollText },
+]
+
 export function DashboardNavCreator() {
   const pathname = usePathname()
   const router = useRouter()
   const { sidebarCollapsed, toggleSidebar } = useSidebar()
   const { logout, user } = useAuth()
   const { profile } = useUserProfile()
+  const canUseGL = useCanUseGeneralLedger()
+  const taxCalcIndex = baseNavItems.findIndex((item) => item.href.includes("tax-calculator"))
+  const navItems =
+    canUseGL && taxCalcIndex >= 0
+      ? [...baseNavItems.slice(0, taxCalcIndex + 1), ...glNavItems, ...baseNavItems.slice(taxCalcIndex + 1)]
+      : baseNavItems
   const [hasFilingRequests, setHasFilingRequests] = useState(false)
   const [isAddTransactionDialogOpen, setIsAddTransactionDialogOpen] = useState(false)
   const [isAddReminderDialogOpen, setIsAddReminderDialogOpen] = useState(false)
