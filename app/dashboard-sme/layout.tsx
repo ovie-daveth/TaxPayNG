@@ -47,7 +47,7 @@ function LayoutContent({
       })
       }, 300)
     }
-  }, [user, loading, router, profile])
+  }, [user, loading])
 
   // Check free trial status and show modals
   useEffect(() => {

@@ -1,7 +1,5 @@
 "use client"
-
 import { useState, useEffect } from "react"
-import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,7 +22,6 @@ export default function VerifyTaxIdPage() {
   const [taxId, setTaxId] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isVerifying, setIsVerifying] = useState(false)
-  const [tinVerified, setTinVerified] = useState(false)
   const [showDocumentUpload, setShowDocumentUpload] = useState(false)
   const [businessDocuments, setBusinessDocuments] = useState<{
     cac?: File
@@ -45,7 +42,7 @@ export default function VerifyTaxIdPage() {
 
   useEffect(() => {
     if (!user && !authLoading) {
-      // console.log("No user after auth loaded, redirecting to login")
+      console.log("No user after auth loaded, redirecting to login")
       router.push("/login")
     }
   }, [user, authLoading, router])
@@ -60,21 +57,20 @@ export default function VerifyTaxIdPage() {
     )
 
     // If user has TIN and is SME with documents, redirect to dashboard
-    if (profile.taxId && profile.businessType === 'sme') {
+    if ((profile.taxId || profile.taxId === "") && profile.businessType === 'sme') {
       if (hasBusinessDocuments) {
         console.log("TIN and business documents exist, redirecting to SME dashboard")
         router.push("/dashboard-sme")
         return
       } else {
         // TIN exists but no documents - show document upload
-        setTinVerified(true)
         setShowDocumentUpload(true)
         return
       }
     }
 
     // If user has TIN and is not SME, redirect to appropriate dashboard
-    if (profile.taxId && profile.businessType !== 'sme') {
+    if ((profile.taxId || profile.taxId === "") && profile.businessType !== 'sme') {
       if (profile.businessType === 'creator') {
         router.push("/dashboard-creator")
       } else {
@@ -85,7 +81,6 @@ export default function VerifyTaxIdPage() {
 
     // If no TIN, show the TIN input form
     setShowDocumentUpload(false)
-    setTinVerified(false)
   }, [profile, loading, router])
 
   if (!user && authLoading) {
@@ -198,7 +193,6 @@ export default function VerifyTaxIdPage() {
 
       // Check if user is SME - they need to upload documents
       if (updatedProfile?.businessType === 'sme') {
-        setTinVerified(true)
         setShowDocumentUpload(true)
       } else {
         // Freelancer - go directly to dashboard
@@ -522,12 +516,6 @@ export default function VerifyTaxIdPage() {
             </>
           )}
           </LandingReveal>
-        </div>
-
-        <div className="lg:hidden mt-6 text-center">
-          <Link href="/" className="text-sm text-muted-foreground hover:text-primary transition-colors duration-300">
-            ← Back to home
-          </Link>
         </div>
       </div>
       {/* Tax ID Info Modal */}
