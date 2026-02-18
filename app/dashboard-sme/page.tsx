@@ -53,8 +53,9 @@ export default function SMEDashboardPage() {
   const [upcomingTasks, setUpcomingTasks] = useState<Reminder[]>([])
 
   useEffect(() => {
-    if (!user) return
+    if (!user?.uid) return
 
+    let cancelled = false
     const fetchActivities = async () => {
       setActivityLoading(true)
       try {
@@ -64,6 +65,7 @@ export default function SMEDashboardPage() {
           fetch("/api/payroll", { headers: { Authorization: `Bearer ${token}` } }),
           fetch("/api/employees", { headers: { Authorization: `Bearer ${token}` } }),
         ])
+        if (cancelled) return
 
         const nextActivities: ActivityItem[] = []
 
@@ -90,6 +92,7 @@ export default function SMEDashboardPage() {
           const payrollsResponse = payrollsResult.value
           if (payrollsResponse.ok) {
             const payrollsData = await payrollsResponse.json()
+            if (cancelled) return
             const payrolls = (payrollsData?.data || []) as Payroll[]
             payrolls
               .sort((a, b) => toDate(b.generatedAt || b.createdAt).getTime() - toDate(a.generatedAt || a.createdAt).getTime())
@@ -114,6 +117,7 @@ export default function SMEDashboardPage() {
           const employeesResponse = employeesResult.value
           if (employeesResponse.ok) {
             const employeesData = await employeesResponse.json()
+            if (cancelled) return
             const employees = (employeesData?.data || []) as Employee[]
             employees
               .sort((a, b) => toDate(b.createdAt || b.employmentDate).getTime() - toDate(a.createdAt || a.employmentDate).getTime())
@@ -149,19 +153,26 @@ export default function SMEDashboardPage() {
         }
 
         nextActivities.sort((a, b) => b.sortTime - a.sortTime)
-        setActivities(nextActivities.slice(0, 8))
+        if (!cancelled) setActivities(nextActivities.slice(0, 8))
       } catch (error) {
-        console.error("Error fetching recent activity:", error)
-        setActivities([])
+        if (!cancelled) {
+          console.error("Error fetching recent activity:", error)
+          setActivities([])
+        }
       } finally {
-        setActivityLoading(false)
+        if (!cancelled) setActivityLoading(false)
       }
     }
 
     fetchActivities()
+    return () => {
+      cancelled = true
+    }
+    // Only re-run when user or profile subscription data changes. Exclude getRecentTransactions
+    // to avoid loop (hook may return new function reference each render).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    user,
-    getRecentTransactions,
+    user?.uid,
     profile?.lastSubscriptionDate,
     profile?.subscriptionStartDate,
     profile?.subscriptionType,
@@ -169,22 +180,26 @@ export default function SMEDashboardPage() {
   ])
 
   useEffect(() => {
-    if (!user) return
+    if (!user?.uid) return
 
+    let cancelled = false
     const fetchUpcomingTasks = async () => {
       setUpcomingLoading(true)
       try {
         const upcoming = await getUpcomingReminders(30)
+        if (cancelled) return
         const activeReminders = upcoming
           .filter((reminder) => !reminder.isCompleted)
           .sort((a, b) => toDate(a.dueDate).getTime() - toDate(b.dueDate).getTime())
           .slice(0, 5)
         setUpcomingTasks(activeReminders)
       } catch (error) {
-        console.error("Error fetching upcoming tasks:", error)
-        setUpcomingTasks([])
+        if (!cancelled) {
+          console.error("Error fetching upcoming tasks:", error)
+          setUpcomingTasks([])
+        }
       } finally {
-        setUpcomingLoading(false)
+        if (!cancelled) setUpcomingLoading(false)
       }
     }
 
@@ -196,9 +211,12 @@ export default function SMEDashboardPage() {
 
     window.addEventListener("reminderChanged", handleReminderChanged)
     return () => {
+      cancelled = true
       window.removeEventListener("reminderChanged", handleReminderChanged)
     }
-  }, [user, getUpcomingReminders])
+    // Only depend on user?.uid so effect doesn't re-run when getUpcomingReminders reference changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid])
 
   const activityIconMap = useMemo(() => {
     return {
