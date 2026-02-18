@@ -50,14 +50,17 @@ export default function VerifyTaxIdPage() {
   useEffect(() => {
     if (!profile || loading) return
 
+    // Only consider user as having TIN when it's a non-empty string (not "" or whitespace)
+    const hasTaxId = Boolean(profile.taxId && String(profile.taxId).trim() !== "")
+
     // Check if businessDocuments exists and has at least one document
     const hasBusinessDocuments = profile.businessDocuments && (
-      profile.businessDocuments.cac || 
+      profile.businessDocuments.cac ||
       profile.businessDocuments.memorandum
     )
 
     // If user has TIN and is SME with documents, redirect to dashboard
-    if ((profile.taxId || profile.taxId === "") && profile.businessType === 'sme') {
+    if (hasTaxId && profile.businessType === 'sme') {
       if (hasBusinessDocuments) {
         console.log("TIN and business documents exist, redirecting to SME dashboard")
         router.push("/dashboard-sme")
@@ -70,7 +73,7 @@ export default function VerifyTaxIdPage() {
     }
 
     // If user has TIN and is not SME, redirect to appropriate dashboard
-    if ((profile.taxId || profile.taxId === "") && profile.businessType !== 'sme') {
+    if (hasTaxId && profile.businessType !== 'sme') {
       if (profile.businessType === 'creator') {
         router.push("/dashboard-creator")
       } else {
@@ -79,7 +82,7 @@ export default function VerifyTaxIdPage() {
       return
     }
 
-    // If no TIN, show the TIN input form
+    // If no TIN (empty or missing), show the TIN input form
     setShowDocumentUpload(false)
   }, [profile, loading, router])
 
