@@ -2,12 +2,13 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Loader2, ArrowLeft, Info, FileCheck2 } from "lucide-react"
+import { Loader2, ArrowLeft, Info, FileCheck2, FileUp } from "lucide-react"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { useSubscription } from "@/lib/hooks/useSubscription"
@@ -18,11 +19,18 @@ import { useBusiness } from "@/lib/contexts/business-context"
 import { TaxAssessmentPreview } from "@/components/reports/tax-assessment-preview"
 
 export default function GenerateTaxAssessmentPage() {
+  const pathname = usePathname()
+  const basePath = pathname?.startsWith("/dashboard-creator")
+    ? "/dashboard-creator"
+    : pathname?.startsWith("/dashboard-sme")
+      ? "/dashboard-sme"
+      : "/dashboard"
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const { hasAccess } = useSubscription()
   const { activeEntityId } = useBusiness()
   const [showPreview, setShowPreview] = useState(false)
+  const [savedReportId, setSavedReportId] = useState<string | null>(null)
   const [isGenerating, setIsGenerating] = useState(false)
   const [reportData, setReportData] = useState<ReportData | null>(null)
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false)
@@ -76,7 +84,7 @@ export default function GenerateTaxAssessmentPage() {
 
       const title = `Tax Assessment (CIT) - Annual ${year}`
 
-      await reportService.saveReport(
+      const reportId = await reportService.saveReport(
         profile.userId,
         title,
         "Tax Assessment",
@@ -85,9 +93,10 @@ export default function GenerateTaxAssessmentPage() {
         activeEntityId || undefined
       )
 
+      setSavedReportId(reportId)
       setReportData(data)
       setShowPreview(true)
-      toast.success("Tax assessment generated and saved successfully")
+      toast.success("Tax assessment generated and saved. You can now file it.")
     } catch (error) {
       console.error("Error generating tax assessment:", error)
       toast.error(error instanceof Error ? error.message : "Failed to generate tax assessment")
@@ -102,7 +111,7 @@ export default function GenerateTaxAssessmentPage() {
         {!showPreview ? (
           <div className="space-y-6">
             <div className="flex items-center justify-between">
-              <Link href="/dashboard/reports">
+              <Link href={`${basePath}/reports`}>
                 <Button variant="outline" size="sm" className="h-8 sm:h-10 text-xs sm:text-sm">
                   <ArrowLeft className="w-4 h-4 mr-2" />
                   Back
@@ -183,11 +192,29 @@ export default function GenerateTaxAssessmentPage() {
           </div>
         ) : (
           reportData && (
-            <TaxAssessmentPreview
-              reportData={reportData}
-              returningCurrency={formData.returningCurrency}
-              onBack={() => setShowPreview(false)}
-            />
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <Link href={`${basePath}/reports`}>
+                  <Button variant="outline" size="sm" className="h-8 sm:h-10 text-xs sm:text-sm">
+                    <ArrowLeft className="w-4 h-4 mr-2" />
+                    Back to reports
+                  </Button>
+                </Link>
+                {savedReportId && (
+                  <Link href={`${basePath}/reports/file/${savedReportId}`}>
+                    <Button size="sm" className="h-8 sm:h-10 text-xs sm:text-sm">
+                      <FileUp className="w-4 h-4 mr-2" />
+                      File this report
+                    </Button>
+                  </Link>
+                )}
+              </div>
+              <TaxAssessmentPreview
+                reportData={reportData}
+                returningCurrency={formData.returningCurrency}
+                onBack={() => setShowPreview(false)}
+              />
+            </div>
           )
         )}
 

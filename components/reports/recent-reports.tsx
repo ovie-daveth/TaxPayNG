@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-import { Eye, FileText, Trash2, Loader2, Edit, MessageSquare, CheckCircle2, ExternalLink, Download } from "lucide-react"
+import { Eye, FileText, Trash2, Loader2, Edit, MessageSquare, CheckCircle2, ExternalLink, Download, FileUp } from "lucide-react"
 import { usePathname, useRouter } from "next/navigation"
 import { useAuth } from "@/lib/hooks/useAuth"
 import { useUserProfile } from "@/lib/hooks/useUserProfile"
@@ -138,6 +138,11 @@ export function RecentReports() {
     }
   }
 
+  /** Reports that can go through the file flow and are not yet filed */
+  const canFileReport = (report: SavedReport) =>
+    ['Self-Assessment', 'Tax Assessment'].includes(report.type) &&
+    !['filed', 'submitted', 'acknowledged'].includes(report.filingStatus || '')
+
   const formatPeriod = (period: SavedReport['period']) => {
     if (period.periodType === 'annual') {
       return `Annual ${period.year}`
@@ -224,6 +229,18 @@ export function RecentReports() {
                   <MessageSquare className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </Button>
               )}
+              {canFileReport(report) && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  onClick={() => router.push(`${basePath}/reports/file/${report.id}`)}
+                  title="File this report"
+                  className="h-8 sm:h-9 gap-1.5 px-2 sm:px-3 text-xs"
+                >
+                  <FileUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                  <span className="hidden sm:inline">File</span>
+                </Button>
+              )}
               {report.status === 'draft' && report.filingStatus != "filed" && (
                 <Button 
                   variant="ghost" 
@@ -263,7 +280,7 @@ export function RecentReports() {
       <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
         <DialogContent className="w-[calc(100vw-2rem)] sm:w-full max-w-5xl max-h-[90vh] sm:max-h-[95vh] overflow-y-auto p-3 sm:p-4 md:p-6">
           <DialogHeader className="pb-2 sm:pb-4">
-            <DialogTitle className="text-base sm:text-lg md:text-xl">{selectedReport?.title}</DialogTitle>
+            <DialogTitle className="text-base sm:text-lg md:text-xl pr-8">{selectedReport?.title}</DialogTitle>
           </DialogHeader>
           {selectedReport?.reportData && (
             <>
@@ -314,6 +331,20 @@ export function RecentReports() {
               {selectedReport.type !== 'Self-Assessment' && selectedReport.type !== 'Income Statement' && selectedReport.type !== 'Expense Report' && selectedReport.type !== 'Tax Summary' && selectedReport.type !== 'Tax Assessment' && (
                 <div className="p-8 text-center text-muted-foreground">
                   Preview not yet implemented for {selectedReport.type}
+                </div>
+              )}
+              {selectedReport && canFileReport(selectedReport) && (
+                <div className="sticky bottom-0 mt-6 pt-4 border-t bg-background flex justify-end">
+                  <Button
+                    onClick={() => {
+                      setShowViewDialog(false)
+                      router.push(`${basePath}/reports/file/${selectedReport.id}`)
+                    }}
+                    className="gap-2"
+                  >
+                    <FileUp className="w-4 h-4" />
+                    File this report
+                  </Button>
                 </div>
               )}
             </>
