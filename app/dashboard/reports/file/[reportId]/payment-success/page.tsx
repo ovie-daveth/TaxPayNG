@@ -74,6 +74,9 @@ export default function PaymentSuccessPage() {
   // Check if this is a no-payment filing (balanceDue = 0)
   const isNoPaymentFiling = paymentData.amount === 0 && !paymentData.rrr && !paymentData.transactionRef
 
+  // SME / Tax Assessment (CIT) uses Tax Pro Max and federal wording; others use IRS and state
+  const isSmeFiling = report?.type === "Tax Assessment" || profile?.businessType === "sme"
+
   useEffect(() => {
     if (reportId && profile?.userId) {
       loadReport()
@@ -91,7 +94,7 @@ export default function PaymentSuccessPage() {
 
     try {
       setLoading(true)
-      const loadedReport = await reportService.getReportById(reportId, 'Self-Assessment')
+      const loadedReport = await reportService.getReportById(reportId)
       if (loadedReport) {
         setReport(loadedReport)
       }
@@ -288,7 +291,7 @@ export default function PaymentSuccessPage() {
     if (!report) return
     setSubmitting(true)
     try {
-      await reportService.updateReport(report.id, "Self-Assessment", {
+      await reportService.updateReport(report.id, report.type, {
         filingStatus: "submitted",
         filingMethod: "direct"
       } as any)
@@ -307,7 +310,7 @@ export default function PaymentSuccessPage() {
     setSubmitting(true)
     try {
       if (result === "success") {
-        await reportService.updateReport(report.id, "Self-Assessment", {
+        await reportService.updateReport(report.id, report.type, {
           filingStatus: "filed",
           filingMethod: "direct"
         } as any)
@@ -317,7 +320,7 @@ export default function PaymentSuccessPage() {
         router.push(`${basePath}/reports/file/${report.id}/confirmation?method=filed&amount=${paymentData.amount}`)
       } else {
         // Keep it pending/submitted (user can try again)
-        await reportService.updateReport(report.id, "Self-Assessment", {
+        await reportService.updateReport(report.id, report.type, {
           filingStatus: "submitted",
           filingMethod: "direct"
         } as any)
@@ -553,15 +556,23 @@ export default function PaymentSuccessPage() {
           {/* Download pack */}
           <Card>
             <CardHeader className="p-3 sm:p-4 md:p-6">
-              <CardTitle className="text-base sm:text-lg md:text-xl font-semibold">Download report pack to file  manually to IRS office</CardTitle>
-              <CardDescription className="text-[11px] sm:text-xs md:text-sm mt-0.5 sm:mt-1">Print your self-assessment report and attach supporting documents before filing.</CardDescription>
+              <CardTitle className="text-base sm:text-lg md:text-xl font-semibold">
+                {isSmeFiling ? "Download report pack to file manually to Tax Pro Max" : "Download report pack to file manually to IRS office"}
+              </CardTitle>
+              <CardDescription className="text-[11px] sm:text-xs md:text-sm mt-0.5 sm:mt-1">
+                {isSmeFiling ? "Print your tax assessment (CIT) report and attach supporting documents before filing." : "Print your self-assessment report and attach supporting documents before filing."}
+              </CardDescription>
             </CardHeader>
-            <CardContent className="p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4">
+            <CardContent className={`p-3 sm:p-4 md:p-6 space-y-3 sm:space-y-4 ${isSmeFiling ? "-mt-16" : ""}`}>
               <div className="space-y-1.5">
-                <Label className="text-[11px] sm:text-xs md:text-sm">State Government (for the printed header)</Label>
-                <Select value={stateForPrint} onValueChange={setStateForPrint}>
+                {!isSmeFiling && (
+                  <>
+                <Label className="text-[11px] sm:text-xs md:text-sm">
+                  {isSmeFiling ? "Federal" : "State Government"}
+                </Label>
+                <Select disabled={isSmeFiling} value={stateForPrint} onValueChange={setStateForPrint}>
                   <SelectTrigger className="h-9 sm:h-10 text-xs sm:text-sm">
-                    <SelectValue placeholder={profile?.address?.state ? "Using profile state" : "Select a state"} />
+                    <SelectValue placeholder={isSmeFiling ? "Federal" : (profile?.address?.state ? "Using profile state" : "Select a state")} />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Abia">Abia</SelectItem>
@@ -604,8 +615,10 @@ export default function PaymentSuccessPage() {
                   </SelectContent>
                 </Select>
                 <p className="text-[11px] text-muted-foreground">
-                  Default is your profile state (if available). You can change it for this printout.
+                  {isSmeFiling ? "Use Federal for Tax Pro Max filing. You can change it for this printout." : "Default is your profile state (if available). You can change it for this printout."}
                 </p>
+                </>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-3">
@@ -616,7 +629,7 @@ export default function PaymentSuccessPage() {
                   className="h-9 sm:h-10 text-xs sm:text-sm justify-start"
                 >
                   {printingReturn ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Printer className="w-4 h-4 mr-2" />}
-                  Print Self-Assessment
+                  {isSmeFiling ? "Print Tax Assessment" : "Print Self-Assessment"}
                 </Button>
                 <Button
                   variant="outline"
@@ -652,7 +665,7 @@ export default function PaymentSuccessPage() {
                   File Yourself on official Portal
                 </CardTitle>
                 <CardDescription className="text-[11px] sm:text-xs md:text-sm mt-0.5 sm:mt-1">
-                  Continue filing on the official government portal, federal or state.
+                  {isSmeFiling ? "Continue filing on Tax Pro Max (federal portal)." : "Continue filing on the official government portal, federal or state."}
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-3 sm:p-4 md:p-6 pt-0 space-y-2">
@@ -756,13 +769,13 @@ export default function PaymentSuccessPage() {
         open={showFilingPortalModal}
         onOpenChange={setShowFilingPortalModal}
         userState={profile?.address?.state}
-        taxDescription="Self-Assessment Tax Filing"
+        taxDescription={isSmeFiling ? "Tax Assessment (CIT) Filing" : "Self-Assessment Tax Filing"}
         taxDuration={`Tax Year ${report?.period?.year || new Date().getFullYear()}`}
         period="yearly"
         mode="filing"
         reportId={reportId}
+        forSme={isSmeFiling}
         onFilingComplete={() => {
-          // Redirect to confirmation page after filing is complete
           router.push(`${basePath}/reports/file/${reportId}/confirmation?amount=${paymentData.amount}`)
         }}
         onSelectNRC={() => {}}

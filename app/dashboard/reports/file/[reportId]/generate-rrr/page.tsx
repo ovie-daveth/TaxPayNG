@@ -70,7 +70,7 @@ export default function GenerateRRRPage() {
 
     try {
       setLoading(true)
-      const loadedReport = await reportService.getReportById(reportId, 'Self-Assessment')
+      const loadedReport = await reportService.getReportById(reportId)
       
       if (!loadedReport) {
         toast.error("Report not found")

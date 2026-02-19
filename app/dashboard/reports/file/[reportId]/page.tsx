@@ -16,6 +16,7 @@ import { useUserProfile } from "@/lib/hooks/useUserProfile"
 import { reportService, taxPaymentService, userService } from "@/lib/services"
 import { SavedReport } from "@/lib/types"
 import { SelfAssessmentPreview } from "@/components/reports/self-assessment-preview"
+import { TaxAssessmentPreview } from "@/components/reports/tax-assessment-preview"
 import { documentService, transactionService } from "@/lib/services"
 import Link from "next/link"
 import { toast } from "sonner"
@@ -92,7 +93,7 @@ export default function FileTaxReturnPage() {
     const now = new Date().toISOString()
     const grossTaxPayable = report.reportData?.tax?.taxPayable || 0
     try {
-      await reportService.updateReport(report.id, "Self-Assessment", {
+      await reportService.updateReport(report.id, report.type, {
         paymentStatus: "paid",
         paymentDate: now,
         // Manual confirmation (since payment happens on NRS)
@@ -123,7 +124,7 @@ export default function FileTaxReturnPage() {
     if (!report) return
     const now = new Date().toISOString()
     try {
-      await reportService.updateReport(report.id, "Self-Assessment", {
+      await reportService.updateReport(report.id, report.type, {
         status: "completed",
         filingStatus: "filed",
         filingMethod: "direct",
@@ -146,7 +147,7 @@ export default function FileTaxReturnPage() {
     const now = new Date().toISOString()
     const grossTaxPayable = report.reportData?.tax?.taxPayable || 0
     try {
-      await reportService.updateReport(report.id, "Self-Assessment", {
+      await reportService.updateReport(report.id, report.type, {
         paymentStatus: "paid",
         paymentDate: now,
         taxesAlreadyPaid: grossTaxPayable,
@@ -195,7 +196,7 @@ export default function FileTaxReturnPage() {
     if (!report) return
     const now = new Date().toISOString()
     try {
-      await reportService.updateReport(report.id, "Self-Assessment", {
+      await reportService.updateReport(report.id, report.type, {
         filingStatus: "submitted",
         filingMethod: "direct",
         updatedAt: now
@@ -241,8 +242,8 @@ export default function FileTaxReturnPage() {
 
     try {
       setLoading(true)
-      // Try to get from selfAssessments collection
-      const loadedReport = await reportService.getReportById(reportId, 'Self-Assessment')
+      // Load by id (works for Self-Assessment and Tax Assessment)
+      const loadedReport = await reportService.getReportById(reportId)
       
       if (!loadedReport) {
         toast.error("Report not found")
@@ -971,18 +972,25 @@ export default function FileTaxReturnPage() {
                   <h2 className="text-lg sm:text-xl font-semibold">Tax Return Preview</h2>
                 </div>
                 {report.reportData && (
-                  <SelfAssessmentPreview
-                    reportData={report.reportData}
-                    formData={{
-                      includeIncome: true,
-                      includeExpenses: true,
-                      includeTax: true,
-                      includeReliefs: true
-                    }}
-                    showFileButton={false}
-                    isEditing={false}
-                    fullBleedMobile
-                  />
+                  report.type === "Tax Assessment" ? (
+                    <TaxAssessmentPreview
+                      reportData={report.reportData}
+                      returningCurrency={(report.reportData as any)?.returningCurrency ?? "NGN"}
+                    />
+                  ) : (
+                    <SelfAssessmentPreview
+                      reportData={report.reportData}
+                      formData={{
+                        includeIncome: true,
+                        includeExpenses: true,
+                        includeTax: true,
+                        includeReliefs: true
+                      }}
+                      showFileButton={false}
+                      isEditing={false}
+                      fullBleedMobile
+                    />
+                  )
                 )}
               </Card>
             </div>
@@ -1074,9 +1082,10 @@ export default function FileTaxReturnPage() {
           onOpenChange={setShowPaymentModal}
           userState={profile?.address?.state}
           taxAmount={balanceDue || 0}
-          taxDescription="Annual Tax Return Payment"
+          taxDescription={report?.type === "Tax Assessment" ? "Tax Assessment (CIT) Payment" : "Annual Tax Return Payment"}
           taxDuration={`Tax Year ${report?.period?.year || new Date().getFullYear()}`}
           period="yearly"
+          forSme={report?.type === "Tax Assessment" || profile?.businessType === "sme"}
           onSelectNRC={() => {
             // NRC portal selected
           }}

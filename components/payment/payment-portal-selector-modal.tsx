@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import {
   Dialog,
@@ -28,6 +28,9 @@ import { taxPaymentService, documentService, reportService } from "@/lib/service
 import { uploadToImageKit } from "@/lib/utils/imagekit"
 import { toast } from "sonner"
 
+const TAX_PROMAX_URL = "https://taxpromax.firs.gov.ng/"
+const NRS_SELF_SERVICE_URL = "https://selfservice.nrs.gov.ng/"
+
 interface PaymentPortalSelectorModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -42,6 +45,8 @@ interface PaymentPortalSelectorModalProps {
   onFilingComplete?: () => void
   mode?: 'payment' | 'filing'
   reportId?: string
+  /** When true (SME filing), show only Tax Pro Max and NRS Self Service; hide State IRS */
+  forSme?: boolean
 }
 
 const STATE_IRS_PORTALS: Record<string, string> = {
@@ -97,8 +102,9 @@ export function PaymentPortalSelectorModal({
   onFilingComplete,
   mode = 'payment',
   reportId,
+  forSme = false,
 }: PaymentPortalSelectorModalProps) {
-  const [selectedOption, setSelectedOption] = useState<"nrc" | "state">("nrc")
+  const [selectedOption, setSelectedOption] = useState<"nrc" | "state" | "taxpromax" | "nrs">(forSme ? "taxpromax" : "nrc")
   const [processing, setProcessing] = useState(false)
   const [embeddedUrl, setEmbeddedUrl] = useState<string | null>(null)
   const [selectedState, setSelectedState] = useState<string | undefined>(userState)
@@ -121,21 +127,31 @@ export function PaymentPortalSelectorModal({
   const userStateIRSUrl = userState ? STATE_IRS_PORTALS[userState] : null
   const hasStateIRS = !!userStateIRSUrl
 
+  useEffect(() => {
+    if (open) {
+      setSelectedOption(forSme ? "taxpromax" : "nrc")
+    }
+  }, [open, forSme])
+
   const handleContinue = async () => {
     setProcessing(true)
     try {
+      // SME: Tax Pro Max or NRS Self Service only
+      if (forSme) {
+        const url = selectedOption === "taxpromax" ? TAX_PROMAX_URL : NRS_SELF_SERVICE_URL
+        setEmbeddedUrl(url)
+        return
+      }
       // Open portal inside an embedded dialog (no redirects, all embedded)
       if (selectedOption === "nrc") {
-        const url = "https://selfservice.nrs.gov.ng/"
-        setEmbeddedUrl(url)
+        setEmbeddedUrl(NRS_SELF_SERVICE_URL)
       } else if (selectedOption === "state") {
         const stateToUse = selectedState || userState
         const url = stateToUse ? STATE_IRS_PORTALS[stateToUse] : null
         if (url) {
           setEmbeddedUrl(url)
         } else {
-          // Fallback to NRC if no state portal available
-          setEmbeddedUrl("https://selfservice.nrs.gov.ng/")
+          setEmbeddedUrl(NRS_SELF_SERVICE_URL)
         }
       }
     } finally {
@@ -150,12 +166,14 @@ export function PaymentPortalSelectorModal({
         <DialogHeader>
           <DialogTitle>Choose {mode === 'filing' ? 'Filing' : 'Payment'} Portal</DialogTitle>
           <DialogDescription>
-            Select where you'd like to {mode === 'filing' ? 'file your tax return' : 'make your tax payment'}. NRC is for federal {mode === 'filing' ? 'filing' : 'payers'} (VAT, Development Fee, CIT), while State IRS is for {mode === 'filing' ? 'filing' : 'those paying'} Personal Income Taxes.
+            {forSme
+              ? "Select where you'd like to file your tax return. Tax Pro Max is for CIT (Company Income Tax); NRS Self Service is for federal self-service."
+              : `Select where you'd like to ${mode === 'filing' ? 'file your tax return' : 'make your tax payment'}. NRC is for federal ${mode === 'filing' ? 'filing' : 'payers'} (VAT, Development Fee, CIT), while State IRS is for ${mode === 'filing' ? 'filing' : 'those paying'} Personal Income Taxes.`}
           </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-4 flex-1 overflow-y-auto">
-          {mode === 'payment' && (
+          {mode === 'payment' && !forSme && (
             <Alert className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/20">
               <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               <AlertDescription className="text-sm text-blue-800 dark:text-blue-200">
@@ -163,100 +181,144 @@ export function PaymentPortalSelectorModal({
               </AlertDescription>
             </Alert>
           )}
-          <RadioGroup value={selectedOption} onValueChange={(v) => setSelectedOption(v as "nrc" | "state") }>
-            {/* NRC Option */}
-            <div
-              className={cn(
-                "relative flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all",
-                selectedOption === "nrc"
-                  ? "border-primary bg-primary/5"
-                  : "border-border hover:border-muted-foreground"
-              )}
-              onClick={() => setSelectedOption("nrc")}
-            >
-              <RadioGroupItem value="nrc" id="nrc" className="mt-1" />
-              <div className="flex-1 min-w-0">
-                <Label
-                  htmlFor="nrc"
-                  className="flex items-center gap-2 cursor-pointer font-semibold text-sm"
+          <RadioGroup
+            value={selectedOption}
+            onValueChange={(v) => setSelectedOption(v as "nrc" | "state" | "taxpromax" | "nrs")}
+          >
+            {forSme ? (
+              <>
+                {/* SME: Tax Pro Max */}
+                <div
+                  className={cn(
+                    "relative flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all",
+                    selectedOption === "taxpromax" ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground"
+                  )}
+                  onClick={() => setSelectedOption("taxpromax")}
                 >
-                  <Building2 className="w-4 h-4" />
-                  National Revenue Center (NRC)
-                </Label>
-                <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-                  {mode === 'filing' ? 'File' : 'Pay'} through the centralized National Revenue Center portal. For federal taxes: VAT, Development Fee, and CIT (Company Income Tax).
-                </p>
-                <div className="mt-3 flex items-center gap-1 text-xs text-primary font-medium">
-                  <ExternalLink className="w-3 h-3" />
-                  <a
-                    href="https://selfservice.nrs.gov.ng/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="hover:underline"
-                  >
-                    selfservice.nrs.gov.ng
-                  </a>
-                </div>
-              </div>
-            </div>
-
-              {/* State IRS Option (always available and editable) */}
-              <div
-                className={cn(
-                  "relative flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all",
-                  selectedOption === "state"
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-muted-foreground"
-                )}
-                onClick={() => setSelectedOption("state")}
-              >
-                <RadioGroupItem value="state" id="state" className="mt-1" />
-                <div className="flex-1 min-w-0">
-                  <Label
-                    htmlFor="state"
-                    className="flex items-center gap-2 cursor-pointer font-semibold text-sm"
-                  >
-                    <MapPin className="w-4 h-4" />
-                    {selectedState || userState || "State"} IRS
-                  </Label>
-                  <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
-                    {mode === 'filing' ? 'File' : 'Pay'} directly through your state's Internal Revenue Service portal. For Personal Income Taxes (PIT).
-                  </p>
-                  <div className="mt-3">
-                    <Label className="text-xs">Choose state</Label>
-                    <Select onValueChange={(v) => setSelectedState(v)} defaultValue={userState}>
-                      <SelectTrigger className="mt-2">
-                        <SelectValue placeholder={userState ?? "Select state"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.keys(STATE_IRS_PORTALS).map((s) => (
-                          <SelectItem key={s} value={s}>{s}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      {selectedState && STATE_IRS_PORTALS[selectedState]
-                        ? STATE_IRS_PORTALS[selectedState].replace("https://", "").replace(/\/$/, "")
-                        : (!selectedState && userStateIRSUrl)
-                        ? userStateIRSUrl.replace("https://", "").replace(/\/$/, "")
-                        : "No portal available for selected state. NRC will be used as fallback."}
+                  <RadioGroupItem value="taxpromax" id="taxpromax" className="mt-1" />
+                  <div className="flex-1 min-w-0">
+                    <Label htmlFor="taxpromax" className="flex items-center gap-2 cursor-pointer font-semibold text-sm">
+                      <Building2 className="w-4 h-4" />
+                      Tax Pro Max
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                      File through the FIRS Tax Pro Max portal. For Company Income Tax (CIT) and federal filings.
                     </p>
-                  </div>
-                  <div className="mt-3 flex items-center gap-1 text-xs text-primary font-medium">
-                    <ExternalLink className="w-3 h-3" />
-                    <a
-                      href={(selectedState && STATE_IRS_PORTALS[selectedState]) || userStateIRSUrl || "https://selfservice.nrs.gov.ng/"}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="hover:underline truncate"
-                      title={(selectedState && STATE_IRS_PORTALS[selectedState]) || userStateIRSUrl || "https://selfservice.nrs.gov.ng/"}
-                    >
-                      {((selectedState && STATE_IRS_PORTALS[selectedState]) || userStateIRSUrl || "https://selfservice.nrs.gov.ng/")
-                        .replace("https://", "").replace(/\/$/, "")}
-                    </a>
+                    <div className="mt-3 flex items-center gap-1 text-xs text-primary font-medium">
+                      <ExternalLink className="w-3 h-3" />
+                      <a href={TAX_PROMAX_URL} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                        taxpromax.firs.gov.ng
+                      </a>
+                    </div>
                   </div>
                 </div>
-              </div>
+                {/* SME: NRS Self Service */}
+                <div
+                  className={cn(
+                    "relative flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all",
+                    selectedOption === "nrs" ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground"
+                  )}
+                  onClick={() => setSelectedOption("nrs")}
+                >
+                  <RadioGroupItem value="nrs" id="nrs" className="mt-1" />
+                  <div className="flex-1 min-w-0">
+                    <Label htmlFor="nrs" className="flex items-center gap-2 cursor-pointer font-semibold text-sm">
+                      <MapPin className="w-4 h-4" />
+                      NRS Self Service
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                      File through the NRS self-service portal for federal filings.
+                    </p>
+                    <div className="mt-3 flex items-center gap-1 text-xs text-primary font-medium">
+                      <ExternalLink className="w-3 h-3" />
+                      <a href={NRS_SELF_SERVICE_URL} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                        selfservice.nrs.gov.ng
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* NRC Option */}
+                <div
+                  className={cn(
+                    "relative flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all",
+                    selectedOption === "nrc" ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground"
+                  )}
+                  onClick={() => setSelectedOption("nrc")}
+                >
+                  <RadioGroupItem value="nrc" id="nrc" className="mt-1" />
+                  <div className="flex-1 min-w-0">
+                    <Label htmlFor="nrc" className="flex items-center gap-2 cursor-pointer font-semibold text-sm">
+                      <Building2 className="w-4 h-4" />
+                      National Revenue Center (NRC)
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                      {mode === 'filing' ? 'File' : 'Pay'} through the centralized National Revenue Center portal. For federal taxes: VAT, Development Fee, and CIT (Company Income Tax).
+                    </p>
+                    <div className="mt-3 flex items-center gap-1 text-xs text-primary font-medium">
+                      <ExternalLink className="w-3 h-3" />
+                      <a href={NRS_SELF_SERVICE_URL} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                        selfservice.nrs.gov.ng
+                      </a>
+                    </div>
+                  </div>
+                </div>
+                {/* State IRS Option */}
+                <div
+                  className={cn(
+                    "relative flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all",
+                    selectedOption === "state" ? "border-primary bg-primary/5" : "border-border hover:border-muted-foreground"
+                  )}
+                  onClick={() => setSelectedOption("state")}
+                >
+                  <RadioGroupItem value="state" id="state" className="mt-1" />
+                  <div className="flex-1 min-w-0">
+                    <Label htmlFor="state" className="flex items-center gap-2 cursor-pointer font-semibold text-sm">
+                      <MapPin className="w-4 h-4" />
+                      {selectedState || userState || "State"} IRS
+                    </Label>
+                    <p className="text-xs text-muted-foreground mt-1.5 leading-relaxed">
+                      {mode === 'filing' ? 'File' : 'Pay'} directly through your state's Internal Revenue Service portal. For Personal Income Taxes (PIT).
+                    </p>
+                    <div className="mt-3">
+                      <Label className="text-xs">Choose state</Label>
+                      <Select onValueChange={(v) => setSelectedState(v)} defaultValue={userState}>
+                        <SelectTrigger className="mt-2">
+                          <SelectValue placeholder={userState ?? "Select state"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {Object.keys(STATE_IRS_PORTALS).map((s) => (
+                            <SelectItem key={s} value={s}>{s}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {selectedState && STATE_IRS_PORTALS[selectedState]
+                          ? STATE_IRS_PORTALS[selectedState].replace("https://", "").replace(/\/$/, "")
+                          : (!selectedState && userStateIRSUrl)
+                          ? userStateIRSUrl.replace("https://", "").replace(/\/$/, "")
+                          : "No portal available for selected state. NRC will be used as fallback."}
+                      </p>
+                    </div>
+                    <div className="mt-3 flex items-center gap-1 text-xs text-primary font-medium">
+                      <ExternalLink className="w-3 h-3" />
+                      <a
+                        href={(selectedState && STATE_IRS_PORTALS[selectedState]) || userStateIRSUrl || NRS_SELF_SERVICE_URL}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline truncate"
+                        title={(selectedState && STATE_IRS_PORTALS[selectedState]) || userStateIRSUrl || NRS_SELF_SERVICE_URL}
+                      >
+                        {((selectedState && STATE_IRS_PORTALS[selectedState]) || userStateIRSUrl || NRS_SELF_SERVICE_URL)
+                          .replace("https://", "").replace(/\/$/, "")}
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
           </RadioGroup>
         </div>
 

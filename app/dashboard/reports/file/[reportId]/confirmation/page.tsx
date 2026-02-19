@@ -68,7 +68,7 @@ export default function FilingConfirmationPage() {
 
     try {
       setLoading(true)
-      const loadedReport = await reportService.getReportById(reportId, 'Self-Assessment')
+      const loadedReport = await reportService.getReportById(reportId)
       if (loadedReport) {
         setReport(loadedReport)
       }
@@ -110,7 +110,7 @@ export default function FilingConfirmationPage() {
     // We update only the nested field we need so one upload doesn't overwrite the other.
     if (kind === "paymentReceipt" || kind === "filingProof") {
       const fieldPath = kind === "paymentReceipt" ? "filingEvidence.paymentReceipt" : "filingEvidence.filingProof"
-      await reportService.updateReport(report.id, "Self-Assessment", {
+      await reportService.updateReport(report.id, report.type, {
         [fieldPath]: entry
       } as any)
 
@@ -128,11 +128,11 @@ export default function FilingConfirmationPage() {
     }
 
     // Additional evidence: append (we keep this sequential in UI, so a simple merge is OK)
-    const latest = await reportService.getReportById(report.id, "Self-Assessment")
+    const latest = await reportService.getReportById(report.id)
     const prevAdditional = (latest as any)?.filingEvidence?.additional || report.filingEvidence?.additional || []
     const nextAdditional = [...prevAdditional, entry]
 
-    await reportService.updateReport(report.id, "Self-Assessment", {
+    await reportService.updateReport(report.id, report.type, {
       "filingEvidence.additional": nextAdditional
     } as any)
 
@@ -171,7 +171,7 @@ export default function FilingConfirmationPage() {
       imageKitUrl: uploadResult.url,
       imageKitFileId: uploadResult.fileId,
       fileSize: uploadResult.size,
-      notes: `Self-Assessment Report: ${report.id}${acknowledgmentNumber ? ` | Ack: ${acknowledgmentNumber}` : ""}`
+      notes: `${report.type} Report: ${report.id}${acknowledgmentNumber ? ` | Ack: ${acknowledgmentNumber}` : ""}`
     })
 
     if (!res.success || !res.data) {
